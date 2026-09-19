@@ -115,7 +115,7 @@ jobs:
             version = $version
             minimumVersion = "0.1.0"
             publishedAt = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
-            changelog = @($changelog)
+            changelog = $changelog
             platforms = [ordered]@{
               "win32-x64" = [ordered]@{
                 type = "portable-exe"

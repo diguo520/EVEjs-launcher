@@ -1,0 +1,13 @@
+{
+  "version": "0.1.13",
+  "changelog": {
+    "zh": [
+      { "type": "fix", "text": "修复 v0.1.12 更新清单中中英文更新日志被错误包装的问题" },
+      { "type": "opt", "text": "启动器兼容旧版单元素数组格式的更新日志清单" }
+    ],
+    "en": [
+      { "type": "fix", "text": "Fixed the wrapped changelog structure in the v0.1.12 update manifest" },
+      { "type": "opt", "text": "Made the launcher compatible with the legacy single-item changelog array format" }
+    ]
+  }
+}

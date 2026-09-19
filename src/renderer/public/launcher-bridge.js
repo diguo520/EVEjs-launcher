@@ -672,8 +672,12 @@
   }
 
   function changelogForLanguage() {
-    const value = UPDATE_INFO.changelog;
-    if (Array.isArray(value)) return value;
+    let value = UPDATE_INFO.changelog;
+    if (Array.isArray(value)) {
+      const first = value[0];
+      if (value.length === 1 && first && typeof first === "object" && !Array.isArray(first) && (first.zh || first.en)) value = first;
+      else return value;
+    }
     const language = curLang === "zh" ? "zh" : "en";
     return value?.[language] || value?.en || value?.zh || [];
   }
