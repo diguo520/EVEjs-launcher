@@ -38,7 +38,7 @@ jobs:
         run: |
           $tag = "${{ github.ref_name }}"
           $version = $tag.TrimStart("v")
-          $packageVersion = (Get-Content -LiteralPath package.json -Raw | ConvertFrom-Json).version
+          $packageVersion = (Get-Content -LiteralPath package.json -Raw -Encoding utf8 | ConvertFrom-Json).version
           if ($packageVersion -ne $version) {
             throw "Tag version $version does not match package.json version $packageVersion"
           }
@@ -62,7 +62,7 @@ jobs:
           $changelog = @()
           $notesPath = Join-Path "release-notes" "$tag.json"
           if (Test-Path -LiteralPath $notesPath) {
-            $notes = Get-Content -LiteralPath $notesPath -Raw | ConvertFrom-Json
+            $notes = Get-Content -LiteralPath $notesPath -Raw -Encoding utf8 | ConvertFrom-Json
             if ($notes.version -ne $version) {
               throw "Release notes version $($notes.version) does not match tag version $version"
             }
