@@ -1,0 +1,93 @@
+﻿name: Build Launcher Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build portable launcher
+        run: npm run package:portable
+
+      - name: Build update manifest
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $version = $tag.TrimStart("v")
+          $packageVersion = (Get-Content -LiteralPath package.json -Raw | ConvertFrom-Json).version
+          if ($packageVersion -ne $version) {
+            throw "Tag version $version does not match package.json version $packageVersion"
+          }
+
+          $source = Get-ChildItem -LiteralPath release -Filter "*.exe" -File |
+            Where-Object { $_.Name -notmatch "uninstall" } |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+          if (-not $source) {
+            throw "Portable exe was not produced in release/"
+          }
+
+          $assetName = "EvEJS-Launcher-Portable-$version.exe"
+          $assetPath = Join-Path "release" $assetName
+          Move-Item -LiteralPath $source.FullName -Destination $assetPath -Force
+
+          $hash = (Get-FileHash -LiteralPath $assetPath -Algorithm SHA256).Hash.ToLowerInvariant()
+          $size = (Get-Item -LiteralPath $assetPath).Length
+          $url = "https://github.com/${{ github.repository }}/releases/download/$tag/$assetName"
+          $manifest = [ordered]@{
+            schemaVersion = 1
+            channel = "stable"
+            version = $version
+            minimumVersion = "0.1.0"
+            publishedAt = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+            changelog = @(
+              @{ type = "new"; text = "GitHub Release build for EvEJS Launcher." }
+            )
+            platforms = [ordered]@{
+              "win32-x64" = [ordered]@{
+                type = "portable-exe"
+                url = $url
+                sha256 = $hash
+                size = $size
+              }
+            }
+          }
+
+          $manifest | ConvertTo-Json -Depth 8 |
+            Set-Content -LiteralPath "release/update-manifest.json" -Encoding utf8NoBOM
+
+          Write-Host "asset=$assetPath"
+          Write-Host "sha256=$hash"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          token: ${{ github.token }}
+          files: |
+            release/EvEJS-Launcher-Portable-*.exe
+            release/update-manifest.json
+          generate_release_notes: true

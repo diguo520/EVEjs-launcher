@@ -41,6 +41,19 @@ EVE Online Neocom 风格一键启动器，基于《EveJS 启动器技术方案.m
 - 下载后校验 SHA256，由独立 `evejs-updater.exe` 等待启动器退出并替换当前便携版
 - 替换前要求主服务器和市场服务已停止，失败保留 `.backup` 回滚
 
+GitHub Release 发布流程位于 `.github/workflows/release.yml`。推送与 `package.json` 版本一致的 `v*` 标签后，会自动构建便携版并上传：
+
+```text
+EvEJS-Launcher-Portable-<version>.exe
+update-manifest.json
+```
+
+启动器更新清单地址示例：
+
+```text
+https://github.com/diguo520/EVEjs-launcher/releases/download/v0.1.6/update-manifest.json
+```
+
 ## 任务视图（服务器日志）
 
 * 左侧 Neocom「任务」图标 → 打开日志面板，读取 `server/logs/server.log`（UTF-8，最近 5000 行）
