@@ -1,0 +1,21 @@
+{
+  "version": "0.1.14",
+  "changelog": {
+    "zh": [
+      { "type": "opt", "text": "启动器运行数据统一写入当前目录下的 _launcher" },
+      { "type": "fix", "text": "修复显卡 GPU 利用率检测无数据" },
+      { "type": "fix", "text": "修复网络速率检测无数据" },
+      { "type": "new", "text": "新增专用 GPU 内存检测" },
+      { "type": "new", "text": "新增 GPU 内存检测" },
+      { "type": "new", "text": "新增虚拟内存检测" }
+    ],
+    "en": [
+      { "type": "opt", "text": "Moved launcher runtime data into _launcher beside the launcher" },
+      { "type": "fix", "text": "Fixed GPU utilization detection returning no data" },
+      { "type": "fix", "text": "Fixed network throughput detection returning no data" },
+      { "type": "new", "text": "Added dedicated GPU memory monitoring" },
+      { "type": "new", "text": "Added GPU memory monitoring" },
+      { "type": "new", "text": "Added virtual memory monitoring" }
+    ]
+  }
+}
