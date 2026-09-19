@@ -58,15 +58,51 @@ jobs:
           $hash = (Get-FileHash -LiteralPath $assetPath -Algorithm SHA256).Hash.ToLowerInvariant()
           $size = (Get-Item -LiteralPath $assetPath).Length
           $url = "https://github.com/${{ github.repository }}/releases/download/$tag/$assetName"
+
+          $changelog = @()
+          $notesPath = Join-Path "release-notes" "$tag.json"
+          if (Test-Path -LiteralPath $notesPath) {
+            $notes = Get-Content -LiteralPath $notesPath -Raw | ConvertFrom-Json
+            if ($notes.version -ne $version) {
+              throw "Release notes version $($notes.version) does not match tag version $version"
+            }
+            $changelog = @($notes.changelog | ForEach-Object {
+              @{ type = [string]$_.type; text = [string]$_.text }
+            })
+          } else {
+            $previousTag = ""
+            try {
+              $previousTag = (git describe --tags --abbrev=0 "$tag^" 2>$null | Select-Object -First 1).Trim()
+            } catch { }
+
+            if ($previousTag) {
+              $commitMessages = @(git log "$previousTag..$tag" --pretty=format:"%s")
+            } else {
+              $commitMessages = @(git log --pretty=format:"%s")
+            }
+
+            foreach ($message in $commitMessages) {
+              $text = ([string]$message).Trim()
+              if (-not $text) { continue }
+              $lower = $text.ToLowerInvariant()
+              $type = "opt"
+              if ($lower.StartsWith("feat") -or $text.StartsWith("新增")) { $type = "new" }
+              elseif ($lower.StartsWith("fix") -or $text.StartsWith("修复")) { $type = "fix" }
+              $changelog += @{ type = $type; text = $text }
+            }
+          }
+
+          if ($changelog.Count -eq 0) {
+            $changelog = @(@{ type = "new"; text = "GitHub Release build for EvEJS Launcher." })
+          }
+
           $manifest = [ordered]@{
             schemaVersion = 1
             channel = "stable"
             version = $version
             minimumVersion = "0.1.0"
             publishedAt = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
-            changelog = @(
-              @{ type = "new"; text = "GitHub Release build for EvEJS Launcher." }
-            )
+            changelog = @($changelog)
             platforms = [ordered]@{
               "win32-x64" = [ordered]@{
                 type = "portable-exe"

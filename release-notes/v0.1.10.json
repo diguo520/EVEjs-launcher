@@ -1,0 +1,8 @@
+{
+  "version": "0.1.10",
+  "changelog": [
+    { "type": "new", "text": "更新日志优先读取 release-notes/vX.Y.Z.json" },
+    { "type": "new", "text": "没有专用说明时回退到上一个 Git 标签到当前标签的提交记录" },
+    { "type": "opt", "text": "更新弹窗展示当前版本对应的发布内容" }
+  ]
+}
