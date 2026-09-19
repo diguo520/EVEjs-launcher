@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, net } from "electron";
 import * as crypto from "crypto";
 import * as fs from "fs";
 import * as path from "path";
@@ -90,7 +90,7 @@ function resolveManifestUrl(): string {
 async function readManifest(url: string): Promise<UpdateManifest> {
   if (url.startsWith("file://")) return JSON.parse(fs.readFileSync(new URL(url), "utf8")) as UpdateManifest;
   if (path.isAbsolute(url) && fs.existsSync(url)) return JSON.parse(fs.readFileSync(url, "utf8")) as UpdateManifest;
-  const response = await fetch(url, { headers: { "User-Agent": `EvEJS-Launcher/${app.getVersion()}` } });
+  const response = await net.fetch(url, { headers: { "User-Agent": `EvEJS-Launcher/${app.getVersion()}` } });
   if (!response.ok) throw new Error(`更新服务器返回 HTTP ${response.status}`);
   return (await response.json()) as UpdateManifest;
 }
@@ -189,7 +189,7 @@ async function downloadToFile(url: string, destination: string, expectedSize: nu
       for await (const chunk of fs.createReadStream(new URL(url))) await writeChunk(chunk as Buffer);
     } else {
       activeDownload = new AbortController();
-      const response = await fetch(url, { signal: activeDownload.signal, headers: { "User-Agent": `EvEJS-Launcher/${app.getVersion()}` } });
+      const response = await net.fetch(url, { signal: activeDownload.signal, headers: { "User-Agent": `EvEJS-Launcher/${app.getVersion()}` } });
       if (!response.ok || !response.body) throw new Error(`下载更新失败: HTTP ${response.status}`);
       const reader = response.body.getReader();
       while (true) {
