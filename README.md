@@ -2,6 +2,31 @@
 
 EVE Online Neocom 风格一键启动器，基于《EveJS 启动器技术方案.md》实施。
 
+## 界面截图
+
+> 截图来自 EvEJS 启动器 v0.1.16（当前版本界面一致）。
+
+### Dashboard · 仪表盘
+
+![Dashboard](docs/screenshots/01-dashboard.png)
+
+### Account Management · 账号管理
+
+![Account Management](docs/screenshots/02-account-management.png)
+
+### Command Manual · 指令手册
+
+![Command Manual](docs/screenshots/03-command-manual.png)
+
+### Database · 数据库管理
+
+![Database](docs/screenshots/04-database.png)
+
+### Mod / Plugin · 模组管理
+
+![Mod / Plugin](docs/screenshots/05-mod-plugin.png)
+
+
 ## 新版 UI/UX
 
 当前正式 renderer 已切换为 `eve-launcher.html` 原型，并通过 `launcher-bridge.js` 接入 Electron IPC。
