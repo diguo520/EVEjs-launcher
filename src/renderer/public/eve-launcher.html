@@ -2555,6 +2555,13 @@ const UPDATE_INFO={
 };
 let updState='idle'; // idle/checking/available/downloading/installing/uptodate
 
+function getUpdateChangelog(){
+  const value=UPDATE_INFO.changelog;
+  if(Array.isArray(value)) return value;
+  const language=(typeof curLang==='string' && curLang==='zh')?'zh':'en';
+  return value?.[language] || value?.en || value?.zh || [];
+}
+
 function checkUpdate(){
   document.getElementById('updateModal').classList.add('open');
   updState='checking';
@@ -2598,7 +2605,7 @@ function renderUpdateModal(){
       </div>
       <div class="upd-changelog">
         <div class="cl-title">${t('更新日志')}</div>
-        <ul>${UPDATE_INFO.changelog.map(c=>`<li><span class="tag ${c.type}">${c.type==='new'?'NEW':(c.type==='fix'?'FIX':'OPT')}</span>${c.text}</li>`).join('')}</ul>
+        <ul>${getUpdateChangelog().map(c=>`<li><span class="tag ${c.type}">${c.type==='new'?'NEW':(c.type==='fix'?'FIX':'OPT')}</span>${c.text}</li>`).join('')}</ul>
       </div>`;
     foot.innerHTML=`
       <button class="mini-btn" onclick="closeModal('updateModal')">${t('稍后再说')}</button>

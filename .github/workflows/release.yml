@@ -66,9 +66,22 @@ jobs:
             if ($notes.version -ne $version) {
               throw "Release notes version $($notes.version) does not match tag version $version"
             }
-            $changelog = @($notes.changelog | ForEach-Object {
-              @{ type = [string]$_.type; text = [string]$_.text }
-            })
+            if ($notes.changelog -is [System.Array]) {
+              $changelog = @($notes.changelog | ForEach-Object {
+                @{ type = [string]$_.type; text = [string]$_.text }
+              })
+            } else {
+              $changelog = [ordered]@{}
+              foreach ($lang in @("zh", "en")) {
+                $entries = @($notes.changelog.$lang)
+                if ($entries.Count -eq 0 -and $lang -eq "en") {
+                  $entries = @($notes.changelog.zh)
+                }
+                $changelog[$lang] = @($entries | ForEach-Object {
+                  @{ type = [string]$_.type; text = [string]$_.text }
+                })
+              }
+            }
           } else {
             $previousTag = ""
             try {

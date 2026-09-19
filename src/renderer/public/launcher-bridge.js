@@ -615,6 +615,13 @@
     if (speedEl) speedEl.textContent = `${formatBytes(speed)}/s`;
   }
 
+  function changelogForLanguage() {
+    const value = UPDATE_INFO.changelog;
+    if (Array.isArray(value)) return value;
+    const language = curLang === "zh" ? "zh" : "en";
+    return value?.[language] || value?.en || value?.zh || [];
+  }
+
   checkUpdate = async function () {
     document.getElementById("updateModal")?.classList.add("open");
     updState = "checking";
@@ -653,7 +660,7 @@
     }
     if (updState === "available") {
       title.textContent = t("发现新版本");
-      body.innerHTML = `<div class="upd-version-row"><div class="upd-ver-block cur"><div class="vl">${t("当前版本")}</div><div class="vv">${current}</div></div><div class="upd-ver-arrow">→</div><div class="upd-ver-block new"><div class="vl">${t("最新版本")}</div><div class="vv">${latest}</div></div></div><div class="upd-meta-row"><div class="mr"><span class="k">${t("大小")}:</span><span class="v">${UPDATE_INFO.size}</span></div><div class="mr"><span class="k">${t("发布日期")}:</span><span class="v">${UPDATE_INFO.date}</span></div><div class="mr"><span class="k">${t("通道")}:</span><span class="v">${UPDATE_INFO.channel}</span></div></div><div class="upd-changelog"><div class="cl-title">${t("更新日志")}</div><ul>${(UPDATE_INFO.changelog || []).map(item => `<li><span class="tag ${item.type}">${item.type === "new" ? "NEW" : item.type === "fix" ? "FIX" : "OPT"}</span>${item.text}</li>`).join("")}</ul></div>`;
+      body.innerHTML = `<div class="upd-version-row"><div class="upd-ver-block cur"><div class="vl">${t("当前版本")}</div><div class="vv">${current}</div></div><div class="upd-ver-arrow">→</div><div class="upd-ver-block new"><div class="vl">${t("最新版本")}</div><div class="vv">${latest}</div></div></div><div class="upd-meta-row"><div class="mr"><span class="k">${t("大小")}:</span><span class="v">${UPDATE_INFO.size}</span></div><div class="mr"><span class="k">${t("发布日期")}:</span><span class="v">${UPDATE_INFO.date}</span></div><div class="mr"><span class="k">${t("通道")}:</span><span class="v">${UPDATE_INFO.channel}</span></div></div><div class="upd-changelog"><div class="cl-title">${t("更新日志")}</div><ul>${changelogForLanguage().map(item => `<li><span class="tag ${item.type}">${item.type === "new" ? "NEW" : item.type === "fix" ? "FIX" : "OPT"}</span>${esc(item.text)}</li>`).join("")}</ul></div>`;
       foot.innerHTML = `<button class="mini-btn" onclick="closeModal('updateModal')">${t("稍后再说")}</button><button class="mini-btn start" onclick="startDownload()">${t("立即更新")}</button>`;
       return;
     }

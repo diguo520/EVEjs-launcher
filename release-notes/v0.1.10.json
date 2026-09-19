@@ -1,8 +1,15 @@
 {
   "version": "0.1.10",
-  "changelog": [
-    { "type": "new", "text": "更新日志优先读取 release-notes/vX.Y.Z.json" },
-    { "type": "new", "text": "没有专用说明时回退到上一个 Git 标签到当前标签的提交记录" },
-    { "type": "opt", "text": "更新弹窗展示当前版本对应的发布内容" }
-  ]
+  "changelog": {
+    "zh": [
+      { "type": "new", "text": "更新日志优先读取 release-notes/vX.Y.Z.json" },
+      { "type": "new", "text": "没有专用说明时回退到当前 Git 标签区间提交记录" },
+      { "type": "opt", "text": "更新弹窗展示当前版本对应的中英文发布内容" }
+    ],
+    "en": [
+      { "type": "new", "text": "Read release notes from release-notes/vX.Y.Z.json first" },
+      { "type": "new", "text": "Fall back to commits between the current Git tag range" },
+      { "type": "opt", "text": "Show localized Chinese and English release notes" }
+    ]
+  }
 }

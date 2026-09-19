@@ -40,6 +40,7 @@ EVE Online Neocom 风格一键启动器，基于《EveJS 启动器技术方案.m
 - 默认从 GitHub Latest Release 检查更新，可通过 `EVEJS_UPDATE_MANIFEST_URL`、`launcher-settings.json` 或便携版同目录 `launcher.config.json` 覆盖
 - 启动约 5 秒后自动检查；保持运行期间每 30 分钟检查一次，窗口重新聚焦时也会刷新提示
 - 更新日志优先读取 `release-notes/vX.Y.Z.json`，缺少专用文件时回退到上一个 Git 标签区间的提交记录
+- 中文界面读取 `changelog.zh`，英文及其他语言读取 `changelog.en`
 - 下载后校验 SHA256，由独立 `evejs-updater.exe` 等待启动器退出并替换当前便携版
 - 替换前要求主服务器和市场服务已停止，失败保留 `.backup` 回滚
 
@@ -54,6 +55,18 @@ update-manifest.json
 
 ```text
 https://github.com/diguo520/EVEjs-launcher/releases/latest/download/update-manifest.json
+```
+
+多语言版本说明示例：
+
+```json
+{
+  "version": "0.1.10",
+  "changelog": {
+    "zh": [{ "type": "new", "text": "新增中文更新说明" }],
+    "en": [{ "type": "new", "text": "Added English release notes" }]
+  }
+}
 ```
 
 ## 任务视图（服务器日志）
