@@ -6,6 +6,7 @@
  *
  * 用法:
  *   node account-cli.js list <repoRoot> [--db <sqlite>]
+ *   node account-cli.js create <repoRoot> <账号> <密码> [--gm]
  *   node account-cli.js delete <repoRoot> <账号key或角色名> [--apply]
  *   node account-cli.js check-running <repoRoot>   # 检测服务是否在运行(端口探活)
  *   node account-cli.js hash <user> <password>     # 输出客户端同款密码哈希(hex)
@@ -48,13 +49,78 @@ function betterSqlite(root) {
   return require(p);
 }
 
+/* ---------------- account helpers ---------------- */
+const DEFAULT_STATION_ID = 60003760;
+const DEFAULT_SOLAR_SYSTEM_ID = 30000142;
+const GM_ACCOUNT_ROLE = "431255270151428096";
+const GM_CHAT_ROLE = "90071993086640128";
+const PLAYER_ACCOUNT_ROLE = "0";
+const PLAYER_CHAT_ROLE = "538968064";
+
+function asNumber(value, fallback = 0) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function accountIsGM(accountData) {
+  if (typeof accountData.isGM === "boolean") return accountData.isGM;
+  return String(accountData.role || "0") !== "0";
+}
+
+function characterLocation(data) {
+  const stationID = asNumber(data.stationID ?? data.stationid, 0);
+  const solarSystemID = asNumber(data.solarSystemID ?? data.solarsystemid, 0);
+  const worldSpaceID = asNumber(data.worldSpaceID ?? data.worldspaceid, 0);
+  const systemName = solarSystemID === DEFAULT_SOLAR_SYSTEM_ID ? "Jita" : solarSystemID ? `System ${solarSystemID}` : "";
+  const stationName = stationID === DEFAULT_STATION_ID
+    ? "Jita IV - Moon 4 - Caldari Navy Assembly Plant"
+    : stationID ? `Station ${stationID}` : "";
+  return {
+    stationID: stationID || null,
+    stationName,
+    solarSystemID: solarSystemID || null,
+    solarSystemName: systemName,
+    worldSpaceID: worldSpaceID || null,
+    label: stationName || systemName || (worldSpaceID ? `Space ${worldSpaceID}` : "Unknown")
+  };
+}
+
+function createAccountRecord(accountId, isGM, passwordhash) {
+  return {
+    passwordhash,
+    id: accountId,
+    isGM: !!isGM,
+    role: isGM ? GM_ACCOUNT_ROLE : PLAYER_ACCOUNT_ROLE,
+    chatRole: isGM ? GM_CHAT_ROLE : PLAYER_CHAT_ROLE,
+    banned: false
+  };
+}
+
+function nextAccountId(db) {
+  let maxId = 0;
+  for (const row of db.prepare("SELECT json FROM accounts").all()) {
+    try {
+      maxId = Math.max(maxId, asNumber(JSON.parse(row.json).id, 0));
+    } catch { /* ignore malformed row */ }
+  }
+  return maxId + 1;
+}
+
 /* ---------------- list ---------------- */
 function listAccounts(root) {
   const Database = betterSqlite(root);
   const db = new Database(dbOf(root), { readonly: true });
   const accounts = db.prepare("SELECT key, json FROM accounts").all();
   const chars = db.prepare("SELECT key, json FROM characters").all();
+  const items = db.prepare("SELECT key, json FROM items").all();
   db.close();
+  const itemNames = new Map();
+  for (const item of items) {
+    try {
+      const data = JSON.parse(item.json);
+      if (data.itemName) itemNames.set(String(item.key), data.itemName);
+    } catch { /* ignore malformed item */ }
+  }
   const out = [];
   for (const a of accounts) {
     let ad;
@@ -66,17 +132,45 @@ function listAccounts(root) {
       })
       .map((c) => {
         const d = JSON.parse(c.json);
-        return { characterId: c.key, characterName: d.characterName || c.key, securityStatus: d.securityStatus ?? null };
+        const shipName = d.shipName || itemNames.get(String(d.shipID)) || (d.shipTypeID ? `Type ${d.shipTypeID}` : "Unknown");
+        return {
+          characterId: c.key,
+          characterName: d.characterName || c.key,
+          isk: asNumber(d.balance ?? d.isk, 0),
+          skillPoints: asNumber(d.skillPoints ?? d.sp, 0),
+          shipName,
+          shipTypeID: asNumber(d.shipTypeID, 0) || null,
+          location: characterLocation(d),
+          securityStatus: d.securityStatus ?? d.securityRating ?? null
+        };
       });
     out.push({
       accountKey: a.key,
       accountId: ad.id,
-      isGM: !!ad.isGM,
+      isGM: accountIsGM(ad),
       banned: !!ad.banned,
       roles
     });
   }
   console.log(JSON.stringify(out));
+}
+
+/* ---------------- create ---------------- */
+function createAccount(root, accKey, password, isGM) {
+  const key = String(accKey || "").trim();
+  if (!key) throw new Error("账号名不能为空");
+  if (!password || String(password).length < 4) throw new Error("密码至少 4 位");
+  const Database = betterSqlite(root);
+  const db = new Database(dbOf(root));
+  try {
+    const existing = db.prepare("SELECT key FROM accounts WHERE key=?").get(key);
+    if (existing) throw new Error(`账号 '${key}' 已存在`);
+    const record = createAccountRecord(nextAccountId(db), isGM, evePasswordHash(key, password));
+    db.prepare("INSERT INTO accounts (key, json) VALUES (?, ?)").run(key, JSON.stringify(record));
+    console.log(JSON.stringify({ ok: true, accountKey: key, accountId: record.id, isGM: record.isGM }));
+  } finally {
+    db.close();
+  }
 }
 
 /* ---------------- delete（移植 delete-account.py v2 逻辑） ---------------- */
@@ -346,9 +440,12 @@ function checkRunning(root) {
 try {
   if (cmd === "list") {
     listAccounts(repoOf(repoRoot));
-  } else if (cmd === "delete") {
+} else if (cmd === "delete") {
     if (!arg1) throw new Error("delete 需要账号key或角色名");
     deleteAccount(repoOf(repoRoot), arg1, APPLY);
+  } else if (cmd === "create") {
+    if (!arg1 || !arg2) throw new Error("create 需要 <repoRoot> <账号> <密码> [--gm]");
+    createAccount(repoOf(repoRoot), arg1, arg2, process.argv.includes("--gm"));
   } else if (cmd === "check-running") {
     checkRunning(repoOf(repoRoot));
   } else if (cmd === "hash") {

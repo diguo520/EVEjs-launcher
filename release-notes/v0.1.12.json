@@ -1,0 +1,41 @@
+{
+  "version": "0.1.12",
+  "changelog": {
+    "zh": [
+      { "type": "opt", "text": "移除顶部刷新按钮" },
+      { "type": "opt", "text": "SESSION 改为主服务器启动维持时间" },
+      { "type": "new", "text": "托肯赞助卡片新增微信收款码悬停展示" },
+      { "type": "opt", "text": "控制台改为服务器日志并更换图标" },
+      { "type": "opt", "text": "PILOTS 改为服务端在线人数" },
+      { "type": "new", "text": "首次启动默认英语，记住语言和窗口状态" },
+      { "type": "opt", "text": "移除首页账号登录并重新对齐资源监控" },
+      { "type": "opt", "text": "顶部时间改为本地时间" },
+      { "type": "new", "text": "新增启动器内创建账号并支持是否授权 GM 权限" },
+      { "type": "new", "text": "账号角色卡片显示真实游戏内头像" },
+      { "type": "new", "text": "角色信息显示真实 ISK 余额" },
+      { "type": "new", "text": "角色信息显示真实技能点 SP" },
+      { "type": "new", "text": "角色信息显示当前舰船" },
+      { "type": "new", "text": "角色信息显示空间站或星系位置" },
+      { "type": "new", "text": "角色信息显示安全等级" },
+      { "type": "opt", "text": "账号与角色信息补齐多语言翻译" }
+    ],
+    "en": [
+      { "type": "opt", "text": "Removed the refresh button next to the language selector" },
+      { "type": "opt", "text": "Changed SESSION to main server uptime" },
+      { "type": "new", "text": "Added a WeChat donation QR popover to the Token Sponsor card" },
+      { "type": "opt", "text": "Renamed Console to Server Logs and changed its icon" },
+      { "type": "opt", "text": "Changed PILOTS to server online players" },
+      { "type": "new", "text": "First launch defaults to English and remembers language and window state" },
+      { "type": "opt", "text": "Removed the home login panel and realigned the resource monitor" },
+      { "type": "opt", "text": "Changed the top clock to local time" },
+      { "type": "new", "text": "Added account creation in the launcher with optional GM permission" },
+      { "type": "new", "text": "Character cards now show real in-game avatars" },
+      { "type": "new", "text": "Character information now shows the real ISK balance" },
+      { "type": "new", "text": "Character information now shows real skill points" },
+      { "type": "new", "text": "Character information now shows the current ship" },
+      { "type": "new", "text": "Character information now shows station or solar system location" },
+      { "type": "new", "text": "Character information now shows security status" },
+      { "type": "opt", "text": "Added multilingual translations for account and character information" }
+    ]
+  }
+}

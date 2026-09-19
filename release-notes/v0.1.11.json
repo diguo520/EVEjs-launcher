@@ -1,0 +1,25 @@
+{
+  "version": "0.1.11",
+  "changelog": {
+    "zh": [
+      { "type": "opt", "text": "移除顶部语言切换旁的刷新按钮" },
+      { "type": "opt", "text": "底部 SESSION 改为主服务器启动维持时间" },
+      { "type": "new", "text": "顶部托肯赞助卡片新增微信收款码悬停展示" },
+      { "type": "opt", "text": "左侧控制台改名为服务器日志并更换图标" },
+      { "type": "opt", "text": "底部 PILOTS 改为服务端在线人数" },
+      { "type": "new", "text": "首次启动默认英语，记住用户语言和窗口大小位置" },
+      { "type": "opt", "text": "移除首页账号登录，资源监控补齐并重新对齐" },
+      { "type": "opt", "text": "顶部时间改为本地时间" }
+    ],
+    "en": [
+      { "type": "opt", "text": "Removed the refresh button next to the language selector" },
+      { "type": "opt", "text": "Changed SESSION to main server uptime" },
+      { "type": "new", "text": "Added a WeChat donation QR popover to the Token Sponsor card" },
+      { "type": "opt", "text": "Renamed Console to Server Logs and changed its icon" },
+      { "type": "opt", "text": "Changed PILOTS to server online players" },
+      { "type": "new", "text": "First launch defaults to English and now remembers language, window size, and position" },
+      { "type": "opt", "text": "Removed the home login panel and realigned the resource monitor" },
+      { "type": "opt", "text": "Changed the top clock to local time" }
+    ]
+  }
+}

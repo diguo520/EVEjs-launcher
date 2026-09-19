@@ -99,6 +99,18 @@ export interface AccountRole {
   characterId: string;
   characterName: string;
   securityStatus: number | null;
+  isk: number;
+  skillPoints: number;
+  shipName: string;
+  shipTypeID: number | null;
+  location: {
+    stationID: number | null;
+    stationName: string;
+    solarSystemID: number | null;
+    solarSystemName: string;
+    worldSpaceID: number | null;
+    label: string;
+  };
   /** 游戏内肖像 base64 data URL（未上传时为默认肖像） */
   avatar?: string | null;
 }

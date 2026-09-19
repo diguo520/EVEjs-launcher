@@ -22,7 +22,7 @@ import {
   engageStart,
   engageStop
 } from "./processManager";
-import { listAccounts, deleteAccount, checkServerRunning, verifyAccount, changeAccountPassword, launchClientWithLogin } from "./accountManager";
+import { listAccounts, createAccount, deleteAccount, checkServerRunning, verifyAccount, changeAccountPassword, launchClientWithLogin } from "./accountManager";
 import * as pty from "./ptyManager";
 import { log } from "./logger";
 import { applyUpdate, cancelUpdateDownload, checkForUpdates, currentUpdateState, downloadUpdate } from "./updater";
@@ -228,6 +228,9 @@ export function registerIpc(): void {
 
   /* ---------- 账号管理 ---------- */
   ipcMain.handle("accounts:list", () => listAccounts());
+  ipcMain.handle("accounts:create", (_e, user: string, password: string, isGM: boolean) =>
+    createAccount(user, password, isGM)
+  );
   ipcMain.handle("accounts:delete", (_e, target: string, apply: boolean) =>
     deleteAccount(String(target ?? ""), !!apply)
   );

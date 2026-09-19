@@ -1,9 +1,10 @@
-import { app, BrowserWindow, shell, session } from "electron";
+import { app, BrowserWindow, shell, session, screen } from "electron";
 import * as fs from "fs";
 import * as path from "path";
 import { registerIpc, pushTerminalLine } from "./ipc";
 import { initLogger, log } from "./logger";
 import { resolveRepoRoot } from "./envDetector";
+import { readSettings, writeSettings } from "./configStore";
 import * as pty from "./ptyManager";
 import { getServices, onServicesChanged, onProgress, cleanupAll } from "./processManager";
 
@@ -26,9 +27,43 @@ function broadcastToWindow(channel: string, ...args: unknown[]): void {
 }
 
 function createWindow(): void {
+  const savedWindow = readSettings().windowBounds as {
+    x?: number;
+    y?: number;
+    width?: number;
+    height?: number;
+    maximized?: boolean;
+  } | undefined;
+  const defaultBounds = { width: 1280, height: 800 };
+  const savedWidth = Number(savedWindow?.width);
+  const savedHeight = Number(savedWindow?.height);
+  const hasSavedSize = Number.isFinite(savedWidth) && savedWidth >= 1024 && Number.isFinite(savedHeight) && savedHeight >= 640;
+  const candidate = {
+    x: Number(savedWindow?.x),
+    y: Number(savedWindow?.y),
+    width: hasSavedSize ? savedWidth : defaultBounds.width,
+    height: hasSavedSize ? savedHeight : defaultBounds.height
+  };
+  const hasSavedPosition = Number.isFinite(candidate.x) && Number.isFinite(candidate.y);
+  let restoredBounds: { x?: number; y?: number; width: number; height: number } = {
+    width: candidate.width,
+    height: candidate.height
+  };
+  if (hasSavedPosition) {
+    try {
+      const workArea = screen.getDisplayMatching(candidate).workArea;
+      const visible = candidate.x < workArea.x + workArea.width - 100 &&
+        candidate.x + candidate.width > workArea.x + 100 &&
+        candidate.y < workArea.y + workArea.height - 100 &&
+        candidate.y + candidate.height > workArea.y + 100;
+      if (visible) restoredBounds = candidate;
+    } catch {
+      /* fall back to default position */
+    }
+  }
+
   mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 800,
+    ...restoredBounds,
     minWidth: 1024,
     minHeight: 640,
     frame: false,
@@ -44,7 +79,34 @@ function createWindow(): void {
     }
   });
 
-  mainWindow.once("ready-to-show", () => mainWindow?.show());
+  const saveWindowBounds = (): void => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    const bounds = mainWindow.getNormalBounds();
+    writeSettings({
+      windowBounds: {
+        x: bounds.x,
+        y: bounds.y,
+        width: bounds.width,
+        height: bounds.height,
+        maximized: mainWindow.isMaximized()
+      }
+    });
+  };
+  let boundsTimer: NodeJS.Timeout | null = null;
+  const scheduleBoundsSave = (): void => {
+    if (boundsTimer) clearTimeout(boundsTimer);
+    boundsTimer = setTimeout(saveWindowBounds, 400);
+  };
+  mainWindow.on("resize", scheduleBoundsSave);
+  mainWindow.on("move", scheduleBoundsSave);
+  mainWindow.on("maximize", scheduleBoundsSave);
+  mainWindow.on("unmaximize", scheduleBoundsSave);
+  mainWindow.on("close", saveWindowBounds);
+
+  mainWindow.once("ready-to-show", () => {
+    if (savedWindow?.maximized) mainWindow?.maximize();
+    mainWindow?.show();
+  });
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
@@ -269,11 +331,21 @@ function createWindow(): void {
             const acc = await window.api.accountsList();
             return JSON.stringify({
               opened: !!document.querySelector("#view-accounts.active"),
+              addAccountModal: !!document.getElementById("addAccountModal"),
+              addAccountApi: typeof window.api.accountsCreate === "function",
               cards: document.querySelectorAll("#accTable .acc-block").length,
               names: [...document.querySelectorAll("#accTable .ac-name")].map((el) => el.textContent?.replace(/\\s+/g, " ").trim()).slice(0, 8),
               gmLinks: [...document.querySelectorAll("#accTable .gm-tag")].map((el) => el.textContent?.trim()),
               listOk: acc.ok,
-              apiAccounts: acc.ok && acc.data ? acc.data.map((a) => a.accountKey + ":" + (a.roles[0]?.characterName ?? "?")) : []
+              apiAccounts: acc.ok && acc.data ? acc.data.map((a) => a.accountKey + ":" + (a.roles[0]?.characterName ?? "?")) : [],
+              firstRole: acc.ok && acc.data?.[0]?.roles?.[0] ? {
+                isk: acc.data[0].roles[0].isk,
+                skillPoints: acc.data[0].roles[0].skillPoints,
+                shipName: acc.data[0].roles[0].shipName,
+                location: acc.data[0].roles[0].location?.label,
+                securityStatus: acc.data[0].roles[0].securityStatus,
+                hasAvatar: !!acc.data[0].roles[0].avatar
+              } : null
             });
           })()`);
           console.log("[SMOKE] accounts-state:", accState);

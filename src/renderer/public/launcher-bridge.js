@@ -26,10 +26,17 @@
   };
 
   let latestServices = [];
+  let mainServerStartedAt = 0;
   let nextLogId = 1;
   function applyServices(list) {
     latestServices = Array.isArray(list) ? list : [];
     const byId = new Map(latestServices.map((item) => [item.id, item]));
+    const mainServer = byId.get("mainServer");
+    if (mainServer?.state === "running") {
+      if (!mainServerStartedAt) mainServerStartedAt = Date.now();
+    } else if (mainServer?.state !== "starting") {
+      mainServerStartedAt = 0;
+    }
     ensureArrayLength(SVC, serviceDefs.length, (index) => ({ ...serviceDefs[index], state: "stop" }));
     serviceDefs.forEach((def, index) => {
       const info = byId.get(def.id) || {};
@@ -364,16 +371,22 @@
   });
   function mapAccountToUI(account, index) {
     const roles = Array.isArray(account.roles) ? account.roles : [];
+    const numberText = (value) => Number(value || 0).toLocaleString("en-US");
     return {
       id: account.accountKey,
       name: account.accountKey,
       gm: !!account.isGM,
       expanded: index === 0,
       chars: roles.map((role) => ({
+        id: role.characterId,
         name: role.characterName || role.characterId || "未知角色",
-        ship: role.characterId || "角色",
+        avatar: role.avatar || "",
+        ship: role.shipName || "未知舰船",
         status: account.banned ? "offline" : "ready",
-        sp: role.securityStatus == null ? "—" : Number(role.securityStatus).toFixed(2)
+        sp: numberText(role.skillPoints),
+        isk: numberText(role.isk),
+        location: role.location?.label || "—",
+        security: role.securityStatus == null ? "—" : Number(role.securityStatus).toFixed(2)
       }))
     };
   }
@@ -419,7 +432,41 @@
   };
 
   addAccount = function () {
-    toast("当前后端暂不支持启动器内创建账号", "warn");
+    const modal = document.getElementById("addAccountModal");
+    if (!modal) return;
+    const user = document.getElementById("newAccountUser");
+    const password = document.getElementById("newAccountPass");
+    const password2 = document.getElementById("newAccountPass2");
+    const gm = document.getElementById("newAccountGm");
+    if (user) user.value = "";
+    if (password) password.value = "";
+    if (password2) password2.value = "";
+    if (gm) gm.classList.remove("on");
+    modal.classList.add("open");
+  };
+
+  submitAddAccount = async function () {
+    const user = (document.getElementById("newAccountUser")?.value || "").trim();
+    const password = document.getElementById("newAccountPass")?.value || "";
+    const password2 = document.getElementById("newAccountPass2")?.value || "";
+    const isGM = !!document.getElementById("newAccountGm")?.classList.contains("on");
+    if (!user) { toast("请输入账号名", "err"); return; }
+    if (password.length < 4) { toast("密码至少 4 位", "err"); return; }
+    if (password !== password2) { toast("两次密码不一致", "err"); return; }
+    const button = document.getElementById("createAccountBtn");
+    if (button) button.disabled = true;
+    try {
+      const result = await api.accountsCreate(user, password, isGM);
+      if (!result?.ok) throw new Error(result?.reason || "创建账号失败");
+      closeModal("addAccountModal");
+      toast(`账号 ${user} 已创建${isGM ? " · GM 权限" : ""}`, "ok");
+      logTo("sys", "OK", `账号 <span class="hi">${esc(user)}</span> 已创建${isGM ? " · GM" : ""}`);
+      await loadAccountsFromBackend();
+    } catch (error) {
+      toast(String(error), "err");
+    } finally {
+      if (button) button.disabled = false;
+    }
   };
   addChar = function () {
     toast("当前后端暂不支持启动器内创建角色", "warn");
@@ -551,6 +598,12 @@
     await tickMetrics();
   };
 
+  function formatUptime(seconds) {
+    const total = Math.max(0, Math.floor(Number(seconds) || 0));
+    return [Math.floor(total / 3600), Math.floor(total / 60) % 60, total % 60]
+      .map((value) => String(value).padStart(2, "0")).join(":");
+  }
+
   tickMetrics = async function () {
     try {
       const metrics = await api.metricsGet();
@@ -570,6 +623,9 @@
       set("mNet", `${(net / 1024 / 1024).toFixed(2)}<span class="u">MB/s</span>`); width("bNet", net / 1024 / 1024 / 100);
       set("mGpu", `—<span class="u">%</span>`); width("bGpu", 0);
       const clock = document.getElementById("monClock"); if (clock) clock.textContent = "LIVE · " + new Date().toTimeString().slice(0, 8);
+      const onlinePlayers = Number(metrics?.onlinePlayers);
+      set("sbPilots", Number.isFinite(onlinePlayers) && onlinePlayers >= 0 ? onlinePlayers.toLocaleString() : "—");
+      set("sbSession", formatUptime(mainServerStartedAt ? (Date.now() - mainServerStartedAt) / 1000 : 0));
     } catch (error) {
       console.error("metricsGet failed", error);
     }

@@ -41,6 +41,7 @@ declare global {
       engageStart(): Promise<ServiceActionResult>;
       engageStop(): Promise<ServiceActionResult>;
       accountsList(): Promise<AccountOpResult>;
+      accountsCreate(user: string, password: string, isGM: boolean): Promise<AccountOpResult>;
       accountsDelete(target: string, apply: boolean): Promise<AccountOpResult>;
       accountsCheckRunning(): Promise<{ running: boolean; ports: number[] }>;
       accountsVerify(user: string, password: string): Promise<{ ok: boolean; reason?: string }>;

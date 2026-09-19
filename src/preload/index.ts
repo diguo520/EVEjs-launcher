@@ -35,6 +35,8 @@ const api = {
   engageStart: () => ipcRenderer.invoke("engage:start"),
   engageStop: () => ipcRenderer.invoke("engage:stop"),
   accountsList: () => ipcRenderer.invoke("accounts:list"),
+  accountsCreate: (user: string, password: string, isGM: boolean) =>
+    ipcRenderer.invoke("accounts:create", user, password, isGM),
   accountsDelete: (target: string, apply: boolean) =>
     ipcRenderer.invoke("accounts:delete", target, apply),
   accountsCheckRunning: () => ipcRenderer.invoke("accounts:checkRunning"),

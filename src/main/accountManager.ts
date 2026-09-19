@@ -9,6 +9,18 @@ export interface AccountRole {
   characterId: string;
   characterName: string;
   securityStatus: number | null;
+  isk: number;
+  skillPoints: number;
+  shipName: string;
+  shipTypeID: number | null;
+  location: {
+    stationID: number | null;
+    stationName: string;
+    solarSystemID: number | null;
+    solarSystemName: string;
+    worldSpaceID: number | null;
+    label: string;
+  };
   /** 游戏内肖像 base64 data URL；未上传肖像时为默认肖像，无默认时为 null */
   avatar?: string | null;
 }
@@ -120,6 +132,20 @@ export async function deleteAccount(
   if (apply) args.push("--apply");
   const { stdout, stderr, code } = await runCli(args);
   if (code !== 0) return { ok: false, reason: (stderr || stdout || "delete 失败").trim() };
+  return { ok: true, output: stdout };
+}
+
+/** 新建账号：用户名 + 密码 + 是否授权 GM */
+export async function createAccount(
+  user: string,
+  password: string,
+  isGM: boolean
+): Promise<AccountOpResult> {
+  const root = resolveRepoRoot();
+  const args = ["create", root, user, password];
+  if (isGM) args.push("--gm");
+  const { stdout, stderr, code } = await runCli(args);
+  if (code !== 0) return { ok: false, reason: (stderr || stdout || "create 失败").trim() };
   return { ok: true, output: stdout };
 }
 
