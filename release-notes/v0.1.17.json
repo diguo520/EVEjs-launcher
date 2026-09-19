@@ -1,0 +1,81 @@
+{
+  "version": "0.1.17",
+  "changelog": {
+    "zh": [
+      {
+        "type": "fix",
+        "text": "修复玩家「只有游戏声音、没有游戏窗口」：补回 Play.bat 的显示安全步骤，并在配置中心新增「修复游戏窗口」按钮，一键把客户端窗口重置到当前主屏 · 窗口模式 · 左上角"
+      },
+      {
+        "type": "new",
+        "text": "客户端配置新增「强制安全窗口模式」开关，写回 EvEJSConfig.bat 的 EVEJS_CLIENT_SAFE_WINDOWED，开启后每次启动都会重置窗口位置与分辨率"
+      },
+      {
+        "type": "fix",
+        "text": "修复 0.1.16 引入的「游戏进程在跑、有声音、但完全没有游戏窗口」：启动客户端时移除了 windowsHide（它会让 Windows 把游戏窗口创建成隐藏状态）"
+      },
+      {
+        "type": "new",
+        "text": "模组管理新增 mods 目录检测：缺失时给出说明并提供「创建 mods 文件夹」按钮"
+      },
+      {
+        "type": "opt",
+        "text": "修复字体发虚看不清：移除被墙的 Google Fonts 外链、改用系统字体栈，并提高底栏字号与文字对比度"
+      },
+      {
+        "type": "fix",
+        "text": "底栏 EVEJS 版本号改为读取服务端真实版本（config/version.json），不再显示写死的旧版本"
+      },
+      {
+        "type": "fix",
+        "text": "修复底栏在线人数不刷新：启动器此前只采集一次资源指标，现改为每 5 秒刷新，并按游戏端口统计已连接客户端数"
+      },
+      {
+        "type": "new",
+        "text": "模组管理接入官方 manifest schema 3（M1）：扫描 mods 目录与 evejs-launcher.mod.json、校验清单、列表真实模组、一键启停 loader（改名 loader.js.disabled ↔ loader.js），并在启动主服务时通过 NODE_OPTIONS=--require 注入，服务端文件零改动；同时清理了原有演示卡片与演示弹窗"
+      },
+      {
+        "type": "new",
+        "text": "新增《EveJS 模组制作规范》文档：启动器每次启动自动释放到 _launcher\\mods\\MOD_AUTHORING.md，并在模组管理页提供「模组制作规范」按钮一键查看；文档涵盖 manifest schema 3 字段、loader 注入原理、NODE_OPTIONS 路径规则、内存与加载顺序规范、可用的服务端接口、会话属性与上线宽限期两个坑、完整代码骨架与排错清单"
+      }
+    ],
+    "en": [
+      {
+        "type": "fix",
+        "text": "Fixed the \"game sound but no game window\" issue for players: restored the display-safety step from Play.bat and added a \"Repair game window\" button in the config center that resets the client to windowed mode at the top-left of the primary screen"
+      },
+      {
+        "type": "new",
+        "text": "Added a \"Force safe windowed mode\" switch to the client config that writes EVEJS_CLIENT_SAFE_WINDOWED into EvEJSConfig.bat; when enabled the window position and resolution are reset on every launch"
+      },
+      {
+        "type": "fix",
+        "text": "Fixed the \"game process runs with sound but no game window\" regression introduced in 0.1.16 by removing windowsHide when spawning the client (it made Windows create the game window in a hidden state)"
+      },
+      {
+        "type": "new",
+        "text": "Mod management now detects the mods folder and shows an explanation plus a \"Create mods folder\" button when it is missing"
+      },
+      {
+        "type": "opt",
+        "text": "Fixed blurry, hard-to-read fonts: removed the blocked Google Fonts request, switched to system font stacks, and increased the status bar font size and text contrast"
+      },
+      {
+        "type": "fix",
+        "text": "The EVEJS version in the status bar now reads the real server version from config/version.json instead of a hard-coded stale value"
+      },
+      {
+        "type": "fix",
+        "text": "Fixed the online player count never updating: the launcher only sampled metrics once, it now refreshes every 5 seconds and counts connected clients on the game port"
+      },
+      {
+        "type": "new",
+        "text": "Mod management now supports the official manifest schema 3 (M1): scans the mods folder and evejs-launcher.mod.json, validates manifests, lists real mods, toggles loaders (renaming loader.js.disabled <-> loader.js) and injects them into the game server via NODE_OPTIONS=--require with zero server-file changes; the old demo cards and demo dialogs were removed"
+      },
+      {
+        "type": "new",
+        "text": "Added the EveJS Mod Authoring Guide: the launcher now releases it to _launcher\\mods\\MOD_AUTHORING.md on every start and provides a \"Mod authoring guide\" button in the Mods page; the guide covers manifest schema 3 fields, how loader injection works, NODE_OPTIONS path rules, memory and load-order guidance, available server APIs, the session-property and login-grace pitfalls, a full code skeleton and a troubleshooting checklist"
+      }
+    ]
+  }
+}

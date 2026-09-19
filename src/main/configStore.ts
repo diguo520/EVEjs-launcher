@@ -75,7 +75,9 @@ export function readClientConfig(repoRoot: string): ClientConfig {
   };
 }
 
-export type ClientConfigPatch = Partial<Pick<ClientConfig, "clientPath" | "clientExe" | "caPem" | "proxyUrl">>;
+export type ClientConfigPatch = Partial<
+  Pick<ClientConfig, "clientPath" | "clientExe" | "caPem" | "proxyUrl" | "safeWindowed" | "safeGraphics">
+>;
 
 /**
  * 回写 EvEJSConfig.bat（Phase 5）：仅更新/新增指定 `set "KEY=VALUE"` 行，
@@ -102,6 +104,8 @@ export function writeClientConfig(repoRoot: string, patch: ClientConfigPatch): C
   if (patch.clientExe !== undefined) upsert("EVEJS_CLIENT_EXE", patch.clientExe);
   if (patch.caPem !== undefined) upsert("EVEJS_CA_PEM", patch.caPem);
   if (patch.proxyUrl !== undefined) upsert("EVEJS_PROXY_URL", patch.proxyUrl);
+  if (patch.safeWindowed !== undefined) upsert("EVEJS_CLIENT_SAFE_WINDOWED", patch.safeWindowed);
+  if (patch.safeGraphics !== undefined) upsert("EVEJS_CLIENT_SAFE_GRAPHICS", patch.safeGraphics);
   fs.writeFileSync(file, lines.join("\r\n").replace(/\r\n+$/, "") + "\r\n", "utf-8");
   return readClientConfig(repoRoot);
 }

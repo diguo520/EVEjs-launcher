@@ -4,20 +4,17 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>EVEJS COMMAND // 启动器</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;900&family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg-void:#05080d; --bg-deep:#0a0f17; --bg-panel:#0e141f; --bg-panel-2:#121a28; --bg-elev:#16202f;
     --line:rgba(0,212,255,0.16); --line-strong:rgba(0,212,255,0.38);
     --cyan:#00d4ff; --cyan-dim:#0a8fb3; --amber:#ff9d2e; --amber-dim:#b36b1a;
     --green:#2ee6a6; --red:#ff3b54; --yellow:#ffd23e; --purple:#b07cff;
-    --txt:#cfe6f2; --txt-dim:#7d93a8; --txt-mute:#4a5c70;
+    --txt:#e4f2fa; --txt-dim:#9db5c9; --txt-mute:#6d8399;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%}
-  body{font-family:'Rajdhani','Inter',sans-serif;background:var(--bg-void);color:var(--txt);overflow:hidden;-webkit-font-smoothing:antialiased;letter-spacing:.02em}
+  body{font-family:'Segoe UI Variable Text','Segoe UI','Microsoft YaHei UI','PingFang SC','Noto Sans CJK SC',sans-serif;background:var(--bg-void);color:var(--txt);overflow:hidden;-webkit-font-smoothing:antialiased;letter-spacing:.02em}
 
   /* ===== BG ===== */
   .bg-layer{position:fixed;inset:0;z-index:0;pointer-events:none}
@@ -45,11 +42,11 @@
   .logo-mark{width:38px;height:38px;display:flex;align-items:center;justify-content:center}
   .logo-mark svg{width:100%;height:100%;filter:drop-shadow(0 0 6px rgba(0,212,255,0.6))}
   .logo-text{display:flex;flex-direction:column;line-height:1}
-  .logo-text .t1{font-family:'Orbitron',sans-serif;font-weight:900;font-size:15px;letter-spacing:.18em;color:#fff;text-shadow:0 0 8px rgba(0,212,255,0.5)}
-  .logo-text .t2{font-family:'Share Tech Mono',monospace;font-size:9.5px;letter-spacing:.3em;color:var(--cyan);margin-top:4px;opacity:.85}
+  .logo-text .t1{font-family:'Orbitron','Segoe UI Semibold','Segoe UI',sans-serif;font-weight:900;font-size:15px;letter-spacing:.18em;color:#fff;text-shadow:0 0 8px rgba(0,212,255,0.5)}
+  .logo-text .t2{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:9.5px;letter-spacing:.3em;color:var(--cyan);margin-top:4px;opacity:.85}
   .topbar-divider{width:1px;height:34px;background:linear-gradient(180deg,transparent,var(--line-strong),transparent)}
   .svc-strip{display:flex;gap:8px}
-  .svc-chip{display:flex;align-items:center;gap:7px;padding:6px 12px;background:var(--bg-panel-2);border:1px solid var(--line);clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px);font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:.12em;cursor:pointer;transition:.18s}
+  .svc-chip{display:flex;align-items:center;gap:7px;padding:6px 12px;background:var(--bg-panel-2);border:1px solid var(--line);clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px);font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:10px;letter-spacing:.12em;cursor:pointer;transition:.18s}
   .svc-chip:hover{border-color:var(--line-strong)}
   .svc-chip .d{width:7px;height:7px;border-radius:50%;flex:0 0 7px}
   .svc-chip .d.ready{background:var(--green);box-shadow:0 0 6px var(--green)}
@@ -62,33 +59,33 @@
   .svc-chip.run .s{color:var(--cyan)}
   .topbar-spacer{flex:1}
   .clock{display:flex;flex-direction:column;align-items:flex-end;line-height:1.1}
-  .clock .eve{font-family:'Orbitron',sans-serif;font-weight:600;font-size:16px;color:#fff;letter-spacing:.1em}
-  .clock .lbl{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--txt-dim);letter-spacing:.28em;margin-top:3px}
+  .clock .eve{font-family:'Orbitron','Segoe UI Semibold','Segoe UI',sans-serif;font-weight:600;font-size:16px;color:#fff;letter-spacing:.1em}
+  .clock .lbl{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:9px;color:var(--txt-dim);letter-spacing:.28em;margin-top:3px}
   .topbar-btn{width:38px;height:38px;display:flex;align-items:center;justify-content:center;background:var(--bg-panel-2);border:1px solid var(--line);color:var(--txt-dim);cursor:pointer;transition:.2s;clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px)}
   .topbar-btn:hover{color:var(--cyan);border-color:var(--cyan);box-shadow:0 0 12px rgba(0,212,255,0.25)}
   .topbar-btn svg{width:18px;height:18px}
   .lang-wrap{position:relative}
-  .lang-btn{display:flex;align-items:center;gap:7px;padding:7px 12px;background:var(--bg-panel-2);border:1px solid var(--line);color:var(--txt-dim);font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:.1em;cursor:pointer;transition:.18s;clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px)}
+  .lang-btn{display:flex;align-items:center;gap:7px;padding:7px 12px;background:var(--bg-panel-2);border:1px solid var(--line);color:var(--txt-dim);font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:11px;letter-spacing:.1em;cursor:pointer;transition:.18s;clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px)}
   .lang-btn:hover{color:var(--cyan);border-color:var(--cyan)}
   .lang-btn svg{width:14px;height:14px}
   .lang-menu{position:absolute;top:calc(100% + 6px);right:0;background:var(--bg-elev);border:1px solid var(--line-strong);z-index:100;display:none;flex-direction:column;min-width:130px;clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px)}
   .lang-menu.open{display:flex}
-  .lang-menu button{padding:9px 13px;background:transparent;border:none;color:var(--txt-dim);font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:.08em;cursor:pointer;text-align:left;display:flex;align-items:center;gap:9px;transition:.15s}
+  .lang-menu button{padding:9px 13px;background:transparent;border:none;color:var(--txt-dim);font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:11px;letter-spacing:.08em;cursor:pointer;text-align:left;display:flex;align-items:center;gap:9px;transition:.15s}
   .lang-menu button:hover{background:rgba(0,212,255,0.08);color:var(--cyan)}
   .lang-menu button.active{color:var(--cyan);background:rgba(0,212,255,0.06)}
   .lang-menu button .flag{font-size:14px}
   .admin{position:relative;display:flex;align-items:center;cursor:help}
   .admin-card{display:flex;align-items:center;gap:10px;padding:5px 12px 5px 6px;background:var(--bg-panel-2);border:1px solid var(--line);clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px);transition:.18s}
   .admin:hover .admin-card{border-color:var(--line-strong);background:rgba(10,15,23,0.9)}
-  .admin-avatar{width:28px;height:28px;background:linear-gradient(135deg,var(--cyan-dim),var(--amber-dim));display:flex;align-items:center;justify-content:center;font-family:'Orbitron';font-weight:700;font-size:12px;color:#0a0f17;clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px)}
+  .admin-avatar{width:28px;height:28px;background:linear-gradient(135deg,var(--cyan-dim),var(--amber-dim));display:flex;align-items:center;justify-content:center;font-family:'Orbitron','Segoe UI Semibold','Segoe UI',sans-serif;font-weight:700;font-size:12px;color:#0a0f17;clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px)}
   .admin-info{display:flex;flex-direction:column;line-height:1.1}
   .admin-info .n{font-size:12px;font-weight:600;color:#fff}
-  .admin-info .r{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--amber);letter-spacing:.18em}
+  .admin-info .r{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:9px;color:var(--amber);letter-spacing:.18em}
   .sponsor-pop{position:absolute;top:calc(100% + 10px);right:0;width:380px;padding:10px;background:var(--bg-elev);border:1px solid var(--line-strong);box-shadow:0 14px 34px rgba(0,0,0,.45);opacity:0;visibility:hidden;transform:translateY(-6px);transition:.18s;z-index:300;text-align:center}
   .admin:hover .sponsor-pop{opacity:1;visibility:visible;transform:translateY(0)}
   .sponsor-qr-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .sponsor-qr img{display:block;width:100%;aspect-ratio:1/1;object-fit:contain;background:#fff;margin:0 auto 8px}
-  .sponsor-pop .cap{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--amber);letter-spacing:.12em}
+  .sponsor-pop .cap{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:9px;color:var(--amber);letter-spacing:.12em}
 
   /* ===== BODY ===== */
   .body{flex:1;display:flex;min-height:0}
@@ -98,15 +95,15 @@
   .sidebar::-webkit-scrollbar{width:4px}
   .sidebar::-webkit-scrollbar-thumb{background:rgba(0,212,255,0.2)}
   .nav-section{padding:0 12px;margin-bottom:16px}
-  .nav-section-title{font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:.3em;color:var(--txt-mute);padding:0 10px 8px}
+  .nav-section-title{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:9px;letter-spacing:.3em;color:var(--txt-mute);padding:0 10px 8px}
   .nav-item{display:flex;align-items:center;gap:11px;padding:9px 11px;margin-bottom:2px;color:var(--txt-dim);cursor:pointer;transition:.18s;position:relative;font-size:13.5px;font-weight:500;letter-spacing:.04em;clip-path:polygon(0 0,calc(100% - 8px) 0,100% 8px,100% 100%,8px 100%,0 calc(100% - 8px))}
   .nav-item svg{width:17px;height:17px;flex:0 0 17px}
   .nav-item:hover{color:var(--cyan);background:rgba(0,212,255,0.06)}
   .nav-item.active{color:#fff;background:linear-gradient(90deg, rgba(0,212,255,0.18), transparent)}
   .nav-item.active::before{content:'';position:absolute;left:0;top:6px;bottom:6px;width:3px;background:var(--cyan);box-shadow:0 0 10px var(--cyan)}
-  .nav-item .badge{margin-left:auto;font-family:'Share Tech Mono',monospace;font-size:9px;padding:1px 6px;background:rgba(255,157,46,0.15);color:var(--amber);border:1px solid rgba(255,157,46,0.3)}
+  .nav-item .badge{margin-left:auto;font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:9px;padding:1px 6px;background:rgba(255,157,46,0.15);color:var(--amber);border:1px solid rgba(255,157,46,0.3)}
   .sidebar-foot{margin-top:auto;padding:14px}
-  .resource-mini{font-family:'Share Tech Mono',monospace;font-size:10px}
+  .resource-mini{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:10px}
   .resource-mini .row{display:flex;justify-content:space-between;color:var(--txt-mute);margin-bottom:5px}
   .resource-mini .row .v{color:var(--cyan)}
   .bar-mini{height:3px;background:rgba(0,212,255,0.1);overflow:hidden;margin-bottom:10px}
@@ -125,17 +122,17 @@
   .panel{background:linear-gradient(180deg, rgba(18,26,40,0.85), rgba(14,20,31,0.75));border:1px solid var(--line);position:relative;clip-path:polygon(0 0,calc(100% - 16px) 0,100% 16px,100% 100%,16px 100%,0 calc(100% - 16px))}
   .panel::before{content:'';position:absolute;top:0;left:0;right:16px;height:1px;background:linear-gradient(90deg,var(--cyan),transparent 70%);opacity:.5}
   .panel-head{display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid var(--line)}
-  .panel-head .tag{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--cyan);letter-spacing:.24em;opacity:.7}
-  .panel-head .title{font-family:'Orbitron',sans-serif;font-weight:600;font-size:13px;letter-spacing:.1em;color:#fff;text-transform:uppercase}
+  .panel-head .tag{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:9px;color:var(--cyan);letter-spacing:.24em;opacity:.7}
+  .panel-head .title{font-family:'Orbitron','Segoe UI Semibold','Segoe UI',sans-serif;font-weight:600;font-size:13px;letter-spacing:.1em;color:#fff;text-transform:uppercase}
   .panel-head .spacer{flex:1}
-  .panel-head .meta{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--txt-dim);letter-spacing:.1em}
+  .panel-head .meta{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:10px;color:var(--txt-dim);letter-spacing:.1em}
   .panel-body{padding:16px}
 
   /* ===== SECTION TITLE ===== */
   .section-title{display:flex;align-items:center;gap:14px;margin-bottom:2px}
   .section-title .bar{width:3px;height:18px;background:var(--cyan);box-shadow:0 0 8px var(--cyan)}
-  .section-title h2{font-family:'Orbitron';font-weight:600;font-size:16px;color:#fff;letter-spacing:.1em;text-transform:uppercase}
-  .section-title .sub{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--txt-mute);letter-spacing:.18em}
+  .section-title h2{font-family:'Orbitron','Segoe UI Semibold','Segoe UI',sans-serif;font-weight:600;font-size:16px;color:#fff;letter-spacing:.1em;text-transform:uppercase}
+  .section-title .sub{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:10px;color:var(--txt-mute);letter-spacing:.18em}
 
   /* ===== CORE SERVICE CARDS ===== */
   .svc-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
@@ -146,20 +143,20 @@
   .svc-icon{width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:rgba(0,212,255,0.08);border:1px solid var(--line);color:var(--cyan);clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px)}
   .svc-icon svg{width:17px;height:17px}
   .svc-card.run .svc-icon{color:var(--green);background:rgba(46,230,166,0.08);border-color:rgba(46,230,166,0.3)}
-  .svc-card .name{font-family:'Orbitron';font-weight:600;font-size:13px;color:#fff;letter-spacing:.05em}
-  .svc-card .tech{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--txt-mute);letter-spacing:.16em;margin-top:2px}
-  .svc-state{margin-left:auto;display:flex;align-items:center;gap:6px;font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:.12em}
+  .svc-card .name{font-family:'Orbitron','Segoe UI Semibold','Segoe UI',sans-serif;font-weight:600;font-size:13px;color:#fff;letter-spacing:.05em}
+  .svc-card .tech{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:9px;color:var(--txt-mute);letter-spacing:.16em;margin-top:2px}
+  .svc-state{margin-left:auto;display:flex;align-items:center;gap:6px;font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:10px;letter-spacing:.12em}
   .svc-state .d{width:8px;height:8px;border-radius:50%}
   .svc-state.ready{color:var(--green)} .svc-state.ready .d{background:var(--green);box-shadow:0 0 6px var(--green)}
   .svc-state.run{color:var(--cyan)} .svc-state.run .d{background:var(--cyan);box-shadow:0 0 6px var(--cyan);animation:pulse 1.2s infinite}
   .svc-state.stop{color:var(--txt-mute)} .svc-state.stop .d{background:var(--txt-mute)}
   .svc-state.err{color:var(--red)} .svc-state.err .d{background:var(--red);box-shadow:0 0 6px var(--red)}
-  .svc-meta{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--txt-dim);line-height:1.7;margin-bottom:12px;min-height:54px}
+  .svc-meta{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:11px;color:var(--txt-dim);line-height:1.7;margin-bottom:12px;min-height:54px}
   .svc-meta .k{color:var(--txt-mute)}
   .svc-meta .v{color:var(--txt)}
   .svc-meta .v.ok{color:var(--green)}
   .svc-card-foot{display:flex;gap:8px;align-items:center}
-  .mini-btn{flex:1;padding:8px;background:rgba(0,212,255,0.08);border:1px solid var(--line);color:var(--cyan);font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:.14em;cursor:pointer;transition:.18s;clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px);display:flex;align-items:center;justify-content:center;gap:6px}
+  .mini-btn{flex:1;padding:8px;background:rgba(0,212,255,0.08);border:1px solid var(--line);color:var(--cyan);font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:10px;letter-spacing:.14em;cursor:pointer;transition:.18s;clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px);display:flex;align-items:center;justify-content:center;gap:6px}
   .mini-btn svg{width:13px;height:13px}
   .mini-btn:hover{background:rgba(0,212,255,0.18);border-color:var(--cyan)}
   .mini-btn.start{color:var(--green);border-color:rgba(46,230,166,0.3);background:rgba(46,230,166,0.06)}
@@ -173,9 +170,9 @@
   .launch-banner .ico{width:34px;height:34px;display:flex;align-items:center;justify-content:center;background:rgba(255,157,46,0.15);border:1px solid rgba(255,157,46,0.4);color:var(--amber);clip-path:polygon(7px 0,100% 0,100% calc(100% - 7px),calc(100% - 7px) 100%,0 100%,0 7px)}
   .launch-banner .ico svg{width:18px;height:18px}
   .launch-banner .txt{flex:1}
-  .launch-banner .t{font-family:'Orbitron';font-weight:600;font-size:13px;color:#fff;letter-spacing:.08em}
-  .launch-banner .s{font-family:'Share Tech Mono',monospace;font-size:9.5px;color:var(--amber);letter-spacing:.14em;margin-top:2px}
-  .launch-btn{display:flex;align-items:center;gap:7px;padding:11px 22px;background:linear-gradient(180deg, var(--amber), var(--amber-dim));border:none;color:#1a0f00;font-family:'Orbitron';font-weight:700;font-size:12px;letter-spacing:.14em;cursor:pointer;transition:.2s;clip-path:polygon(8px 0,100% 0,calc(100% - 8px) 100%,0 100%);text-transform:uppercase;box-shadow:0 0 16px rgba(255,157,46,0.4)}
+  .launch-banner .t{font-family:'Orbitron','Segoe UI Semibold','Segoe UI',sans-serif;font-weight:600;font-size:13px;color:#fff;letter-spacing:.08em}
+  .launch-banner .s{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:9.5px;color:var(--amber);letter-spacing:.14em;margin-top:2px}
+  .launch-btn{display:flex;align-items:center;gap:7px;padding:11px 22px;background:linear-gradient(180deg, var(--amber), var(--amber-dim));border:none;color:#1a0f00;font-family:'Orbitron','Segoe UI Semibold','Segoe UI',sans-serif;font-weight:700;font-size:12px;letter-spacing:.14em;cursor:pointer;transition:.2s;clip-path:polygon(8px 0,100% 0,calc(100% - 8px) 100%,0 100%);text-transform:uppercase;box-shadow:0 0 16px rgba(255,157,46,0.4)}
   .launch-btn svg{width:13px;height:13px;flex:0 0 13px}
   .launch-btn:hover{box-shadow:0 0 26px rgba(255,157,46,0.7);transform:translateY(-1px)}
   .launch-btn.stop{background:linear-gradient(180deg,var(--red),#7a1a28);color:#fff;box-shadow:0 0 16px rgba(255,59,84,0.4)}
@@ -184,28 +181,28 @@
   /* ===== LOGIN PANEL ===== */
   .login-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px}
   .field{display:flex;flex-direction:column;gap:5px}
-  .field label{font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:.22em;color:var(--txt-mute)}
-  .field input{background:rgba(5,8,13,0.6);border:1px solid var(--line);color:var(--txt);padding:9px 11px;font-family:'Share Tech Mono',monospace;font-size:12px;outline:none;transition:.18s;clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px)}
+  .field label{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:9px;letter-spacing:.22em;color:var(--txt-mute)}
+  .field input{background:rgba(5,8,13,0.6);border:1px solid var(--line);color:var(--txt);padding:9px 11px;font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:12px;outline:none;transition:.18s;clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px)}
   .field input:focus{border-color:var(--cyan);box-shadow:0 0 10px rgba(0,212,255,0.2) inset}
   .field input::placeholder{color:var(--txt-mute)}
   .login-row{display:flex;align-items:center;gap:12px;margin-top:6px;flex-wrap:wrap}
-  .checkbox{display:flex;align-items:center;gap:7px;cursor:pointer;font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--txt-dim);letter-spacing:.1em}
+  .checkbox{display:flex;align-items:center;gap:7px;cursor:pointer;font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:10px;color:var(--txt-dim);letter-spacing:.1em}
   .checkbox .box{width:14px;height:14px;background:rgba(5,8,13,0.6);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;transition:.18s;clip-path:polygon(3px 0,100% 0,calc(100% - 3px) 100%,0 100%)}
   .checkbox.on .box{background:var(--cyan);border-color:var(--cyan)}
   .checkbox.on .box::after{content:'';width:5px;height:8px;border:solid #0a0f17;border-width:0 2px 2px 0;transform:rotate(45deg) translateY(-1px)}
-  .link{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--cyan);letter-spacing:.1em;cursor:pointer;text-decoration:none}
+  .link{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:10px;color:var(--cyan);letter-spacing:.1em;cursor:pointer;text-decoration:none}
   .link:hover{text-decoration:underline}
 
   /* ===== TABS ===== */
   .tabs{display:flex;gap:0;border-bottom:1px solid var(--line)}
-  .tab{padding:9px 16px;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:.14em;color:var(--txt-dim);cursor:pointer;transition:.18s;border-bottom:2px solid transparent;position:relative;top:1px}
+  .tab{padding:9px 16px;font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:11px;letter-spacing:.14em;color:var(--txt-dim);cursor:pointer;transition:.18s;border-bottom:2px solid transparent;position:relative;top:1px}
   .tab:hover{color:var(--txt)}
   .tab.active{color:var(--cyan);border-bottom-color:var(--cyan)}
   .tab .cnt{font-size:9px;color:var(--txt-mute);margin-left:5px}
   .tab.active .cnt{color:var(--cyan)}
 
   /* ===== CONSOLE ===== */
-  .console{background:rgba(5,8,13,0.85);border:1px solid var(--line);font-family:'Share Tech Mono',monospace;font-size:12px;line-height:1.7;height:100%;overflow-y:auto;padding:12px 14px;clip-path:polygon(0 0,calc(100% - 14px) 0,100% 14px,100% 100%,14px 100%,0 calc(100% - 14px))}
+  .console{background:rgba(5,8,13,0.85);border:1px solid var(--line);font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:12px;line-height:1.7;height:100%;overflow-y:auto;padding:12px 14px;clip-path:polygon(0 0,calc(100% - 14px) 0,100% 14px,100% 100%,14px 100%,0 calc(100% - 14px))}
   .console::-webkit-scrollbar{width:6px}
   .console::-webkit-scrollbar-thumb{background:rgba(0,212,255,0.25)}
   .log-line{display:flex;gap:10px;padding:1px 0;animation:logIn .25s ease}
@@ -227,19 +224,19 @@
   .log-line .msg .port{color:var(--amber);font-weight:600}
   .log-line .msg .exit-code{color:var(--red);font-weight:700}
   .console-input{display:flex;align-items:center;gap:10px;padding:10px 14px;background:rgba(5,8,13,0.6);border:1px solid var(--line);border-top:none;clip-path:polygon(0 0,calc(100% - 14px) 0,100% 14px,100% 100%,14px 100%,0 calc(100% - 14px))}
-  .console-input .prompt{color:var(--green);font-family:'Share Tech Mono',monospace;font-size:12px}
-  .console-input input{flex:1;background:transparent;border:none;outline:none;color:var(--txt);font-family:'Share Tech Mono',monospace;font-size:12px}
+  .console-input .prompt{color:var(--green);font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:12px}
+  .console-input input{flex:1;background:transparent;border:none;outline:none;color:var(--txt);font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:12px}
   .console-input input::placeholder{color:var(--txt-mute)}
 
   /* ===== ENV CHECK ===== */
   .env-summary{display:flex;align-items:center;gap:18px;margin-bottom:14px;padding:14px 16px;background:rgba(46,230,166,0.06);border:1px solid rgba(46,230,166,0.25);clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,12px 100%,0 calc(100% - 12px))}
   .env-ring{width:64px;height:64px;flex:0 0 64px;position:relative}
   .env-ring svg{transform:rotate(-90deg)}
-  .env-ring .pct{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'Orbitron';font-weight:700;font-size:14px;color:var(--green)}
+  .env-ring .pct{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'Orbitron','Segoe UI Semibold','Segoe UI',sans-serif;font-weight:700;font-size:14px;color:var(--green)}
   .env-summary .info{flex:1}
-  .env-summary .info .t{font-family:'Orbitron';font-size:14px;color:#fff;letter-spacing:.06em}
-  .env-summary .info .s{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--green);letter-spacing:.14em;margin-top:3px}
-  .env-summary .info .d{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--txt-dim);margin-top:4px}
+  .env-summary .info .t{font-family:'Orbitron','Segoe UI Semibold','Segoe UI',sans-serif;font-size:14px;color:#fff;letter-spacing:.06em}
+  .env-summary .info .s{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:10px;color:var(--green);letter-spacing:.14em;margin-top:3px}
+  .env-summary .info .d{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:10px;color:var(--txt-dim);margin-top:4px}
   .check-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
   .check-card{background:rgba(5,8,13,0.4);border:1px solid var(--line);padding:14px;clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,12px 100%,0 calc(100% - 12px));display:flex;flex-direction:column;gap:10px}
   .check-card .ch-head{display:flex;align-items:center;gap:10px}
@@ -249,24 +246,24 @@
   .check-card.pending{border-color:rgba(255,157,46,0.3)}
   .check-card.pending .ch-ico{background:rgba(255,157,46,0.1);border-color:rgba(255,157,46,0.3);color:var(--amber)}
   .ch-tag.warn{background:rgba(255,157,46,0.12);color:var(--amber);border:1px solid rgba(255,157,46,0.3)}
-  .check-card .ch-name{font-family:'Orbitron';font-weight:600;font-size:12px;color:#fff;letter-spacing:.04em;flex:1}
-  .check-card .ch-tag{font-family:'Share Tech Mono',monospace;font-size:9px;padding:2px 8px;letter-spacing:.14em;clip-path:polygon(4px 0,100% 0,calc(100% - 4px) 100%,0 100%)}
+  .check-card .ch-name{font-family:'Orbitron','Segoe UI Semibold','Segoe UI',sans-serif;font-weight:600;font-size:12px;color:#fff;letter-spacing:.04em;flex:1}
+  .check-card .ch-tag{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:9px;padding:2px 8px;letter-spacing:.14em;clip-path:polygon(4px 0,100% 0,calc(100% - 4px) 100%,0 100%)}
   .check-card .ch-tag.ok{background:rgba(46,230,166,0.12);color:var(--green);border:1px solid rgba(46,230,166,0.3)}
   .check-card .ch-tag.fail{background:rgba(255,59,84,0.12);color:var(--red);border:1px solid rgba(255,59,84,0.3)}
-  .check-card .ch-detail{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--txt-dim);line-height:1.5}
+  .check-card .ch-detail{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:11px;color:var(--txt-dim);line-height:1.5}
   .check-card.init .ch-ico{background:rgba(0,212,255,0.1);border-color:rgba(0,212,255,0.3);color:var(--cyan)}
   .init-progress{margin-top:8px}
   .init-progress .ip-bar{height:5px;background:rgba(0,212,255,0.1);position:relative;overflow:hidden;clip-path:polygon(3px 0,100% 0,calc(100% - 3px) 100%,0 100%)}
   .init-progress .ip-bar > i{position:absolute;left:0;top:0;bottom:0;width:0;background:linear-gradient(90deg,var(--cyan-dim),var(--cyan));transition:width .3s ease;box-shadow:0 0 6px rgba(0,212,255,0.5)}
-  .init-progress .ip-pct{display:flex;justify-content:space-between;font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--cyan);letter-spacing:.12em;margin-top:4px}
+  .init-progress .ip-pct{display:flex;justify-content:space-between;font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:9px;color:var(--cyan);letter-spacing:.12em;margin-top:4px}
 
   /* ===== ACCOUNT & CHARACTER MANAGEMENT ===== */
   .acc-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
   .acc-search{flex:1;min-width:200px;display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(5,8,13,0.6);border:1px solid var(--line);clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px)}
   .acc-search svg{width:14px;height:14px;color:var(--txt-mute);flex:0 0 14px}
-  .acc-search input{flex:1;background:transparent;border:none;outline:none;color:var(--txt);font-family:'Share Tech Mono',monospace;font-size:12px}
+  .acc-search input{flex:1;background:transparent;border:none;outline:none;color:var(--txt);font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:12px}
   .acc-search input::placeholder{color:var(--txt-mute)}
-  .acc-select{background:rgba(5,8,13,0.6) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2300d4ff' stroke-width='2'><polyline points='6 9 12 15 18 9'/></svg>") no-repeat right 10px center/14px;border:1px solid var(--line);color:var(--txt);padding:8px 30px 8px 12px;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:.1em;outline:none;clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px);appearance:none;cursor:pointer}
+  .acc-select{background:rgba(5,8,13,0.6) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2300d4ff' stroke-width='2'><polyline points='6 9 12 15 18 9'/></svg>") no-repeat right 10px center/14px;border:1px solid var(--line);color:var(--txt);padding:8px 30px 8px 12px;font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:11px;letter-spacing:.1em;outline:none;clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px);appearance:none;cursor:pointer}
   .acc-select option{background:var(--bg-elev);color:var(--txt)}
   .acc-select:focus{border-color:var(--cyan)}
 
@@ -274,17 +271,17 @@
   .acc-block.expanded{border-color:var(--line-strong);box-shadow:0 0 0 1px rgba(0,212,255,0.15) inset}
   .acc-block-head{display:flex;align-items:center;gap:14px;padding:14px 16px;cursor:pointer;transition:.18s}
   .acc-block-head:hover{background:rgba(0,212,255,0.04)}
-  .acc-block .ac-avatar{width:42px;height:42px;flex:0 0 42px;background:linear-gradient(135deg,var(--cyan-dim),var(--purple));display:flex;align-items:center;justify-content:center;font-family:'Orbitron';font-weight:700;font-size:14px;color:#0a0f17;clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px)}
+  .acc-block .ac-avatar{width:42px;height:42px;flex:0 0 42px;background:linear-gradient(135deg,var(--cyan-dim),var(--purple));display:flex;align-items:center;justify-content:center;font-family:'Orbitron','Segoe UI Semibold','Segoe UI',sans-serif;font-weight:700;font-size:14px;color:#0a0f17;clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px)}
   .acc-block .ac-avatar.gm{background:linear-gradient(135deg,var(--amber),var(--red))}
   .acc-block .ac-info{flex:1;min-width:0}
-  .acc-block .ac-name{font-family:'Orbitron';font-weight:600;font-size:14px;color:#fff}
-  .acc-block .ac-meta{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--txt-mute);letter-spacing:.1em;margin-top:3px;display:flex;gap:14px;flex-wrap:wrap}
+  .acc-block .ac-name{font-family:'Orbitron','Segoe UI Semibold','Segoe UI',sans-serif;font-weight:600;font-size:14px;color:#fff}
+  .acc-block .ac-meta{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:10px;color:var(--txt-mute);letter-spacing:.1em;margin-top:3px;display:flex;gap:14px;flex-wrap:wrap}
   .acc-block .ac-meta .v{color:var(--txt-dim)}
   .acc-block .ac-meta .gm{color:var(--amber)}
-  .acc-block .ac-toggle{display:flex;align-items:center;gap:8px;font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--cyan);letter-spacing:.14em}
+  .acc-block .ac-toggle{display:flex;align-items:center;gap:8px;font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:10px;color:var(--cyan);letter-spacing:.14em}
   .acc-block .ac-toggle svg{width:14px;height:14px;transition:transform .25s}
   .acc-block.expanded .ac-toggle svg{transform:rotate(90deg)}
-  .acc-block .ac-del{padding:7px 12px;background:rgba(255,59,84,0.08);border:1px solid rgba(255,59,84,0.3);color:var(--red);font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:.12em;cursor:pointer;clip-path:polygon(5px 0,100% 0,calc(100% - 5px) 100%,0 100%)}
+  .acc-block .ac-del{padding:7px 12px;background:rgba(255,59,84,0.08);border:1px solid rgba(255,59,84,0.3);color:var(--red);font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:10px;letter-spacing:.12em;cursor:pointer;clip-path:polygon(5px 0,100% 0,calc(100% - 5px) 100%,0 100%)}
   .acc-block .ac-del:hover{background:rgba(255,59,84,0.18)}
 
   .char-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;padding:0 16px 16px}
@@ -294,28 +291,28 @@
   .char-card.empty:hover{border-color:var(--cyan);background:rgba(0,212,255,0.04)}
   .char-card.empty .plus{width:42px;height:42px;border:1px dashed var(--line-strong);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--cyan);margin-bottom:8px}
   .char-card.empty .plus svg{width:20px;height:20px}
-  .char-card.empty .et{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--cyan);letter-spacing:.14em}
-  .char-card.empty .es{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--txt-mute);letter-spacing:.12em;margin-top:3px}
-  .char-status{display:flex;align-items:center;gap:6px;font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:.14em;align-self:flex-start}
+  .char-card.empty .et{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:11px;color:var(--cyan);letter-spacing:.14em}
+  .char-card.empty .es{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:9px;color:var(--txt-mute);letter-spacing:.12em;margin-top:3px}
+  .char-status{display:flex;align-items:center;gap:6px;font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:9px;letter-spacing:.14em;align-self:flex-start}
   .char-status .d{width:7px;height:7px;border-radius:50%}
   .char-status.ready{color:var(--green)} .char-status.ready .d{background:var(--green);box-shadow:0 0 6px var(--green)}
   .char-status.new{color:var(--cyan)} .char-status.new .d{background:var(--cyan);box-shadow:0 0 6px var(--cyan)}
   .char-status.offline{color:var(--txt-mute)} .char-status.offline .d{background:var(--txt-mute)}
   .char-hex{width:72px;height:80px;margin:6px auto;position:relative;display:flex;align-items:center;justify-content:center}
   .char-hex svg.hex-bg{position:absolute;inset:0;width:100%;height:100%}
-  .char-hex .hex-inner{position:relative;z-index:1;width:46px;height:46px;display:flex;align-items:center;justify-content:center;font-family:'Orbitron';font-weight:700;font-size:16px;color:#fff;background:linear-gradient(135deg,var(--cyan-dim),var(--purple));clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%)}
+  .char-hex .hex-inner{position:relative;z-index:1;width:46px;height:46px;display:flex;align-items:center;justify-content:center;font-family:'Orbitron','Segoe UI Semibold','Segoe UI',sans-serif;font-weight:700;font-size:16px;color:#fff;background:linear-gradient(135deg,var(--cyan-dim),var(--purple));clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%)}
   .char-hex .hex-inner img{width:100%;height:100%;object-fit:cover;display:block}
   .char-hex.gm .hex-inner{background:linear-gradient(135deg,var(--amber),var(--red))}
-  .char-name{font-family:'Orbitron';font-weight:600;font-size:13px;color:#fff;text-align:center;letter-spacing:.04em}
-  .char-account{font-family:'Share Tech Mono',monospace;font-size:9.5px;color:var(--txt-mute);text-align:center;letter-spacing:.08em;margin-top:1px}
-  .char-class{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--cyan);text-align:center;letter-spacing:.06em;margin-top:2px}
-  .char-details{display:grid;gap:4px;font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--txt-dim);margin-top:2px}
+  .char-name{font-family:'Orbitron','Segoe UI Semibold','Segoe UI',sans-serif;font-weight:600;font-size:13px;color:#fff;text-align:center;letter-spacing:.04em}
+  .char-account{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:9.5px;color:var(--txt-mute);text-align:center;letter-spacing:.08em;margin-top:1px}
+  .char-class{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:10px;color:var(--cyan);text-align:center;letter-spacing:.06em;margin-top:2px}
+  .char-details{display:grid;gap:4px;font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:9px;color:var(--txt-dim);margin-top:2px}
   .char-details span{display:flex;justify-content:space-between;gap:6px;border-top:1px solid rgba(0,212,255,0.08);padding-top:4px}
   .char-details b{font-weight:400;color:var(--txt-mute)}
   .char-details .isk{color:var(--green)}
   .char-details .security{color:var(--amber)}
   .char-foot{display:flex;gap:6px;margin-top:auto}
-  .launch-char{flex:1;padding:8px;background:linear-gradient(180deg,var(--amber),var(--amber-dim));border:none;color:#1a0f00;font-family:'Orbitron';font-weight:700;font-size:10px;letter-spacing:.14em;cursor:pointer;clip-path:polygon(5px 0,100% 0,calc(100% - 5px) 100%,0 100%);transition:.18s}
+  .launch-char{flex:1;padding:8px;background:linear-gradient(180deg,var(--amber),var(--amber-dim));border:none;color:#1a0f00;font-family:'Orbitron','Segoe UI Semibold','Segoe UI',sans-serif;font-weight:700;font-size:10px;letter-spacing:.14em;cursor:pointer;clip-path:polygon(5px 0,100% 0,calc(100% - 5px) 100%,0 100%);transition:.18s}
   .launch-char:hover{box-shadow:0 0 12px rgba(255,157,46,0.5)}
   .launch-char.unavail{background:rgba(125,147,168,0.15);color:var(--txt-mute);cursor:not-allowed}
   .char-more{width:32px;flex:0 0 32px;background:rgba(0,212,255,0.08);border:1px solid var(--line);color:var(--txt-dim);cursor:pointer;display:flex;align-items:center;justify-content:center;clip-path:polygon(4px 0,100% 0,calc(100% - 4px) 100%,0 100%);transition:.18s}
@@ -323,7 +320,7 @@
   .char-more svg{width:14px;height:14px}
   .char-menu{position:absolute;right:8px;top:42px;background:var(--bg-elev);border:1px solid var(--line-strong);z-index:20;display:none;flex-direction:column;min-width:90px;clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px)}
   .char-menu.open{display:flex}
-  .char-menu button{padding:8px 12px;background:transparent;border:none;color:var(--txt-dim);font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:.1em;cursor:pointer;text-align:left;display:flex;align-items:center;gap:7px}
+  .char-menu button{padding:8px 12px;background:transparent;border:none;color:var(--txt-dim);font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:10px;letter-spacing:.1em;cursor:pointer;text-align:left;display:flex;align-items:center;gap:7px}
   .char-menu button:hover{background:rgba(0,212,255,0.08);color:var(--cyan)}
   .char-menu button.del{color:var(--red)}
   .char-menu button.del:hover{background:rgba(255,59,84,0.1)}
@@ -338,52 +335,52 @@
 
   /* ===== TABLE ===== */
   .tbl{width:100%;border-collapse:collapse;font-size:13px}
-  .tbl th{text-align:left;padding:10px 12px;font-family:'Share Tech Mono',monospace;font-size:9.5px;letter-spacing:.22em;color:var(--txt-mute);font-weight:400;border-bottom:1px solid var(--line);text-transform:uppercase;background:rgba(5,8,13,0.4)}
+  .tbl th{text-align:left;padding:10px 12px;font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:9.5px;letter-spacing:.22em;color:var(--txt-mute);font-weight:400;border-bottom:1px solid var(--line);text-transform:uppercase;background:rgba(5,8,13,0.4)}
   .tbl td{padding:11px 12px;border-bottom:1px solid rgba(0,212,255,0.07);color:var(--txt)}
   .tbl tr:hover td{background:rgba(0,212,255,0.04)}
-  .tbl .mono{font-family:'Share Tech Mono',monospace;font-size:12px}
+  .tbl .mono{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:12px}
   .db-workbench{display:grid;grid-template-columns:220px minmax(0,1fr) 330px;gap:12px;min-height:560px;margin-top:16px}
   .db-sidebar,.db-main,.db-inspector{background:linear-gradient(180deg,rgba(18,26,40,0.78),rgba(8,13,21,0.86));border:1px solid var(--line);min-width:0}
   .db-sidebar{display:flex;flex-direction:column;gap:10px;padding:12px;max-height:620px}
-  .db-sidebar-head,.db-inspector-head{display:flex;align-items:center;justify-content:space-between;font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--cyan);letter-spacing:.16em;text-transform:uppercase}
+  .db-sidebar-head,.db-inspector-head{display:flex;align-items:center;justify-content:space-between;font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:10px;color:var(--cyan);letter-spacing:.16em;text-transform:uppercase}
   .db-count{background:rgba(0,212,255,.12);border:1px solid rgba(0,212,255,.3);padding:1px 6px;color:var(--cyan)}
   .db-table-list{overflow-y:auto;flex:1;min-height:0}
-  .db-table-item{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;padding:8px 9px;margin-bottom:4px;background:transparent;border:1px solid transparent;color:var(--txt-dim);font-family:'Share Tech Mono',monospace;font-size:10px;text-align:left;cursor:pointer}
+  .db-table-item{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;padding:8px 9px;margin-bottom:4px;background:transparent;border:1px solid transparent;color:var(--txt-dim);font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:10px;text-align:left;cursor:pointer}
   .db-table-item:hover{background:rgba(0,212,255,.05);border-color:var(--line);color:var(--txt)}
   .db-table-item.active{background:rgba(0,212,255,.1);border-color:var(--cyan);color:#fff}
   .db-table-item .n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.db-table-item .c{color:var(--txt-mute);font-size:9px}
   .db-main{display:flex;flex-direction:column;min-height:560px}
   .db-main-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line)}
-  .db-main-title{font-family:'Orbitron';font-size:14px;color:#fff;letter-spacing:.05em}.db-main-sub{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--txt-mute);margin-top:3px}
+  .db-main-title{font-family:'Orbitron','Segoe UI Semibold','Segoe UI',sans-serif;font-size:14px;color:#fff;letter-spacing:.05em}.db-main-sub{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:9px;color:var(--txt-mute);margin-top:3px}
   .db-toolbar{display:flex;gap:7px;flex-wrap:nowrap}.db-toolbar .mini-btn{flex:0 0 auto;min-width:76px;padding:6px 12px;white-space:nowrap}
-  .db-tabs{display:flex;gap:2px;padding:8px 12px 0;border-bottom:1px solid var(--line)}.db-tab{padding:7px 14px;background:transparent;border:1px solid transparent;border-bottom:none;color:var(--txt-mute);font-family:'Share Tech Mono',monospace;font-size:10px;cursor:pointer}.db-tab:hover{color:var(--cyan)}.db-tab.active{color:var(--cyan);background:rgba(0,212,255,.06);border-color:var(--line);border-bottom-color:var(--bg-elev)}
+  .db-tabs{display:flex;gap:2px;padding:8px 12px 0;border-bottom:1px solid var(--line)}.db-tab{padding:7px 14px;background:transparent;border:1px solid transparent;border-bottom:none;color:var(--txt-mute);font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:10px;cursor:pointer}.db-tab:hover{color:var(--cyan)}.db-tab.active{color:var(--cyan);background:rgba(0,212,255,.06);border-color:var(--line);border-bottom-color:var(--bg-elev)}
   .db-tab-panel{display:flex;flex-direction:column;flex:1;min-height:0;padding:12px}
-  .db-data-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:10px}.db-data-toolbar .field{flex:1}.db-pager{display:flex;align-items:center;gap:7px;font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--txt-mute);white-space:nowrap}.db-pager .mini-btn{padding:5px 8px}
+  .db-data-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:10px}.db-data-toolbar .field{flex:1}.db-pager{display:flex;align-items:center;gap:7px;font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:9px;color:var(--txt-mute);white-space:nowrap}.db-pager .mini-btn{padding:5px 8px}
   .db-grid-wrap{overflow:auto;border:1px solid var(--line);flex:1;min-height:260px;background:rgba(5,8,13,.4)}
-  .db-grid{border-collapse:collapse;width:100%;min-width:620px;font-family:'Share Tech Mono',monospace;font-size:10px}.db-grid th{position:sticky;top:0;z-index:2;padding:8px 10px;background:#0b111b;color:var(--cyan);text-align:left;border-bottom:1px solid var(--line-strong);white-space:nowrap}.db-grid td{max-width:280px;padding:7px 10px;border-bottom:1px solid rgba(0,212,255,.07);color:var(--txt-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}.db-grid tr:hover td{background:rgba(0,212,255,.04)}.db-grid tr.active td{background:rgba(0,212,255,.1);color:#fff}.db-grid td.pk{color:var(--amber)}
-  #dbSqlPreview{width:100%;height:100%;min-height:360px;resize:none;background:linear-gradient(180deg,#080d15,#05080d);border:1px solid var(--line);color:#b8eaff;font-family:'Share Tech Mono',monospace;font-size:12px;line-height:1.65;padding:14px;outline:none;clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px);box-shadow:0 0 0 1px rgba(0,212,255,.03) inset}
+  .db-grid{border-collapse:collapse;width:100%;min-width:620px;font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:10px}.db-grid th{position:sticky;top:0;z-index:2;padding:8px 10px;background:#0b111b;color:var(--cyan);text-align:left;border-bottom:1px solid var(--line-strong);white-space:nowrap}.db-grid td{max-width:280px;padding:7px 10px;border-bottom:1px solid rgba(0,212,255,.07);color:var(--txt-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}.db-grid tr:hover td{background:rgba(0,212,255,.04)}.db-grid tr.active td{background:rgba(0,212,255,.1);color:#fff}.db-grid td.pk{color:var(--amber)}
+  #dbSqlPreview{width:100%;height:100%;min-height:360px;resize:none;background:linear-gradient(180deg,#080d15,#05080d);border:1px solid var(--line);color:#b8eaff;font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:12px;line-height:1.65;padding:14px;outline:none;clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px);box-shadow:0 0 0 1px rgba(0,212,255,.03) inset}
   #dbSqlPreview:focus{border-color:var(--cyan);box-shadow:0 0 0 1px rgba(0,212,255,.18) inset,0 0 14px rgba(0,212,255,.1)}
   .db-inspector{display:flex;flex-direction:column;min-height:560px}.db-inspector-head{padding:12px 13px;border-bottom:1px solid var(--line)}.db-inspector-hint{color:var(--txt-mute);letter-spacing:0;text-transform:none}
-  .db-inspector-fields{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px}.db-empty{color:var(--txt-mute);font-family:'Share Tech Mono',monospace;font-size:10px;text-align:center;padding:40px 8px}
-  .db-sidebar input.field,.db-data-toolbar input.field,.db-field input,.db-field textarea{width:100%;min-height:36px;background:linear-gradient(180deg,rgba(10,17,28,.95),rgba(5,8,13,.82));border:1px solid var(--line);color:var(--txt);font-family:'Share Tech Mono',monospace;font-size:11px;line-height:1.4;padding:9px 11px;outline:none;transition:border-color .18s,box-shadow .18s,background .18s;clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px);box-shadow:0 0 0 1px rgba(0,212,255,.025) inset}
+  .db-inspector-fields{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px}.db-empty{color:var(--txt-mute);font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:10px;text-align:center;padding:40px 8px}
+  .db-sidebar input.field,.db-data-toolbar input.field,.db-field input,.db-field textarea{width:100%;min-height:36px;background:linear-gradient(180deg,rgba(10,17,28,.95),rgba(5,8,13,.82));border:1px solid var(--line);color:var(--txt);font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:11px;line-height:1.4;padding:9px 11px;outline:none;transition:border-color .18s,box-shadow .18s,background .18s;clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px);box-shadow:0 0 0 1px rgba(0,212,255,.025) inset}
   .db-sidebar input.field:hover,.db-data-toolbar input.field:hover,.db-field input:hover,.db-field textarea:hover{border-color:var(--line-strong);background:linear-gradient(180deg,rgba(13,22,36,.98),rgba(6,10,17,.9))}
   .db-sidebar input.field:focus,.db-data-toolbar input.field:focus,.db-field input:focus,.db-field textarea:focus{border-color:var(--cyan);box-shadow:0 0 0 1px rgba(0,212,255,.18) inset,0 0 14px rgba(0,212,255,.12)}
-  .db-field{display:flex;flex-direction:column;gap:5px}.db-field label{display:flex;align-items:center;gap:6px;font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--txt-mute);letter-spacing:.12em;text-transform:uppercase}.db-field label .pk{color:var(--amber);font-size:8px;padding:1px 4px;border:1px solid rgba(255,157,46,.35);background:rgba(255,157,46,.08)}.db-field textarea{min-height:170px;resize:vertical;line-height:1.55;white-space:pre}
+  .db-field{display:flex;flex-direction:column;gap:5px}.db-field label{display:flex;align-items:center;gap:6px;font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:9px;color:var(--txt-mute);letter-spacing:.12em;text-transform:uppercase}.db-field label .pk{color:var(--amber);font-size:8px;padding:1px 4px;border:1px solid rgba(255,157,46,.35);background:rgba(255,157,46,.08)}.db-field textarea{min-height:170px;resize:vertical;line-height:1.55;white-space:pre}
   .db-sidebar input.field::placeholder,.db-data-toolbar input.field::placeholder,.db-field input::placeholder,.db-field textarea::placeholder{color:var(--txt-mute)}
   .db-inspector-actions{display:flex;justify-content:flex-end;gap:8px;padding:10px 12px;border-top:1px solid var(--line)}.db-inspector-actions .mini-btn{padding:6px 12px}
-  .db-path-bar{display:flex;align-items:center;gap:9px;margin-top:10px;padding:8px 11px;background:rgba(5,8,13,.45);border:1px solid var(--line);font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--txt-mute)}.db-path-bar code{color:var(--txt-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .db-backup-list{display:flex;flex-direction:column;gap:8px;max-height:360px;overflow-y:auto}.db-backup-item{display:flex;align-items:center;gap:12px;padding:10px 12px;background:rgba(5,8,13,.55);border:1px solid var(--line);cursor:pointer;transition:.18s}.db-backup-item:hover{border-color:var(--line-strong);background:rgba(10,15,23,.75)}.db-backup-item.active{border-color:var(--cyan);background:rgba(0,212,255,.08);box-shadow:0 0 0 1px rgba(0,212,255,.15) inset}.db-backup-item .bi-main{flex:1;min-width:0}.db-backup-item .bi-name{font-family:'Share Tech Mono',monospace;font-size:11px;color:#fff;word-break:break-all}.db-backup-item .bi-meta{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--txt-mute);margin-top:4px}.db-backup-item .bi-size{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--cyan);white-space:nowrap}
+  .db-path-bar{display:flex;align-items:center;gap:9px;margin-top:10px;padding:8px 11px;background:rgba(5,8,13,.45);border:1px solid var(--line);font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:9px;color:var(--txt-mute)}.db-path-bar code{color:var(--txt-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .db-backup-list{display:flex;flex-direction:column;gap:8px;max-height:360px;overflow-y:auto}.db-backup-item{display:flex;align-items:center;gap:12px;padding:10px 12px;background:rgba(5,8,13,.55);border:1px solid var(--line);cursor:pointer;transition:.18s}.db-backup-item:hover{border-color:var(--line-strong);background:rgba(10,15,23,.75)}.db-backup-item.active{border-color:var(--cyan);background:rgba(0,212,255,.08);box-shadow:0 0 0 1px rgba(0,212,255,.15) inset}.db-backup-item .bi-main{flex:1;min-width:0}.db-backup-item .bi-name{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:11px;color:#fff;word-break:break-all}.db-backup-item .bi-meta{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:9px;color:var(--txt-mute);margin-top:4px}.db-backup-item .bi-size{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:10px;color:var(--cyan);white-space:nowrap}
   @media (max-width:1450px){.db-workbench{grid-template-columns:190px minmax(0,1fr) 290px}}
   @media (max-width:1180px){.db-workbench{grid-template-columns:190px minmax(0,1fr)}.db-inspector{grid-column:1/-1;min-height:320px}}
 
   /* ===== ACCOUNT ===== */
   .acc-row td .acc-cell{display:flex;align-items:center;gap:10px}
-  .acc-avatar{width:30px;height:30px;background:linear-gradient(135deg,var(--cyan-dim),var(--purple));display:flex;align-items:center;justify-content:center;font-family:'Orbitron';font-weight:700;font-size:11px;color:#0a0f17;clip-path:polygon(5px 0,100% 0,100% calc(100% - 5px),calc(100% - 5px) 100%,0 100%,0 5px);flex:0 0 30px}
+  .acc-avatar{width:30px;height:30px;background:linear-gradient(135deg,var(--cyan-dim),var(--purple));display:flex;align-items:center;justify-content:center;font-family:'Orbitron','Segoe UI Semibold','Segoe UI',sans-serif;font-weight:700;font-size:11px;color:#0a0f17;clip-path:polygon(5px 0,100% 0,100% calc(100% - 5px),calc(100% - 5px) 100%,0 100%,0 5px);flex:0 0 30px}
   .acc-avatar.gm{background:linear-gradient(135deg,var(--amber),var(--red))}
   .acc-name{font-weight:600;color:#fff;font-size:13px}
-  .gm-tag{display:inline-block;font-family:'Share Tech Mono',monospace;font-size:8px;padding:1px 5px;background:rgba(255,157,46,0.15);color:var(--amber);border:1px solid rgba(255,157,46,0.4);letter-spacing:.12em;margin-left:6px;vertical-align:middle}
+  .gm-tag{display:inline-block;font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:8px;padding:1px 5px;background:rgba(255,157,46,0.15);color:var(--amber);border:1px solid rgba(255,157,46,0.4);letter-spacing:.12em;margin-left:6px;vertical-align:middle}
   .status-online{color:var(--green)} .status-offline{color:var(--txt-mute)}
-  .del-btn{padding:5px 12px;background:rgba(255,59,84,0.08);border:1px solid rgba(255,59,84,0.3);color:var(--red);font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:.12em;cursor:pointer;transition:.18s;clip-path:polygon(5px 0,100% 0,calc(100% - 5px) 100%,0 100%)}
+  .del-btn{padding:5px 12px;background:rgba(255,59,84,0.08);border:1px solid rgba(255,59,84,0.3);color:var(--red);font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:10px;letter-spacing:.12em;cursor:pointer;transition:.18s;clip-path:polygon(5px 0,100% 0,calc(100% - 5px) 100%,0 100%)}
   .del-btn:hover{background:rgba(255,59,84,0.18)}
 
   /* ===== COMMAND MANUAL ===== */
@@ -392,14 +389,14 @@
   .cmd-stat:hover{border-color:var(--line-strong);background:rgba(10,15,23,0.7)}
   .cmd-stat.active{border-color:var(--cyan);background:rgba(0,212,255,0.08);box-shadow:0 0 0 1px rgba(0,212,255,0.2) inset}
   .cmd-stat.active .n{color:var(--cyan);text-shadow:0 0 8px rgba(0,212,255,0.5)}
-  .cmd-stat .n{font-family:'Orbitron';font-weight:700;font-size:18px;color:var(--cyan)}
-  .cmd-stat .l{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--txt-mute);letter-spacing:.14em;margin-top:3px}
-  .cmd-cat-tab{padding:7px 13px;background:rgba(5,8,13,0.5);border:1px solid var(--line);color:var(--txt-dim);font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:.06em;cursor:pointer;transition:.18s;clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px);display:flex;align-items:center;gap:6px}
+  .cmd-stat .n{font-family:'Orbitron','Segoe UI Semibold','Segoe UI',sans-serif;font-weight:700;font-size:18px;color:var(--cyan)}
+  .cmd-stat .l{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:9px;color:var(--txt-mute);letter-spacing:.14em;margin-top:3px}
+  .cmd-cat-tab{padding:7px 13px;background:rgba(5,8,13,0.5);border:1px solid var(--line);color:var(--txt-dim);font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:11px;letter-spacing:.06em;cursor:pointer;transition:.18s;clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px);display:flex;align-items:center;gap:6px}
   .cmd-cat-tab:hover{color:var(--cyan);border-color:var(--line-strong)}
   .cmd-cat-tab.active{color:var(--cyan);border-color:var(--cyan);background:rgba(0,212,255,0.08)}
   .cmd-cat-tab .cnt{font-size:9px;color:var(--txt-mute);background:rgba(0,212,255,0.06);padding:1px 5px}
   .cmd-cat-tab.active .cnt{color:var(--cyan)}
-  .cmd-notice{padding:12px 14px;background:rgba(0,212,255,0.04);border-left:3px solid var(--cyan);font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--txt-dim);line-height:1.7;margin-bottom:14px}
+  .cmd-notice{padding:12px 14px;background:rgba(0,212,255,0.04);border-left:3px solid var(--cyan);font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:11px;color:var(--txt-dim);line-height:1.7;margin-bottom:14px}
   .cmd-notice .hi{color:var(--cyan)} .cmd-notice .amb{color:var(--amber)}
   .cmd-gen{display:grid;grid-template-columns:190px 2fr 0.8fr auto;gap:10px;align-items:end;padding:14px;background:rgba(5,8,13,0.4);border:1px solid var(--line);margin-bottom:14px}
   .cmd-gen > .field:first-child{width:190px;min-width:190px;max-width:190px}
@@ -411,7 +408,7 @@
   input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
   input[type=number]{-moz-appearance:textfield}
   .qty-wrap{position:relative;display:flex;align-items:center}
-  .qty-wrap input{padding-right:28px !important;background:rgba(5,8,13,0.6) !important;border:1px solid var(--line) !important;color:var(--txt) !important;font-family:'Share Tech Mono',monospace !important;font-size:12px !important;outline:none;clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px);width:100%}
+  .qty-wrap input{padding-right:28px !important;background:rgba(5,8,13,0.6) !important;border:1px solid var(--line) !important;color:var(--txt) !important;font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace !important;font-size:12px !important;outline:none;clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px);width:100%}
   .qty-wrap input:focus{border-color:var(--cyan) !important}
   .qty-btn{position:absolute;right:2px;top:2px;bottom:2px;width:22px;display:flex;flex-direction:column;border:none;background:transparent}
   .qty-btn button{flex:1;width:100%;background:rgba(0,212,255,0.06);border:none;border-left:1px solid var(--line);color:var(--cyan);cursor:pointer;font-size:7px;display:flex;align-items:center;justify-content:center;padding:0;transition:.15s}
@@ -423,48 +420,48 @@
   .item-suggest-list.open{display:flex}
   .item-suggest-item{display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;border-bottom:1px solid rgba(0,212,255,0.06);transition:.15s}
   .item-suggest-item:hover{background:rgba(0,212,255,0.08)}
-  .item-suggest-item .si-id{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--txt-mute);min-width:50px}
+  .item-suggest-item .si-id{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:10px;color:var(--txt-mute);min-width:50px}
   .item-suggest-item .si-en{font-size:12px;color:var(--cyan)}
   .item-suggest-item .si-cn{font-size:11px;color:var(--txt-dim)}
-  .item-suggest-item .si-cat{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--amber);margin-left:auto;padding:1px 6px;background:rgba(255,157,46,0.08);border:1px solid rgba(255,157,46,0.2)}
-  .item-suggest-empty{padding:14px;text-align:center;color:var(--txt-mute);font-family:'Share Tech Mono',monospace;font-size:11px}
+  .item-suggest-item .si-cat{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:9px;color:var(--amber);margin-left:auto;padding:1px 6px;background:rgba(255,157,46,0.08);border:1px solid rgba(255,157,46,0.2)}
+  .item-suggest-empty{padding:14px;text-align:center;color:var(--txt-mute);font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:11px}
   /* 查询面板 */
   .query-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
   .query-card{background:rgba(5,8,13,0.5);border:1px solid var(--line);padding:10px 12px;display:flex;flex-direction:column;gap:4px;cursor:pointer;transition:.15s}
   .query-card:hover{border-color:var(--line-strong);background:rgba(10,15,23,0.7)}
-  .query-card .qc-id{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--txt-mute)}
+  .query-card .qc-id{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:10px;color:var(--txt-mute)}
   .query-card .qc-name{font-size:12px;color:var(--cyan)}
-  .query-card .qc-meta{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--txt-dim);display:flex;gap:8px;flex-wrap:wrap}
+  .query-card .qc-meta{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:10px;color:var(--txt-dim);display:flex;gap:8px;flex-wrap:wrap}
   .query-card .qc-tag{font-size:9px;padding:1px 5px;background:rgba(255,157,46,0.08);border:1px solid rgba(255,157,46,0.2);color:var(--amber)}
-  .query-card .qc-spawn{margin-top:4px;padding:4px 8px;background:rgba(46,230,166,0.08);border:1px solid rgba(46,230,166,0.3);color:var(--green);font-family:'Share Tech Mono',monospace;font-size:9px;text-align:center;letter-spacing:.1em}
+  .query-card .qc-spawn{margin-top:4px;padding:4px 8px;background:rgba(46,230,166,0.08);border:1px solid rgba(46,230,166,0.3);color:var(--green);font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:9px;text-align:center;letter-spacing:.1em}
   .query-card:hover .qc-spawn{background:rgba(46,230,166,0.16)}
   .query-pagination{display:flex;gap:6px;justify-content:center;margin-top:14px;flex-wrap:wrap}
-  .query-pagination button{padding:5px 10px;background:rgba(5,8,13,0.5);border:1px solid var(--line);color:var(--txt-dim);font-family:'Share Tech Mono',monospace;font-size:10px;cursor:pointer}
+  .query-pagination button{padding:5px 10px;background:rgba(5,8,13,0.5);border:1px solid var(--line);color:var(--txt-dim);font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:10px;cursor:pointer}
   .query-pagination button:hover{color:var(--cyan);border-color:var(--cyan)}
   .query-pagination button.active{color:var(--cyan);border-color:var(--cyan);background:rgba(0,212,255,0.08)}
   .query-pagination button:disabled{opacity:.4;cursor:not-allowed}
   .filter-chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
-  .filter-chip{padding:4px 10px;background:rgba(5,8,13,0.5);border:1px solid var(--line);color:var(--txt-dim);font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:.06em;cursor:pointer;transition:.15s;clip-path:polygon(4px 0,100% 0,calc(100% - 4px) 100%,0 100%)}
+  .filter-chip{padding:4px 10px;background:rgba(5,8,13,0.5);border:1px solid var(--line);color:var(--txt-dim);font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:10px;letter-spacing:.06em;cursor:pointer;transition:.15s;clip-path:polygon(4px 0,100% 0,calc(100% - 4px) 100%,0 100%)}
   .filter-chip:hover{color:var(--cyan);border-color:var(--line-strong)}
   .filter-chip.active{color:var(--cyan);border-color:var(--cyan);background:rgba(0,212,255,0.08)}
-  .cmd-preview{padding:12px 14px;background:rgba(5,8,13,0.7);border:1px solid var(--line);font-family:'Share Tech Mono',monospace;font-size:14px;color:var(--green);letter-spacing:.06em;margin-bottom:14px;clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,12px 100%,0 calc(100% - 12px));display:flex;align-items:center;gap:12px}
+  .cmd-preview{padding:12px 14px;background:rgba(5,8,13,0.7);border:1px solid var(--line);font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:14px;color:var(--green);letter-spacing:.06em;margin-bottom:14px;clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,12px 100%,0 calc(100% - 12px));display:flex;align-items:center;gap:12px}
   .cmd-preview .lbl{color:var(--txt-mute);font-size:10px;letter-spacing:.2em}
-  .cmd-preview .copy{margin-left:auto;padding:6px 14px;background:rgba(0,212,255,0.1);border:1px solid var(--cyan);color:var(--cyan);font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:.14em;cursor:pointer;clip-path:polygon(5px 0,100% 0,calc(100% - 5px) 100%,0 100%)}
+  .cmd-preview .copy{margin-left:auto;padding:6px 14px;background:rgba(0,212,255,0.1);border:1px solid var(--cyan);color:var(--cyan);font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:10px;letter-spacing:.14em;cursor:pointer;clip-path:polygon(5px 0,100% 0,calc(100% - 5px) 100%,0 100%)}
   .cmd-preview .copy:hover{background:rgba(0,212,255,0.2)}
-  select.field-sel{background:rgba(5,8,13,0.6);border:1px solid var(--line);color:var(--txt);padding:9px 11px;font-family:'Share Tech Mono',monospace;font-size:12px;outline:none;width:100%;clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px);appearance:none;cursor:pointer}
+  select.field-sel{background:rgba(5,8,13,0.6);border:1px solid var(--line);color:var(--txt);padding:9px 11px;font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:12px;outline:none;width:100%;clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px);appearance:none;cursor:pointer}
   select.field-sel:focus{border-color:var(--cyan)}
 
   /* ===== CONFIG ===== */
   .cfg-group{margin-bottom:16px}
-  .cfg-group-title{font-family:'Orbitron';font-weight:600;font-size:12px;color:var(--amber);letter-spacing:.1em;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .cfg-group-title{font-family:'Orbitron','Segoe UI Semibold','Segoe UI',sans-serif;font-weight:600;font-size:12px;color:var(--amber);letter-spacing:.1em;margin-bottom:10px;display:flex;align-items:center;gap:8px}
   .cfg-group-title::before{content:'';width:8px;height:8px;background:var(--amber);clip-path:polygon(50% 0,100% 100%,0 100%)}
   .cfg-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .cfg-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px}
 
   /* ===== STATUS BAR ===== */
-  .statusbar{height:32px;flex:0 0 32px;display:flex;align-items:center;gap:0;background:linear-gradient(180deg, rgba(10,15,23,0.9), rgba(5,8,13,0.95));border-top:1px solid var(--line-strong);font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:.14em}
+  .statusbar{height:34px;flex:0 0 34px;display:flex;align-items:center;gap:0;background:linear-gradient(180deg, rgba(10,15,23,0.9), rgba(5,8,13,0.95));border-top:1px solid var(--line-strong);font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:11.5px;letter-spacing:.03em}
   .sb-cell{display:flex;align-items:center;gap:7px;padding:0 14px;height:100%;border-right:1px solid var(--line);color:var(--txt-dim)}
-  .sb-cell .k{color:var(--txt-mute)} .sb-cell .v{color:var(--txt)}
+  .sb-cell .k{color:var(--txt-dim);font-size:11px;letter-spacing:.04em} .sb-cell .v{color:var(--txt);font-size:11.5px}
   .sb-cell.ok .v{color:var(--green)} .sb-cell.warn .v{color:var(--amber)}
   .sb-spacer{flex:1}
   .sb-led{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green)}
@@ -472,10 +469,10 @@
   /* ===== STAT CARDS ===== */
   .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
   .stat{padding:13px 15px;background:rgba(18,26,40,0.6);border:1px solid var(--line);clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,12px 100%,0 calc(100% - 12px));position:relative;overflow:hidden}
-  .stat .lbl{font-family:'Share Tech Mono',monospace;font-size:9.5px;letter-spacing:.24em;color:var(--txt-mute)}
-  .stat .val{font-family:'Orbitron',sans-serif;font-weight:700;font-size:24px;color:#fff;margin-top:5px;line-height:1}
+  .stat .lbl{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:9.5px;letter-spacing:.24em;color:var(--txt-mute)}
+  .stat .val{font-family:'Orbitron','Segoe UI Semibold','Segoe UI',sans-serif;font-weight:700;font-size:24px;color:#fff;margin-top:5px;line-height:1}
   .stat .val .unit{font-size:11px;color:var(--txt-dim);margin-left:4px;font-weight:400}
-  .stat .delta{font-family:'Share Tech Mono',monospace;font-size:10px;margin-top:5px;letter-spacing:.08em}
+  .stat .delta{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:10px;margin-top:5px;letter-spacing:.08em}
   .stat .delta.up{color:var(--green)} .stat .delta.warn{color:var(--amber)}
   .stat.accent .val{color:var(--cyan);text-shadow:0 0 10px rgba(0,212,255,0.4)}
   .stat.amber .val{color:var(--amber);text-shadow:0 0 10px rgba(255,157,46,0.4)}
@@ -488,12 +485,12 @@
   .monitor-grid .mon-wide{grid-column:1 / -1}
   .disk-volume-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:7px;margin-top:10px}
   .disk-volume{padding:7px 8px;background:rgba(5,8,13,.52);border:1px solid rgba(0,212,255,.1);clip-path:polygon(5px 0,100% 0,100% calc(100% - 5px),calc(100% - 5px) 100%,0 100%,0 5px)}
-  .disk-volume .dv-top{display:flex;justify-content:space-between;gap:8px;font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--txt-dim);margin-bottom:5px}
+  .disk-volume .dv-top{display:flex;justify-content:space-between;gap:8px;font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:9px;color:var(--txt-dim);margin-bottom:5px}
   .disk-volume .dv-root{color:var(--cyan);font-weight:700}.disk-volume .dv-pct{color:var(--amber)}
   .disk-volume .dv-bar{height:4px;background:rgba(0,212,255,.08);overflow:hidden}.disk-volume .dv-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--cyan-dim),var(--amber))}
   .mon-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
-  .mon-head .k{font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:.2em;color:var(--txt-dim)}
-  .mon-head .v{font-family:'Orbitron',sans-serif;font-weight:600;font-size:14px;color:#fff}
+  .mon-head .k{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:10px;letter-spacing:.2em;color:var(--txt-dim)}
+  .mon-head .v{font-family:'Orbitron','Segoe UI Semibold','Segoe UI',sans-serif;font-weight:600;font-size:14px;color:#fff}
   .mon-head .v .u{font-size:10px;color:var(--txt-dim);margin-left:3px}
   .mon-track{height:7px;background:rgba(0,212,255,0.07);position:relative;overflow:hidden}
   .mon-track > i{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,var(--cyan-dim),var(--cyan));transition:width .6s ease}
@@ -507,11 +504,11 @@
   .mod-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
   .mod-icon{width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:rgba(0,212,255,0.08);border:1px solid var(--line);color:var(--cyan);clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px)}
   .mod-icon svg{width:16px;height:16px}
-  .mod-name{font-family:'Orbitron';font-weight:600;font-size:12px;color:#fff;letter-spacing:.05em}
-  .mod-ver{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--txt-mute);margin-top:2px;display:flex;gap:6px;align-items:center}
-  .mod-kind{font-family:'Share Tech Mono',monospace;font-size:8px;padding:1px 5px;background:rgba(176,124,255,0.12);color:var(--purple);border:1px solid rgba(176,124,255,0.3);letter-spacing:.1em}
+  .mod-name{font-family:'Orbitron','Segoe UI Semibold','Segoe UI',sans-serif;font-weight:600;font-size:12px;color:#fff;letter-spacing:.05em}
+  .mod-ver{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:9px;color:var(--txt-mute);margin-top:2px;display:flex;gap:6px;align-items:center}
+  .mod-kind{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:8px;padding:1px 5px;background:rgba(176,124,255,0.12);color:var(--purple);border:1px solid rgba(176,124,255,0.3);letter-spacing:.1em}
   .mod-desc{font-size:12px;color:var(--txt-dim);line-height:1.5;margin-bottom:10px;min-height:36px;flex:1}
-  .mod-meta{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--txt-mute);letter-spacing:.08em;margin-bottom:10px;display:flex;gap:10px;flex-wrap:wrap}
+  .mod-meta{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:9px;color:var(--txt-mute);letter-spacing:.08em;margin-bottom:10px;display:flex;gap:10px;flex-wrap:wrap}
   .mod-meta .v{color:var(--txt-dim)}
   .mod-foot{display:flex;justify-content:space-between;align-items:center;gap:8px;padding-top:8px;border-top:1px solid var(--line)}
   .mod-actions{display:flex;gap:5px}
@@ -524,7 +521,7 @@
   .toggle.on{background:rgba(46,230,166,0.2);border-color:rgba(46,230,166,0.5)}
   .toggle .knob{position:absolute;top:1px;left:1px;width:14px;height:14px;background:var(--txt-mute);transition:.2s;clip-path:polygon(3px 0,100% 0,calc(100% - 3px) 100%,0 100%)}
   .toggle.on .knob{left:21px;background:var(--green);box-shadow:0 0 6px var(--green)}
-  .mod-state{font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:.16em}
+  .mod-state{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:9px;letter-spacing:.16em}
   .mod-state.on{color:var(--green)} .mod-state.off{color:var(--txt-mute)} .mod-state.removed{color:var(--amber)}
 
   /* ===== MODAL ===== */
@@ -533,76 +530,76 @@
   .modal{background:linear-gradient(180deg, rgba(18,26,40,0.98), rgba(14,20,31,0.98));border:1px solid var(--line-strong);width:100%;max-width:560px;max-height:90vh;overflow-y:auto;clip-path:polygon(0 0,calc(100% - 20px) 0,100% 20px,100% 100%,20px 100%,0 calc(100% - 20px));position:relative}
   .modal::before{content:'';position:absolute;top:0;left:0;right:20px;height:1px;background:linear-gradient(90deg,var(--cyan),transparent 70%);opacity:.6}
   .modal-head{display:flex;align-items:center;gap:12px;padding:16px 18px;border-bottom:1px solid var(--line)}
-  .modal-head .tag{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--cyan);letter-spacing:.24em;opacity:.7}
-  .modal-head .title{font-family:'Orbitron';font-weight:600;font-size:14px;color:#fff;letter-spacing:.1em;text-transform:uppercase;flex:1}
+  .modal-head .tag{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:9px;color:var(--cyan);letter-spacing:.24em;opacity:.7}
+  .modal-head .title{font-family:'Orbitron','Segoe UI Semibold','Segoe UI',sans-serif;font-weight:600;font-size:14px;color:#fff;letter-spacing:.1em;text-transform:uppercase;flex:1}
   .modal-head .x{width:28px;height:28px;display:flex;align-items:center;justify-content:center;background:rgba(255,59,84,0.08);border:1px solid rgba(255,59,84,0.3);color:var(--red);cursor:pointer;clip-path:polygon(5px 0,100% 0,calc(100% - 5px) 100%,0 100%)}
   .modal-head .x:hover{background:rgba(255,59,84,0.18)}
   .modal-body{padding:18px}
   .modal-foot{display:flex;gap:10px;justify-content:flex-end;padding:14px 18px;border-top:1px solid var(--line)}
   .modal-foot .mini-btn{padding:9px 20px}
   .modal-field{margin-bottom:14px}
-  .modal-field label{font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:.22em;color:var(--txt-mute);display:block;margin-bottom:5px}
+  .modal-field label{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:9px;letter-spacing:.22em;color:var(--txt-mute);display:block;margin-bottom:5px}
   .modal-field label .req{color:var(--red)}
-  .modal-field input,.modal-field textarea{width:100%;background:rgba(5,8,13,0.6);border:1px solid var(--line);color:var(--txt);padding:9px 11px;font-family:'Share Tech Mono',monospace;font-size:12px;outline:none;transition:.18s;clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px)}
+  .modal-field input,.modal-field textarea{width:100%;background:rgba(5,8,13,0.6);border:1px solid var(--line);color:var(--txt);padding:9px 11px;font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:12px;outline:none;transition:.18s;clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px)}
   .modal-field input:focus,.modal-field textarea:focus{border-color:var(--cyan);box-shadow:0 0 10px rgba(0,212,255,0.2) inset}
-  .modal-field select{width:100%;background:rgba(5,8,13,0.6) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2300d4ff' stroke-width='2'><polyline points='6 9 12 15 18 9'/></svg>") no-repeat right 10px center/14px;border:1px solid var(--line);color:var(--txt);padding:9px 30px 9px 11px;font-family:'Share Tech Mono',monospace;font-size:12px;outline:none;transition:.18s;clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px);appearance:none;cursor:pointer}
+  .modal-field select{width:100%;background:rgba(5,8,13,0.6) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2300d4ff' stroke-width='2'><polyline points='6 9 12 15 18 9'/></svg>") no-repeat right 10px center/14px;border:1px solid var(--line);color:var(--txt);padding:9px 30px 9px 11px;font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:12px;outline:none;transition:.18s;clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px);appearance:none;cursor:pointer}
   .modal-field select:focus{border-color:var(--cyan);box-shadow:0 0 10px rgba(0,212,255,0.2) inset}
   .modal-field select option{background:var(--bg-elev);color:var(--txt)}
-  .modal-field textarea{resize:vertical;min-height:60px;font-family:'Rajdhani',sans-serif;font-size:13px}
-  .modal-field .hint{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--txt-mute);margin-top:4px;letter-spacing:.06em}
+  .modal-field textarea{resize:vertical;min-height:60px;font-family:'Segoe UI Variable Text','Segoe UI','Microsoft YaHei UI','PingFang SC','Noto Sans CJK SC',sans-serif;font-size:13px}
+  .modal-field .hint{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:9px;color:var(--txt-mute);margin-top:4px;letter-spacing:.06em}
   .modal-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .modal-preview{background:rgba(5,8,13,0.6);border:1px solid var(--line);padding:12px;margin-bottom:14px;clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px)}
-  .modal-preview .ph{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--cyan);letter-spacing:.2em;margin-bottom:8px}
-  .modal-preview pre{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--green);line-height:1.5;white-space:pre-wrap;word-break:break-all}
+  .modal-preview .ph{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:9px;color:var(--cyan);letter-spacing:.2em;margin-bottom:8px}
+  .modal-preview pre{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:11px;color:var(--green);line-height:1.5;white-space:pre-wrap;word-break:break-all}
   .modal-confirm{display:flex;align-items:center;gap:14px;padding:14px;background:rgba(255,59,84,0.06);border:1px solid rgba(255,59,84,0.3);clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px);margin-bottom:8px}
   .modal-confirm .ci{width:40px;height:40px;flex:0 0 40px;display:flex;align-items:center;justify-content:center;background:rgba(255,59,84,0.15);border:1px solid rgba(255,59,84,0.4);color:var(--red);clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px)}
   .modal-confirm .ci svg{width:20px;height:20px}
   .modal-confirm .ct{flex:1}
-  .modal-confirm .ct .t{font-family:'Orbitron';font-weight:600;font-size:13px;color:#fff}
-  .modal-confirm .ct .s{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--red);margin-top:3px;letter-spacing:.08em}
+  .modal-confirm .ct .t{font-family:'Orbitron','Segoe UI Semibold','Segoe UI',sans-serif;font-weight:600;font-size:13px;color:#fff}
+  .modal-confirm .ct .s{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:10px;color:var(--red);margin-top:3px;letter-spacing:.08em}
 
 
   /* ===== UPDATE MODAL ===== */
   .upd-version-row{display:flex;align-items:center;gap:16px;padding:14px 16px;background:rgba(5,8,13,0.5);border:1px solid var(--line);margin-bottom:16px;clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px)}
   .upd-ver-block{flex:1;text-align:center}
-  .upd-ver-block .vl{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--txt-mute);letter-spacing:.2em}
-  .upd-ver-block .vv{font-family:'Orbitron';font-weight:700;font-size:18px;margin-top:4px}
+  .upd-ver-block .vl{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:9px;color:var(--txt-mute);letter-spacing:.2em}
+  .upd-ver-block .vv{font-family:'Orbitron','Segoe UI Semibold','Segoe UI',sans-serif;font-weight:700;font-size:18px;margin-top:4px}
   .upd-ver-block.cur .vv{color:var(--txt-dim)}
   .upd-ver-block.new .vv{color:var(--green);text-shadow:0 0 10px rgba(46,230,166,0.4)}
   .upd-ver-arrow{color:var(--cyan);font-size:20px}
   .upd-changelog{max-height:200px;overflow-y:auto;background:rgba(5,8,13,0.4);border:1px solid var(--line);padding:14px;margin-bottom:16px;clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px)}
-  .upd-changelog .cl-title{font-family:'Orbitron';font-weight:600;font-size:12px;color:var(--cyan);margin-bottom:10px;letter-spacing:.08em}
+  .upd-changelog .cl-title{font-family:'Orbitron','Segoe UI Semibold','Segoe UI',sans-serif;font-weight:600;font-size:12px;color:var(--cyan);margin-bottom:10px;letter-spacing:.08em}
   .upd-changelog ul{list-style:none;padding:0}
   .upd-changelog li{font-size:12px;color:var(--txt-dim);line-height:1.8;padding-left:16px;position:relative}
   .upd-changelog li::before{content:'▸';position:absolute;left:0;color:var(--cyan)}
-  .upd-changelog li .tag{font-family:'Share Tech Mono',monospace;font-size:8px;padding:1px 5px;margin-right:6px;letter-spacing:.1em}
+  .upd-changelog li .tag{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:8px;padding:1px 5px;margin-right:6px;letter-spacing:.1em}
   .upd-changelog li .tag.new{background:rgba(46,230,166,0.12);color:var(--green);border:1px solid rgba(46,230,166,0.3)}
   .upd-changelog li .tag.fix{background:rgba(255,157,46,0.12);color:var(--amber);border:1px solid rgba(255,157,46,0.3)}
   .upd-changelog li .tag.opt{background:rgba(0,212,255,0.12);color:var(--cyan);border:1px solid rgba(0,212,255,0.3)}
   .upd-dl-progress{margin-bottom:16px}
   .upd-dl-bar{height:8px;background:rgba(0,212,255,0.08);position:relative;overflow:hidden;clip-path:polygon(3px 0,100% 0,calc(100% - 3px) 100%,0 100%)}
   .upd-dl-bar > i{position:absolute;left:0;top:0;bottom:0;width:0;background:linear-gradient(90deg,var(--cyan-dim),var(--cyan));transition:width .3s ease;box-shadow:0 0 8px rgba(0,212,255,0.5)}
-  .upd-dl-info{display:flex;justify-content:space-between;font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--cyan);margin-top:6px;letter-spacing:.1em}
+  .upd-dl-info{display:flex;justify-content:space-between;font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:10px;color:var(--cyan);margin-top:6px;letter-spacing:.1em}
   .upd-stage{display:flex;align-items:center;gap:10px;padding:12px 14px;background:rgba(0,212,255,0.04);border:1px solid var(--line);margin-bottom:14px;clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px)}
   .upd-stage .si{width:28px;height:28px;display:flex;align-items:center;justify-content:center;color:var(--cyan)}
   .upd-stage .si svg{width:16px;height:16px}
   .upd-stage .si.spin svg{animation:spin 1s linear infinite}
-  .upd-stage .st{flex:1;font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--txt);letter-spacing:.08em}
-  .upd-stage .ss{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--cyan)}
-  .upd-meta-row{display:flex;gap:16px;margin-bottom:16px;font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--txt-mute)}
+  .upd-stage .st{flex:1;font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:11px;color:var(--txt);letter-spacing:.08em}
+  .upd-stage .ss{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:10px;color:var(--cyan)}
+  .upd-meta-row{display:flex;gap:16px;margin-bottom:16px;font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:10px;color:var(--txt-mute)}
   .upd-meta-row .mr{display:flex;gap:6px}
   .upd-meta-row .mr .k{color:var(--txt-mute)}
   .upd-meta-row .mr .v{color:var(--txt-dim)}
   .modal-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .modal-preview{background:rgba(5,8,13,0.6);border:1px solid var(--line);padding:12px;margin-bottom:14px;clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px)}
-  .modal-preview .ph{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--cyan);letter-spacing:.2em;margin-bottom:8px}
-  .modal-preview pre{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--green);line-height:1.5;white-space:pre-wrap;word-break:break-all}
+  .modal-preview .ph{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:9px;color:var(--cyan);letter-spacing:.2em;margin-bottom:8px}
+  .modal-preview pre{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:11px;color:var(--green);line-height:1.5;white-space:pre-wrap;word-break:break-all}
   .modal-confirm{display:flex;align-items:center;gap:14px;padding:14px;background:rgba(255,59,84,0.06);border:1px solid rgba(255,59,84,0.3);clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px);margin-bottom:8px}
   .modal-confirm .ci{width:40px;height:40px;flex:0 0 40px;display:flex;align-items:center;justify-content:center;background:rgba(255,59,84,0.15);border:1px solid rgba(255,59,84,0.4);color:var(--red);clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px)}
   .modal-confirm .ci svg{width:20px;height:20px}
   .modal-confirm .ct{flex:1}
-  .modal-confirm .ct .t{font-family:'Orbitron';font-weight:600;font-size:13px;color:#fff}
-  .modal-confirm .ct .s{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--red);margin-top:3px;letter-spacing:.08em}
+  .modal-confirm .ct .t{font-family:'Orbitron','Segoe UI Semibold','Segoe UI',sans-serif;font-weight:600;font-size:13px;color:#fff}
+  .modal-confirm .ct .s{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:10px;color:var(--red);margin-top:3px;letter-spacing:.08em}
 
 
   /* ===== NODE CARDS ===== */
@@ -613,19 +610,19 @@
   .node-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
   .node-status{width:9px;height:9px;border-radius:50%;flex:0 0 9px}
   .node-status.online{background:var(--green);box-shadow:0 0 8px var(--green)} .node-status.offline{background:var(--txt-mute)} .node-status.booting{background:var(--amber);box-shadow:0 0 8px var(--amber);animation:pulse 1s infinite}
-  .node-name{font-family:'Orbitron';font-weight:600;font-size:12px;color:#fff;letter-spacing:.06em}
-  .node-region{margin-left:auto;font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--txt-mute);letter-spacing:.16em}
+  .node-name{font-family:'Orbitron','Segoe UI Semibold','Segoe UI',sans-serif;font-weight:600;font-size:12px;color:#fff;letter-spacing:.06em}
+  .node-region{margin-left:auto;font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:9px;color:var(--txt-mute);letter-spacing:.16em}
   .node-metrics{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
-  .node-metric{font-family:'Share Tech Mono',monospace;font-size:10px}
+  .node-metric{font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:10px}
   .node-metric .k{color:var(--txt-mute);letter-spacing:.14em;font-size:9px}
   .node-metric .v{color:var(--txt);font-size:12px;margin-top:2px}
   .node-bar{height:4px;background:rgba(0,212,255,0.08);position:relative;margin-bottom:6px;overflow:hidden}
   .node-bar > i{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,var(--cyan),var(--amber))}
-  .node-foot{display:flex;justify-content:space-between;font-family:'Share Tech Mono',monospace;font-size:9.5px;color:var(--txt-dim);letter-spacing:.1em}
+  .node-foot{display:flex;justify-content:space-between;font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:9.5px;color:var(--txt-dim);letter-spacing:.1em}
 
   /* ===== TOAST ===== */
   .toast-wrap{position:fixed;top:74px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px}
-  .toast{padding:11px 16px;background:rgba(18,26,40,0.95);border:1px solid var(--line-strong);color:var(--txt);font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:.1em;clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px);display:flex;align-items:center;gap:10px;animation:slideIn .3s ease;min-width:240px}
+  .toast{padding:11px 16px;background:rgba(18,26,40,0.95);border:1px solid var(--line-strong);color:var(--txt);font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:11px;letter-spacing:.1em;clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px);display:flex;align-items:center;gap:10px;animation:slideIn .3s ease;min-width:240px}
   @keyframes slideIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:none}}
   .toast.ok{border-color:rgba(46,230,166,0.5)} .toast.ok .d{background:var(--green);box-shadow:0 0 6px var(--green)}
   .toast.warn{border-color:rgba(255,157,46,0.5)} .toast.warn .d{background:var(--amber);box-shadow:0 0 6px var(--amber)}
@@ -656,102 +653,6 @@
 <div class="bg-layer bg-scanlines"></div>
 <div class="bg-layer bg-vignette"></div>
 <div class="toast-wrap" id="toasts"></div>
-
-<!-- ===== CREATE MOD MODAL ===== -->
-<div class="modal-overlay" id="createModModal">
-  <div class="modal">
-    <div class="modal-head"><span class="tag">// NEW MOD</span><span class="title">创建模组</span><button class="x" onclick="closeModal('createModModal')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
-    <div class="modal-body">
-      <div class="modal-preview">
-        <div class="ph">evejs-launcher.mod.json · 预览</div>
-        <pre id="modManifestPreview"></pre>
-      </div>
-      <div class="modal-row">
-        <div class="modal-field"><label>模组 ID <span class="req">*</span></label><input id="mfId" placeholder="hello-loader" value="my-new-mod" oninput="updateModPreview()"><div class="hint">唯一标识，小写英文 + 连字符，≤128 字符</div></div>
-        <div class="modal-field"><label>显示名称 <span class="req">*</span></label><input id="mfName" placeholder="Hello Loader" value="My New Mod" oninput="updateModPreview()"><div class="hint">玩家可见名称，≤100 字符</div></div>
-      </div>
-      <div class="modal-row">
-        <div class="modal-field"><label>版本 <span class="req">*</span></label><input id="mfVer" placeholder="1.0.0" value="1.0.0" oninput="updateModPreview()"><div class="hint">语义化版本，≤64 字符</div></div>
-        <div class="modal-field"><label>类型 kind <span class="req">*</span></label><select id="mfKind" onchange="updateModPreview()">
-          <option value="loader">loader · 加载器</option>
-          <option value="source-integrated">source-integrated · 源码集成</option>
-          <option value="client-package">client-package · 客户端包</option>
-          <option value="settings">settings · 纯设置</option>
-        </select><div class="hint">决定激活策略与运行方式</div></div>
-      </div>
-      <div class="modal-field"><label>描述</label><textarea id="mfDesc" placeholder="模组功能描述…" oninput="updateModPreview()">A new EveJS mod package.</textarea><div class="hint">≤1000 字符</div></div>
-      <div class="modal-row">
-        <div class="modal-field"><label>重启策略 restart <span class="req">*</span></label><select id="mfRestart" onchange="updateModPreview()">
-          <option value="game_server">game_server · 重启游戏服务</option>
-          <option value="client">client · 重启客户端</option>
-          <option value="launcher">launcher · 重启启动器</option>
-          <option value="none">none · 不重启</option>
-        </select></div>
-        <div class="modal-field"><label>后端支持</label><select id="mfBackend" onchange="updateModPreview()">
-          <option value="both">native + docker</option>
-          <option value="native">native only</option>
-          <option value="docker">docker only</option>
-        </select></div>
-      </div>
-    </div>
-    <div class="modal-foot">
-      <button class="mini-btn" onclick="closeModal('createModModal')">取消</button>
-      <button class="mini-btn start" onclick="createMod()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="20 6 9 17 4 12"/></svg>创建模组</button>
-    </div>
-  </div>
-</div>
-
-<!-- ===== IMPORT MOD MODAL ===== -->
-<div class="modal-overlay" id="importModModal">
-  <div class="modal">
-    <div class="modal-head"><span class="tag">// IMPORT</span><span class="title" id="importTitle">导入 ZIP 模组</span><button class="x" onclick="closeModal('importModModal')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
-    <div class="modal-body">
-      <div class="modal-field"><label>模组 ID <span class="req">*</span></label><input id="ifId" placeholder="imported-mod" value="imported-mod"></div>
-      <div class="modal-row">
-        <div class="modal-field"><label>显示名称 <span class="req">*</span></label><input id="ifName" placeholder="Imported Mod" value="Imported Mod"></div>
-        <div class="modal-field"><label>版本</label><input id="ifVer" placeholder="1.0.0" value="1.0.0"></div>
-      </div>
-      <div class="modal-row">
-        <div class="modal-field"><label>类型</label><select id="ifKind">
-          <option value="loader">loader</option>
-          <option value="source-integrated">source-integrated</option>
-          <option value="client-package">client-package</option>
-          <option value="settings">settings</option>
-        </select></div>
-        <div class="modal-field"><label>重启策略</label><select id="ifRestart">
-          <option value="game_server">game_server</option>
-          <option value="client">client</option>
-          <option value="launcher">launcher</option>
-          <option value="none">none</option>
-        </select></div>
-      </div>
-      <div class="modal-field"><label id="ifSourceLabel">ZIP 文件路径</label><input id="ifSource" placeholder="C:\mods\hello-loader.zip" value=""></div>
-      <div class="modal-field"><label>描述</label><textarea id="ifDesc" placeholder="模组描述…">Imported mod package.</textarea></div>
-    </div>
-    <div class="modal-foot">
-      <button class="mini-btn" onclick="closeModal('importModModal')">取消</button>
-      <button class="mini-btn start" onclick="importMod()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="20 6 9 17 4 12"/></svg>导入</button>
-    </div>
-  </div>
-</div>
-
-<!-- ===== DELETE CONFIRM MODAL ===== -->
-<div class="modal-overlay" id="deleteModModal">
-  <div class="modal" style="max-width:440px">
-    <div class="modal-head"><span class="tag">// CONFIRM</span><span class="title">移除模组</span><button class="x" onclick="closeModal('deleteModModal')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
-    <div class="modal-body">
-      <div class="modal-confirm">
-        <div class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10.3 3.2 1.8 17a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.2a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12" y2="17"/></svg></div>
-        <div class="ct"><div class="t" id="delModName">--</div><div class="s">将移至可恢复存储 · 可通过 Undo 恢复</div></div>
-      </div>
-      <div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--txt-dim);line-height:1.6">移除后模组文件将移出活动模组目录进入可恢复存储。已保存的设置与激活状态会保留，可通过 Undo Removal 恢复。</div>
-    </div>
-    <div class="modal-foot">
-      <button class="mini-btn" onclick="closeModal('deleteModModal')">取消</button>
-      <button class="mini-btn stop" id="delModConfirm" style="color:var(--red);border-color:rgba(255,59,84,0.4);background:rgba(255,59,84,0.1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>确认移除</button>
-    </div>
-  </div>
-</div>
 
 <!-- ===== ADD COMMAND MODAL ===== -->
 <div class="modal-overlay" id="addCmdModal">
@@ -880,7 +781,7 @@
       </div>
       <div class="logo-text">
         <div class="t1">EVEJS COMMAND</div>
-        <div class="t2">SERVER LAUNCHER · v0.1.16</div>
+        <div class="t2">SERVER LAUNCHER · v0.1.17</div>
       </div>
     </div>
     <div class="topbar-divider"></div>
@@ -1056,7 +957,7 @@
           <button class="mini-btn start" onclick="openAddCmdModal()" style="padding:8px 16px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>添加指令</button>
           <button class="mini-btn" onclick="importCmdJSON()" style="padding:8px 14px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>导入 JSON</button>
           <button class="mini-btn" onclick="exportCmdJSON()" style="padding:8px 14px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>导出 JSON</button>
-          <span class="meta" id="cmdCustomMeta" style="margin-left:auto;color:var(--txt-mute);font-family:'Share Tech Mono',monospace;font-size:11px"></span>
+          <span class="meta" id="cmdCustomMeta" style="margin-left:auto;color:var(--txt-mute);font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:11px"></span>
           <input type="file" id="cmdImportFile" accept=".json" style="display:none" onchange="handleCmdImportFile(event)">
         </div>
         <div class="cmd-stats" id="cmdStats"></div>
@@ -1185,9 +1086,21 @@
             <option value="client-package">CLIENT</option>
             <option value="settings">SETTINGS</option>
           </select>
-          <button class="mini-btn" onclick="openImportMod()" style="padding:8px 14px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>导入 ZIP</button>
-          <button class="mini-btn" onclick="openImportMod(true)" style="padding:8px 14px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>导入文件夹</button>
-          <button class="mini-btn start" onclick="openCreateMod()" style="padding:8px 16px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>创建模组</button>
+          <button class="mini-btn" onclick="openModsFolder()" style="padding:8px 14px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>打开 mods 目录</button>
+          <button class="mini-btn" onclick="openModAuthoringDoc()" style="padding:8px 14px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>模组制作规范</button>
+          <button class="mini-btn start" onclick="refreshModsList()" style="padding:8px 16px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="23 4 23 10 17 10"/><path d="M20.5 15a9 9 0 1 1-2.1-9.4L23 10"/></svg>刷新列表</button>
+        </div>
+        <div class="panel" id="modsMissingPanel" style="display:none;border-color:rgba(255,157,46,0.35)">
+          <div class="panel-body" style="padding:16px">
+            <div style="display:flex;gap:14px;align-items:flex-start">
+              <div style="color:var(--amber);flex:0 0 auto;font-size:16px;line-height:1.2">⚠</div>
+              <div style="flex:1">
+                <div style="font-size:13px;color:#fff;margin-bottom:6px">未找到 mods 文件夹</div>
+                <div style="font-size:12px;color:var(--txt-dim);line-height:1.65">启动器使用 EveJS 根目录下的 <code id="modsMissingPath" style="color:var(--cyan)">mods</code> 作为模组目录。该目录不存在时模组不会被加载，也无法导入或创建模组。</div>
+              </div>
+              <button class="mini-btn start" id="modsCreateBtn" style="flex:0 0 auto;padding:9px 20px" onclick="createModsFolder()">创建 mods 文件夹</button>
+            </div>
+          </div>
         </div>
         <div class="panel">
           <div class="panel-head"><span class="tag">// MODS</span><span class="title">模组列表</span><span class="spacer"></span><span class="meta" id="modSummary">0 个模组</span></div>
@@ -1241,6 +1154,16 @@
                 <div id="cfgAutoLogin" class="checkbox" onclick="this.classList.toggle('on')"><span class="box"></span>启动后自动登录</div>
               </div>
             </div>
+            <div class="cfg-group">
+              <div class="cfg-group-title">显示 / 窗口</div>
+              <div class="login-row">
+                <div id="cfgSafeWindowed" class="checkbox" onclick="this.classList.toggle('on')"><span class="box"></span>强制安全窗口模式</div>
+              </div>
+              <div class="row" style="gap:12px;margin-top:9px;align-items:center">
+                <button id="cfgRepairBtn" class="mini-btn" style="flex:0 0 auto;padding:9px 22px" onclick="repairClientWindow()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="20" height="14" rx="0"/><line x1="8" y1="22" x2="16" y2="22"/><line x1="12" y1="18" x2="12" y2="22"/></svg>修复游戏窗口</button>
+                <span style="font-size:11px;color:var(--txt-dim)">窗口跑到屏幕外或全屏黑屏时点这里</span>
+              </div>
+            </div>
             <div class="row"><button id="cfgSaveBtn" class="mini-btn start" style="flex:0 0 auto;padding:10px 28px" onclick="saveConfigFromUI()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>保存配置</button></div>
           </div>
         </div>
@@ -1281,7 +1204,7 @@
     <div class="sb-cell"><span class="k">在线人数</span><span class="v" id="sbPilots">--</span></div>
     <div class="sb-cell"><span class="k">PING</span><span class="v" id="sbPing">23ms</span></div>
     <div class="sb-spacer"></div>
-    <div class="sb-cell"><span class="k">EVEJS</span><span class="v">v0.1.15</span></div>
+    <div class="sb-cell"><span class="k">EVEJS</span><span class="v" id="sbEvejs">—</span></div>
     <div class="sb-cell"><span class="k">PATH</span><span class="v" id="sbPath">/opt/evejs</span></div>
     <div class="sb-cell warn"><span class="k">ALERTS</span><span class="v">2</span></div>
     <div class="sb-cell"><span class="k">主服务启动维持时间</span><span class="v" id="sbSession">00:00:00</span></div>
@@ -1358,6 +1281,49 @@ Object.assign(TRANSLATE,{
   '登录后进入角色选择，点击空槽位即可创建角色。': {'en':'Signs in and opens character selection — click an empty slot to create a character.','ja':'ログイン後にキャラクター選択へ移動します。空きスロットをクリックするとキャラクターを作成できます。','ko':'로그인 후 캐릭터 선택 화면으로 이동합니다. 빈 슬롯을 클릭하면 캐릭터를 생성할 수 있습니다.','fr':'Connecte le compte puis ouvre la sélection de personnage — cliquez sur un emplacement vide pour créer un personnage.','de':'Meldet das Konto an und öffnet die Charakterauswahl – klicken Sie auf einen freien Slot, um einen Charakter zu erstellen.','nl':'Logt in en opent de personageselectie — klik op een lege plek om een personage aan te maken.','ru':'Выполняет вход и открывает выбор персонажа — нажмите на пустой слот, чтобы создать персонажа.'},
   '进入角色创建': {'en':'Opening character creation','ja':'キャラクター作成を開いています','ko':'캐릭터 생성 화면을 여는 중','fr':'Ouverture de la création de personnage','de':'Charaktererstellung wird geöffnet','nl':'Personageaanmaak wordt geopend','ru':'Открытие создания персонажа'},
   '输入账号密码以自动登录': {'en':'Enter the account password to sign in','ja':'自動ログインするにはアカウントのパスワードを入力','ko':'자동 로그인하려면 계정 비밀번호를 입력하세요','fr':'Saisissez le mot de passe du compte pour la connexion automatique','de':'Kontopasswort für die automatische Anmeldung eingeben','nl':'Voer het accountwachtwoord in voor automatisch inloggen','ru':'Введите пароль аккаунта для автоматического входа'}
+
+});
+
+Object.assign(TRANSLATE,{
+  '显示 / 窗口': {'en':'Display / Window','ja':'表示 / ウィンドウ','ko':'디스플레이 / 창','fr':'Affichage / fenêtre','de':'Anzeige / Fenster','nl':'Beeldscherm / venster','ru':'Экран / окно'},
+  '强制安全窗口模式': {'en':'Force safe windowed mode','ja':'安全なウィンドウモードを強制','ko':'안전한 창 모드 강제','fr':'Forcer le mode fenêtré sûr','de':'Sicheren Fenstermodus erzwingen','nl':'Veilige venstermodus forceren','ru':'Принудительный безопасный оконный режим'},
+  '修复游戏窗口': {'en':'Repair game window','ja':'ゲームウィンドウを修復','ko':'게임 창 복구','fr':'Réparer la fenêtre du jeu','de':'Spielfenster reparieren','nl':'Spelvenster repareren','ru':'Исправить окно игры'},
+  '窗口跑到屏幕外或全屏黑屏时点这里': {'en':'Click this when the window is off-screen or fullscreen shows nothing but sound','ja':'ウィンドウが画面外にある、または全画面で音だけのときにクリック','ko':'창이 화면 밖에 있거나 전체 화면에서 소리만 날 때 클릭하세요','fr':'Cliquez ici si la fenêtre est hors écran ou si le plein écran n\'affiche que le son','de':'Klicken Sie hier, wenn das Fenster außerhalb des Bildschirms liegt oder im Vollbild nur Ton kommt','nl':'Klik hier als het venster buiten het scherm staat of volledig scherm alleen geluid geeft','ru':'Нажмите, если окно за пределами экрана или в полноэкранном режиме только звук'},
+  '正在重置游戏窗口显示设置…': {'en':'Resetting the game window settings…','ja':'ゲームウィンドウ設定をリセットしています…','ko':'게임 창 설정을 재설정하는 중…','fr':'Réinitialisation des paramètres de fenêtre…','de':'Spielfenster-Einstellungen werden zurückgesetzt…','nl':'Spelvensterinstellingen worden gereset…','ru':'Сброс настроек окна игры…'},
+  '游戏窗口显示设置已重置': {'en':'Game window settings have been reset','ja':'ゲームウィンドウ設定をリセットしました','ko':'게임 창 설정이 재설정되었습니다','fr':'Paramètres de fenêtre réinitialisés','de':'Spielfenster-Einstellungen wurden zurückgesetzt','nl':'Spelvensterinstellingen zijn gereset','ru':'Настройки окна игры сброшены'},
+  '游戏窗口修复失败': {'en':'Failed to repair the game window','ja':'ゲームウィンドウの修復に失敗しました','ko':'게임 창 복구 실패','fr':'Échec de la réparation de la fenêtre','de':'Spielfenster konnte nicht repariert werden','nl':'Spelvenster repareren mislukt','ru':'Не удалось исправить окно игры'}
+
+});
+
+Object.assign(TRANSLATE,{
+  '个模组': {'en':'mods','ja':'個の模組','ko':'개 모드','fr':'mods','de':'Mods','nl':'mods','ru':'модов'},
+  '未找到 mods 文件夹': {'en':"Folder 'mods' not found",'ja':'mods フォルダが見つかりません','ko':'mods 폴더를 찾을 수 없습니다','fr':"Dossier 'mods' introuvable",'de':"Ordner 'mods' nicht gefunden",'nl':"Map 'mods' niet gevonden",'ru':"Папка 'mods' не найдена"},
+  '创建 mods 文件夹': {'en':'Create mods folder','ja':'mods フォルダを作成','ko':'mods 폴더 만들기','fr':'Créer le dossier mods','de':'Ordner mods erstellen','nl':'Map mods aanmaken','ru':'Создать папку mods'},
+  '启动器使用 EveJS 根目录下的 mods 作为模组目录。该目录不存在时模组不会被加载，也无法导入或创建模组。': {'en':'The launcher uses the mods folder in the EveJS root directory. Without it, mods are not loaded and you cannot import or create any.','ja':'ランチャーは EveJS ルート直下の mods フォルダを模組ディレクトリとして使用します。存在しない場合、模組は読み込まれず、インポートや作成もできません。','ko':'런처는 EveJS 루트의 mods 폴더를 모드 디렉터리로 사용합니다. 이 폴더가 없으면 모드가 로드되지 않고 가져오기나 생성도 할 수 없습니다.','fr':"Le lanceur utilise le dossier mods à la racine d'EveJS. Sans lui, les mods ne sont pas chargés et vous ne pouvez ni les importer ni en créer.",'de':'Der Launcher nutzt den Ordner mods im EveJS-Stammverzeichnis. Fehlt er, werden Mods nicht geladen und können weder importiert noch erstellt werden.','nl':'De launcher gebruikt de map mods in de EveJS-hoofdmap. Zonder die map worden mods niet geladen en kun je ze niet importeren of aanmaken.','ru':'Лаунчер использует папку mods в корне EveJS. Без неё моды не загружаются, и их нельзя импортировать или создать.'},
+  'mods 文件夹已创建': {'en':'mods folder created','ja':'mods フォルダを作成しました','ko':'mods 폴더를 만들었습니다','fr':'Dossier mods créé','de':'Ordner mods erstellt','nl':'Map mods aangemaakt','ru':'Папка mods создана'},
+  '创建 mods 文件夹失败': {'en':'Failed to create mods folder','ja':'mods フォルダの作成に失敗しました','ko':'mods 폴더 생성 실패','fr':'Échec de la création du dossier mods','de':'Ordner mods konnte nicht erstellt werden','nl':'Map mods aanmaken mislukt','ru':'Не удалось создать папку mods'}
+
+});
+
+Object.assign(TRANSLATE,{
+  'mods 目录里还没有模组': {'en':'No mods found in the mods folder','ja':'mods フォルダに模組がありません','ko':'mods 폴더에 모드가 없습니다','fr':'Aucun mod dans le dossier mods','de':'Keine Mods im Ordner mods gefunden','nl':'Geen mods gevonden in de map mods','ru':'В папке mods нет модов'},
+  '没有匹配的模组': {'en':'No matching mods','ja':'一致する模組がありません','ko':'일치하는 모드가 없습니다','fr':'Aucun mod correspondant','de':'Keine passenden Mods','nl':'Geen overeenkomende mods','ru':'Подходящих модов нет'},
+  '暂不支持': {'en':'Not supported yet','ja':'未対応','ko':'아직 지원되지 않음','fr':'Pas encore pris en charge','de':'Noch nicht unterstützt','nl':'Nog niet ondersteund','ru':'Пока не поддерживается'},
+  '缺少依赖': {'en':'Missing dependency','ja':'依存関係が不足','ko':'의존성 누락','fr':'Dépendance manquante','de':'Fehlende Abhängigkeit','nl':'Ontbrekende afhankelijkheid','ru':'Не хватает зависимости'},
+  '冲突': {'en':'Conflict','ja':'競合','ko':'충돌','fr':'Conflit','de':'Konflikt','nl':'Conflict','ru':'Конфликт'},
+  '无描述': {'en':'No description','ja':'説明なし','ko':'설명 없음','fr':'Aucune description','de':'Keine Beschreibung','nl':'Geen beschrijving','ru':'Без описания'},
+  '目录': {'en':'Folder','ja':'フォルダ','ko':'폴더','fr':'Dossier','de':'Ordner','nl':'Map','ru':'Папка'},
+  '打开 mods 目录': {'en':'Open mods folder','ja':'mods フォルダを開く','ko':'mods 폴더 열기','fr':'Ouvrir le dossier mods','de':'Ordner mods öffnen','nl':'Map mods openen','ru':'Открыть папку mods'},
+  '模组制作规范': {'en':'Mod authoring guide','ja':'模組作成ガイド','ko':'모드 제작 가이드','fr':'Guide de création de mods','de':'Mod-Erstellungsanleitung','nl':'Handleiding voor mods maken','ru':'Руководство по созданию модов'},
+  '已用系统默认程序打开模组制作规范': {'en':'Opened the mod authoring guide','ja':'模組作成ガイドを開きました','ko':'모드 제작 가이드를 열었습니다','fr':'Guide de création de mods ouvert','de':'Mod-Erstellungsanleitung geöffnet','nl':'Handleiding voor mods maken geopend','ru':'Руководство по созданию модов открыто'},
+  '未找到 .md 关联程序，已在资源管理器中选中该文档': {'en':"No .md handler found — the file was selected in Explorer instead",'ja':'.md に関連付いたアプリがないため、エクスプローラーで選択しました','ko':'.md 연결 프로그램이 없어 탐색기에서 선택했습니다','fr':"Aucune application associée au .md — le fichier a été sélectionné dans l'Explorateur",'de':"Keine .md-Zuordnung gefunden – Datei wurde im Explorer markiert",'nl':'Geen .md-koppeling gevonden — bestand is geselecteerd in Verkenner','ru':'Нет программы для .md — файл выделен в проводнике'},
+  '打开模组制作规范失败': {'en':'Failed to open the mod authoring guide','ja':'模組作成ガイドを開けませんでした','ko':'모드 제작 가이드를 열지 못했습니다','fr':'Échec de l\'ouverture du guide de création de mods','de':'Mod-Erstellungsanleitung konnte nicht geöffnet werden','nl':'Handleiding voor mods maken kon niet worden geopend','ru':'Не удалось открыть руководство по созданию модов'},
+  '操作失败': {'en':'Operation failed','ja':'操作に失敗しました','ko':'작업 실패','fr':'Échec de l\'opération','de':'Vorgang fehlgeschlagen','nl':'Bewerking mislukt','ru':'Операция не удалась'},
+  '刷新列表': {'en':'Refresh list','ja':'一覧を更新','ko':'목록 새로고침','fr':'Actualiser la liste','de':'Liste aktualisieren','nl':'Lijst vernieuwen','ru':'Обновить список'},
+  '点击启用': {'en':'Click to enable','ja':'クリックで有効化','ko':'클릭하여 활성화','fr':'Cliquer pour activer','de':'Zum Aktivieren klicken','nl':'Klik om in te schakelen','ru':'Нажмите, чтобы включить'},
+  '点击禁用': {'en':'Click to disable','ja':'クリックで無効化','ko':'클릭하여 비활성화','fr':'Cliquer pour désactiver','de':'Zum Deaktivieren klicken','nl':'Klik om uit te schakelen','ru':'Нажмите, чтобы отключить'},
+  '模组已启用，请重启游戏服务生效': {'en':'Mod enabled — restart the game server to apply','ja':'模組を有効化しました。反映にはゲームサーバーの再起動が必要です','ko':'모드를 활성화했습니다. 적용하려면 게임 서버를 재시작하세요','fr':'Mod activé — redémarrez le serveur de jeu pour appliquer','de':'Mod aktiviert – Spielserver neu starten, um zu übernehmen','nl':'Mod ingeschakeld — herstart de gameserver om toe te passen','ru':'Мод включён — перезапустите игровой сервер'},
+  '模组已禁用，请重启游戏服务生效': {'en':'Mod disabled — restart the game server to apply','ja':'模組を無効化しました。反映にはゲームサーバーの再起動が必要です','ko':'모드를 비활성화했습니다. 적용하려면 게임 서버를 재시작하세요','fr':'Mod désactivé — redémarrez le serveur de jeu pour appliquer','de':'Mod deaktiviert – Spielserver neu starten, um zu übernehmen','nl':'Mod uitgeschakeld — herstart de gameserver om toe te passen','ru':'Мод отключён — перезапустите игровой сервер'}
 
 });
 
@@ -1723,7 +1689,7 @@ function initAllEnv(){
 function runEnvCheck(){
   toast(t('正在重新检测环境…'),'warn');
   const list=document.getElementById('checkList');
-  list.innerHTML='<div style="padding:30px;text-align:center;color:var(--txt-mute);font-family:Share Tech Mono">'+t('扫描中…')+'</div>';
+  list.innerHTML='<div style="padding:30px;text-align:center;color:var(--txt-mute);font-family:Cascadia Mono,Consolas,SFMono-Regular,DejaVu Sans Mono,monospace">'+t('扫描中…')+'</div>';
   setTimeout(()=>{
     renderEnvCheck();
     const pass=ENV.filter(e=>e.status==='ok').length;
@@ -2558,151 +2524,59 @@ document.getElementById('cmdInput').addEventListener('keydown',e=>{
   }
 });
 
-/* ============ MODS ============ */
-const MODS=[
-  {id:'esi-bridge',name:'ESI Bridge',ver:'v3.1.0',on:true,desc:'与 EVE ESI API 双向同步，提供实时市场与角色数据。',icon:'bridge',kind:'source-integrated',restart:'game_server',backend:'both',path:'mods/esi-bridge',removed:false},
-  {id:'auth-guard',name:'Auth Guard',ver:'v2.4.7',on:true,desc:'基于角色的访问控制与 JWT 鉴权中间件。',icon:'shield',kind:'loader',restart:'game_server',backend:'native',path:'mods/auth-guard',removed:false},
-  {id:'market-engine',name:'Market Engine',ver:'v5.0.2',on:true,desc:'订单撮合引擎，支持限价/市价/即时成交。',icon:'chart',kind:'source-integrated',restart:'game_server',backend:'both',path:'mods/market-engine',removed:false},
-  {id:'fleet-comms',name:'Fleet Comms',ver:'v1.8.3',on:true,desc:'舰队实时通讯频道，WebSocket 低延迟推送。',icon:'radio',kind:'loader',restart:'none',backend:'both',path:'mods/fleet-comms',removed:false},
-  {id:'killboard-feed',name:'Killboard Feed',ver:'v2.1.0',on:true,desc:'击杀邮件流处理与排行榜聚合。',icon:'skull',kind:'loader',restart:'game_server',backend:'native',path:'mods/killboard-feed',removed:false},
-  {id:'sov-map',name:'Sovereignty Map',ver:'v4.3.1',on:false,desc:'星系主权与势力范围可视化地图。',icon:'globe',kind:'client-package',restart:'client',backend:'native',path:'mods/sov-map',removed:false},
-  {id:'industry-tracker',name:'Industry Tracker',ver:'v1.2.4',on:true,desc:'工业任务、蓝图与制造流水线追踪。',icon:'factory',kind:'settings',restart:'none',backend:'both',path:'mods/industry-tracker',removed:false},
-  {id:'anti-cheat',name:'Anti-Cheat Sentinel',ver:'v6.5.0',on:true,desc:'行为分析与异常检测守护进程。',icon:'eye',kind:'source-integrated',restart:'game_server',backend:'native',path:'mods/anti-cheat',removed:false}
-];
+/* ============ MODS（真实数据，由 launcher-bridge.js 从后端加载） ============ */
+let MODS=[];
 const KIND_LABEL={loader:'LOADER','source-integrated':'SOURCE','client-package':'CLIENT',settings:'SETTINGS'};
+const MOD_ICON={loader:'shield','source-integrated':'chart','client-package':'globe',settings:'factory'};
+function modAttr(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function renderMods(){
-  const q=(document.getElementById('modSearch').value||'').toLowerCase().trim();
-  const filt=document.getElementById('modFilter').value;
   const grid=document.getElementById('modsGrid');
-  grid.innerHTML=MODS.map((m,i)=>{
-    if(q && !(m.name.toLowerCase().includes(q)||m.id.toLowerCase().includes(q))) return '';
-    if(filt!=='all' && m.kind!==filt) return '';
-    const stateCls=m.removed?'removed':(m.on?'on':'off');
-    const stateTxt=m.removed?'● REMOVED':(m.on?'● ENABLED':'○ DISABLED');
-    const actions=m.removed
-      ? `<button class="mod-act undo" title="Undo Removal" onclick="undoRemoveMod(${i})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="1 4 1 10 7 10"/><path d="M3.5 15a9 9 0 1 0 2.1-9.4L1 10"/></svg></button>`
-      : `<div class="toggle ${m.on?'on':''}" data-i="${i}"><span class="knob"></span></div>
-         <div class="mod-actions">
-           <button class="mod-act" title="配置" onclick="toast('${m.name}: 配置','ok')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>
-           <button class="mod-act del" title="移除" onclick="confirmDeleteMod(${i})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></button>
-         </div>`;
-    return `
-    <div class="mod ${m.removed?'removed':''}">
-      <div class="mod-head"><div class="mod-icon">${I[m.icon]||I.shield}</div><div style="flex:1"><div class="mod-name">${m.name}</div><div class="mod-ver">${m.ver} <span class="mod-kind">${KIND_LABEL[m.kind]||m.kind}</span></div></div></div>
-      <div class="mod-desc">${m.desc}</div>
-      <div class="mod-meta"><span>id: <span class="v">${m.id}</span></span><span>restart: <span class="v">${m.restart}</span></span></div>
-      <div class="mod-foot">
-        <span class="mod-state ${stateCls}">${stateTxt}</span>
-        ${actions}
-      </div>
-    </div>`;
-  }).join('');
-  const visible=MODS.filter(m=>(!q||m.name.toLowerCase().includes(q)||m.id.toLowerCase().includes(q))&&(filt==='all'||m.kind===filt));
-  const active=visible.filter(m=>!m.removed).length;
-  const removed=visible.filter(m=>m.removed).length;
-  document.getElementById('modSummary').textContent=active+' '+t('个活跃')+(removed>0?' · '+removed+' '+t('已移除'):'');
-  // bind toggles
-  grid.querySelectorAll('.toggle').forEach(t=>t.addEventListener('click',()=>{
-    const i=+t.dataset.i; const m=MODS[i];
-    if(m.removed) return;
-    t.classList.toggle('on'); m.on=t.classList.contains('on');
-    t.parentElement.querySelector('.mod-state').className='mod-state '+(m.on?'on':'off');
-    t.parentElement.querySelector('.mod-state').textContent=m.on?'● ENABLED':'○ DISABLED';
-    toast(m.name+(m.on?' 已启用':' 已禁用'),m.on?'ok':'warn');
-    logTo('sys',m.on?'OK':'WARN','模组 <span class="hi">'+m.name+'</span> '+(m.on?'已启用':'已禁用'));
-  }));
+  if(!grid) return;
+  const q=(document.getElementById('modSearch')?.value||'').toLowerCase().trim();
+  const filt=document.getElementById('modFilter')?.value||'all';
+  const rows=MODS.filter(m=>{
+    if(q && !((m.displayName||'').toLowerCase().includes(q)||(m.id||'').toLowerCase().includes(q))) return false;
+    if(filt!=='all' && m.kind!==filt) return false;
+    return true;
+  });
+  if(!MODS.length){
+    grid.innerHTML='<div style="grid-column:1/-1;padding:34px;text-align:center;color:var(--txt-mute);font-size:12px">'+t('mods 目录里还没有模组')+'</div>';
+  } else if(!rows.length){
+    grid.innerHTML='<div style="grid-column:1/-1;padding:34px;text-align:center;color:var(--txt-mute);font-size:12px">'+t('没有匹配的模组')+'</div>';
+  } else {
+    grid.innerHTML=rows.map(m=>{
+      const stateCls=!m.supported?'removed':(m.enabled?'on':'off');
+      const stateTxt=!m.supported?'○ '+t('暂不支持'):(m.enabled?'● ENABLED':'○ DISABLED');
+      const notes=[];
+      if(m.error) notes.push(m.error);
+      if(m.missingRequires&&m.missingRequires.length) notes.push(t('缺少依赖')+': '+m.missingRequires.join(', '));
+      if(m.activeConflicts&&m.activeConflicts.length) notes.push(t('冲突')+': '+m.activeConflicts.join(', '));
+      if(!m.supported && m.unsupportedReason) notes.push(m.unsupportedReason);
+      const toggle=m.supported
+        ? '<div class="toggle '+(m.enabled?'on':'')+'" data-mod-folder="'+modAttr(m.folder)+'" title="'+t(m.enabled?'点击禁用':'点击启用')+'"><span class="knob"></span></div>'
+        : '';
+      const ver=m.version?('v'+String(m.version).replace(/^v/i,'')):'';
+      return '<div class="mod '+(m.enabled?'':'disabled')+'">'
+        +'<div class="mod-head"><div class="mod-icon">'+(I[MOD_ICON[m.kind]]||I.shield)+'</div><div style="flex:1">'
+        +'<div class="mod-name">'+modAttr(m.displayName||m.id)+'</div>'
+        +'<div class="mod-ver">'+modAttr(ver)+' <span class="mod-kind">'+(KIND_LABEL[m.kind]||m.kind||'')+'</span></div>'
+        +'</div></div>'
+        +'<div class="mod-desc">'+(modAttr(m.description)||'<span style="color:var(--txt-mute)">'+t('无描述')+'</span>')+'</div>'
+        +'<div class="mod-meta"><span>id: <span class="v">'+modAttr(m.id)+'</span></span><span>restart: <span class="v">'+modAttr(m.restart||'—')+'</span></span><span>'+t('目录')+': <span class="v">'+modAttr(m.folder)+'</span></span></div>'
+        +(notes.length?'<div style="font-size:11px;color:var(--amber);line-height:1.6;margin-bottom:8px">'+notes.map(n=>modAttr(n)).join('<br>')+'</div>':'')
+        +'<div class="mod-foot"><span class="mod-state '+stateCls+'">'+stateTxt+'</span>'+toggle+'</div>'
+        +'</div>';
+    }).join('');
+  }
+  grid.querySelectorAll('.toggle[data-mod-folder]').forEach(el=>{
+    el.addEventListener('click',()=>{ void toggleMod(el.dataset.modFolder, !el.classList.contains('on')); });
+  });
+  const enabled=MODS.filter(m=>m.enabled).length;
+  const summary=document.getElementById('modSummary');
+  if(summary) summary.textContent=MODS.length+' '+t('个模组')+' · '+enabled+' '+t('个活跃');
+  if(typeof autoTranslateAfterRender==='function') autoTranslateAfterRender();
+}
 
-  if(typeof autoTranslateAfterRender==="function") autoTranslateAfterRender();}
-function openCreateMod(){
-  document.getElementById('createModModal').classList.add('open');
-  updateModPreview();
-}
-function updateModPreview(){
-  const id=document.getElementById('mfId').value||'my-mod';
-  const name=document.getElementById('mfName').value||'My Mod';
-  const ver=document.getElementById('mfVer').value||'1.0.0';
-  const kind=document.getElementById('mfKind').value;
-  const restart=document.getElementById('mfRestart').value;
-  const backend=document.getElementById('mfBackend').value;
-  const desc=document.getElementById('mfDesc').value||'';
-  const backends=backend==='both'?['native','docker']:[backend];
-  const strategy=kind==='loader'?'loader_rename':(kind==='settings'?'json_boolean':'package');
-  const manifest={
-    schemaVersion:3, id, displayName:name, version:ver,
-    description:desc, kind,
-    supportedBackends:backends,
-    activation:{strategy},
-    restart
-  };
-  document.getElementById('modManifestPreview').textContent=JSON.stringify(manifest,null,2);
-}
-function createMod(){
-  const id=document.getElementById('mfId').value.trim();
-  const name=document.getElementById('mfName').value.trim();
-  const ver=document.getElementById('mfVer').value.trim();
-  if(!id||!name||!ver){ toast('ID、名称、版本为必填项','err'); return; }
-  if(MODS.some(m=>m.id===id)){ toast('模组 ID "'+id+'" 已存在','err'); return; }
-  const kind=document.getElementById('mfKind').value;
-  const iconMap={loader:'shield','source-integrated':'chart','client-package':'globe',settings:'factory'};
-  MODS.unshift({
-    id, name, ver:ver.startsWith('v')?ver:'v'+ver, on:false, desc:document.getElementById('mfDesc').value||'A new EveJS mod package.',
-    icon:iconMap[kind]||'shield', kind, restart:document.getElementById('mfRestart').value,
-    backend:document.getElementById('mfBackend').value, path:'mods/'+id, removed:false
-  });
-  closeModal('createModModal');
-  renderMods();
-  toast('模组 '+name+' 已创建（初始禁用）','ok');
-  logTo('sys','OK','模组 <span class="hi">'+name+'</span> ('+id+') 已创建 · kind='+kind);
-}
-let importIsFolder=false;
-function openImportMod(isFolder){
-  importIsFolder=!!isFolder;
-  document.getElementById('importTitle').textContent=isFolder?t('导入文件夹模组'):t('导入 ZIP 模组');
-  document.getElementById('ifSourceLabel').textContent=isFolder?t('文件夹路径'):t('ZIP 文件路径');
-  document.getElementById('ifSource').placeholder=isFolder?'C:\\mods\\hello-loader':'C:\\mods\\hello-loader.zip';
-  document.getElementById('importModModal').classList.add('open');
-}
-function importMod(){
-  const id=document.getElementById('ifId').value.trim();
-  const name=document.getElementById('ifName').value.trim();
-  const src=document.getElementById('ifSource').value.trim();
-  if(!id||!name){ toast('ID、名称为必填项','err'); return; }
-  if(!src){ toast(importIsFolder?'请填写文件夹路径':'请填写 ZIP 路径','err'); return; }
-  if(MODS.some(m=>m.id===id)){ toast('模组 ID "'+id+'" 已存在','err'); return; }
-  const kind=document.getElementById('ifKind').value;
-  const iconMap={loader:'shield','source-integrated':'chart','client-package':'globe',settings:'factory'};
-  MODS.unshift({
-    id, name, ver:'v'+(document.getElementById('ifVer').value||'1.0.0'), on:false,
-    desc:document.getElementById('ifDesc').value||'Imported mod package.',
-    icon:iconMap[kind]||'shield', kind, restart:document.getElementById('ifRestart').value,
-    backend:'both', path:'mods/'+id, removed:false
-  });
-  closeModal('importModModal');
-  renderMods();
-  toast('模组 '+name+' 已从'+(importIsFolder?'文件夹':'ZIP')+'导入','ok');
-  logTo('sys','OK','模组 <span class="hi">'+name+'</span> 已导入 · source='+src);
-}
-function confirmDeleteMod(i){
-  const m=MODS[i];
-  document.getElementById('delModName').textContent=m.name+' ('+m.id+')';
-  document.getElementById('deleteModModal').classList.add('open');
-  document.getElementById('delModConfirm').onclick=()=>{ removeMod(i); };
-}
-function removeMod(i){
-  const m=MODS[i];
-  m.removed=true; m.on=false;
-  closeModal('deleteModModal');
-  renderMods();
-  toast('模组 '+m.name+' 已移除 · 可 Undo 恢复','warn');
-  logTo('sys','WARN','模组 <span class="hi">'+m.name+'</span> 已移至可恢复存储');
-}
-function undoRemoveMod(i){
-  const m=MODS[i];
-  m.removed=false;
-  renderMods();
-  toast('模组 '+m.name+' 已恢复（禁用状态）','ok');
-  logTo('sys','OK','模组 <span class="hi">'+m.name+'</span> 已从可恢复存储还原');
-}
 function closeModal(id){ document.getElementById(id).classList.remove('open'); }
 // close modal on overlay click
 document.addEventListener('click',e=>{ if(e.target.classList&&e.target.classList.contains('modal-overlay')) e.target.classList.remove('open'); });
@@ -2822,7 +2696,7 @@ function renderUpdateModal(){
         <div class="upd-dl-bar"><i id="updInstBar" style="width:0%"></i></div>
         <div class="upd-dl-info"><span id="updInstStage">${t('解压文件…')}</span><span></span></div>
       </div>
-      <div style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--txt-mute);margin-top:10px;letter-spacing:.08em">⚠ ${t('安装过程中请勿关闭启动器')}</div>`;
+      <div style="font-family:Cascadia Mono,Consolas,SFMono-Regular,DejaVu Sans Mono,monospace;font-size:10px;color:var(--txt-mute);margin-top:10px;letter-spacing:.08em">⚠ ${t('安装过程中请勿关闭启动器')}</div>`;
     foot.innerHTML='';
     return;
   }

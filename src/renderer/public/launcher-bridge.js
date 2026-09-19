@@ -646,6 +646,12 @@
       setInput("cfgCaPem", config?.client?.caPem);
       setInput("cfgProxyUrl", config?.client?.proxyUrl);
       setInput("cfgClientSource", config?.client?.sourceFile);
+      const evejsVersionEl = document.getElementById("sbEvejs");
+      if (evejsVersionEl) {
+        const serverVersion = String(appInfo?.evejsVersion || "").trim();
+        evejsVersionEl.textContent = serverVersion ? "v" + serverVersion : "—";
+        evejsVersionEl.title = serverVersion ? "EveJS server " + serverVersion : "EveJS version not detected";
+      }
       const serverMeta = document.getElementById("cfgServerMeta");
       if (serverMeta) serverMeta.textContent = config?.server?.sourceFile || "";
       const clientMeta = document.getElementById("cfgClientMeta");
@@ -654,6 +660,7 @@
       if (statusPath) statusPath.textContent = appInfo?.repoRoot || "";
       setCheckbox("cfgStartMarket", settings?.startMarket !== false);
       setCheckbox("cfgAutoLogin", settings?.autoLogin === true);
+      setCheckbox("cfgSafeWindowed", String(config?.client?.safeWindowed || "off").trim().toLowerCase() === "on");
     } catch (error) {
       toast("配置读取失败: " + String(error), "err");
     }
@@ -1020,7 +1027,8 @@
       clientPath: document.getElementById("cfgClientPath")?.value || "",
       clientExe: document.getElementById("cfgClientExe")?.value || "",
       caPem: document.getElementById("cfgCaPem")?.value || "",
-      proxyUrl: document.getElementById("cfgProxyUrl")?.value || ""
+      proxyUrl: document.getElementById("cfgProxyUrl")?.value || "",
+      safeWindowed: checkboxOn("cfgSafeWindowed") ? "on" : "off"
     });
     if (!result?.ok) {
       toast(result?.reason || "配置保存失败", "err");
@@ -1029,6 +1037,94 @@
     toast("配置已保存到 " + (result.client?.sourceFile || "EvEJSConfig.bat"), "ok");
     await loadConfigFromBackend();
     await tickMetrics();
+  };
+
+  repairClientWindow = async function () {
+    const button = document.getElementById("cfgRepairBtn");
+    if (button) button.disabled = true;
+    toast(t("正在重置游戏窗口显示设置…"), "warn");
+    try {
+      const result = await api.configRepairClientDisplay();
+      if (!result?.ok) throw new Error(result?.reason || "修复失败");
+      toast(t("游戏窗口显示设置已重置"), "ok");
+      logTo("sys", "OK", "已重置游戏窗口显示设置（窗口模式 · 主屏左上角）");
+    } catch (error) {
+      toast(t("游戏窗口修复失败") + ": " + String(error), "err");
+    } finally {
+      if (button) button.disabled = false;
+    }
+  };
+
+  async function refreshModsStatus() {
+    const panel = document.getElementById("modsMissingPanel");
+    if (!panel) return;
+    try {
+      const status = await api.modsList();
+      const pathEl = document.getElementById("modsMissingPath");
+      if (pathEl && status?.root) pathEl.textContent = status.root;
+      panel.style.display = status?.exists ? "none" : "";
+      MODS.length = 0;
+      (status?.mods || []).forEach((mod) => MODS.push(mod));
+      renderMods();
+    } catch (error) {
+      console.error("modsList failed", error);
+    }
+  }
+
+  refreshModsList = async function () {
+    await refreshModsStatus();
+    toast(t("刷新列表") + " · " + MODS.length + " " + t("个模组"), "ok");
+  };
+
+  openModsFolder = async function () {
+    try {
+      const result = await api.modsOpenFolder();
+      if (!result?.ok) throw new Error(result?.reason || "打开失败");
+      logTo("sys", "OK", "已打开模组目录 <span class=\"hi\">" + esc(result.root || "mods") + "</span>");
+    } catch (error) {
+      toast(String(error), "err");
+    }
+  };
+
+  openModAuthoringDoc = async function () {
+    try {
+      const result = await api.modsOpenAuthoringDoc();
+      if (!result?.ok) throw new Error(result?.reason || "打开失败");
+      if (result.revealed) toast(t("未找到 .md 关联程序，已在资源管理器中选中该文档"), "warn");
+      else toast(t("已用系统默认程序打开模组制作规范"), "ok");
+      logTo("sys", "OK", "模组制作规范: <span class=\"hi\">" + esc(result.path || "") + "</span>");
+    } catch (error) {
+      toast(t("打开模组制作规范失败") + ": " + String(error), "err");
+    }
+  };
+
+  toggleMod = async function (folder, next) {
+    try {
+      const result = await api.modsSetEnabled(folder, next);
+      if (!result?.ok) throw new Error(result?.reason || "操作失败");
+      toast(t(next ? "模组已启用，请重启游戏服务生效" : "模组已禁用，请重启游戏服务生效"), next ? "ok" : "warn");
+      logTo("sys", next ? "OK" : "WARN", "模组 <span class=\"hi\">" + esc(folder) + "</span> " + (next ? "已启用" : "已禁用"));
+      await refreshModsStatus();
+    } catch (error) {
+      toast(t("操作失败") + ": " + String(error), "err");
+      await refreshModsStatus();
+    }
+  };
+
+  createModsFolder = async function () {
+    const button = document.getElementById("modsCreateBtn");
+    if (button) button.disabled = true;
+    try {
+      const result = await api.modsCreateFolder();
+      if (!result?.ok) throw new Error(result?.reason || "创建失败");
+      toast(t("mods 文件夹已创建"), "ok");
+      logTo("sys", "OK", "已创建模组目录 <span class=\"hi\">" + esc(result.root || "mods") + "</span>");
+      await refreshModsStatus();
+    } catch (error) {
+      toast(t("创建 mods 文件夹失败") + ": " + String(error), "err");
+    } finally {
+      if (button) button.disabled = false;
+    }
   };
 
   function formatUptime(seconds) {
@@ -1293,6 +1389,12 @@
   const databaseNav = document.querySelector('.nav-item[data-view="database"]');
   if (databaseNav) databaseNav.addEventListener("click", () => loadDatabaseOverview());
   if (document.getElementById("view-database")?.classList.contains("active")) loadDatabaseOverview();
+  const modulesNav = document.querySelector('.nav-item[data-view="modules"]');
+  if (modulesNav) modulesNav.addEventListener("click", () => refreshModsStatus());
+  if (document.getElementById("view-modules")?.classList.contains("active")) refreshModsStatus();
+
+  // 资源指标 / 在线人数：原来只在启动时拉取一次，这里改为定时刷新
+  setInterval(() => { void tickMetrics(); }, 5000);
 
   const launchButton = document.getElementById("launchAll");
   if (launchButton) {
@@ -1312,6 +1414,7 @@
     await loadAccountsFromBackend();
     await loadConfigFromBackend();
     await tickMetrics();
+    await refreshModsStatus();
     api.initState().then((state) => { if (state?.busy) logTo("sys", "SYS", esc(state.message || state.label || "初始化任务运行中")); }).catch(() => {});
     logTo("sys", "OK", "EVEJS COMMAND 启动器已连接 Electron 后端");
   })();

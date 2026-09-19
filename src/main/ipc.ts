@@ -24,6 +24,8 @@ import {
 } from "./processManager";
 import { listAccounts, createAccount, deleteAccount, checkServerRunning, verifyAccount, changeAccountPassword, launchClientWithLogin, launchStoredAccount } from "./accountManager";
 import * as pty from "./ptyManager";
+import { repairClientDisplay } from "./processManager";
+import { scanMods, setModEnabled, createModsFolder, planLoaders, modsRoot, ensureModAuthoringDoc } from "./modManager";
 import { log } from "./logger";
 import { applyUpdate, cancelUpdateDownload, checkForUpdates, currentUpdateState, downloadUpdate } from "./updater";
 import { databaseOverview, databaseTable, databaseSaveRow, databaseInsertRow, databaseDeleteRow, databaseCreateBackup, databaseBackups, databaseRestoreBackup } from "./databaseManager";
@@ -32,6 +34,61 @@ const execFileAsync = promisify(execFile);
 let previousCpu = os.cpus().map((cpu) => ({ ...cpu.times }));
 let previousNetBytes: number | null = null;
 let previousNetAt = Date.now();
+
+/** EveJS 服务端版本：优先 config/version.json，其次根 package.json / server/package.json */
+function readEvejsVersion(repoRoot: string): string {
+  const candidates = [
+    path.join(repoRoot, "config", "version.json"),
+    path.join(repoRoot, "package.json"),
+    path.join(repoRoot, "server", "package.json")
+  ];
+  for (const file of candidates) {
+    try {
+      const data = JSON.parse(fs.readFileSync(file, "utf8").replace(/^\uFEFF/, "")) as Record<string, unknown>;
+      const value = data.evejsVersion ?? data.version;
+      if (typeof value === "string" && value.trim()) return value.trim();
+    } catch {
+      /* 尝试下一个候选 */
+    }
+  }
+  return "";
+}
+
+/**
+ * 在线人数：统计游戏端口上处于 ESTABLISHED 的“服务端那一侧”连接数。
+ * 回环连接在 netstat 里会出现两行（服务端侧 + 客户端侧），因此只数 LocalAddress 端口 = 游戏端口 的行。
+ */
+async function countOnlinePlayers(): Promise<number | null> {
+  if (process.platform !== "win32") return null;
+  let gamePort = 26000;
+  try {
+    const parsed = readServerConfig(resolveRepoRoot()).ports.game;
+    if (Number.isFinite(parsed) && parsed > 0) gamePort = parsed;
+  } catch {
+    /* 用默认端口 */
+  }
+  const suffix = ":" + gamePort;
+  try {
+    const { stdout } = await execFileAsync("netstat.exe", ["-ano", "-p", "TCP"], {
+      timeout: 8000,
+      windowsHide: true,
+      maxBuffer: 8 * 1024 * 1024
+    });
+    let count = 0;
+    for (const raw of String(stdout).split(/\r?\n/)) {
+      const cols = raw.trim().split(/\s+/);
+      if (cols.length < 4) continue;
+      if (cols[0].toUpperCase() !== "TCP") continue;
+      if (cols[3].toUpperCase() !== "ESTABLISHED") continue;
+      if (!cols[1].endsWith(suffix)) continue;
+      count += 1;
+    }
+    return count;
+  } catch {
+    return null;
+  }
+}
+
 
 interface GpuMetrics {
   gpuPercent: number | null;
@@ -240,6 +297,7 @@ export function registerIpc(): void {
   ipcMain.handle("app:info", () => ({
     name: "EvEJS 启动器",
     version: app.getVersion(),
+    evejsVersion: readEvejsVersion(resolveRepoRoot()),
     repoRoot: resolveRepoRoot(),
     platform: process.platform,
     phase: "3-4"
@@ -306,7 +364,8 @@ export function registerIpc(): void {
       gpuMemoryUsedGB: gpu.gpuMemoryUsedGB,
       gpuMemoryTotalGB: gpu.gpuMemoryTotalGB,
       virtualMemUsedGB: gpu.virtualMemUsedGB,
-      virtualMemTotalGB: gpu.virtualMemTotalGB
+      virtualMemTotalGB: gpu.virtualMemTotalGB,
+      onlinePlayers: await countOnlinePlayers()
     };
   });
 
@@ -394,6 +453,43 @@ export function registerIpc(): void {
     } catch (err) {
       return { ok: false, reason: err instanceof Error ? err.message : String(err) };
     }
+  });
+  ipcMain.handle("config:repairClientDisplay", () => repairClientDisplay());
+
+  /* ---------- 模组（manifest schema 3，M1：loader 启停 + NODE_OPTIONS 注入） ---------- */
+  ipcMain.handle("mods:list", () => scanMods(resolveRepoRoot()));
+  ipcMain.handle("mods:plan", () => planLoaders(resolveRepoRoot()));
+  ipcMain.handle("mods:setEnabled", (_e, folder: string, enabled: boolean) => {
+    try {
+      return setModEnabled(resolveRepoRoot(), String(folder ?? ""), !!enabled);
+    } catch (err) {
+      return { ok: false, reason: err instanceof Error ? err.message : String(err) };
+    }
+  });
+  ipcMain.handle("mods:createFolder", () => createModsFolder(resolveRepoRoot()));
+  ipcMain.handle("mods:authoringDoc", () => ensureModAuthoringDoc());
+  ipcMain.handle("mods:openAuthoringDoc", async () => {
+    const doc = ensureModAuthoringDoc();
+    if (!doc.ok) return { ok: false, reason: doc.reason, path: doc.path };
+    const error = await shell.openPath(doc.path);
+    if (!error) return { ok: true, path: doc.path, revealed: false };
+    // 系统没有 .md 关联程序时，退化为在资源管理器中选中该文件
+    try {
+      shell.showItemInFolder(doc.path);
+      return { ok: true, path: doc.path, revealed: true, reason: error };
+    } catch (err) {
+      return { ok: false, reason: err instanceof Error ? err.message : String(err), path: doc.path };
+    }
+  });
+  ipcMain.handle("mods:openFolder", async () => {
+    const root = modsRoot(resolveRepoRoot());
+    try {
+      fs.mkdirSync(root, { recursive: true });
+    } catch {
+      /* 目录可能已存在 */
+    }
+    const error = await shell.openPath(root);
+    return error ? { ok: false, reason: error, root } : { ok: true, root };
   });
   ipcMain.handle("settings:get", () => readSettings());
   ipcMain.handle("settings:set", (_e, patch: Record<string, unknown>) => writeSettings(patch));

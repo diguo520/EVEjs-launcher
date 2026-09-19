@@ -8,6 +8,7 @@ import { checkTcp } from "./healthChecker";
 import * as pty from "./ptyManager";
 import { log } from "./logger";
 import { launcherRuntimeRoot } from "./runtimePaths";
+import { planLoaders } from "./modManager";
 
 /* ------------------------------------------------------------------ */
 /* Phase 3-4：真实服务进程管理（状态机 + 端口探活 + 崩溃处理）            */
@@ -230,8 +231,20 @@ async function startMainServer(): Promise<ServiceActionResult> {
     note("[主服务器] 启动失败：server/index.js 不存在");
     return { ok: false, reason: "server/index.js 不存在" };
   }
+  const env = baseEnv();
+  // 模组 loader：通过 NODE_OPTIONS=--require 注入，服务端文件零改动。
+  // 注意 NODE_OPTIONS 的解析规则：反斜杠会被当转义符吃掉，且按空格分词，
+  // 所以路径必须转成正斜杠并加双引号（已实测验证）。
+  const plan = planLoaders(root);
+  if (plan.paths.length) {
+    const requireArgs = plan.paths.map((p) => `--require "${p}"`).join(" ");
+    env.NODE_OPTIONS = [process.env.NODE_OPTIONS, requireArgs].filter(Boolean).join(" ");
+    note(`[主服务器] 已注入 ${plan.paths.length} 个模组 loader`);
+    for (const loaderPath of plan.paths) note(`[主服务器]   · ${path.basename(path.dirname(loaderPath))}`);
+  }
+  for (const skipped of plan.skipped) note(`[主服务器] 跳过模组 ${skipped.id}：${skipped.reason}`);
   note("[主服务器] 启动 npm start（server/）…");
-  const session = pty.createSession("mainServer", "cmd.exe", ["/c", "npm start"], serverDir, baseEnv());
+  const session = pty.createSession("mainServer", "cmd.exe", ["/c", "npm start"], serverDir, env);
   const r = RUN.mainServer;
   r.sessionId = "mainServer";
   r.ownedPid = session.pid;
@@ -376,6 +389,87 @@ async function prepareClientCertificateTrust(root: string, clientPath: string): 
   }
 }
 
+/** EvEJSConfig.bat 里的 on/off 开关判定 */
+function isSwitchOn(value: string | undefined): boolean {
+  return ["1", "true", "yes", "on"].includes(String(value ?? "").trim().toLowerCase());
+}
+
+/**
+ * 运行 tools\ClientSETUP\scripts\PrepareClientSettings.ps1，
+ * 等价 Play.bat 的 :EnsureClientDisplaySafety / :EnsureClientGraphicsSafety。
+ * 脚本自身会检查 EVEJS_CLIENT_SAFE_* 开关，关闭时直接返回。
+ */
+async function execPrepareClientSettings(
+  root: string,
+  clientPath: string,
+  mode: "Display" | "Graphics",
+  switches: { safeWindowed: string; safeGraphics: string }
+): Promise<{ ok: boolean; output: string }> {
+  const script = path.join(root, "tools", "ClientSETUP", "scripts", "PrepareClientSettings.ps1");
+  if (!fs.existsSync(script)) return { ok: false, output: "未找到 PrepareClientSettings.ps1" };
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    EVEJS_CLIENT_PATH: clientPath,
+    EVEJS_CLIENT_SAFE_WINDOWED: switches.safeWindowed,
+    EVEJS_CLIENT_SAFE_GRAPHICS: switches.safeGraphics
+  };
+  try {
+    const { stdout } = await execFileAsync(
+      "powershell.exe",
+      ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script, "-Mode", mode],
+      { timeout: 120_000, windowsHide: true, maxBuffer: 4 * 1024 * 1024, env }
+    );
+    return { ok: true, output: String(stdout || "").trim() };
+  } catch (e) {
+    const raw = e instanceof Error ? e.message : String(e);
+    return { ok: false, output: raw.split(/\r?\n/)[0] };
+  }
+}
+
+/** 启动前按配置决定是否重置显示设置（开关默认 off，此时完全不启动 PowerShell） */
+async function prepareClientDisplaySafety(root: string, client: ClientConfig): Promise<void> {
+  const switches = {
+    safeWindowed: client.safeWindowed || "off",
+    safeGraphics: client.safeGraphics || "off"
+  };
+  if (isSwitchOn(switches.safeWindowed)) {
+    const r = await execPrepareClientSettings(root, client.clientPath, "Display", switches);
+    const line = r.output.split(/\r?\n/).map((s) => s.trim()).filter(Boolean)[0];
+    note(r.ok ? `[客户端] ${line || "已应用安全窗口模式"}` : `[客户端] 显示设置重置失败（继续启动）：${line}`);
+  }
+  if (isSwitchOn(switches.safeGraphics)) {
+    const r = await execPrepareClientSettings(root, client.clientPath, "Graphics", switches);
+    const line = r.output.split(/\r?\n/).map((s) => s.trim()).filter(Boolean)[0];
+    note(r.ok ? `[客户端] ${line || "已应用低配画质预设"}` : `[客户端] 画质预设应用失败（继续启动）：${line}`);
+  }
+}
+
+/**
+ * 配置中心「修复游戏窗口」：一次性把客户端显示设置重置为
+ * 「当前主屏 + 窗口模式 + 左上角」，解决窗口跑到屏幕外 / 全屏黑屏只有声音。
+ * 不修改 EvEJSConfig.bat 的常驻开关，因此不会每次启动都覆盖玩家设置。
+ */
+export async function repairClientDisplay(): Promise<ServiceActionResult> {
+  const root = resolveRepoRoot();
+  let client: ClientConfig;
+  try {
+    client = readClientConfig(root);
+  } catch {
+    return { ok: false, reason: "客户端配置读取失败" };
+  }
+  if (!client.clientPath || !fs.existsSync(client.clientPath)) {
+    return { ok: false, reason: "客户端路径无效，请先在配置中心设置" };
+  }
+  const r = await execPrepareClientSettings(root, client.clientPath, "Display", {
+    safeWindowed: "on",
+    safeGraphics: "off"
+  });
+  if (!r.ok) return { ok: false, reason: r.output || "显示设置重置失败" };
+  const line = r.output.split(/\r?\n/).map((s) => s.trim()).filter(Boolean)[0];
+  note("[客户端] 已重置游戏窗口显示设置");
+  return { ok: true, reason: line || "已重置为窗口模式" };
+}
+
 /** 客户端 stdout/stderr 由 /stdout= /stderr= 落到 _launcher/logs/client，再增量喂给终端页签 */
 function startClientLogTail(file: string, tabId: string): () => void {
   let offset = 0;
@@ -500,12 +594,19 @@ async function startClient(login?: ClientLoginOpts): Promise<ServiceActionResult
 
   await prepareClientCertificateTrust(root, client.clientPath);
 
+  await prepareClientDisplaySafety(root, client);
+
   let child: ChildProcess;
   try {
+    // 注意：这里绝对不要传 windowsHide —— Node 会因此设置
+    // STARTF_USESHOWWINDOW + SW_HIDE，Windows 会把这个 SW_HIDE 应用到
+    // exefile.exe（GUI 子系统）第一次显示窗口上，导致游戏窗口被创建成隐藏：
+    // 进程在跑、有声音、能进游戏，但桌面上看不到任何窗口。
+    // 控制台窗口由 DETACHED_PROCESS（不分配控制台）+ 客户端 /noconsole 负责，
+    // 与 windowsHide 无关。
     child = spawn(exe, args, {
       cwd: client.clientPath,
       env,
-      windowsHide: true,
       stdio: "ignore",
       creationFlags: DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
     } as SpawnOptions);

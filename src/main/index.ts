@@ -6,6 +6,7 @@ import { initLogger, log } from "./logger";
 import { resolveRepoRoot } from "./envDetector";
 import { readSettings, writeSettings } from "./configStore";
 import { ensureLauncherRuntimePaths } from "./runtimePaths";
+import { ensureModAuthoringDoc } from "./modManager";
 import * as pty from "./ptyManager";
 import { getServices, onServicesChanged, onProgress, onOutput, cleanupAll } from "./processManager";
 
@@ -454,6 +455,13 @@ if (!gotLock) {
       session.defaultSession.setSpellCheckerLanguages([]);
     } catch { /* spellcheck disabled */ }
     registerIpc();
+    // 每次启动把内置的模组制作规范释放到 _launcher/mods/，方便模组作者查阅
+    const authoringDoc = ensureModAuthoringDoc();
+    if (authoringDoc.ok) {
+      log("launcher", (authoringDoc.written ? "已释放" : "已是最新") + "模组制作规范: " + authoringDoc.path);
+    } else {
+      log("launcher", "模组制作规范释放失败: " + authoringDoc.reason);
+    }
     createWindow();
 
     app.on("activate", () => {
