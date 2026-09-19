@@ -744,13 +744,32 @@
     }
   });
 
-  setTimeout(async () => {
+  const UPDATE_NOTICE_INTERVAL_MS = 30 * 60 * 1000;
+  const UPDATE_FOCUS_MIN_INTERVAL_MS = 5 * 60 * 1000;
+  let lastUpdateNoticeAt = Date.now();
+  let notifiedUpdateVersion = "";
+
+  async function checkUpdateNotice(force = false) {
+    const now = Date.now();
+    if (!force && now - lastUpdateNoticeAt < UPDATE_FOCUS_MIN_INTERVAL_MS) return;
+    lastUpdateNoticeAt = now;
     const result = await api.updateCheck().catch(() => null);
     if (result?.ok && result.available) {
       syncUpdateInfo(result);
       setUpdateDot(true);
+      const latest = v(result.latestVersion || "");
+      if (latest && latest !== notifiedUpdateVersion) {
+        notifiedUpdateVersion = latest;
+        toast(`发现新版本 ${latest}，点击右上角更新按钮`, "ok");
+      }
+    } else if (result?.ok && !result.available) {
+      setUpdateDot(false);
     }
-  }, 5000);
+  }
+
+  setTimeout(() => checkUpdateNotice(true), 5000);
+  setInterval(() => checkUpdateNotice(), UPDATE_NOTICE_INTERVAL_MS);
+  window.addEventListener("focus", () => checkUpdateNotice());
   const launchButton = document.getElementById("launchAll");
   if (launchButton) {
     const readonlyLaunchButton = launchButton.cloneNode(true);

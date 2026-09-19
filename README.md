@@ -38,6 +38,7 @@ EVE Online Neocom 风格一键启动器，基于《EveJS 启动器技术方案.m
 
 - 顶部更新入口、红点、更新弹窗、下载进度和错误状态
 - 默认从 GitHub Latest Release 检查更新，可通过 `EVEJS_UPDATE_MANIFEST_URL`、`launcher-settings.json` 或便携版同目录 `launcher.config.json` 覆盖
+- 启动约 5 秒后自动检查；保持运行期间每 30 分钟检查一次，窗口重新聚焦时也会刷新提示
 - 下载后校验 SHA256，由独立 `evejs-updater.exe` 等待启动器退出并替换当前便携版
 - 替换前要求主服务器和市场服务已停止，失败保留 `.backup` 回滚
 
