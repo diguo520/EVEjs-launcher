@@ -51,6 +51,7 @@ export interface UpdateCheckResult {
   reason?: string;
 }
 
+const DEFAULT_UPDATE_MANIFEST_URL = "https://github.com/diguo520/EVEjs-launcher/releases/latest/download/update-manifest.json";
 let manifestUrl = "";
 let manifest: UpdateManifest | null = null;
 let asset: UpdateAsset | null = null;
@@ -76,20 +77,24 @@ function configBaseDir(): string {
   return process.env.PORTABLE_EXECUTABLE_DIR || (app.isPackaged ? path.dirname(app.getPath("exe")) : process.cwd());
 }
 
+function parseJson<T>(text: string): T {
+  return JSON.parse(text.replace(/^\uFEFF/, "")) as T;
+}
+
 function resolveManifestUrl(): string {
   if (process.env.EVEJS_UPDATE_MANIFEST_URL) return process.env.EVEJS_UPDATE_MANIFEST_URL.trim();
   const settings = readSettings();
   if (typeof settings.updateManifestUrl === "string" && settings.updateManifestUrl.trim()) return settings.updateManifestUrl.trim();
   try {
-    const config = JSON.parse(fs.readFileSync(path.join(configBaseDir(), "launcher.config.json"), "utf8"));
+    const config = parseJson<Record<string, unknown>>(fs.readFileSync(path.join(configBaseDir(), "launcher.config.json"), "utf8"));
     if (typeof config.updateManifestUrl === "string" && config.updateManifestUrl.trim()) return config.updateManifestUrl.trim();
   } catch { /* ignore */ }
-  return "";
+  return DEFAULT_UPDATE_MANIFEST_URL;
 }
 
 async function readManifest(url: string): Promise<UpdateManifest> {
-  if (url.startsWith("file://")) return JSON.parse(fs.readFileSync(new URL(url), "utf8")) as UpdateManifest;
-  if (path.isAbsolute(url) && fs.existsSync(url)) return JSON.parse(fs.readFileSync(url, "utf8")) as UpdateManifest;
+  if (url.startsWith("file://")) return parseJson<UpdateManifest>(fs.readFileSync(new URL(url), "utf8"));
+  if (path.isAbsolute(url) && fs.existsSync(url)) return parseJson<UpdateManifest>(fs.readFileSync(url, "utf8"));
   const response = await net.fetch(url, { headers: { "User-Agent": `EvEJS-Launcher/${app.getVersion()}` } });
   if (!response.ok) throw new Error(`更新服务器返回 HTTP ${response.status}`);
   return (await response.json()) as UpdateManifest;

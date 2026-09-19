@@ -17,6 +17,7 @@ export interface ClientConfig {
 }
 
 const BAT_VAR_RE = /^\s*set\s+"?([A-Za-z_][A-Za-z0-9_]*)"?\s*=\s*(.*?)\s*$/;
+const parseJson = <T>(text: string): T => JSON.parse(text.replace(/^\uFEFF/, "")) as T;
 
 export function findClientConfigFile(repoRoot: string): string | null {
   const candidates = [
@@ -118,7 +119,7 @@ export function readServerConfig(repoRoot: string): ServerConfig {
   const file = path.join(repoRoot, "config", "server.json");
   const fallback: ServerConfig = { ports: { game: 26000, images: 26001, gateway: 26002 }, sourceFile: file };
   try {
-    const raw = JSON.parse(fs.readFileSync(file, "utf-8"));
+    const raw = parseJson<any>(fs.readFileSync(file, "utf-8"));
     return {
       ports: {
         game: raw?.network?.serverPort ?? 26000,
@@ -143,7 +144,7 @@ function settingsFile(): string {
 export function readSettings(): Record<string, unknown> {
   try {
     const raw = fs.readFileSync(settingsFile(), "utf-8");
-    const parsed = JSON.parse(raw);
+    const parsed = parseJson<Record<string, unknown>>(raw);
     return parsed && typeof parsed === "object" ? parsed : {};
   } catch {
     return {};
