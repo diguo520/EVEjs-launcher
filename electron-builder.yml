@@ -1,0 +1,37 @@
+# electron-builder 打包配置（Phase 6 使用；壳阶段仅预留）
+appId: com.evejs.launcher
+productName: EvEJS 启动器
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist/**/*
+  - package.json
+  - "!**/*.map"
+  - "!**/*.ts"
+# 账号管理 CLI 需由系统 Node 执行(asar 内系统 node 不可读)，放入 resources 随包分发
+extraResources:
+  - from: scripts/account-cli.js
+    to: account-cli.js
+  - from: updater/bin/evejs-updater.exe
+    to: evejs-updater.exe
+asar: true
+# node-pty 使用预编译二进制且已在 Electron 33 ABI 实测可用，跳过 @electron/rebuild 重编
+npmRebuild: false
+win:
+  executableName: EvEJSLauncher
+  icon: build/icon.ico
+  target:
+    - target: portable
+      arch: [x64]
+    - target: nsis
+      arch: [x64]
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+portable:
+  artifactName: "EvEJS-启动器-便携版-${version}.${ext}"
+electronDownload:
+  mirror: https://npmmirror.com/mirrors/electron/

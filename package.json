@@ -1,0 +1,42 @@
+{
+  "name": "evejs-launcher",
+  "productName": "EvEJS 启动器",
+  "version": "0.1.5",
+  "description": "EveJS 一键启动器（EVE 风格 UI + 内嵌终端）— 当前为 Phase 1-2 界面壳",
+  "private": true,
+  "main": "dist/main/main/index.js",
+  "scripts": {
+    "dev": "concurrently -k -n VITE,ELECTRON -c cyan,green \"npm:dev:vite\" \"npm:dev:electron\"",
+    "dev:vite": "vite",
+    "dev:electron": "wait-on tcp:127.0.0.1:5173 && set \"VITE_DEV_SERVER_URL=http://127.0.0.1:5173\" && electron .",
+    "build:main": "tsc -p tsconfig.main.json",
+    "build:renderer": "vite build",
+    "build": "npm run build:main && npm run build:renderer",
+    "build:updater": "go build -C updater -trimpath -ldflags \"-s -w\" -o bin/evejs-updater.exe .",
+    "package:portable": "npm run build && npm run build:updater && electron-builder --win portable --x64",
+    "start": "npm run build && electron .",
+    "smoke": "npm run build && electron . --smoke-test"
+  },
+  "dependencies": {
+    "@xterm/addon-fit": "^0.10.0",
+    "@xterm/xterm": "^5.5.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "optionalDependencies": {
+    "node-pty": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "concurrently": "^8.2.2",
+    "electron": "^33.2.0",
+    "electron-builder": "^26.15.3",
+    "typescript": "^5.5.4",
+    "vite": "^5.4.8",
+    "wait-on": "^8.0.1"
+  },
+  "author": "EvEJS"
+}
