@@ -5,14 +5,18 @@ import { registerIpc, pushTerminalLine } from "./ipc";
 import { initLogger, log } from "./logger";
 import { resolveRepoRoot } from "./envDetector";
 import { readSettings, writeSettings } from "./configStore";
+import { ensureLauncherRuntimePaths } from "./runtimePaths";
 import * as pty from "./ptyManager";
 import { getServices, onServicesChanged, onProgress, cleanupAll } from "./processManager";
 
 app.commandLine.appendSwitch("disable-spell-checking");
-const userDataOverride = process.env.EVEJS_USER_DATA_DIR;
-if (userDataOverride) {
-  app.setPath("userData", path.resolve(userDataOverride));
-}
+const runtimePaths = ensureLauncherRuntimePaths();
+app.setPath("userData", runtimePaths.userData);
+app.setPath("sessionData", runtimePaths.sessionData);
+app.setPath("cache", runtimePaths.cache);
+app.setPath("temp", runtimePaths.temp);
+app.setPath("logs", runtimePaths.logs);
+app.setPath("crashDumps", runtimePaths.crashDumps);
 
 const APP_VERSION = app.getVersion();
 const isSmokeTest = process.argv.includes("--smoke-test");
@@ -348,6 +352,7 @@ function createWindow(): void {
               sponsorPopover: !!document.querySelector(".sponsor-pop img"),
               sponsorParentClipped: sponsor ? getComputedStyle(sponsor).clipPath !== "none" : null,
               sponsorCardClipped: sponsorCard ? getComputedStyle(sponsorCard).clipPath !== "none" : null,
+              metrics: await (async () => { await new Promise((r) => setTimeout(r, 2500)); return window.api.metricsGet(); })(),
               cards: document.querySelectorAll("#accTable .acc-block").length,
               names: [...document.querySelectorAll("#accTable .ac-name")].map((el) => el.textContent?.replace(/\\s+/g, " ").trim()).slice(0, 8),
               gmLinks: [...document.querySelectorAll("#accTable .gm-tag")].map((el) => el.textContent?.trim()),

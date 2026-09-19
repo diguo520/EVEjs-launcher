@@ -4,6 +4,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { resolveRepoRoot, findVsInstallPath } from "./envDetector";
 import { readClientConfig, writeClientConfig } from "./configStore";
+import { launcherTempDir } from "./runtimePaths";
 
 /** 初始化任务键：deps=主服务器依赖 / db=本地数据库 / market=市场服务二进制 / client=客户端路径 / ca=CA 证书 */
 export type InitKey = "deps" | "db" | "market" | "client" | "ca";
@@ -220,7 +221,7 @@ export function runInit(key: InitKey): { ok: boolean; reason?: string } {
   const bat = def.buildBat ? def.buildBat(root) : null;
   if (!bat) return fail("缺少初始化前置条件（如 MSVC 构建工具），请先安装");
 
-  const initDir = path.join(root, "_local", "launcher-init");
+  const initDir = path.join(launcherTempDir(), "launcher-init");
   try {
     fs.mkdirSync(initDir, { recursive: true });
   } catch {

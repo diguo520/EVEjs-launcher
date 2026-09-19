@@ -10,3 +10,4 @@ launcher-settings.json
 .env.*
 *.backup
 *.new
+_launcher/

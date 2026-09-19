@@ -640,6 +640,13 @@
       const diskUsed = Number(metrics?.diskUsedGB || 0);
       const diskTotal = Number(metrics?.diskTotalGB || 1);
       const net = Number(metrics?.netBytesPerSec || 0);
+      const gpuPercent = metrics?.gpuPercent == null ? null : Number(metrics.gpuPercent);
+      const gpuDedicatedUsed = metrics?.gpuDedicatedUsedGB == null ? null : Number(metrics.gpuDedicatedUsedGB);
+      const gpuDedicatedTotal = metrics?.gpuDedicatedTotalGB == null ? null : Number(metrics.gpuDedicatedTotalGB);
+      const gpuMemoryUsed = metrics?.gpuMemoryUsedGB == null ? null : Number(metrics.gpuMemoryUsedGB);
+      const gpuMemoryTotal = metrics?.gpuMemoryTotalGB == null ? null : Number(metrics.gpuMemoryTotalGB);
+      const virtualUsed = metrics?.virtualMemUsedGB == null ? null : Number(metrics.virtualMemUsedGB);
+      const virtualTotal = metrics?.virtualMemTotalGB == null ? null : Number(metrics.virtualMemTotalGB);
       const memPct = memTotal ? memUsed / memTotal * 100 : 0;
       const diskPct = diskTotal ? diskUsed / diskTotal * 100 : 0;
       const set = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
@@ -648,7 +655,10 @@
       set("mMem", `${memUsed.toFixed(1)}<span class="u">GB / ${memTotal.toFixed(1)}GB</span>`); width("bMem", memPct); set("sbMem", `${memUsed.toFixed(1)}G`);
       set("mDisk", `${diskUsed.toFixed(0)}<span class="u">GB / ${diskTotal.toFixed(0)}GB</span>`); width("bDisk", diskPct);
       set("mNet", `${(net / 1024 / 1024).toFixed(2)}<span class="u">MB/s</span>`); width("bNet", net / 1024 / 1024 / 100);
-      set("mGpu", `—<span class="u">%</span>`); width("bGpu", 0);
+      set("mGpu", gpuPercent == null ? "—" : `${gpuPercent.toFixed(1)}<span class="u">%</span>`); width("bGpu", gpuPercent || 0);
+      set("mGpuDedicated", gpuDedicatedUsed == null || gpuDedicatedTotal == null ? "—" : `${gpuDedicatedUsed.toFixed(1)}<span class="u">GB / ${gpuDedicatedTotal.toFixed(1)}GB</span>`); width("bGpuDedicated", gpuDedicatedTotal ? gpuDedicatedUsed / gpuDedicatedTotal * 100 : 0);
+      set("mGpuMemory", gpuMemoryUsed == null || gpuMemoryTotal == null ? "—" : `${gpuMemoryUsed.toFixed(1)}<span class="u">GB / ${gpuMemoryTotal.toFixed(1)}GB</span>`); width("bGpuMemory", gpuMemoryTotal ? gpuMemoryUsed / gpuMemoryTotal * 100 : 0);
+      set("mVirtualMem", virtualUsed == null || virtualTotal == null ? "—" : `${virtualUsed.toFixed(1)}<span class="u">GB / ${virtualTotal.toFixed(1)}GB</span>`); width("bVirtualMem", virtualTotal ? virtualUsed / virtualTotal * 100 : 0);
       const clock = document.getElementById("monClock"); if (clock) clock.textContent = "LIVE · " + new Date().toTimeString().slice(0, 8);
       const onlinePlayers = Number(metrics?.onlinePlayers);
       set("sbPilots", Number.isFinite(onlinePlayers) && onlinePlayers >= 0 ? onlinePlayers.toLocaleString() : "—");

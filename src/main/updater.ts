@@ -5,6 +5,7 @@ import * as path from "path";
 import { spawn } from "child_process";
 import { getServices } from "./processManager";
 import { readSettings } from "./configStore";
+import { launcherTempDir } from "./runtimePaths";
 
 export interface UpdateAsset {
   type: string;
@@ -256,7 +257,8 @@ export async function applyUpdate(): Promise<{ ok: boolean; reason?: string }> {
   const helper = updaterHelperPath();
   if (!fs.existsSync(helper)) return { ok: false, reason: "更新器不存在" };
   try {
-    const tempDir = path.join(app.getPath("temp"), "EveJS-Launcher-Updater", manifest?.version || "current");
+    const tempRoot = launcherTempDir();
+    const tempDir = path.join(tempRoot, "EveJS-Launcher-Updater", manifest?.version || "current");
     fs.mkdirSync(tempDir, { recursive: true });
     const helperCopy = path.join(tempDir, "evejs-updater.exe");
     fs.copyFileSync(helper, helperCopy);
@@ -268,7 +270,12 @@ export async function applyUpdate(): Promise<{ ok: boolean; reason?: string }> {
       "--from", app.getVersion(),
       "--restart"
     ];
-    const child = spawn(helperCopy, args, { detached: true, stdio: "ignore", windowsHide: true });
+    const child = spawn(helperCopy, args, {
+      detached: true,
+      stdio: "ignore",
+      windowsHide: true,
+      env: { ...process.env, TMPDIR: tempRoot, TMP: tempRoot, TEMP: tempRoot }
+    });
     child.unref();
     emit({ state: "applying", message: "正在安装更新…" });
     setTimeout(() => app.quit(), 500);

@@ -909,9 +909,12 @@
               <div class="panel-body monitor-grid">
                 <div class="mon-block"><div class="mon-head"><span class="k" data-i18n="cpu">处理器 CPU</span><span class="v" id="mCpu">47.2<span class="u">%</span></span></div><div class="mon-track"><i id="bCpu" style="width:47%"></i></div></div>
                 <div class="mon-block"><div class="mon-head"><span class="k" data-i18n="gpu">显卡 GPU</span><span class="v" id="mGpu">38.5<span class="u">%</span></span></div><div class="mon-track amber"><i id="bGpu" style="width:38%"></i></div></div>
+                <div class="mon-block"><div class="mon-head"><span class="k">专用 GPU 内存</span><span class="v" id="mGpuDedicated">—</span></div><div class="mon-track amber"><i id="bGpuDedicated" style="width:0%"></i></div></div>
+                <div class="mon-block"><div class="mon-head"><span class="k">GPU 内存</span><span class="v" id="mGpuMemory">—</span></div><div class="mon-track"><i id="bGpuMemory" style="width:0%"></i></div></div>
                 <div class="mon-block"><div class="mon-head"><span class="k" data-i18n="mem">内存 MEMORY</span><span class="v" id="mMem">12.4<span class="u">GB / 32GB</span></span></div><div class="mon-track"><i id="bMem" style="width:39%"></i></div></div>
+                <div class="mon-block"><div class="mon-head"><span class="k">虚拟内存</span><span class="v" id="mVirtualMem">—</span></div><div class="mon-track amber"><i id="bVirtualMem" style="width:0%"></i></div></div>
                 <div class="mon-block"><div class="mon-head"><span class="k" data-i18n="disk">磁盘 DISK</span><span class="v" id="mDisk">421<span class="u">GB / 1TB</span></span></div><div class="mon-track amber"><i id="bDisk" style="width:42%"></i></div></div>
-                <div class="mon-block mon-wide"><div class="mon-head"><span class="k" data-i18n="net">网络 I/O</span><span class="v" id="mNet">842<span class="u">MB/s</span></span></div><div class="mon-track"><i id="bNet" style="width:38%"></i></div></div>
+                <div class="mon-block"><div class="mon-head"><span class="k" data-i18n="net">网络 I/O</span><span class="v" id="mNet">842<span class="u">MB/s</span></span></div><div class="mon-track"><i id="bNet" style="width:38%"></i></div></div>
               </div>
             </div>
           </div>
@@ -1234,6 +1237,9 @@ Object.assign(TRANSLATE,{
   '角色': {'en':'Character','ja':'キャラクター','ko':'캐릭터','fr':'Personnage','de':'Charakter','nl':'Personage','ru':'Персонаж'},
   '登录并启动': {'en':'Login & Launch','ja':'ログインして起動','ko':'로그인 후 실행','fr':'Se connecter et lancer','de':'Anmelden und starten','nl':'Inloggen en starten','ru':'Войти и запустить'},
   '客户端将使用账号和密码自动登录，并直达角色选择。': {'en':'The client will log in automatically with the account and password, then go to character selection.','ja':'クライアントはアカウントとパスワードで自動ログインし、キャラクター選択へ進みます。','ko':'클라이언트가 계정과 비밀번호로 자동 로그인한 후 캐릭터 선택으로 이동합니다.','fr':'Le client se connectera automatiquement avec le compte et le mot de passe, puis ira à la sélection du personnage.','de':'Der Client meldet sich automatisch mit Konto und Passwort an und wechselt zur Charakterauswahl.','nl':'De client logt automatisch in met account en wachtwoord en gaat daarna naar karakterselectie.','ru':'Клиент автоматически войдёт с аккаунтом и паролем и перейдёт к выбору персонажа.'},
+  '专用 GPU 内存': {'en':'Dedicated GPU Memory','ja':'専用 GPU メモリ','ko':'전용 GPU 메모리','fr':'Mémoire GPU dédiée','de':'Dedizierter GPU-Speicher','nl':'Toegewezen GPU-geheugen','ru':'Выделенная память GPU'},
+  'GPU 内存': {'en':'GPU Memory','ja':'GPU メモリ','ko':'GPU 메모리','fr':'Mémoire GPU','de':'GPU-Speicher','nl':'GPU-geheugen','ru':'Память GPU'},
+  '虚拟内存': {'en':'Virtual Memory','ja':'仮想メモリ','ko':'가상 메모리','fr':'Mémoire virtuelle','de':'Virtueller Speicher','nl':'Virtueel geheugen','ru':'Виртуальная память'},
   '位置': {'en':'Location','ja':'位置','ko':'위치','fr':'Emplacement','de':'Ort','nl':'Locatie','ru':'Местоположение'},
   '安全等级': {'en':'Security Status','ja':'セキュリティ','ko':'보안 등급','fr':'Statut de sécurité','de':'Sicherheitsstatus','nl':'Veiligheidsstatus','ru':'Уровень безопасности'}
 });

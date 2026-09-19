@@ -1,13 +1,13 @@
 import * as fs from "fs";
 import * as path from "path";
-import { resolveRepoRoot } from "./envDetector";
+import { app } from "electron";
 
 let logFile: string | null = null;
 
-/** 初始化日志落盘：<repoRoot>/server/logs/launcher.log（与服务端 server.log 同目录） */
+/** 初始化日志落盘：<launcherDir>/_launcher/logs/launcher.log */
 export function initLogger(): void {
   try {
-    const dir = path.join(resolveRepoRoot(), "server", "logs");
+    const dir = app.getPath("logs");
     fs.mkdirSync(dir, { recursive: true });
     logFile = path.join(dir, "launcher.log");
   } catch {

@@ -29,8 +29,135 @@ import { applyUpdate, cancelUpdateDownload, checkForUpdates, currentUpdateState,
 
 const execFileAsync = promisify(execFile);
 let previousCpu = os.cpus().map((cpu) => ({ ...cpu.times }));
-let previousNetBytes = 0;
+let previousNetBytes: number | null = null;
 let previousNetAt = Date.now();
+
+interface GpuMetrics {
+  gpuPercent: number | null;
+  gpuDedicatedUsedGB: number | null;
+  gpuDedicatedTotalGB: number | null;
+  gpuSharedUsedGB: number | null;
+  gpuMemoryUsedGB: number | null;
+  gpuMemoryTotalGB: number | null;
+  virtualMemUsedGB: number | null;
+  virtualMemTotalGB: number | null;
+}
+
+const EMPTY_GPU_METRICS: GpuMetrics = {
+  gpuPercent: null,
+  gpuDedicatedUsedGB: null,
+  gpuDedicatedTotalGB: null,
+  gpuSharedUsedGB: null,
+  gpuMemoryUsedGB: null,
+  gpuMemoryTotalGB: null,
+  virtualMemUsedGB: null,
+  virtualMemTotalGB: null
+};
+
+let gpuMetricsCache: { at: number; value: GpuMetrics; refreshing: boolean } = {
+  at: 0,
+  value: EMPTY_GPU_METRICS,
+  refreshing: false
+};
+
+function toNullableNumber(value: unknown): number | null {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function bytesToGB(value: number | null): number | null {
+  return value == null ? null : value / 1024 ** 3;
+}
+
+async function queryWindowsGpuMetrics(): Promise<GpuMetrics> {
+  const command = [
+    '$ErrorActionPreference = "SilentlyContinue";',
+    '$eng = @(Get-CimInstance Win32_PerfFormattedData_GPUPerformanceCounters_GPUEngine | ForEach-Object { [double]$_.UtilizationPercentage });',
+    '$mem = @(Get-CimInstance Win32_PerfFormattedData_GPUPerformanceCounters_GPUAdapterMemory);',
+    '$vc = @(Get-CimInstance Win32_VideoController);',
+    '$os = Get-CimInstance Win32_OperatingSystem;',
+    '$gpuPercent = $null; if ($eng.Count -gt 0) { $gpuPercent = ($eng | Measure-Object -Maximum).Maximum };',
+    '$dedicatedUsedBytes = ($mem | Measure-Object -Property DedicatedUsage -Sum).Sum;',
+    '$sharedUsedBytes = ($mem | Measure-Object -Property SharedUsage -Sum).Sum;',
+    '$committedUsedBytes = ($mem | Measure-Object -Property TotalCommitted -Sum).Sum;',
+    '$dedicatedTotalBytes = ($vc | Measure-Object -Property AdapterRAM -Sum).Sum;',
+    '$virtualTotalBytes = $null; if ($os -and $os.TotalVirtualMemorySize) { $virtualTotalBytes = [double]$os.TotalVirtualMemorySize * 1024 };',
+    '$virtualFreeBytes = $null; if ($os -and $os.FreeVirtualMemory) { $virtualFreeBytes = [double]$os.FreeVirtualMemory * 1024 };',
+    '[pscustomobject]@{ gpuPercent=$gpuPercent; dedicatedUsedBytes=$dedicatedUsedBytes; dedicatedTotalBytes=$dedicatedTotalBytes; sharedUsedBytes=$sharedUsedBytes; committedUsedBytes=$committedUsedBytes; virtualTotalBytes=$virtualTotalBytes; virtualFreeBytes=$virtualFreeBytes } | ConvertTo-Json -Compress'
+  ].join(" ");
+  const { stdout } = await execFileAsync("powershell.exe", ["-NoProfile", "-Command", command], {
+    timeout: 8000,
+    windowsHide: true,
+    maxBuffer: 1024 * 1024
+  });
+  const data = JSON.parse(stdout.trim()) as Record<string, unknown>;
+  const dedicatedUsed = toNullableNumber(data.dedicatedUsedBytes);
+  const dedicatedTotal = toNullableNumber(data.dedicatedTotalBytes);
+  const committedUsed = toNullableNumber(data.committedUsedBytes);
+  const virtualTotal = toNullableNumber(data.virtualTotalBytes);
+  const virtualFree = toNullableNumber(data.virtualFreeBytes);
+  return {
+    gpuPercent: toNullableNumber(data.gpuPercent),
+    gpuDedicatedUsedGB: bytesToGB(dedicatedUsed),
+    gpuDedicatedTotalGB: bytesToGB(dedicatedTotal),
+    gpuSharedUsedGB: bytesToGB(toNullableNumber(data.sharedUsedBytes)),
+    gpuMemoryUsedGB: bytesToGB(committedUsed),
+    gpuMemoryTotalGB: bytesToGB(dedicatedTotal),
+    virtualMemUsedGB: virtualTotal != null && virtualFree != null ? bytesToGB(Math.max(0, virtualTotal - virtualFree)) : null,
+    virtualMemTotalGB: bytesToGB(virtualTotal)
+  };
+}
+
+async function queryNvidiaSmiMetrics(): Promise<GpuMetrics> {
+  const { stdout } = await execFileAsync(
+    "nvidia-smi",
+    ["--query-gpu=utilization.gpu,memory.used,memory.total", "--format=csv,noheader,nounits"],
+    { timeout: 2500, windowsHide: true }
+  );
+  const rows = stdout.trim().split(/\r?\n/).map((line) => line.split(",").map((part) => Number(part.trim()))).filter((row) => row.length >= 3 && row.every(Number.isFinite));
+  if (!rows.length) return EMPTY_GPU_METRICS;
+  const used = rows.reduce((sum, row) => sum + row[1] * 1024 ** 2, 0);
+  const total = rows.reduce((sum, row) => sum + row[2] * 1024 ** 2, 0);
+  return {
+    ...EMPTY_GPU_METRICS,
+    gpuPercent: Math.min(100, Math.max(...rows.map((row) => row[0]))),
+    gpuDedicatedUsedGB: bytesToGB(used),
+    gpuDedicatedTotalGB: bytesToGB(total),
+    gpuMemoryUsedGB: bytesToGB(used),
+    gpuMemoryTotalGB: bytesToGB(total)
+  };
+}
+
+function getGpuMetrics(): GpuMetrics {
+  const now = Date.now();
+  if (!gpuMetricsCache.refreshing && now - gpuMetricsCache.at > 5000) {
+    gpuMetricsCache.refreshing = true;
+    const windowsQuery = process.platform === "win32" ? queryWindowsGpuMetrics().catch(() => EMPTY_GPU_METRICS) : Promise.resolve(EMPTY_GPU_METRICS);
+    windowsQuery.then(async (windowsMetrics) => {
+      if (windowsMetrics.gpuPercent != null || windowsMetrics.gpuDedicatedUsedGB != null) {
+        gpuMetricsCache = { at: Date.now(), value: windowsMetrics, refreshing: false };
+        return;
+      }
+      const nvidiaMetrics = await queryNvidiaSmiMetrics().catch(() => EMPTY_GPU_METRICS);
+      gpuMetricsCache = { at: Date.now(), value: nvidiaMetrics, refreshing: false };
+    }).catch(() => {
+      gpuMetricsCache = { at: Date.now(), value: EMPTY_GPU_METRICS, refreshing: false };
+    });
+  }
+  return gpuMetricsCache.value;
+}
+
+async function readNetworkBytes(): Promise<number | null> {
+  if (process.platform !== "win32") return null;
+  try {
+    const { stdout } = await execFileAsync("netstat", ["-e"], { timeout: 2500, windowsHide: true });
+    for (const line of stdout.split(/\r?\n/)) {
+      const numbers = line.trim().match(/\d+/g);
+      if (numbers && numbers.length === 2) return Number(numbers[0]) + Number(numbers[1]);
+    }
+  } catch { /* counters unavailable */ }
+  return null;
+}
 
 /** 向指定终端页签推送一行文本（渲染层 xterm 直接写入） */
 export function pushTerminalLine(tabId: string, text: string): void {
@@ -97,29 +224,30 @@ export function registerIpc(): void {
       diskTotal = Number(stat.blocks) * Number(stat.bsize);
       diskFree = Number(stat.bavail) * Number(stat.bsize);
     } catch { /* ignore */ }
-    let netBytes = 0;
-    try {
-      if (process.platform === "win32") {
-        const command = "Get-NetAdapterStatistics | Measure-Object -Property ReceivedBytes,SentBytes -Sum | ConvertTo-Json -Compress";
-        const { stdout } = await execFileAsync("powershell.exe", ["-NoProfile", "-Command", command], { timeout: 1500, windowsHide: true });
-        const parsed = JSON.parse(stdout);
-        const sum = parsed?.Sum;
-        if (Array.isArray(sum)) netBytes = sum.reduce((total, value) => total + Number(value || 0), 0);
-        else netBytes = Number(sum || 0);
-      }
-    } catch { /* network counters unavailable */ }
+    const netBytes = await readNetworkBytes();
     const now = Date.now();
     const elapsed = Math.max(0.1, (now - previousNetAt) / 1000);
-    const netRate = netBytes >= previousNetBytes && previousNetBytes > 0 ? (netBytes - previousNetBytes) / elapsed : 0;
-    previousNetBytes = netBytes;
+    const netRate = netBytes != null && previousNetBytes != null && netBytes >= previousNetBytes
+      ? (netBytes - previousNetBytes) / elapsed
+      : 0;
+    if (netBytes != null) previousNetBytes = netBytes;
     previousNetAt = now;
+    const gpu = getGpuMetrics();
     return {
       cpuPercent,
       memUsedGB: memUsed / 1024 ** 3,
       memTotalGB: memTotal / 1024 ** 3,
       diskUsedGB: (diskTotal - diskFree) / 1024 ** 3,
       diskTotalGB: diskTotal / 1024 ** 3,
-      netBytesPerSec: netRate
+      netBytesPerSec: netRate,
+      gpuPercent: gpu.gpuPercent,
+      gpuDedicatedUsedGB: gpu.gpuDedicatedUsedGB,
+      gpuDedicatedTotalGB: gpu.gpuDedicatedTotalGB,
+      gpuSharedUsedGB: gpu.gpuSharedUsedGB,
+      gpuMemoryUsedGB: gpu.gpuMemoryUsedGB,
+      gpuMemoryTotalGB: gpu.gpuMemoryTotalGB,
+      virtualMemUsedGB: gpu.virtualMemUsedGB,
+      virtualMemTotalGB: gpu.virtualMemTotalGB
     };
   });
 

@@ -20,7 +20,22 @@ declare global {
       appInfo(): Promise<AppInfo>;
       envCheck(): Promise<EnvReport>;
       healthCheck(): Promise<HealthResult>;
-      metricsGet(): Promise<{ cpuPercent: number; memUsedGB: number; memTotalGB: number; diskUsedGB: number; diskTotalGB: number; netBytesPerSec: number }>;
+      metricsGet(): Promise<{
+        cpuPercent: number;
+        memUsedGB: number;
+        memTotalGB: number;
+        diskUsedGB: number;
+        diskTotalGB: number;
+        netBytesPerSec: number;
+        gpuPercent: number | null;
+        gpuDedicatedUsedGB: number | null;
+        gpuDedicatedTotalGB: number | null;
+        gpuSharedUsedGB: number | null;
+        gpuMemoryUsedGB: number | null;
+        gpuMemoryTotalGB: number | null;
+        virtualMemUsedGB: number | null;
+        virtualMemTotalGB: number | null;
+      }>;
       readServerLog(): Promise<ServerLogResult>;
       initRun(key: string): Promise<{ ok: boolean; reason?: string }>;
       initState(): Promise<InitState>;
