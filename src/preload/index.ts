@@ -56,9 +56,10 @@ const api = {
     ipcRenderer.invoke("accounts:verify", user, password),
   accountsSetPassword: (user: string, oldPw: string, newPw: string) =>
     ipcRenderer.invoke("accounts:setPassword", user, oldPw, newPw),
-  accountsLaunch: (user: string) => ipcRenderer.invoke("accounts:launch", user),
-  loginStart: (user: string, password: string, remember = false) =>
-    ipcRenderer.invoke("login:start", user, password, remember),
+  accountsLaunch: (user: string, characterId?: string | number) =>
+    ipcRenderer.invoke("accounts:launch", user, characterId),
+  loginStart: (user: string, password: string, remember = false, characterId?: string | number) =>
+    ipcRenderer.invoke("login:start", user, password, remember, characterId),
   configSetClient: (patch: Record<string, string>) => ipcRenderer.invoke("config:setClient", patch),
   configSetRepoRoot: (repoRoot: string) => ipcRenderer.invoke("config:setRepoRoot", repoRoot),
   terminalInput: (tabId: string, data: string) => ipcRenderer.send("terminal:input", tabId, data),

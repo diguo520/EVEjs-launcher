@@ -239,24 +239,34 @@ export async function changeAccountPassword(
 }
 
 /**
- * 登录并直达角色选择：
+ * 登录并直达所选角色（对齐 EveJS-Launcher-V1 方案）：
  * 1) 本地验证账号密码（客户端同款哈希，只读数据库）
- * 2) 启动客户端并注入客户端原生 /login:<user>:<password> 参数
- *    → 客户端 GetLoginCredentials / TryAutomaticLogin 自动登录 → 角色选择
+ * 2) 启动客户端并注入客户端原生参数
+ *    /noconsole                → 不创建 [CCP] 调试控制台窗口
+ *    /login:<user>:<password>  → GetLoginCredentials / TryAutomaticLogin 自动登录
+ *    /autoSelectCharacter:<id> → 跳过角色选择，直接进入该角色
  */
-export async function launchClientWithLogin(user: string, password: string, remember = false): Promise<AccountOpResult> {
+export async function launchClientWithLogin(
+  user: string,
+  password: string,
+  remember = false,
+  characterId?: string | number
+): Promise<AccountOpResult> {
   const v = await verifyAccount(user, password);
   if (!v.ok) return { ok: false, reason: v.reason ?? "账号或密码错误" };
   if (password.includes(":")) return { ok: false, reason: "密码不能包含冒号（客户端 /login: 参数限制）" };
   if (remember) rememberAccountPassword(user, password);
-  const res = await startService("client", { login: { user, password } });
+  const res = await startService("client", { login: { user, password, characterId } });
   if (!res.ok) return { ok: false, reason: res.reason ?? "客户端启动失败" };
-  return { ok: true, output: "登录成功，客户端自动登录中 → 角色选择" };
+  return {
+    ok: true,
+    output: characterId ? "登录成功，客户端直达角色" : "登录成功，客户端自动登录中"
+  };
 }
 
 /** 使用创建账号时保存的安全凭据启动客户端，不把密码暴露给渲染层。 */
-export async function launchStoredAccount(user: string): Promise<AccountOpResult> {
+export async function launchStoredAccount(user: string, characterId?: string | number): Promise<AccountOpResult> {
   const password = storedAccountPassword(user);
   if (!password) return { ok: false, reason: "未找到已保存的登录凭据，请手动输入一次密码" };
-  return launchClientWithLogin(user, password, false);
+  return launchClientWithLogin(user, password, false, characterId);
 }

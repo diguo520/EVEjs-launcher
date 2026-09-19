@@ -1,0 +1,41 @@
+{
+  "version": "0.1.16",
+  "changelog": {
+    "zh": [
+      {
+        "type": "opt",
+        "text": "托肯赞助卡片的微信收款码更换为 wechat.png"
+      },
+      {
+        "type": "opt",
+        "text": "客户端改用原生 /noconsole 直连启动，不再弹出 CCP 控制台窗口；客户端日志改存 _launcher\\logs\\client 并实时显示在客户端页签"
+      },
+      {
+        "type": "fix",
+        "text": "角色「登录启动」通过 /autoSelectCharacter:<角色ID> 直达所选角色，不再停留在角色选择"
+      },
+      {
+        "type": "new",
+        "text": "账号管理新增「创建角色」入口：无角色账号可一键进入游戏角色创建，创建完成后启动器自动刷新账号列表"
+      }
+    ],
+    "en": [
+      {
+        "type": "opt",
+        "text": "Replaced the WeChat donation QR on the sponsor card with wechat.png"
+      },
+      {
+        "type": "opt",
+        "text": "Client now launches directly with the native /noconsole switch so the CCP console window no longer appears; client output is stored under _launcher\\logs\\client and streamed live to the client log tab"
+      },
+      {
+        "type": "fix",
+        "text": "Character launch now passes /autoSelectCharacter:<characterID> so the client enters the selected character directly instead of stopping at character select"
+      },
+      {
+        "type": "new",
+        "text": "Added a Create Character entry in account management: accounts without characters jump straight into the in-game character creation, and the launcher refreshes the account list once the character is created"
+      }
+    ]
+  }
+}

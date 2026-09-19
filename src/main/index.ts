@@ -7,7 +7,7 @@ import { resolveRepoRoot } from "./envDetector";
 import { readSettings, writeSettings } from "./configStore";
 import { ensureLauncherRuntimePaths } from "./runtimePaths";
 import * as pty from "./ptyManager";
-import { getServices, onServicesChanged, onProgress, cleanupAll } from "./processManager";
+import { getServices, onServicesChanged, onProgress, onOutput, cleanupAll } from "./processManager";
 
 app.commandLine.appendSwitch("disable-spell-checking");
 const runtimePaths = ensureLauncherRuntimePaths();
@@ -142,6 +142,7 @@ function createWindow(): void {
   // 服务状态变更 → 渲染层；进度日志 → system 页签
   onServicesChanged((list) => broadcastToWindow("services:changed", list));
   onProgress((line) => pushTerminalLine("system", line + "\r\n"));
+  onOutput((tabId, data) => broadcastToWindow("terminal:data", tabId, data));
 
   if (isServiceSmoke) {
     mainWindow.webContents.once("did-finish-load", () => {

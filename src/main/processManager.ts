@@ -1,11 +1,13 @@
-import { execSync, spawn, type ChildProcessWithoutNullStreams } from "child_process";
+import { execFile, execSync, spawn, type ChildProcess, type SpawnOptions } from "child_process";
+import { promisify } from "util";
 import * as fs from "fs";
 import * as path from "path";
 import { resolveRepoRoot } from "./envDetector";
-import { readClientConfig, readSettings, type ClientConfig } from "./configStore";
+import { readClientConfig, readServerConfig, readSettings, type ClientConfig } from "./configStore";
 import { checkTcp } from "./healthChecker";
 import * as pty from "./ptyManager";
 import { log } from "./logger";
+import { launcherRuntimeRoot } from "./runtimePaths";
 
 /* ------------------------------------------------------------------ */
 /* Phase 3-4：真实服务进程管理（状态机 + 端口探活 + 崩溃处理）            */
@@ -40,7 +42,7 @@ interface Runtime {
   info: ServiceInfo;
   ownedPid?: number;
   sessionId?: string;
-  child?: ChildProcessWithoutNullStreams;
+  child?: ChildProcess;
 }
 
 const RUN: Record<ServiceId, Runtime> = {
@@ -55,6 +57,8 @@ type SnapshotListener = (list: ServiceInfo[]) => void;
 const snapshotListeners = new Set<SnapshotListener>();
 type ProgressListener = (line: string) => void;
 const progressListeners = new Set<ProgressListener>();
+type OutputListener = (tabId: string, data: string) => void;
+const outputListeners = new Set<OutputListener>();
 
 export function getServices(): ServiceInfo[] {
   return (Object.keys(RUN) as ServiceId[]).map((id) => ({ ...RUN[id].info }));
@@ -70,6 +74,11 @@ export function onProgress(fn: ProgressListener): () => void {
   return () => progressListeners.delete(fn);
 }
 
+export function onOutput(fn: OutputListener): () => void {
+  outputListeners.add(fn);
+  return () => outputListeners.delete(fn);
+}
+
 function emit(): void {
   const snapshot = getServices();
   snapshotListeners.forEach((fn) => fn(snapshot));
@@ -78,6 +87,10 @@ function emit(): void {
 function note(line: string): void {
   log("svc", line);
   progressListeners.forEach((fn) => fn(line));
+}
+
+function emitOutput(tabId: string, data: string): void {
+  outputListeners.forEach((fn) => fn(tabId, data));
 }
 
 function setState(id: ServiceId, state: ServiceState, message?: string): void {
@@ -183,6 +196,8 @@ pty.onExit((tabId, code) => {
 export interface ClientLoginOpts {
   user: string;
   password: string;
+  /** 目标角色 ID（客户端 /autoSelectCharacter: 参数，直达该角色） */
+  characterId?: string | number;
 }
 
 export async function startService(id: ServiceId, opts?: { login?: ClientLoginOpts }): Promise<ServiceActionResult> {
@@ -281,6 +296,128 @@ async function startMarketServer(): Promise<ServiceActionResult> {
   return { ok: false, reason: "市场服务 40110 端口 30s 未监听" };
 }
 
+/* ------------------------------------------------------------------ */
+/* 客户端启动：对齐 EveJS-Launcher-V1 方案（直连 exefile + /noconsole）      */
+/*   V1 参数组合：/noconsole /login:<账号>:<密码>                          */
+/*                /autoSelectCharacter:<角色ID> /port:<游戏端口>            */
+/*   创建标志：DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP                 */
+/*   → 不分配控制台，且客户端不再自建 [CCP] Vxx.xx client 调试窗口           */
+/* ------------------------------------------------------------------ */
+
+const DETACHED_PROCESS = 0x00000008;
+const CREATE_NEW_PROCESS_GROUP = 0x00000200;
+const execFileAsync = promisify(execFile);
+
+/** tq 同级的 ResFiles 资源缓存目录（等价 Play.bat 的 :ResolveClientResourceCache） */
+function resolveClientResFiles(clientPath: string): string | null {
+  try {
+    const resFiles = path.join(path.resolve(clientPath, ".."), "ResFiles");
+    return fs.existsSync(resFiles) ? resFiles : null;
+  } catch {
+    return null;
+  }
+}
+
+/** 复刻 Play.bat 的 :ApplyClientNetworkPolicy（代理 / Darkly 屏蔽 / Sentry 关闭 / 本地 CA） */
+function applyClientNetworkPolicy(env: NodeJS.ProcessEnv, proxyUrl: string, caPem: string): void {
+  const proxy = proxyUrl && proxyUrl.trim() ? proxyUrl.trim() : "http://127.0.0.1:26002/";
+  const darklyHosts = [
+    "launchdarkly.com",
+    ".launchdarkly.com",
+    "clientstream.launchdarkly.com",
+    "events.launchdarkly.com",
+    "mobile.launchdarkly.com",
+    "app.launchdarkly.com",
+    "sdk.launchdarkly.com",
+    "stream.launchdarkly.com",
+    "launchdarkly.us",
+    ".launchdarkly.us",
+    "launchdarkly.eu",
+    ".launchdarkly.eu"
+  ].join(",");
+  env.EVEJS_PROXY_URL = proxy;
+  env.EVEJS_PROXY_LOCAL_INTERCEPT = "1";
+  env.EVEJS_PROXY_UNHANDLED_HOST_POLICY = "block";
+  env.EVEJS_PROXY_BLOCKED_HOSTS =
+    "api.ipify.org,sentry.io,.sentry.io,google-analytics.com,.google-analytics.com," + darklyHosts;
+  for (const key of ["http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY", "all_proxy", "ALL_PROXY"]) {
+    env[key] = proxy;
+  }
+  env.EVEJS_NO_PROXY = "127.0.0.1,localhost,::1";
+  env.no_proxy = env.EVEJS_NO_PROXY;
+  env.NO_PROXY = env.EVEJS_NO_PROXY;
+  env.EVE_CLIENT_SENTRY_DSN = "";
+  env.SSL_CERT_DIR = "";
+  env.LD_OFFLINE = "true";
+  env.LAUNCHDARKLY_OFFLINE = "true";
+  env.LAUNCHDARKLY_SEND_EVENTS = "false";
+  env.LD_SEND_EVENTS = "false";
+  if (caPem && fs.existsSync(caPem)) {
+    env.SSL_CERT_FILE = caPem;
+    env.REQUESTS_CA_BUNDLE = caPem;
+    env.CURL_CA_BUNDLE = caPem;
+  }
+}
+
+/** Play.bat 每次启动都会跑 Install-EvEJSCerts.ps1；直连客户端时要自己补上（失败不阻塞） */
+async function prepareClientCertificateTrust(root: string, clientPath: string): Promise<void> {
+  const script = path.join(root, "tools", "ClientSETUP", "scripts", "Install-EvEJSCerts.ps1");
+  if (!fs.existsSync(script)) return;
+  try {
+    await execFileAsync(
+      "powershell.exe",
+      ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script, "-ClientPath", clientPath],
+      { timeout: 120_000, windowsHide: true, maxBuffer: 4 * 1024 * 1024 }
+    );
+    note("[客户端] 已准备 EveJS 证书信任");
+  } catch (e) {
+    const raw = e instanceof Error ? e.message : String(e);
+    note(`[客户端] 证书准备未成功（继续启动）：${raw.split(/\r?\n/)[0]}`);
+  }
+}
+
+/** 客户端 stdout/stderr 由 /stdout= /stderr= 落到 _launcher/logs/client，再增量喂给终端页签 */
+function startClientLogTail(file: string, tabId: string): () => void {
+  let offset = 0;
+  let pending = Buffer.alloc(0);
+  const pump = (): void => {
+    let size = 0;
+    try {
+      size = fs.statSync(file).size;
+    } catch {
+      return;
+    }
+    if (size <= offset) return;
+    let chunk: Buffer;
+    try {
+      const fd = fs.openSync(file, "r");
+      const length = size - offset;
+      chunk = Buffer.alloc(length);
+      const read = fs.readSync(fd, chunk, 0, length, offset);
+      fs.closeSync(fd);
+      chunk = chunk.subarray(0, read);
+      offset += read;
+    } catch {
+      return;
+    }
+    pending = Buffer.concat([pending, chunk]);
+    const newline = pending.lastIndexOf(0x0a);
+    if (newline >= 0) {
+      emitOutput(tabId, pending.subarray(0, newline + 1).toString("utf8"));
+      pending = pending.subarray(newline + 1);
+    } else if (pending.length >= 65536) {
+      emitOutput(tabId, pending.toString("utf8"));
+      pending = Buffer.alloc(0);
+    }
+  };
+  const timer = setInterval(pump, 350);
+  pump();
+  return () => {
+    clearInterval(timer);
+    pump();
+  };
+}
+
 async function startClient(login?: ClientLoginOpts): Promise<ServiceActionResult> {
   const root = resolveRepoRoot();
   let client: ClientConfig;
@@ -297,109 +434,136 @@ async function startClient(login?: ClientLoginOpts): Promise<ServiceActionResult
   }
   const bin64 = path.join(client.clientPath, "bin64", "exefile.exe");
   const bin = path.join(client.clientPath, "bin", "exefile.exe");
-  const exe = client.clientExe || (fs.existsSync(bin64) ? bin64 : bin);
+  const exe =
+    client.clientExe && fs.existsSync(client.clientExe) ? client.clientExe : fs.existsSync(bin64) ? bin64 : bin;
   if (!fs.existsSync(exe)) {
     setState("client", "error", `客户端程序不存在：${exe}`);
     note(`[客户端] 未启动：${exe} 不存在`);
     return { ok: false, reason: `exefile 不存在：${exe}` };
   }
-  note("[客户端] 启动 exefile.exe …");
-  // 自动登录（客户端原生 /login:<user>:<password> 参数 → GetLoginCredentials → TryAutomaticLogin）
-  const loginArg = login && login.user && login.password ? `${login.user}:${login.password}` : "";
-  if (login && login.password.includes(":")) {
+
+  /* ---- 自动登录参数（V1 同款三件套） ---- */
+  const args: string[] = ["/noconsole"];
+  const account = (login?.user ?? "").trim();
+  const password = login?.password ?? "";
+  const characterId =
+    login?.characterId === undefined || login?.characterId === null ? "" : String(login.characterId).trim();
+  if (password.includes(":")) {
     setState("client", "error", "自动登录失败：密码不能包含冒号（客户端 /login: 参数限制）");
     return { ok: false, reason: "密码不能包含冒号" };
   }
-  if (loginArg) note(`[客户端] 自动登录参数已注入（user=${login?.user}）`);
-  const env: NodeJS.ProcessEnv = {
-    ...process.env,
-    EVEJS_PROXY_URL: client.proxyUrl || "http://127.0.0.1:26002/",
-    EVEJS_PROXY_LOCAL_INTERCEPT: "1",
-    EVEJS_PROXY_UNHANDLED_HOST_POLICY: "block"
-  };
-  if (client.caPem && fs.existsSync(client.caPem)) {
-    env.SSL_CERT_FILE = client.caPem;
-    env.REQUESTS_CA_BUNDLE = client.caPem;
-    env.CURL_CA_BUNDLE = client.caPem;
-  }
-  if (loginArg) env.EVEJS_AUTO_LOGIN = loginArg;
-
-  // 优先走官方 Play.bat（完整校验：start.ini / blue.dll / ResFiles / 证书信任 / 服务器就绪 +
-  // 网络策略），PTY 会话让启动器终端显示全部输出。
-  // 自动登录通过 EVEJS_AUTO_LOGIN 环境变量交给 Play.bat 补丁拼接 /login: 参数。
-  // 兼容：Play.bat 缺失或为原版（无补丁）时，回退直连 exefile + /login: 参数，自动登录仍生效。
-  const playBat = path.join(root, "Play.bat");
-  let playPatched = false;
-  if (fs.existsSync(playBat)) {
-    try {
-      playPatched = fs.readFileSync(playBat, "utf8").includes("EVEJS_AUTO_LOGIN");
-    } catch {
-      /* 读取失败按未打补丁处理 */
-    }
-  }
-  if (fs.existsSync(playBat) && playPatched) {
-    note("[客户端] 通过 Play.bat 启动（完整校验 + 终端输出）…");
-    const session = pty.createSession("client", "cmd.exe", ["/c", playBat], root, env);
-    const r = RUN.client;
-    r.sessionId = "client";
-    r.ownedPid = session.pid;
-    r.info.pid = session.pid;
-    setState("client", "starting", `客户端启动中（PID ${session.pid}）`);
-    emit();
-    const up = await waitClientUp(90_000);
-    if (RUN.client.info.state !== "starting") {
-      // Play.bat 校验失败/客户端已退出（onExit 已置 error）
-      return { ok: false, reason: RUN.client.info.message || "客户端启动失败" };
-    }
-    if (!up) {
-      setState("client", "error", "客户端 exefile 未在 90s 内出现（详见终端）");
-      note("[客户端] 未检测到 exefile 进程，详见终端输出");
-      return { ok: false, reason: "客户端未启动（详见终端）" };
-    }
-    setState("client", "running", `客户端已启动（PID ${session.pid}）`);
-    note(`[客户端] Play.bat 已拉起客户端`);
-    return { ok: true, reason: "ok" };
+  if (account && password) args.push(`/login:${account}:${password}`);
+  if (/^\d+$/.test(characterId) && Number(characterId) > 0) {
+    args.push(`/autoSelectCharacter:${characterId}`);
+  } else if (characterId) {
+    note(`[客户端] 角色 ID 非法，已忽略自动选角：${characterId}`);
   }
 
-  if (fs.existsSync(playBat) && !playPatched) {
-    note("[客户端] Play.bat 为原版（无自动登录补丁），已回退直连 exefile + /login: 参数");
+  /* ---- 游戏端口 ---- */
+  let gamePort = 26000;
+  try {
+    const parsed = readServerConfig(root).ports.game;
+    if (Number.isFinite(parsed) && parsed > 0) gamePort = parsed;
+  } catch {
+    /* 读取失败时沿用默认端口 */
   }
-  const args: string[] = [];
-  if (loginArg) args.push(`/login:${loginArg}`);
-  const child = spawn(exe, args, { cwd: client.clientPath, env, windowsHide: false });
+  args.push(`/port:${gamePort}`);
+
+  /* ---- 客户端输出落盘到 _launcher/logs/client（目录与文件名全部 ASCII） ---- */
+  const clientLogDir = path.join(launcherRuntimeRoot(), "logs", "client");
+  try {
+    fs.mkdirSync(clientLogDir, { recursive: true });
+  } catch {
+    /* 落盘失败不阻塞启动 */
+  }
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const stdoutLog = path.join(clientLogDir, `client-${stamp}-${process.pid}.out.log`);
+  const stderrLog = path.join(clientLogDir, `client-${stamp}-${process.pid}.err.log`);
+  args.push(`/stdout=${stdoutLog}`, `/stderr=${stderrLog}`);
+
+  /* ---- 环境（等价 Play.bat 的 ApplyClientNetworkPolicy + ResFiles） ---- */
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  applyClientNetworkPolicy(env, client.proxyUrl || "http://127.0.0.1:26002/", client.caPem);
+  const resFiles = resolveClientResFiles(client.clientPath);
+  if (resFiles) env.EO_REMOTEFILECACHEFOLDER = resFiles;
+
+  note("[客户端] 直连启动 exefile（/noconsole，不再产生 CCP 控制台窗口）…");
+  if (account && password) {
+    note(
+      `[客户端] 自动登录：account=${account} · ${
+        characterId ? `characterId=${characterId}` : "未指定角色（停在角色选择）"
+      }`
+    );
+  }
+  if (!resFiles) note("[客户端] 未找到 tq 同级的 ResFiles 资源缓存，如报资源错误请检查客户端安装");
+  note(`[客户端] 输出日志：${stdoutLog}`);
+
+  await prepareClientCertificateTrust(root, client.clientPath);
+
+  let child: ChildProcess;
+  try {
+    child = spawn(exe, args, {
+      cwd: client.clientPath,
+      env,
+      windowsHide: true,
+      stdio: "ignore",
+      creationFlags: DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+    } as SpawnOptions);
+  } catch (e) {
+    const reason = e instanceof Error ? e.message : String(e);
+    setState("client", "error", `客户端启动失败：${reason}`);
+    return { ok: false, reason };
+  }
+
   const r = RUN.client;
   r.child = child;
   r.ownedPid = child.pid;
   r.info.pid = child.pid;
-  setState("client", "running", `客户端已启动（PID ${child.pid}）`);
-  note(`[客户端] PID ${child.pid} 已启动`);
+  setState("client", "starting", `客户端启动中（PID ${child.pid}）`);
+  emit();
 
-  child.on("exit", (code) => {
+  const stopOut = startClientLogTail(stdoutLog, "client");
+  const stopErr = startClientLogTail(stderrLog, "client");
+  const stopTails = (): void => {
+    stopOut();
+    stopErr();
+  };
+
+  child.on("error", (err) => {
+    stopTails();
     if (RUN.client.info.state === "running" || RUN.client.info.state === "starting") {
-      setState("client", "error", `客户端已退出（exit ${code ?? "?"}）`);
-      note(`[客户端] 已退出 exit=${code}`);
+      setState("client", "error", `客户端启动失败：${err.message}`);
     }
+    note(`[客户端] 启动失败：${err.message}`);
     r.ownedPid = undefined;
+    r.child = undefined;
     emit();
   });
+
+  child.on("exit", (code) => {
+    stopTails();
+    if (RUN.client.info.state === "running" || RUN.client.info.state === "starting") {
+      setState("client", "error", `客户端已退出（exit ${code ?? "?"}）`);
+      note(`[客户端] 已退出 exit=${code ?? "?"}`);
+    }
+    r.ownedPid = undefined;
+    r.child = undefined;
+    emit();
+  });
+
+  /* 直连启动后短暂观察：早期崩溃（配置 / 证书 / 资源错误）立刻反馈给 UI */
+  const deadline = Date.now() + 6000;
+  while (Date.now() < deadline) {
+    if (child.exitCode !== null || RUN.client.info.state !== "starting") {
+      return { ok: false, reason: RUN.client.info.message || `客户端已退出（exit ${child.exitCode ?? "?"}）` };
+    }
+    await sleep(400);
+  }
+
+  setState("client", "running", `客户端已启动（PID ${child.pid}）`);
+  note(`[客户端] 已启动${characterId ? `并请求直达角色（characterId=${characterId}）` : ""}`);
   return { ok: true, reason: "ok" };
 }
-
-/** 轮询 exefile.exe 进程是否出现（Play.bat 校验完成后客户端拉起） */
-async function waitClientUp(timeoutMs: number): Promise<boolean> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    try {
-      const out = execSync('tasklist /FI "IMAGENAME eq exefile.exe" /FO CSV /NH', { encoding: "utf8", timeout: 5000 });
-      if (out.trim() && /exefile\.exe/i.test(out)) return true;
-    } catch {
-      /* tasklist 失败继续轮询 */
-    }
-    await new Promise((r) => setTimeout(r, 1500));
-  }
-  return false;
-}
-
 /* ------------------------- 停止 / 重启 ------------------------- */
 
 export async function stopService(id: ServiceId): Promise<ServiceActionResult> {

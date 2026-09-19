@@ -26,8 +26,10 @@
   };
 
   let latestServices = [];
+  let pendingLaunchCharacterId = "";
   let mainServerStartedAt = 0;
   let nextLogId = 1;
+  let lastClientState = null;
   function applyServices(list) {
     latestServices = Array.isArray(list) ? list : [];
     const byId = new Map(latestServices.map((item) => [item.id, item]));
@@ -37,6 +39,18 @@
     } else if (mainServer?.state !== "starting") {
       mainServerStartedAt = 0;
     }
+    const clientInfo = byId.get("client");
+    const clientState = clientInfo?.state ?? null;
+    if (
+      lastClientState &&
+      (lastClientState === "running" || lastClientState === "starting") &&
+      (clientState === "idle" || clientState === "error")
+    ) {
+      // 客户端退出：可能刚在游戏里创建了新角色，刷新账号列表
+      void loadAccountsFromBackend();
+    }
+    if (clientState) lastClientState = clientState;
+
     ensureArrayLength(SVC, serviceDefs.length, (index) => ({ ...serviceDefs[index], state: "stop" }));
     serviceDefs.forEach((def, index) => {
       const info = byId.get(def.id) || {};
@@ -469,20 +483,65 @@
       if (button) button.disabled = false;
     }
   };
-  addChar = function () {
-    toast("当前后端暂不支持启动器内创建角色", "warn");
+  addChar = async function (index) {
+    const account = ACC[index];
+    if (!account) return;
+    if (account.hasCredential) {
+      try {
+        toast(`${account.name} · ${t("进入角色创建")}`, "ok");
+        const result = await api.accountsLaunch(account.name);
+        if (!result?.ok) throw new Error(result?.reason || "客户端启动失败");
+        logTo("sys", "OK", `账号 <span class="hi">${esc(account.name)}</span> · 已进入角色选择，点击空槽位即可创建角色`);
+      } catch (error) {
+        toast(`进入角色创建失败: ${String(error)}`, "err");
+      }
+      return;
+    }
+    const modal = document.getElementById("createCharacterModal");
+    const accountField = document.getElementById("createAccountName");
+    const password = document.getElementById("createAccountPassword");
+    if (!modal || !accountField || !password) return;
+    accountField.value = account.name;
+    password.value = "";
+    modal.classList.add("open");
+    setTimeout(() => password.focus(), 80);
+  };
+
+  submitCreateCharacter = async function () {
+    const accountName = document.getElementById("createAccountName")?.value || "";
+    const password = document.getElementById("createAccountPassword")?.value || "";
+    if (!password) {
+      toast("请输入账号密码", "err");
+      return;
+    }
+    const button = document.getElementById("createCharacterBtn");
+    if (button) button.disabled = true;
+    try {
+      const result = await api.loginStart(accountName, password, true);
+      if (!result?.ok) throw new Error(result?.reason || "客户端启动失败");
+      closeModal("createCharacterModal");
+      toast(`${accountName} · ${t("进入角色创建")}`, "ok");
+      logTo("sys", "OK", `账号 <span class="hi">${esc(accountName)}</span> · 已进入角色选择，点击空槽位即可创建角色`);
+    } catch (error) {
+      toast(String(error), "err");
+    } finally {
+      if (button) button.disabled = false;
+    }
   };
   delChar = function () {
     toast("请通过账号删除流程处理角色数据", "warn");
   };
-  launchChar = async function (accountName, characterName) {
+  launchChar = async function (accountName, characterName, characterId) {
     const accountRecord = ACC.find((item) => item.name === accountName);
+    const roleRecord = accountRecord?.chars?.find((item) => item.name === characterName);
+    const targetCharacterId = String(characterId || roleRecord?.id || "");
+    pendingLaunchCharacterId = targetCharacterId;
     if (accountRecord?.hasCredential) {
       try {
-        toast(`${characterName} · 自动登录中`, "ok");
-        const result = await api.accountsLaunch(accountName);
+        toast(`${characterName} · 直达角色启动中`, "ok");
+        const result = await api.accountsLaunch(accountName, targetCharacterId);
         if (!result?.ok) throw new Error(result?.reason || "自动登录失败");
-        logTo("sys", "OK", `启动角色 <span class="hi">${esc(characterName)}</span> · 账号 ${esc(accountName)} · 已保存凭据自动登录`);
+        logTo("sys", "OK", `启动角色 <span class="hi">${esc(characterName)}</span> · 账号 ${esc(accountName)} · 已保存凭据直达角色`);
       } catch (error) {
         toast(`自动登录失败: ${String(error)}`, "err");
       }
@@ -511,11 +570,11 @@
     const button = document.getElementById("launchCharacterBtn");
     if (button) button.disabled = true;
     try {
-      const result = await api.loginStart(accountName, password, true);
+      const result = await api.loginStart(accountName, password, true, pendingLaunchCharacterId);
       if (!result?.ok) throw new Error(result?.reason || "客户端启动失败");
       closeModal("launchCharacterModal");
-      toast(`${characterName} · 客户端自动登录中`, "ok");
-      logTo("sys", "OK", `启动角色 <span class="hi">${esc(characterName)}</span> · 账号 ${esc(accountName)} · 自动登录`);
+      toast(`${characterName} · 客户端直达角色中`, "ok");
+      logTo("sys", "OK", `启动角色 <span class="hi">${esc(characterName)}</span> · 账号 ${esc(accountName)} · 直达角色`);
     } catch (error) {
       toast(String(error), "err");
     } finally {

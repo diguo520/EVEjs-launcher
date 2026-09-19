@@ -838,6 +838,22 @@
 </div>
 
 
+<!-- ===== CREATE CHARACTER MODAL ===== -->
+<div class="modal-overlay" id="createCharacterModal">
+  <div class="modal">
+    <div class="modal-head"><span class="tag">// CREATE</span><span class="title">创建角色</span><button class="x" onclick="closeModal('createCharacterModal')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+    <div class="modal-body">
+      <div class="modal-field"><label>账号</label><input id="createAccountName" readonly></div>
+      <div class="modal-field"><label>密码</label><input id="createAccountPassword" type="password" placeholder="输入账号密码以自动登录" autocomplete="current-password"></div>
+      <div class="cmd-notice" style="margin:0;font-size:10px">登录后进入角色选择，点击空槽位即可创建角色。</div>
+    </div>
+    <div class="modal-foot">
+      <button class="mini-btn" onclick="closeModal('createCharacterModal')">取消</button>
+      <button class="mini-btn start" id="createCharacterBtn" onclick="submitCreateCharacter()">登录并进入创建</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===== DATABASE RESTORE MODAL ===== -->
 <div class="modal-overlay" id="dbRestoreModal">
   <div class="modal" style="width:620px">
@@ -864,7 +880,7 @@
       </div>
       <div class="logo-text">
         <div class="t1">EVEJS COMMAND</div>
-        <div class="t2">SERVER LAUNCHER · v0.1.15</div>
+        <div class="t2">SERVER LAUNCHER · v0.1.16</div>
       </div>
     </div>
     <div class="topbar-divider"></div>
@@ -881,7 +897,7 @@
       <div class="admin-card"><div class="admin-avatar">TS</div><div class="admin-info"><div class="n">托肯赞助</div><div class="r">● TOKEN SPONSOR</div></div></div>
       <div class="sponsor-pop">
         <div class="sponsor-qr-grid">
-          <div class="sponsor-qr"><img src="./shoukuanma.png" alt="微信收款码"><div class="cap">WECHAT DONATION · 微信赞助</div></div>
+          <div class="sponsor-qr"><img src="./wechat.png" alt="微信收款码"><div class="cap">WECHAT DONATION · 微信赞助</div></div>
           <div class="sponsor-qr"><img src="./paypal.png" alt="PayPal 收款码"><div class="cap">PAYPAL DONATION · PAYPAL 赞助</div></div>
         </div>
       </div>
@@ -1332,6 +1348,19 @@ Object.assign(TRANSLATE,{
   '位置': {'en':'Location','ja':'位置','ko':'위치','fr':'Emplacement','de':'Ort','nl':'Locatie','ru':'Местоположение'},
   '安全等级': {'en':'Security Status','ja':'セキュリティ','ko':'보안 등급','fr':'Statut de sécurité','de':'Sicherheitsstatus','nl':'Veiligheidsstatus','ru':'Уровень безопасности'}
 });
+Object.assign(TRANSLATE,{
+  '创建角色': {'en':'Create Character','ja':'キャラクター作成','ko':'캐릭터 생성','fr':'Créer un personnage','de':'Charakter erstellen','nl':'Personage aanmaken','ru':'Создать персонажа'},
+  '剩余槽位': {'en':'Slots left','ja':'残りスロット','ko':'남은 슬롯','fr':'Emplacements restants','de':'Freie Slots','nl':'Resterende slots','ru':'Свободных слотов'},
+  '登录启动': {'en':'Launch','ja':'起動','ko':'실행','fr':'Lancer','de':'Starten','nl':'Starten','ru':'Запустить'},
+  '启动客户端': {'en':'Launch Client','ja':'クライアント起動','ko':'클라이언트 실행','fr':'Lancer le client','de':'Client starten','nl':'Client starten','ru':'Запустить клиент'},
+  '登录并启动': {'en':'Sign in & Launch','ja':'ログインして起動','ko':'로그인 후 실행','fr':'Connexion et lancement','de':'Anmelden & starten','nl':'Inloggen en starten','ru':'Войти и запустить'},
+  '登录并进入创建': {'en':'Sign in & Create','ja':'ログインして作成','ko':'로그인 후 생성','fr':'Connexion et création','de':'Anmelden & erstellen','nl':'Inloggen en aanmaken','ru':'Войти и создать'},
+  '登录后进入角色选择，点击空槽位即可创建角色。': {'en':'Signs in and opens character selection — click an empty slot to create a character.','ja':'ログイン後にキャラクター選択へ移動します。空きスロットをクリックするとキャラクターを作成できます。','ko':'로그인 후 캐릭터 선택 화면으로 이동합니다. 빈 슬롯을 클릭하면 캐릭터를 생성할 수 있습니다.','fr':'Connecte le compte puis ouvre la sélection de personnage — cliquez sur un emplacement vide pour créer un personnage.','de':'Meldet das Konto an und öffnet die Charakterauswahl – klicken Sie auf einen freien Slot, um einen Charakter zu erstellen.','nl':'Logt in en opent de personageselectie — klik op een lege plek om een personage aan te maken.','ru':'Выполняет вход и открывает выбор персонажа — нажмите на пустой слот, чтобы создать персонажа.'},
+  '进入角色创建': {'en':'Opening character creation','ja':'キャラクター作成を開いています','ko':'캐릭터 생성 화면을 여는 중','fr':'Ouverture de la création de personnage','de':'Charaktererstellung wird geöffnet','nl':'Personageaanmaak wordt geopend','ru':'Открытие создания персонажа'},
+  '输入账号密码以自动登录': {'en':'Enter the account password to sign in','ja':'自動ログインするにはアカウントのパスワードを入力','ko':'자동 로그인하려면 계정 비밀번호를 입력하세요','fr':'Saisissez le mot de passe du compte pour la connexion automatique','de':'Kontopasswort für die automatische Anmeldung eingeben','nl':'Voer het accountwachtwoord in voor automatisch inloggen','ru':'Введите пароль аккаунта для автоматического входа'}
+
+});
+
 // 保存所有元素的原始中文文本，用于切换回中文或避免重复翻译
 let i18nOriginals = new WeakMap();
 function t(zh){
@@ -1760,7 +1789,7 @@ function renderAccounts(){
             <span><b>${t('安全等级')}</b><strong class="security">${c.security || '—'}</strong></span>
           </div>
           <div class="char-foot">
-            <button class="launch-char ${c.status==='offline'?'unavail':''}" onclick="launchChar('${a.name}','${c.name}')">${c.status==='offline'?'UNAVAILABLE':t('登录启动')}</button>
+            <button class="launch-char ${c.status==='offline'?'unavail':''}" onclick="launchChar('${a.name}','${c.name}','${c.id}')">${c.status==='offline'?'UNAVAILABLE':t('登录启动')}</button>
             <button class="char-more" onclick="toggleCharMenu(event,this)"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button>
           </div>
           <div class="char-menu">
@@ -1775,8 +1804,8 @@ function renderAccounts(){
       return `
       <div class="char-card empty" onclick="addChar(${ai})">
         <div class="plus"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
-        <div class="et">创建角色</div>
-        <div class="es">剩余槽位 ${MAX_CHARS-charCount}/3</div>
+        <div class="et">${t('创建角色')}</div>
+        <div class="es">${t('剩余槽位')} ${MAX_CHARS-charCount}/3</div>
       </div>`;
     }).filter(Boolean).join('');
     if(q||filt!=='all'){ if(!slots) return ''; }

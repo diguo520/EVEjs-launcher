@@ -446,11 +446,13 @@ export function registerIpc(): void {
   ipcMain.handle("accounts:setPassword", (_e, user: string, oldPw: string, newPw: string) =>
     changeAccountPassword(String(user ?? ""), String(oldPw ?? ""), String(newPw ?? ""))
   );
-  ipcMain.handle("accounts:launch", (_e, user: string) =>
-    launchStoredAccount(String(user ?? ""))
+  ipcMain.handle("accounts:launch", (_e, user: string, characterId?: string | number) =>
+    launchStoredAccount(String(user ?? ""), characterId)
   );
-  ipcMain.handle("login:start", (_e, user: string, password: string, remember: boolean) =>
-    launchClientWithLogin(String(user ?? ""), String(password ?? ""), !!remember)
+  ipcMain.handle(
+    "login:start",
+    (_e, user: string, password: string, remember: boolean, characterId?: string | number) =>
+      launchClientWithLogin(String(user ?? ""), String(password ?? ""), !!remember, characterId)
   );
 
   /* ---------- 终端输入回传 / 尺寸同步 ---------- */
