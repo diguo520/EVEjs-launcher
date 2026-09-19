@@ -51,7 +51,7 @@ update-manifest.json
 启动器更新清单地址示例：
 
 ```text
-https://github.com/diguo520/EVEjs-launcher/releases/download/v0.1.7/update-manifest.json
+https://github.com/diguo520/EVEjs-launcher/releases/download/v0.1.8/update-manifest.json
 ```
 
 ## 任务视图（服务器日志）
