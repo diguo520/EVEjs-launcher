@@ -2,12 +2,16 @@
   "version": "0.1.13",
   "changelog": {
     "zh": [
-      { "type": "fix", "text": "修复 v0.1.12 更新清单中中英文更新日志被错误包装的问题" },
-      { "type": "opt", "text": "启动器兼容旧版单元素数组格式的更新日志清单" }
+      { "type": "fix", "text": "修复托肯赞助卡片悬停二维码被裁剪不显示的问题" },
+      { "type": "fix", "text": "修复账号管理角色启动无法自动登录并拉起客户端的问题" },
+      { "type": "fix", "text": "修复更新清单中中英文更新日志被错误包装的问题" },
+      { "type": "opt", "text": "兼容旧版单元素数组格式的更新日志清单" }
     ],
     "en": [
-      { "type": "fix", "text": "Fixed the wrapped changelog structure in the v0.1.12 update manifest" },
-      { "type": "opt", "text": "Made the launcher compatible with the legacy single-item changelog array format" }
+      { "type": "fix", "text": "Fixed the Token Sponsor QR code being clipped on hover" },
+      { "type": "fix", "text": "Fixed character launch from account management so the client starts with automatic login" },
+      { "type": "fix", "text": "Fixed the wrapped bilingual changelog structure in the update manifest" },
+      { "type": "opt", "text": "Added compatibility for the legacy single-item changelog array format" }
     ]
   }
 }

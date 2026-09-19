@@ -329,10 +329,25 @@ function createWindow(): void {
             item.click();
             await new Promise((r) => setTimeout(r, 2500));
             const acc = await window.api.accountsList();
+            const firstAccount = acc.ok && acc.data ? acc.data[0] : null;
+            const firstCharacter = firstAccount && firstAccount.roles ? firstAccount.roles[0] : null;
+            if (firstAccount && firstCharacter && typeof launchChar === "function") {
+              launchChar(firstAccount.accountKey, firstCharacter.characterName);
+            }
+            const launchModalOpen = !!document.getElementById("launchCharacterModal")?.classList.contains("open");
+            closeModal("launchCharacterModal");
+            const sponsor = document.querySelector(".admin");
+            const sponsorCard = document.querySelector(".admin-card");
             return JSON.stringify({
               opened: !!document.querySelector("#view-accounts.active"),
               addAccountModal: !!document.getElementById("addAccountModal"),
               addAccountApi: typeof window.api.accountsCreate === "function",
+              launchModal: !!document.getElementById("launchCharacterModal"),
+              launchModalOpen,
+              launchApi: typeof window.api.loginStart === "function",
+              sponsorPopover: !!document.querySelector(".sponsor-pop img"),
+              sponsorParentClipped: sponsor ? getComputedStyle(sponsor).clipPath !== "none" : null,
+              sponsorCardClipped: sponsorCard ? getComputedStyle(sponsorCard).clipPath !== "none" : null,
               cards: document.querySelectorAll("#accTable .acc-block").length,
               names: [...document.querySelectorAll("#accTable .ac-name")].map((el) => el.textContent?.replace(/\\s+/g, " ").trim()).slice(0, 8),
               gmLinks: [...document.querySelectorAll("#accTable .gm-tag")].map((el) => el.textContent?.trim()),

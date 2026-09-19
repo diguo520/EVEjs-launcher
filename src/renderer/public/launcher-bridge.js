@@ -474,12 +474,39 @@
   delChar = function () {
     toast("请通过账号删除流程处理角色数据", "warn");
   };
-  launchChar = async function (accountName, characterName) {
+  launchChar = function (accountName, characterName) {
+    const modal = document.getElementById("launchCharacterModal");
+    const account = document.getElementById("launchAccountName");
+    const character = document.getElementById("launchCharacterName");
+    const password = document.getElementById("launchAccountPassword");
+    if (!modal || !account || !character || !password) return;
+    account.value = accountName;
+    character.value = characterName;
+    password.value = "";
+    modal.classList.add("open");
+    setTimeout(() => password.focus(), 80);
+  };
+
+  submitCharacterLaunch = async function () {
+    const accountName = document.getElementById("launchAccountName")?.value || "";
+    const characterName = document.getElementById("launchCharacterName")?.value || "";
+    const password = document.getElementById("launchAccountPassword")?.value || "";
+    if (!password) {
+      toast("请输入账号密码", "err");
+      return;
+    }
+    const button = document.getElementById("launchCharacterBtn");
+    if (button) button.disabled = true;
     try {
-      const result = await api.serviceStart("client");
-      toast(result?.ok ? `正在启动 ${characterName}` : result?.reason || "客户端启动失败", result?.ok ? "ok" : "err");
+      const result = await api.loginStart(accountName, password);
+      if (!result?.ok) throw new Error(result?.reason || "客户端启动失败");
+      closeModal("launchCharacterModal");
+      toast(`${characterName} · 客户端自动登录中`, "ok");
+      logTo("sys", "OK", `启动角色 <span class="hi">${esc(characterName)}</span> · 账号 ${esc(accountName)} · 自动登录`);
     } catch (error) {
-      toast("客户端启动失败: " + String(error), "err");
+      toast(String(error), "err");
+    } finally {
+      if (button) button.disabled = false;
     }
   };
 
