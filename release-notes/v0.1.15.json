@@ -1,0 +1,73 @@
+{
+    "version":  "0.1.15",
+    "changelog":  {
+                      "zh":  [
+                                 {
+                                     "type":  "new",
+                                     "text":  "托肯赞助卡片新增 PayPal 收款码，与微信收款码并排显示"
+                                 },
+                                 {
+                                     "type":  "fix",
+                                     "text":  "修复更新弹窗无法读取中英文更新日志对象"
+                                 },
+                                 {
+                                     "type":  "fix",
+                                     "text":  "新建账号后角色登录自动使用已保存凭据，不再重复输入密码"
+                                 },
+                                 {
+                                     "type":  "opt",
+                                     "text":  "数据库页面改为真实表清单和数据库统计"
+                                 },
+                                 {
+                                     "type":  "new",
+                                     "text":  "新增数据库行查看、编辑、新增和删除功能"
+                                 },
+                                 {
+                                     "type":  "new",
+                                     "text":  "数据库编辑前自动生成 launcher-backup 备份"
+                                 },
+                                 {
+                                     "type":  "new",
+                                     "text":  "自动检测并显示所有磁盘卷的盘符、已用空间、总空间和占用比例"
+                                 },
+                                 {
+                                     "type":  "new",
+                                     "text":  "新增数据库版本化备份和恢复功能，恢复前自动安全备份"
+                                 }
+                             ],
+                      "en":  [
+                                 {
+                                     "type":  "new",
+                                     "text":  "Added a PayPal donation QR next to the WeChat QR on the sponsor card"
+                                 },
+                                 {
+                                     "type":  "fix",
+                                     "text":  "Fixed the update dialog dropping localized changelog objects"
+                                 },
+                                 {
+                                     "type":  "fix",
+                                     "text":  "Character launch now uses saved account credentials after account creation instead of asking for the password again"
+                                 },
+                                 {
+                                     "type":  "opt",
+                                     "text":  "Database page now shows the real table list and database statistics"
+                                 },
+                                 {
+                                     "type":  "new",
+                                     "text":  "Added database row viewing, editing, insertion, and deletion"
+                                 },
+                                 {
+                                     "type":  "new",
+                                     "text":  "Automatically creates a launcher-backup before database edits"
+                                 },
+                                 {
+                                     "type":  "new",
+                                     "text":  "Automatically detects and displays all disk volumes with drive letter, used space, total space, and usage percentage"
+                                 },
+                                 {
+                                     "type":  "new",
+                                     "text":  "Added versioned database backup and restore with automatic safety backup before restore"
+                                 }
+                             ]
+                  }
+}

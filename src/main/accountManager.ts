@@ -1,9 +1,10 @@
 import { execFile } from "child_process";
 import * as path from "path";
 import * as fs from "fs";
-import { app } from "electron";
+import { app, safeStorage } from "electron";
 import { resolveRepoRoot } from "./envDetector";
 import { startService } from "./processManager";
+import { readSettings, writeSettings } from "./configStore";
 
 export interface AccountRole {
   characterId: string;
@@ -30,6 +31,7 @@ export interface AccountInfo {
   accountId: number;
   isGM: boolean;
   banned: boolean;
+  hasStoredCredential?: boolean;
   roles: AccountRole[];
 }
 
@@ -38,6 +40,44 @@ export interface AccountOpResult {
   data?: AccountInfo[];
   reason?: string;
   output?: string;
+}
+
+function credentialMap(): Record<string, string> {
+  const value = readSettings().accountCredentials;
+  return value && typeof value === "object" ? { ...(value as Record<string, string>) } : {};
+}
+
+function rememberAccountPassword(user: string, password: string): boolean {
+  try {
+    if (!user || !password || !safeStorage.isEncryptionAvailable()) return false;
+    const credentials = credentialMap();
+    credentials[user] = safeStorage.encryptString(password).toString("base64");
+    writeSettings({ accountCredentials: credentials });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function storedAccountPassword(user: string): string | null {
+  try {
+    const encrypted = credentialMap()[user];
+    if (!encrypted || !safeStorage.isEncryptionAvailable()) return null;
+    return safeStorage.decryptString(Buffer.from(encrypted, "base64"));
+  } catch {
+    return null;
+  }
+}
+
+function hasStoredCredential(user: string): boolean {
+  return !!storedAccountPassword(user);
+}
+
+function forgetAccountPassword(user: string): void {
+  const credentials = credentialMap();
+  if (!Object.prototype.hasOwnProperty.call(credentials, user)) return;
+  delete credentials[user];
+  writeSettings({ accountCredentials: credentials });
 }
 
 /** account-cli.js 位置：打包后随 extraResources 进 resources；开发时在 launcher/scripts */
@@ -112,6 +152,7 @@ export async function listAccounts(): Promise<AccountOpResult> {
   try {
     const accounts = JSON.parse(stdout.trim()) as AccountInfo[];
     for (const acc of accounts) {
+      acc.hasStoredCredential = hasStoredCredential(acc.accountKey);
       for (const role of acc.roles) {
         role.avatar = resolvePortraitDataUrl(root, role.characterId);
       }
@@ -132,6 +173,7 @@ export async function deleteAccount(
   if (apply) args.push("--apply");
   const { stdout, stderr, code } = await runCli(args);
   if (code !== 0) return { ok: false, reason: (stderr || stdout || "delete 失败").trim() };
+  forgetAccountPassword(target);
   return { ok: true, output: stdout };
 }
 
@@ -146,6 +188,7 @@ export async function createAccount(
   if (isGM) args.push("--gm");
   const { stdout, stderr, code } = await runCli(args);
   if (code !== 0) return { ok: false, reason: (stderr || stdout || "create 失败").trim() };
+  rememberAccountPassword(user, password);
   return { ok: true, output: stdout };
 }
 
@@ -191,6 +234,7 @@ export async function changeAccountPassword(
   if (!newPassword || newPassword.length < 4) return { ok: false, reason: "新密码至少 4 位" };
   const { stdout, stderr, code } = await runCli(["set-password", root, user, newPassword]);
   if (code !== 0) return { ok: false, reason: (stderr || stdout || "修改失败").trim() };
+  rememberAccountPassword(user, newPassword);
   return { ok: true, output: stdout };
 }
 
@@ -200,11 +244,19 @@ export async function changeAccountPassword(
  * 2) 启动客户端并注入客户端原生 /login:<user>:<password> 参数
  *    → 客户端 GetLoginCredentials / TryAutomaticLogin 自动登录 → 角色选择
  */
-export async function launchClientWithLogin(user: string, password: string): Promise<AccountOpResult> {
+export async function launchClientWithLogin(user: string, password: string, remember = false): Promise<AccountOpResult> {
   const v = await verifyAccount(user, password);
   if (!v.ok) return { ok: false, reason: v.reason ?? "账号或密码错误" };
   if (password.includes(":")) return { ok: false, reason: "密码不能包含冒号（客户端 /login: 参数限制）" };
+  if (remember) rememberAccountPassword(user, password);
   const res = await startService("client", { login: { user, password } });
   if (!res.ok) return { ok: false, reason: res.reason ?? "客户端启动失败" };
   return { ok: true, output: "登录成功，客户端自动登录中 → 角色选择" };
+}
+
+/** 使用创建账号时保存的安全凭据启动客户端，不把密码暴露给渲染层。 */
+export async function launchStoredAccount(user: string): Promise<AccountOpResult> {
+  const password = storedAccountPassword(user);
+  if (!password) return { ok: false, reason: "未找到已保存的登录凭据，请手动输入一次密码" };
+  return launchClientWithLogin(user, password, false);
 }

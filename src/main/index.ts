@@ -271,7 +271,9 @@ function createWindow(): void {
               updateLatestVersion: updateReport.latestVersion ?? "",
               updateReason: updateReport.reason ?? "",
               updateModalOpen: !!document.getElementById("updateModal")?.classList.contains("open"),
-              updateModalTitle: document.getElementById("updTitle")?.textContent?.trim() ?? ""
+              updateModalTitle: document.getElementById("updTitle")?.textContent?.trim() ?? "",
+              updateChangelogRows: [...document.querySelectorAll("#updBody .upd-changelog li")].map((item) => item.textContent?.replace(/\\s+/g, " ").trim()),
+              updateChangelogFirst: document.querySelector("#updBody .upd-changelog li")?.textContent?.replace(/\\s+/g, " ").trim() ?? ""
             });
           })()`);
           console.log("[SMOKE] renderer-state:", state);
@@ -378,6 +380,47 @@ function createWindow(): void {
           }
         } catch (e) {
           console.log("[SMOKE] accounts-state ERROR:", e);
+        }
+
+        // 数据库管理探针：真实表清单、统计和分页行读取。
+        try {
+          const dbState = await mainWindow?.webContents.executeJavaScript(`(async () => {
+            const item = document.querySelector('.nav-item[data-view="database"]');
+            if (!item) return JSON.stringify({ opened: false, reason: "no nav item" });
+            item.click();
+            if (typeof closeModal === "function") closeModal("updateModal");
+            await new Promise((r) => setTimeout(r, 1500));
+            const overview = await window.api.databaseOverview();
+            const table = await window.api.databaseTable("accounts", 2, 0);
+            const backups = await window.api.databaseBackups();
+            return JSON.stringify({
+              opened: !!document.querySelector("#view-database.active"),
+              tableCount: overview.tableCount,
+              totalRows: overview.totalRows,
+              journalMode: overview.journalMode,
+              tableRows: document.querySelectorAll("#dbTableList .db-table-item").length,
+              hasEditor: !!document.getElementById("dbInspectorFields"),
+              hasGrid: !!document.getElementById("dbGridBody"),
+              hasStructureTab: !!document.getElementById("dbTabStructure"),
+              backupButton: !!document.getElementById("dbBackupBtn"),
+              restoreButton: !!document.getElementById("dbRestoreBtn"),
+              restoreModal: !!document.getElementById("dbRestoreModal"),
+              backupCount: backups.backups ? backups.backups.length : 0,
+              accountRows: table.rows ? table.rows.length : 0,
+              accountTotal: table.total
+            });
+          })()`);
+          console.log("[SMOKE] database-state:", dbState);
+          const image3 = await mainWindow?.webContents.capturePage();
+          if (image3) {
+            const shotDir = path.resolve(__dirname, "../../../docs");
+            fs.mkdirSync(shotDir, { recursive: true });
+            const shot = path.join(shotDir, "ui-database.png");
+            fs.writeFileSync(shot, image3.toPNG());
+            console.log("[SMOKE] database screenshot saved:", shot);
+          }
+        } catch (e) {
+          console.log("[SMOKE] database-state ERROR:", e);
         }
         console.log("[SMOKE] quit");
         app.exit(0);

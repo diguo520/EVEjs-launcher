@@ -120,6 +120,7 @@ export interface AccountInfo {
   accountId: number;
   isGM: boolean;
   banned: boolean;
+  hasStoredCredential?: boolean;
   roles: AccountRole[];
 }
 

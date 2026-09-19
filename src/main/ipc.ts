@@ -22,10 +22,11 @@ import {
   engageStart,
   engageStop
 } from "./processManager";
-import { listAccounts, createAccount, deleteAccount, checkServerRunning, verifyAccount, changeAccountPassword, launchClientWithLogin } from "./accountManager";
+import { listAccounts, createAccount, deleteAccount, checkServerRunning, verifyAccount, changeAccountPassword, launchClientWithLogin, launchStoredAccount } from "./accountManager";
 import * as pty from "./ptyManager";
 import { log } from "./logger";
 import { applyUpdate, cancelUpdateDownload, checkForUpdates, currentUpdateState, downloadUpdate } from "./updater";
+import { databaseOverview, databaseTable, databaseSaveRow, databaseInsertRow, databaseDeleteRow, databaseCreateBackup, databaseBackups, databaseRestoreBackup } from "./databaseManager";
 
 const execFileAsync = promisify(execFile);
 let previousCpu = os.cpus().map((cpu) => ({ ...cpu.times }));
@@ -159,6 +160,65 @@ async function readNetworkBytes(): Promise<number | null> {
   return null;
 }
 
+interface DiskVolumeMetrics {
+  root: string;
+  totalGB: number;
+  usedGB: number;
+  freeGB: number;
+  percent: number;
+}
+
+function volumeFromStat(root: string, stat: fs.StatsFs): DiskVolumeMetrics | null {
+  const blockSize = Number(stat.bsize);
+  const total = Number(stat.blocks) * blockSize;
+  const free = Number(stat.bavail) * blockSize;
+  if (!Number.isFinite(total) || total <= 0) return null;
+  const used = Math.max(0, total - free);
+  return {
+    root: root.replace(/[\\/]+$/, ""),
+    totalGB: total / 1024 ** 3,
+    usedGB: used / 1024 ** 3,
+    freeGB: free / 1024 ** 3,
+    percent: total > 0 ? Math.max(0, Math.min(100, used / total * 100)) : 0
+  };
+}
+
+async function readDiskVolumes(): Promise<DiskVolumeMetrics[]> {
+  if (process.platform === "win32") {
+    const volumes: DiskVolumeMetrics[] = [];
+    for (const letter of "ABCDEFGHIJKLMNOPQRSTUVWXYZ") {
+      const root = `${letter}:`;
+      try {
+        const volume = volumeFromStat(root, fs.statfsSync(`${root}\\`));
+        if (volume) volumes.push(volume);
+      } catch {
+        /* drive letter not mounted or not ready */
+      }
+    }
+    return volumes.sort((left, right) => left.root.localeCompare(right.root));
+  }
+  try {
+    const { stdout } = await execFileAsync("df", ["-kP"], { timeout: 2500, windowsHide: true });
+    return stdout.split(/\r?\n/).slice(1).map((line) => {
+      const parts = line.trim().split(/\s+/);
+      if (parts.length < 6) return null;
+      const total = Number(parts[1]) * 1024;
+      const used = Number(parts[2]) * 1024;
+      const free = Number(parts[3]) * 1024;
+      if (!Number.isFinite(total) || total <= 0) return null;
+      return {
+        root: parts.slice(5).join(" "),
+        totalGB: total / 1024 ** 3,
+        usedGB: used / 1024 ** 3,
+        freeGB: free / 1024 ** 3,
+        percent: total > 0 ? Math.max(0, Math.min(100, used / total * 100)) : 0
+      } satisfies DiskVolumeMetrics;
+    }).filter((volume): volume is DiskVolumeMetrics => volume !== null);
+  } catch {
+    return [];
+  }
+}
+
 /** 向指定终端页签推送一行文本（渲染层 xterm 直接写入） */
 export function pushTerminalLine(tabId: string, text: string): void {
   const win = BrowserWindow.getAllWindows()[0];
@@ -197,6 +257,7 @@ export function registerIpc(): void {
   ipcMain.handle("env:check", () => detectEnv());
   ipcMain.handle("health:check", () => checkAll());
   ipcMain.handle("metrics:get", async () => {
+    const repoRoot = resolveRepoRoot();
     const cpus = os.cpus();
     let idleDelta = 0;
     let totalDelta = 0;
@@ -217,13 +278,9 @@ export function registerIpc(): void {
     const memTotal = os.totalmem();
     const memFree = os.freemem();
     const memUsed = memTotal - memFree;
-    let diskTotal = 0;
-    let diskFree = 0;
-    try {
-      const stat = fs.statfsSync(resolveRepoRoot());
-      diskTotal = Number(stat.blocks) * Number(stat.bsize);
-      diskFree = Number(stat.bavail) * Number(stat.bsize);
-    } catch { /* ignore */ }
+    const volumes = await readDiskVolumes();
+    const repoRootDrive = path.parse(repoRoot).root.replace(/[\\/]+$/, "").toUpperCase();
+    const currentVolume = volumes.find((volume) => volume.root.toUpperCase() === repoRootDrive) || volumes[0] || null;
     const netBytes = await readNetworkBytes();
     const now = Date.now();
     const elapsed = Math.max(0.1, (now - previousNetAt) / 1000);
@@ -237,8 +294,10 @@ export function registerIpc(): void {
       cpuPercent,
       memUsedGB: memUsed / 1024 ** 3,
       memTotalGB: memTotal / 1024 ** 3,
-      diskUsedGB: (diskTotal - diskFree) / 1024 ** 3,
-      diskTotalGB: diskTotal / 1024 ** 3,
+      diskUsedGB: currentVolume?.usedGB || 0,
+      diskTotalGB: currentVolume?.totalGB || 0,
+      diskRoot: currentVolume?.root || path.parse(repoRoot).root,
+      volumes,
       netBytesPerSec: netRate,
       gpuPercent: gpu.gpuPercent,
       gpuDedicatedUsedGB: gpu.gpuDedicatedUsedGB,
@@ -339,6 +398,24 @@ export function registerIpc(): void {
   ipcMain.handle("settings:get", () => readSettings());
   ipcMain.handle("settings:set", (_e, patch: Record<string, unknown>) => writeSettings(patch));
 
+  /* ---------- 数据库管理 ---------- */
+  ipcMain.handle("database:overview", () => databaseOverview());
+  ipcMain.handle("database:table", (_e, table: string, limit?: number, offset?: number) =>
+    databaseTable(String(table ?? ""), Number(limit) || 100, Number(offset) || 0)
+  );
+  ipcMain.handle("database:save", (_e, table: string, values: Record<string, unknown>) =>
+    databaseSaveRow(String(table ?? ""), values ?? {})
+  );
+  ipcMain.handle("database:insert", (_e, table: string, values: Record<string, unknown>) =>
+    databaseInsertRow(String(table ?? ""), values ?? {})
+  );
+  ipcMain.handle("database:delete", (_e, table: string, values: Record<string, unknown>) =>
+    databaseDeleteRow(String(table ?? ""), values ?? {})
+  );
+  ipcMain.handle("database:backup", () => databaseCreateBackup());
+  ipcMain.handle("database:backups", () => databaseBackups());
+  ipcMain.handle("database:restore", (_e, name: string) => databaseRestoreBackup(String(name ?? "")));
+
   /* ---------- 启动器更新 ---------- */
   ipcMain.handle("update:check", () => checkForUpdates());
   ipcMain.handle("update:state", () => currentUpdateState());
@@ -369,8 +446,11 @@ export function registerIpc(): void {
   ipcMain.handle("accounts:setPassword", (_e, user: string, oldPw: string, newPw: string) =>
     changeAccountPassword(String(user ?? ""), String(oldPw ?? ""), String(newPw ?? ""))
   );
-  ipcMain.handle("login:start", (_e, user: string, password: string) =>
-    launchClientWithLogin(String(user ?? ""), String(password ?? ""))
+  ipcMain.handle("accounts:launch", (_e, user: string) =>
+    launchStoredAccount(String(user ?? ""))
+  );
+  ipcMain.handle("login:start", (_e, user: string, password: string, remember: boolean) =>
+    launchClientWithLogin(String(user ?? ""), String(password ?? ""), !!remember)
   );
 
   /* ---------- 终端输入回传 / 尺寸同步 ---------- */

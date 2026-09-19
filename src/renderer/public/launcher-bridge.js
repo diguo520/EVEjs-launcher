@@ -376,6 +376,7 @@
       id: account.accountKey,
       name: account.accountKey,
       gm: !!account.isGM,
+      hasCredential: !!account.hasStoredCredential,
       expanded: index === 0,
       chars: roles.map((role) => ({
         id: role.characterId,
@@ -474,7 +475,19 @@
   delChar = function () {
     toast("请通过账号删除流程处理角色数据", "warn");
   };
-  launchChar = function (accountName, characterName) {
+  launchChar = async function (accountName, characterName) {
+    const accountRecord = ACC.find((item) => item.name === accountName);
+    if (accountRecord?.hasCredential) {
+      try {
+        toast(`${characterName} · 自动登录中`, "ok");
+        const result = await api.accountsLaunch(accountName);
+        if (!result?.ok) throw new Error(result?.reason || "自动登录失败");
+        logTo("sys", "OK", `启动角色 <span class="hi">${esc(characterName)}</span> · 账号 ${esc(accountName)} · 已保存凭据自动登录`);
+      } catch (error) {
+        toast(`自动登录失败: ${String(error)}`, "err");
+      }
+      return;
+    }
     const modal = document.getElementById("launchCharacterModal");
     const account = document.getElementById("launchAccountName");
     const character = document.getElementById("launchCharacterName");
@@ -498,7 +511,7 @@
     const button = document.getElementById("launchCharacterBtn");
     if (button) button.disabled = true;
     try {
-      const result = await api.loginStart(accountName, password);
+      const result = await api.loginStart(accountName, password, true);
       if (!result?.ok) throw new Error(result?.reason || "客户端启动失败");
       closeModal("launchCharacterModal");
       toast(`${characterName} · 客户端自动登录中`, "ok");
@@ -592,6 +605,340 @@
     if (element) element.classList.toggle("on", !!on);
   }
 
+  const databaseState = {
+    tables: [],
+    table: "",
+    rows: [],
+    columns: [],
+    primaryKeys: [],
+    total: 0,
+    page: 0,
+    pageSize: 50,
+    selectedIndex: -1,
+    isNew: false,
+    tab: "data"
+  };
+
+  function databaseSize(value) {
+    const bytes = Number(value || 0);
+    if (!bytes) return "0 B";
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KB`;
+    if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+    return `${(bytes / 1024 ** 3).toFixed(2)} GB`;
+  }
+
+  function databaseValueText(value) {
+    if (value == null) return "";
+    if (typeof value === "object") return JSON.stringify(value);
+    return String(value);
+  }
+
+  function databaseCellText(value) {
+    const text = databaseValueText(value).replace(/\s+/g, " ");
+    return text.length > 120 ? text.slice(0, 117) + "…" : text;
+  }
+
+  function databasePrimaryKeyText(row, index) {
+    if (!databaseState.primaryKeys.length) return `row ${index + 1}`;
+    return databaseState.primaryKeys.map((key) => `${key.name}=${databaseValueText(row[key.name]) || "—"}`).join(" · ");
+  }
+
+  function renderDatabaseTableList() {
+    const list = document.getElementById("dbTableList");
+    if (!list) return;
+    const query = String(document.getElementById("dbTableSearch")?.value || "").trim().toLowerCase();
+    const tables = databaseState.tables.filter((table) => !query || table.name.toLowerCase().includes(query));
+    list.innerHTML = tables.map((table) => `
+      <button class="db-table-item ${table.name === databaseState.table ? "active" : ""}" onclick="selectDatabaseTable('${esc(table.name)}')">
+        <span class="n">${esc(table.name)}</span><span class="c">${Number(table.rows || 0).toLocaleString()}</span>
+      </button>`).join("");
+    const badge = document.getElementById("dbTableCountBadge");
+    if (badge) badge.textContent = String(databaseState.tables.length);
+  }
+
+  loadDatabaseOverview = async function () {
+    try {
+      const result = await api.databaseOverview();
+      if (!result?.ok) {
+        toast(result?.reason || "数据库读取失败", "err");
+        return;
+      }
+      databaseState.tables = Array.isArray(result.tables) ? result.tables : [];
+      const setText = (id, value) => { const element = document.getElementById(id); if (element) element.textContent = value; };
+      setText("dbSize", databaseSize(result.sizeBytes));
+      setText("dbTableCount", Number(result.tableCount || 0).toLocaleString());
+      setText("dbRowCount", Number(result.totalRows || 0).toLocaleString());
+      setText("dbJournal", String(result.journalMode || "unknown").toUpperCase());
+      setText("dbPath", result.path || "");
+      renderDatabaseTableList();
+      if (!databaseState.table && databaseState.tables.length) await selectDatabaseTable(databaseState.tables[0].name);
+    } catch (error) {
+      toast("数据库读取失败: " + String(error), "err");
+    }
+  };
+
+  selectDatabaseTable = async function (table) {
+    databaseState.table = String(table || "");
+    databaseState.page = 0;
+    databaseState.selectedIndex = -1;
+    databaseState.isNew = false;
+    renderDatabaseTableList();
+    await loadDatabaseTable();
+  };
+
+  loadDatabaseTable = async function () {
+    if (!databaseState.table) return;
+    try {
+      const result = await api.databaseTable(databaseState.table, databaseState.pageSize, databaseState.page * databaseState.pageSize);
+      if (!result?.ok) {
+        toast(result?.reason || "数据表读取失败", "err");
+        return;
+      }
+      databaseState.rows = Array.isArray(result.rows) ? result.rows : [];
+      databaseState.columns = Array.isArray(result.columns) ? result.columns : [];
+      databaseState.primaryKeys = Array.isArray(result.primaryKeys) ? result.primaryKeys : [];
+      databaseState.total = Number(result.total || 0);
+      databaseState.selectedIndex = -1;
+      databaseState.isNew = false;
+      const title = document.getElementById("dbEditorTitle");
+      if (title) title.textContent = databaseState.table;
+      const meta = document.getElementById("dbEditorMeta");
+      if (meta) meta.textContent = `${databaseState.total.toLocaleString()} ROWS · ${databaseState.columns.length} COLUMNS · page ${databaseState.page + 1}`;
+      renderDatabaseRows();
+      renderDatabaseStructure();
+      renderDatabaseSql();
+      renderDatabaseInspector();
+      if (databaseState.rows.length) selectDatabaseRow(0);
+      const refresh = document.getElementById("dbRefreshTableBtn");
+      if (refresh) refresh.disabled = false;
+      const add = document.getElementById("dbNewRowBtn");
+      if (add) add.disabled = false;
+      const backup = document.getElementById("dbBackupBtn");
+      if (backup) backup.disabled = false;
+      updateDatabasePager();
+    } catch (error) {
+      toast("数据表读取失败: " + String(error), "err");
+    }
+  };
+
+  function updateDatabasePager() {
+    const pageCount = Math.max(1, Math.ceil(databaseState.total / databaseState.pageSize));
+    const info = document.getElementById("dbPageInfo");
+    if (info) info.textContent = `${databaseState.page + 1} / ${pageCount}`;
+    const prev = document.getElementById("dbPagePrev");
+    if (prev) prev.disabled = databaseState.page <= 0;
+    const next = document.getElementById("dbPageNext");
+    if (next) next.disabled = databaseState.page >= pageCount - 1;
+  }
+
+  databasePage = function (delta) {
+    const pageCount = Math.max(1, Math.ceil(databaseState.total / databaseState.pageSize));
+    databaseState.page = Math.max(0, Math.min(pageCount - 1, databaseState.page + delta));
+    loadDatabaseTable();
+  };
+
+  renderDatabaseRows = function () {
+    const head = document.getElementById("dbGridHead");
+    const body = document.getElementById("dbGridBody");
+    if (!head || !body) return;
+    const filter = String(document.getElementById("dbRowFilter")?.value || "").trim().toLowerCase();
+    const columns = databaseState.columns;
+    head.innerHTML = `<tr><th style="width:42px">#</th>${columns.map((column) => `<th>${esc(column.name)}<span style="color:var(--txt-mute);margin-left:4px">${esc(column.type || "")}</span></th>`).join("")}</tr>`;
+    const rows = databaseState.rows.filter((row) => !filter || JSON.stringify(row).toLowerCase().includes(filter));
+    body.innerHTML = rows.map((row, index) => {
+      const originalIndex = databaseState.rows.indexOf(row);
+      const cells = columns.map((column) => `<td class="${column.pk ? "pk" : ""} title="${esc(databaseCellText(row[column.name]))}">${esc(databaseCellText(row[column.name])) || "—"}</td>`).join("");
+      return `<tr class="${databaseState.selectedIndex === originalIndex ? "active" : ""}" onclick="selectDatabaseRow(${originalIndex})"><td>${originalIndex + 1}</td>${cells}</tr>`;
+    }).join("");
+  };
+
+  renderDatabaseStructure = function () {
+    const body = document.getElementById("dbStructureBody");
+    if (!body) return;
+    body.innerHTML = databaseState.columns.map((column) => `<tr><td class="mono">${esc(column.name)}</td><td class="mono">${esc(column.type || "")}</td><td class="mono">${column.pk ? "YES" : ""}</td><td class="mono">${column.notnull ? "YES" : ""}</td><td class="mono">${esc(column.dflt_value ?? "")}</td></tr>`).join("");
+  };
+
+  renderDatabaseSql = function () {
+    const editor = document.getElementById("dbSqlPreview");
+    if (!editor) return;
+    const table = databaseState.table;
+    editor.value = table ? `SELECT *\nFROM "${table}"\nLIMIT ${databaseState.pageSize} OFFSET ${databaseState.page * databaseState.pageSize};\n\n-- SQL 仅用于查看，编辑请使用数据表详情表单` : "";
+  };
+
+  switchDatabaseTab = function (tab) {
+    databaseState.tab = tab || "data";
+    document.querySelectorAll("#dbTabs .db-tab").forEach((button) => button.classList.toggle("active", button.dataset.dbTab === databaseState.tab));
+    for (const name of ["data", "structure", "sql"]) {
+      const panel = document.getElementById(`dbTab${name[0].toUpperCase()}${name.slice(1)}`);
+      if (panel) panel.style.display = name === databaseState.tab ? "flex" : "none";
+    }
+  };
+
+  selectDatabaseRow = function (index) {
+    const row = databaseState.rows[index];
+    if (!row) return;
+    databaseState.selectedIndex = index;
+    databaseState.isNew = false;
+    renderDatabaseRows();
+    renderDatabaseInspector();
+  };
+
+  function renderDatabaseInspector() {
+    const fields = document.getElementById("dbInspectorFields");
+    const hint = document.getElementById("dbInspectorHint");
+    const save = document.getElementById("dbSaveRowBtn");
+    const remove = document.getElementById("dbDeleteRowBtn");
+    if (!fields) return;
+    const row = databaseState.selectedIndex >= 0 ? databaseState.rows[databaseState.selectedIndex] : null;
+    if (!row && !databaseState.isNew) {
+      fields.innerHTML = `<div class="db-empty">选择一行查看字段</div>`;
+      if (hint) hint.textContent = "未选择";
+      if (save) save.disabled = true;
+      if (remove) remove.disabled = true;
+      return;
+    }
+    const values = databaseState.isNew ? databaseState.newRow || {} : row;
+    fields.innerHTML = databaseState.columns.map((column) => {
+      const value = databaseValueText(values[column.name]);
+      const long = column.name === "json" || value.length > 120;
+      const label = `${esc(column.name)}<span class="pk">${column.pk ? " PK" : ""}</span>`;
+      return `<div class="db-field"><label>${label}</label>${long ? `<textarea data-db-field="${esc(column.name)}">${esc(value)}</textarea>` : `<input data-db-field="${esc(column.name)}" value="${esc(value)}">`}</div>`;
+    }).join("");
+    if (hint) hint.textContent = databaseState.isNew ? "新行" : databasePrimaryKeyText(row, databaseState.selectedIndex);
+    if (save) save.disabled = false;
+    if (remove) remove.disabled = databaseState.isNew;
+  }
+
+  function collectDatabaseFields() {
+    const values = {};
+    document.querySelectorAll("[data-db-field]").forEach((element) => {
+      const name = element.dataset.dbField;
+      const raw = element.value;
+      const column = databaseState.columns.find((item) => item.name === name);
+      let value = raw;
+      if (column?.name === "json" || /^\s*[\[{]/.test(raw)) {
+        try { value = JSON.parse(raw); } catch { value = raw; }
+      }
+      values[name] = value;
+    });
+    return values;
+  }
+
+  newDatabaseRow = function () {
+    if (!databaseState.table) return;
+    const row = {};
+    for (const column of databaseState.columns) {
+      row[column.name] = column.name === "json" ? "{}" : column.pk && String(column.type || "").toUpperCase().includes("INT") ? 0 : "";
+    }
+    databaseState.selectedIndex = -1;
+    databaseState.isNew = true;
+    databaseState.newRow = row;
+    renderDatabaseInspector();
+  };
+
+  saveDatabaseRow = async function () {
+    if (!databaseState.table) return;
+    try {
+      const values = collectDatabaseFields();
+      const result = databaseState.isNew
+        ? await api.databaseInsertRow(databaseState.table, values)
+        : await api.databaseSaveRow(databaseState.table, values);
+      if (!result?.ok) throw new Error(result?.reason || "保存失败");
+      toast(`已保存 ${databaseState.table}`, "ok");
+      logTo("sys", "OK", `数据库表 <span class="hi">${esc(databaseState.table)}</span> 已保存`);
+      await loadDatabaseTable();
+      await loadDatabaseOverview();
+    } catch (error) {
+      toast(String(error), "err");
+    }
+  };
+
+  deleteDatabaseRow = async function () {
+    if (!databaseState.table || databaseState.selectedIndex < 0) return;
+    const row = databaseState.rows[databaseState.selectedIndex];
+    if (!row || !window.confirm(`确认删除 ${databaseState.table} 中的这一行？`)) return;
+    try {
+      const result = await api.databaseDeleteRow(databaseState.table, row);
+      if (!result?.ok) throw new Error(result?.reason || "删除失败");
+      toast(`已删除 ${databaseState.table} 中的一行`, "warn");
+      await loadDatabaseTable();
+      await loadDatabaseOverview();
+    } catch (error) {
+      toast(String(error), "err");
+    }
+  };
+
+  let selectedDatabaseBackup = "";
+
+  createDatabaseBackup = async function () {
+    try {
+      const result = await api.databaseBackup();
+      if (!result?.ok) throw new Error(result?.reason || "备份失败");
+      toast(`数据库备份完成：${result.name}`, "ok");
+      logTo("sys", "OK", `数据库已备份 · <span class="hi">${esc(result.name)}</span>`);
+      if (document.getElementById("dbRestoreModal")?.classList.contains("open")) await openDatabaseRestore();
+    } catch (error) {
+      toast(String(error), "err");
+    }
+  };
+
+  function renderDatabaseBackupList(result) {
+    const list = document.getElementById("dbBackupList");
+    if (!list) return;
+    const backups = Array.isArray(result?.backups) ? result.backups : [];
+    if (!backups.length) {
+      list.innerHTML = `<div class="db-empty">暂无数据库备份</div>`;
+      const confirm = document.getElementById("dbRestoreConfirmBtn");
+      if (confirm) confirm.disabled = true;
+      return;
+    }
+    list.innerHTML = backups.map((backup) => `
+      <div class="db-backup-item ${backup.name === selectedDatabaseBackup ? "active" : ""}" data-backup="${esc(backup.name)}" onclick="selectDatabaseBackup(this.dataset.backup)">
+        <div class="bi-main"><div class="bi-name">${esc(backup.name)}</div><div class="bi-meta">${new Date(backup.createdAt).toLocaleString()} · ${esc(result.directory || "")}</div></div>
+        <div class="bi-size">${databaseSize(backup.sizeBytes)}</div>
+      </div>`).join("");
+    const confirm = document.getElementById("dbRestoreConfirmBtn");
+    if (confirm) confirm.disabled = !selectedDatabaseBackup;
+  }
+
+  openDatabaseRestore = async function () {
+    selectedDatabaseBackup = "";
+    const modal = document.getElementById("dbRestoreModal");
+    const list = document.getElementById("dbBackupList");
+    if (modal) modal.classList.add("open");
+    if (list) list.innerHTML = `<div class="db-empty">正在读取备份…</div>`;
+    try {
+      const result = await api.databaseBackups();
+      if (!result?.ok) throw new Error(result?.reason || "备份列表读取失败");
+      renderDatabaseBackupList(result);
+    } catch (error) {
+      if (list) list.innerHTML = `<div class="db-empty">${esc(String(error))}</div>`;
+    }
+  };
+
+  selectDatabaseBackup = function (name) {
+    selectedDatabaseBackup = String(name || "");
+    document.querySelectorAll("#dbBackupList .db-backup-item").forEach((item) => item.classList.toggle("active", item.dataset.backup === selectedDatabaseBackup));
+    const confirm = document.getElementById("dbRestoreConfirmBtn");
+    if (confirm) confirm.disabled = !selectedDatabaseBackup;
+  };
+
+  restoreSelectedDatabaseBackup = async function () {
+    if (!selectedDatabaseBackup) return;
+    if (!window.confirm(`确认恢复数据库版本 ${selectedDatabaseBackup}？当前数据库会先自动备份。`)) return;
+    try {
+      const result = await api.databaseRestore(selectedDatabaseBackup);
+      if (!result?.ok) throw new Error(result?.reason || "恢复失败");
+      closeModal("dbRestoreModal");
+      toast(`数据库已恢复到 ${result.restored}；安全备份：${result.safetyBackup}`, "ok");
+      logTo("sys", "OK", `数据库已恢复 · <span class="hi">${esc(result.restored)}</span> · 安全备份 ${esc(result.safetyBackup || "")}`);
+      await loadDatabaseOverview();
+      if (databaseState.table) await loadDatabaseTable();
+    } catch (error) {
+      toast(String(error), "err");
+    }
+  };
   function checkboxOn(id) {
     return !!document.getElementById(id)?.classList.contains("on");
   }
@@ -655,6 +1002,16 @@
       set("mMem", `${memUsed.toFixed(1)}<span class="u">GB / ${memTotal.toFixed(1)}GB</span>`); width("bMem", memPct); set("sbMem", `${memUsed.toFixed(1)}G`);
       set("mDisk", `${diskUsed.toFixed(0)}<span class="u">GB / ${diskTotal.toFixed(0)}GB</span>`); width("bDisk", diskPct);
       set("mNet", `${(net / 1024 / 1024).toFixed(2)}<span class="u">MB/s</span>`); width("bNet", net / 1024 / 1024 / 100);
+      const diskLabel = document.getElementById("diskLabel");
+      if (diskLabel) diskLabel.textContent = metrics?.diskRoot ? `${t("EVEJS 所在盘")} · ${metrics.diskRoot}` : t("EVEJS 所在盘");
+      const volumeList = document.getElementById("diskVolumeList");
+      if (volumeList) {
+        const volumes = Array.isArray(metrics?.volumes) ? metrics.volumes : [];
+        volumeList.innerHTML = volumes.map((volume) => {
+          const percent = Math.max(0, Math.min(100, Number(volume.percent || 0)));
+          return `<div class="disk-volume"><div class="dv-top"><span class="dv-root">${esc(volume.root)}</span><span class="dv-pct">${percent.toFixed(0)}%</span></div><div class="dv-bar"><i style="width:${percent}%"></i></div><div class="dv-top" style="margin:5px 0 0"><span>${Number(volume.usedGB || 0).toFixed(1)} GB</span><span>${Number(volume.totalGB || 0).toFixed(1)} GB</span></div></div>`;
+        }).join("");
+      }
       set("mGpu", gpuPercent == null ? "—" : `${gpuPercent.toFixed(1)}<span class="u">%</span>`); width("bGpu", gpuPercent || 0);
       set("mGpuDedicated", gpuDedicatedUsed == null || gpuDedicatedTotal == null ? "—" : `${gpuDedicatedUsed.toFixed(1)}<span class="u">GB / ${gpuDedicatedTotal.toFixed(1)}GB</span>`); width("bGpuDedicated", gpuDedicatedTotal ? gpuDedicatedUsed / gpuDedicatedTotal * 100 : 0);
       set("mGpuMemory", gpuMemoryUsed == null || gpuMemoryTotal == null ? "—" : `${gpuMemoryUsed.toFixed(1)}<span class="u">GB / ${gpuMemoryTotal.toFixed(1)}GB</span>`); width("bGpuMemory", gpuMemoryTotal ? gpuMemoryUsed / gpuMemoryTotal * 100 : 0);
@@ -691,7 +1048,7 @@
     UPDATE_INFO.size = formatBytes(result.size);
     UPDATE_INFO.date = result.date || "";
     UPDATE_INFO.channel = result.channel || "stable";
-    UPDATE_INFO.changelog = Array.isArray(result.changelog) ? result.changelog : [];
+    UPDATE_INFO.changelog = result.changelog && typeof result.changelog === "object" ? result.changelog : [];
     UPDATE_INFO.targetPath = result.targetPath || "";
   }
   function updateProgress(state) {
@@ -874,6 +1231,10 @@
   setTimeout(() => checkUpdateNotice(true), 5000);
   setInterval(() => checkUpdateNotice(), UPDATE_NOTICE_INTERVAL_MS);
   window.addEventListener("focus", () => checkUpdateNotice());
+  const databaseNav = document.querySelector('.nav-item[data-view="database"]');
+  if (databaseNav) databaseNav.addEventListener("click", () => loadDatabaseOverview());
+  if (document.getElementById("view-database")?.classList.contains("active")) loadDatabaseOverview();
+
   const launchButton = document.getElementById("launchAll");
   if (launchButton) {
     const readonlyLaunchButton = launchButton.cloneNode(true);

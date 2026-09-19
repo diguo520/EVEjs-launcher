@@ -28,6 +28,18 @@ const api = {
   getConfig: () => ipcRenderer.invoke("config:get"),
   settingsGet: () => ipcRenderer.invoke("settings:get"),
   settingsSet: (patch: Record<string, unknown>) => ipcRenderer.invoke("settings:set", patch),
+  databaseOverview: () => ipcRenderer.invoke("database:overview"),
+  databaseTable: (table: string, limit = 100, offset = 0) =>
+    ipcRenderer.invoke("database:table", table, limit, offset),
+  databaseSaveRow: (table: string, values: Record<string, unknown>) =>
+    ipcRenderer.invoke("database:save", table, values),
+  databaseInsertRow: (table: string, values: Record<string, unknown>) =>
+    ipcRenderer.invoke("database:insert", table, values),
+  databaseDeleteRow: (table: string, values: Record<string, unknown>) =>
+    ipcRenderer.invoke("database:delete", table, values),
+  databaseBackup: () => ipcRenderer.invoke("database:backup"),
+  databaseBackups: () => ipcRenderer.invoke("database:backups"),
+  databaseRestore: (name: string) => ipcRenderer.invoke("database:restore", name),
   serviceStart: (id: string) => ipcRenderer.invoke("service:start", id),
   serviceStop: (id: string) => ipcRenderer.invoke("service:stop", id),
   serviceRestart: (id: string) => ipcRenderer.invoke("service:restart", id),
@@ -44,8 +56,9 @@ const api = {
     ipcRenderer.invoke("accounts:verify", user, password),
   accountsSetPassword: (user: string, oldPw: string, newPw: string) =>
     ipcRenderer.invoke("accounts:setPassword", user, oldPw, newPw),
-  loginStart: (user: string, password: string) =>
-    ipcRenderer.invoke("login:start", user, password),
+  accountsLaunch: (user: string) => ipcRenderer.invoke("accounts:launch", user),
+  loginStart: (user: string, password: string, remember = false) =>
+    ipcRenderer.invoke("login:start", user, password, remember),
   configSetClient: (patch: Record<string, string>) => ipcRenderer.invoke("config:setClient", patch),
   configSetRepoRoot: (repoRoot: string) => ipcRenderer.invoke("config:setRepoRoot", repoRoot),
   terminalInput: (tabId: string, data: string) => ipcRenderer.send("terminal:input", tabId, data),

@@ -13,6 +13,8 @@ files:
 extraResources:
   - from: scripts/account-cli.js
     to: account-cli.js
+  - from: scripts/database-cli.js
+    to: database-cli.js
   - from: updater/bin/evejs-updater.exe
     to: evejs-updater.exe
 asar: true

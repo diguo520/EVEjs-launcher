@@ -84,9 +84,10 @@
   .admin-info{display:flex;flex-direction:column;line-height:1.1}
   .admin-info .n{font-size:12px;font-weight:600;color:#fff}
   .admin-info .r{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--amber);letter-spacing:.18em}
-  .sponsor-pop{position:absolute;top:calc(100% + 10px);right:0;width:190px;padding:10px;background:var(--bg-elev);border:1px solid var(--line-strong);box-shadow:0 14px 34px rgba(0,0,0,.45);opacity:0;visibility:hidden;transform:translateY(-6px);transition:.18s;z-index:300;text-align:center}
+  .sponsor-pop{position:absolute;top:calc(100% + 10px);right:0;width:380px;padding:10px;background:var(--bg-elev);border:1px solid var(--line-strong);box-shadow:0 14px 34px rgba(0,0,0,.45);opacity:0;visibility:hidden;transform:translateY(-6px);transition:.18s;z-index:300;text-align:center}
   .admin:hover .sponsor-pop{opacity:1;visibility:visible;transform:translateY(0)}
-  .sponsor-pop img{display:block;width:170px;height:170px;object-fit:contain;background:#fff;margin:0 auto 8px}
+  .sponsor-qr-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .sponsor-qr img{display:block;width:100%;aspect-ratio:1/1;object-fit:contain;background:#fff;margin:0 auto 8px}
   .sponsor-pop .cap{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--amber);letter-spacing:.12em}
 
   /* ===== BODY ===== */
@@ -341,6 +342,39 @@
   .tbl td{padding:11px 12px;border-bottom:1px solid rgba(0,212,255,0.07);color:var(--txt)}
   .tbl tr:hover td{background:rgba(0,212,255,0.04)}
   .tbl .mono{font-family:'Share Tech Mono',monospace;font-size:12px}
+  .db-workbench{display:grid;grid-template-columns:220px minmax(0,1fr) 330px;gap:12px;min-height:560px;margin-top:16px}
+  .db-sidebar,.db-main,.db-inspector{background:linear-gradient(180deg,rgba(18,26,40,0.78),rgba(8,13,21,0.86));border:1px solid var(--line);min-width:0}
+  .db-sidebar{display:flex;flex-direction:column;gap:10px;padding:12px;max-height:620px}
+  .db-sidebar-head,.db-inspector-head{display:flex;align-items:center;justify-content:space-between;font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--cyan);letter-spacing:.16em;text-transform:uppercase}
+  .db-count{background:rgba(0,212,255,.12);border:1px solid rgba(0,212,255,.3);padding:1px 6px;color:var(--cyan)}
+  .db-table-list{overflow-y:auto;flex:1;min-height:0}
+  .db-table-item{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;padding:8px 9px;margin-bottom:4px;background:transparent;border:1px solid transparent;color:var(--txt-dim);font-family:'Share Tech Mono',monospace;font-size:10px;text-align:left;cursor:pointer}
+  .db-table-item:hover{background:rgba(0,212,255,.05);border-color:var(--line);color:var(--txt)}
+  .db-table-item.active{background:rgba(0,212,255,.1);border-color:var(--cyan);color:#fff}
+  .db-table-item .n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.db-table-item .c{color:var(--txt-mute);font-size:9px}
+  .db-main{display:flex;flex-direction:column;min-height:560px}
+  .db-main-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line)}
+  .db-main-title{font-family:'Orbitron';font-size:14px;color:#fff;letter-spacing:.05em}.db-main-sub{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--txt-mute);margin-top:3px}
+  .db-toolbar{display:flex;gap:7px;flex-wrap:nowrap}.db-toolbar .mini-btn{flex:0 0 auto;min-width:76px;padding:6px 12px;white-space:nowrap}
+  .db-tabs{display:flex;gap:2px;padding:8px 12px 0;border-bottom:1px solid var(--line)}.db-tab{padding:7px 14px;background:transparent;border:1px solid transparent;border-bottom:none;color:var(--txt-mute);font-family:'Share Tech Mono',monospace;font-size:10px;cursor:pointer}.db-tab:hover{color:var(--cyan)}.db-tab.active{color:var(--cyan);background:rgba(0,212,255,.06);border-color:var(--line);border-bottom-color:var(--bg-elev)}
+  .db-tab-panel{display:flex;flex-direction:column;flex:1;min-height:0;padding:12px}
+  .db-data-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:10px}.db-data-toolbar .field{flex:1}.db-pager{display:flex;align-items:center;gap:7px;font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--txt-mute);white-space:nowrap}.db-pager .mini-btn{padding:5px 8px}
+  .db-grid-wrap{overflow:auto;border:1px solid var(--line);flex:1;min-height:260px;background:rgba(5,8,13,.4)}
+  .db-grid{border-collapse:collapse;width:100%;min-width:620px;font-family:'Share Tech Mono',monospace;font-size:10px}.db-grid th{position:sticky;top:0;z-index:2;padding:8px 10px;background:#0b111b;color:var(--cyan);text-align:left;border-bottom:1px solid var(--line-strong);white-space:nowrap}.db-grid td{max-width:280px;padding:7px 10px;border-bottom:1px solid rgba(0,212,255,.07);color:var(--txt-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}.db-grid tr:hover td{background:rgba(0,212,255,.04)}.db-grid tr.active td{background:rgba(0,212,255,.1);color:#fff}.db-grid td.pk{color:var(--amber)}
+  #dbSqlPreview{width:100%;height:100%;min-height:360px;resize:none;background:linear-gradient(180deg,#080d15,#05080d);border:1px solid var(--line);color:#b8eaff;font-family:'Share Tech Mono',monospace;font-size:12px;line-height:1.65;padding:14px;outline:none;clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px);box-shadow:0 0 0 1px rgba(0,212,255,.03) inset}
+  #dbSqlPreview:focus{border-color:var(--cyan);box-shadow:0 0 0 1px rgba(0,212,255,.18) inset,0 0 14px rgba(0,212,255,.1)}
+  .db-inspector{display:flex;flex-direction:column;min-height:560px}.db-inspector-head{padding:12px 13px;border-bottom:1px solid var(--line)}.db-inspector-hint{color:var(--txt-mute);letter-spacing:0;text-transform:none}
+  .db-inspector-fields{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px}.db-empty{color:var(--txt-mute);font-family:'Share Tech Mono',monospace;font-size:10px;text-align:center;padding:40px 8px}
+  .db-sidebar input.field,.db-data-toolbar input.field,.db-field input,.db-field textarea{width:100%;min-height:36px;background:linear-gradient(180deg,rgba(10,17,28,.95),rgba(5,8,13,.82));border:1px solid var(--line);color:var(--txt);font-family:'Share Tech Mono',monospace;font-size:11px;line-height:1.4;padding:9px 11px;outline:none;transition:border-color .18s,box-shadow .18s,background .18s;clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px);box-shadow:0 0 0 1px rgba(0,212,255,.025) inset}
+  .db-sidebar input.field:hover,.db-data-toolbar input.field:hover,.db-field input:hover,.db-field textarea:hover{border-color:var(--line-strong);background:linear-gradient(180deg,rgba(13,22,36,.98),rgba(6,10,17,.9))}
+  .db-sidebar input.field:focus,.db-data-toolbar input.field:focus,.db-field input:focus,.db-field textarea:focus{border-color:var(--cyan);box-shadow:0 0 0 1px rgba(0,212,255,.18) inset,0 0 14px rgba(0,212,255,.12)}
+  .db-field{display:flex;flex-direction:column;gap:5px}.db-field label{display:flex;align-items:center;gap:6px;font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--txt-mute);letter-spacing:.12em;text-transform:uppercase}.db-field label .pk{color:var(--amber);font-size:8px;padding:1px 4px;border:1px solid rgba(255,157,46,.35);background:rgba(255,157,46,.08)}.db-field textarea{min-height:170px;resize:vertical;line-height:1.55;white-space:pre}
+  .db-sidebar input.field::placeholder,.db-data-toolbar input.field::placeholder,.db-field input::placeholder,.db-field textarea::placeholder{color:var(--txt-mute)}
+  .db-inspector-actions{display:flex;justify-content:flex-end;gap:8px;padding:10px 12px;border-top:1px solid var(--line)}.db-inspector-actions .mini-btn{padding:6px 12px}
+  .db-path-bar{display:flex;align-items:center;gap:9px;margin-top:10px;padding:8px 11px;background:rgba(5,8,13,.45);border:1px solid var(--line);font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--txt-mute)}.db-path-bar code{color:var(--txt-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .db-backup-list{display:flex;flex-direction:column;gap:8px;max-height:360px;overflow-y:auto}.db-backup-item{display:flex;align-items:center;gap:12px;padding:10px 12px;background:rgba(5,8,13,.55);border:1px solid var(--line);cursor:pointer;transition:.18s}.db-backup-item:hover{border-color:var(--line-strong);background:rgba(10,15,23,.75)}.db-backup-item.active{border-color:var(--cyan);background:rgba(0,212,255,.08);box-shadow:0 0 0 1px rgba(0,212,255,.15) inset}.db-backup-item .bi-main{flex:1;min-width:0}.db-backup-item .bi-name{font-family:'Share Tech Mono',monospace;font-size:11px;color:#fff;word-break:break-all}.db-backup-item .bi-meta{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--txt-mute);margin-top:4px}.db-backup-item .bi-size{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--cyan);white-space:nowrap}
+  @media (max-width:1450px){.db-workbench{grid-template-columns:190px minmax(0,1fr) 290px}}
+  @media (max-width:1180px){.db-workbench{grid-template-columns:190px minmax(0,1fr)}.db-inspector{grid-column:1/-1;min-height:320px}}
 
   /* ===== ACCOUNT ===== */
   .acc-row td .acc-cell{display:flex;align-items:center;gap:10px}
@@ -367,7 +401,9 @@
   .cmd-cat-tab.active .cnt{color:var(--cyan)}
   .cmd-notice{padding:12px 14px;background:rgba(0,212,255,0.04);border-left:3px solid var(--cyan);font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--txt-dim);line-height:1.7;margin-bottom:14px}
   .cmd-notice .hi{color:var(--cyan)} .cmd-notice .amb{color:var(--amber)}
-  .cmd-gen{display:grid;grid-template-columns:1.4fr 2fr 0.8fr auto;gap:10px;align-items:end;padding:14px;background:rgba(5,8,13,0.4);border:1px solid var(--line);margin-bottom:14px}
+  .cmd-gen{display:grid;grid-template-columns:190px 2fr 0.8fr auto;gap:10px;align-items:end;padding:14px;background:rgba(5,8,13,0.4);border:1px solid var(--line);margin-bottom:14px}
+  .cmd-gen > .field:first-child{width:190px;min-width:190px;max-width:190px}
+  .cmd-gen #cmdType{width:100%;min-width:0;overflow:hidden;text-overflow:ellipsis}
   /* 自定义 select 样式（与主题一致） */
   .field-sel{background:rgba(5,8,13,0.6) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2300d4ff' stroke-width='2'><polyline points='6 9 12 15 18 9'/></svg>") no-repeat right 10px center/14px !important;padding-right:30px !important}
   .field-sel option{background:var(--bg-elev);color:var(--txt)}
@@ -450,6 +486,11 @@
   .monitor-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 18px;align-content:start}
   .monitor-grid .mon-block{margin-bottom:0;min-width:0}
   .monitor-grid .mon-wide{grid-column:1 / -1}
+  .disk-volume-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:7px;margin-top:10px}
+  .disk-volume{padding:7px 8px;background:rgba(5,8,13,.52);border:1px solid rgba(0,212,255,.1);clip-path:polygon(5px 0,100% 0,100% calc(100% - 5px),calc(100% - 5px) 100%,0 100%,0 5px)}
+  .disk-volume .dv-top{display:flex;justify-content:space-between;gap:8px;font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--txt-dim);margin-bottom:5px}
+  .disk-volume .dv-root{color:var(--cyan);font-weight:700}.disk-volume .dv-pct{color:var(--amber)}
+  .disk-volume .dv-bar{height:4px;background:rgba(0,212,255,.08);overflow:hidden}.disk-volume .dv-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--cyan-dim),var(--amber))}
   .mon-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
   .mon-head .k{font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:.2em;color:var(--txt-dim)}
   .mon-head .v{font-family:'Orbitron',sans-serif;font-weight:600;font-size:14px;color:#fff}
@@ -595,7 +636,7 @@
   .grow{flex:1}
   .grid-2{display:grid;grid-template-columns:1.6fr 1fr;gap:16px}
 
-  @media (max-width:1280px){.svc-cards{grid-template-columns:repeat(2,1fr)}.cmd-stats{grid-template-columns:repeat(3,1fr)}.mods{grid-template-columns:repeat(2,1fr)}.grid-2{grid-template-columns:1fr}.cmd-gen{grid-template-columns:1fr 1fr}.check-cards,.acc-cards{grid-template-columns:repeat(2,1fr)}.dash-grid{grid-template-columns:1fr !important}.char-grid{grid-template-columns:repeat(3,1fr)}}
+  @media (max-width:1280px){.svc-cards{grid-template-columns:repeat(2,1fr)}.cmd-stats{grid-template-columns:repeat(3,1fr)}.mods{grid-template-columns:repeat(2,1fr)}.grid-2{grid-template-columns:1fr}.cmd-gen{grid-template-columns:190px minmax(260px,1fr) 90px auto}.check-cards,.acc-cards{grid-template-columns:repeat(2,1fr)}.dash-grid{grid-template-columns:1fr !important}.char-grid{grid-template-columns:repeat(3,1fr)}}
   @media (max-width:820px){.sidebar{display:none}.svc-cards,.stats-row,.mods,.cmd-stats,.check-cards,.acc-cards{grid-template-columns:1fr}.svc-strip{display:none}.cfg-grid,.cfg-row{grid-template-columns:1fr}.char-grid{grid-template-columns:repeat(2,1fr)}}
 
 /* Electron window controls and drag regions */
@@ -797,6 +838,18 @@
 </div>
 
 
+<!-- ===== DATABASE RESTORE MODAL ===== -->
+<div class="modal-overlay" id="dbRestoreModal">
+  <div class="modal" style="width:620px">
+    <div class="modal-head"><span class="tag">// RESTORE</span><span class="title">数据库恢复</span><button class="x" onclick="closeModal('dbRestoreModal')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+    <div class="modal-body">
+      <div class="cmd-notice" style="margin:0 0 12px;font-size:10px">恢复前会自动备份当前数据库。恢复完成后请重新启动服务。</div>
+      <div class="db-backup-list" id="dbBackupList"><div class="db-empty">正在读取备份…</div></div>
+    </div>
+    <div class="modal-foot"><button class="mini-btn" onclick="closeModal('dbRestoreModal')">取消</button><button class="mini-btn start" id="dbRestoreConfirmBtn" onclick="restoreSelectedDatabaseBackup()" disabled>恢复所选版本</button></div>
+  </div>
+</div>
+
 <div class="app">
   <!-- ============ TOPBAR ============ -->
   <header class="topbar">
@@ -811,7 +864,7 @@
       </div>
       <div class="logo-text">
         <div class="t1">EVEJS COMMAND</div>
-        <div class="t2">SERVER LAUNCHER · v0.1.14</div>
+        <div class="t2">SERVER LAUNCHER · v0.1.15</div>
       </div>
     </div>
     <div class="topbar-divider"></div>
@@ -826,7 +879,12 @@
     <div class="topbar-divider"></div>
     <div class="admin">
       <div class="admin-card"><div class="admin-avatar">TS</div><div class="admin-info"><div class="n">托肯赞助</div><div class="r">● TOKEN SPONSOR</div></div></div>
-      <div class="sponsor-pop"><img src="./shoukuanma.png" alt="微信收款码"><div class="cap">WECHAT DONATION · 微信赞助</div></div>
+      <div class="sponsor-pop">
+        <div class="sponsor-qr-grid">
+          <div class="sponsor-qr"><img src="./shoukuanma.png" alt="微信收款码"><div class="cap">WECHAT DONATION · 微信赞助</div></div>
+          <div class="sponsor-qr"><img src="./paypal.png" alt="PayPal 收款码"><div class="cap">PAYPAL DONATION · PAYPAL 赞助</div></div>
+        </div>
+      </div>
     </div>
     <div class="win-controls">
       <button title="最小化" onclick="window.api.windowMinimize()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
@@ -913,7 +971,7 @@
                 <div class="mon-block"><div class="mon-head"><span class="k">GPU 内存</span><span class="v" id="mGpuMemory">—</span></div><div class="mon-track"><i id="bGpuMemory" style="width:0%"></i></div></div>
                 <div class="mon-block"><div class="mon-head"><span class="k" data-i18n="mem">内存 MEMORY</span><span class="v" id="mMem">12.4<span class="u">GB / 32GB</span></span></div><div class="mon-track"><i id="bMem" style="width:39%"></i></div></div>
                 <div class="mon-block"><div class="mon-head"><span class="k">虚拟内存</span><span class="v" id="mVirtualMem">—</span></div><div class="mon-track amber"><i id="bVirtualMem" style="width:0%"></i></div></div>
-                <div class="mon-block"><div class="mon-head"><span class="k" data-i18n="disk">磁盘 DISK</span><span class="v" id="mDisk">421<span class="u">GB / 1TB</span></span></div><div class="mon-track amber"><i id="bDisk" style="width:42%"></i></div></div>
+                <div class="mon-block mon-wide disk-volume-block"><div class="mon-head"><span class="k" id="diskLabel" data-i18n="disk">磁盘卷</span><span class="v" id="mDisk">421<span class="u">GB / 1TB</span></span></div><div class="mon-track amber"><i id="bDisk" style="width:42%"></i></div><div class="disk-volume-list" id="diskVolumeList"></div></div>
                 <div class="mon-block"><div class="mon-head"><span class="k" data-i18n="net">网络 I/O</span><span class="v" id="mNet">842<span class="u">MB/s</span></span></div><div class="mon-track"><i id="bNet" style="width:38%"></i></div></div>
               </div>
             </div>
@@ -1062,28 +1120,41 @@
       <section class="view" id="view-database">
         <div class="section-title"><span class="bar"></span><h2>数据库</h2><span class="sub">// PERSISTENCE LAYER</span></div>
         <div class="stats-row">
-          <div class="stat accent"><div class="lbl">DB SIZE</div><div class="val">847<span class="unit">GB</span></div><div class="delta up">▲ +2.1GB / day</div></div>
-          <div class="stat"><div class="lbl">TABLES</div><div class="val">1,284</div><div class="delta up">▲ OK</div></div>
-          <div class="stat"><div class="lbl">QUERIES/s</div><div class="val" id="dbQps">42.1K</div><div class="delta up">▲ NOMINAL</div></div>
-          <div class="stat amber"><div class="lbl">REPLICATION</div><div class="val">2<span class="unit">/ 3</span></div><div class="delta warn">◆ 1 LAGGING</div></div>
+          <div class="stat accent"><div class="lbl">DB SIZE</div><div class="val" id="dbSize">--<span class="unit">MB</span></div><div class="delta up">SQLite</div></div>
+          <div class="stat"><div class="lbl">TABLES</div><div class="val" id="dbTableCount">--</div><div class="delta up">REAL</div></div>
+          <div class="stat"><div class="lbl">ROWS</div><div class="val" id="dbRowCount">--</div><div class="delta up">TOTAL</div></div>
+          <div class="stat amber"><div class="lbl">JOURNAL</div><div class="val" id="dbJournal">--</div><div class="delta warn">MODE</div></div>
         </div>
-        <div class="panel">
-          <div class="panel-head"><span class="tag">// TABLES</span><span class="title">核心数据表</span><span class="spacer"></span><span class="meta">TOP BY SIZE</span></div>
-          <div class="panel-body" style="padding:0">
-            <table class="tbl">
-              <thead><tr><th>表名</th><th>引擎</th><th>行数</th><th>大小</th><th>索引</th><th>最后写入</th><th>状态</th></tr></thead>
-              <tbody>
-                <tr><td class="mono">invTypes</td><td class="mono">InnoDB</td><td class="mono">36,842</td><td class="mono">128 MB</td><td class="mono">7</td><td class="mono">2s ago</td><td><span style="color:var(--green)">● ACTIVE</span></td></tr>
-                <tr><td class="mono">charCharacters</td><td class="mono">InnoDB</td><td class="mono">8.2M</td><td class="mono">14.7 GB</td><td class="mono">12</td><td class="mono">1s ago</td><td><span style="color:var(--green)">● ACTIVE</span></td></tr>
-                <tr><td class="mono">marketOrders</td><td class="mono">InnoDB</td><td class="mono">412K</td><td class="mono">2.1 GB</td><td class="mono">9</td><td class="mono">0s ago</td><td><span style="color:var(--green)">● ACTIVE</span></td></tr>
-                <tr><td class="mono">corpCorporations</td><td class="mono">InnoDB</td><td class="mono">184K</td><td class="mono">890 MB</td><td class="mono">6</td><td class="mono">5s ago</td><td><span style="color:var(--green)">● ACTIVE</span></td></tr>
-                <tr><td class="mono">universeSolarSystems</td><td class="mono">InnoDB</td><td class="mono">8,285</td><td class="mono">64 MB</td><td class="mono">5</td><td class="mono">1h ago</td><td><span style="color:var(--txt-dim)">○ READONLY</span></td></tr>
-                <tr><td class="mono">killmails</td><td class="mono">InnoDB</td><td class="mono">94.2M</td><td class="mono">187 GB</td><td class="mono">14</td><td class="mono">0s ago</td><td><span style="color:var(--green)">● ACTIVE</span></td></tr>
-                <tr><td class="mono">walletJournal</td><td class="mono">InnoDB</td><td class="mono">312M</td><td class="mono">421 GB</td><td class="mono">11</td><td class="mono">0s ago</td><td><span style="color:var(--amber)">◆ REINDEX</span></td></tr>
-              </tbody>
-            </table>
-          </div>
+        <div class="db-workbench">
+          <aside class="db-sidebar">
+            <div class="db-sidebar-head"><span>数据表</span><span class="db-count" id="dbTableCountBadge">0</span></div>
+            <input id="dbTableSearch" class="field" placeholder="搜索表名…" oninput="renderDatabaseTableList()">
+            <div class="db-table-list" id="dbTableList"></div>
+          </aside>
+          <section class="db-main">
+            <div class="db-main-head">
+              <div><div class="db-main-title" id="dbEditorTitle">选择数据表</div><div class="db-main-sub" id="dbEditorMeta">从左侧选择一张表开始浏览</div></div>
+              <div class="db-toolbar"><button class="mini-btn" id="dbBackupBtn" onclick="createDatabaseBackup()" disabled>备份</button><button class="mini-btn" id="dbRestoreBtn" onclick="openDatabaseRestore()">恢复</button><button class="mini-btn" id="dbRefreshTableBtn" onclick="loadDatabaseTable()" disabled>刷新</button><button class="mini-btn start" id="dbNewRowBtn" onclick="newDatabaseRow()" disabled>新增行</button></div>
+            </div>
+            <div class="db-tabs" id="dbTabs">
+              <button class="db-tab active" data-db-tab="data" onclick="switchDatabaseTab('data')">数据</button>
+              <button class="db-tab" data-db-tab="structure" onclick="switchDatabaseTab('structure')">结构</button>
+              <button class="db-tab" data-db-tab="sql" onclick="switchDatabaseTab('sql')">SQL</button>
+            </div>
+            <div class="db-tab-panel" id="dbTabData">
+              <div class="db-data-toolbar"><input id="dbRowFilter" class="field" placeholder="筛选当前页数据…" oninput="renderDatabaseRows()"><select id="dbPageSize" class="acc-select" onchange="loadDatabaseTable()"><option value="25">25 行</option><option value="50" selected>50 行</option><option value="100">100 行</option><option value="200">200 行</option></select><div class="db-pager"><button class="mini-btn" id="dbPagePrev" onclick="databasePage(-1)" disabled>上一页</button><span id="dbPageInfo">0 / 0</span><button class="mini-btn" id="dbPageNext" onclick="databasePage(1)" disabled>下一页</button></div></div>
+              <div class="db-grid-wrap"><table class="db-grid"><thead id="dbGridHead"></thead><tbody id="dbGridBody"></tbody></table></div>
+            </div>
+            <div class="db-tab-panel" id="dbTabStructure" style="display:none"><table class="tbl"><thead><tr><th>列名</th><th>类型</th><th>主键</th><th>非空</th><th>默认值</th></tr></thead><tbody id="dbStructureBody"></tbody></table></div>
+            <div class="db-tab-panel" id="dbTabSql" style="display:none"><textarea id="dbSqlPreview" readonly spellcheck="false" placeholder="选择数据表后显示当前表 SQL"></textarea></div>
+          </section>
+          <aside class="db-inspector">
+            <div class="db-inspector-head"><span>行详情</span><span class="db-inspector-hint" id="dbInspectorHint">未选择</span></div>
+            <div class="db-inspector-fields" id="dbInspectorFields"><div class="db-empty">选择一行查看字段</div></div>
+            <div class="db-inspector-actions"><button class="mini-btn" id="dbDeleteRowBtn" onclick="deleteDatabaseRow()" disabled>删除行</button><button class="mini-btn start" id="dbSaveRowBtn" onclick="saveDatabaseRow()" disabled>保存行</button></div>
+          </aside>
         </div>
+        <div class="db-path-bar"><span>DATABASE</span><code id="dbPath">gameStore.sqlite</code><button class="mini-btn" onclick="loadDatabaseOverview()" style="margin-left:auto;padding:4px 10px">刷新统计</button></div>
       </section>
 
       <!-- ===== MODULES ===== -->
@@ -1194,7 +1265,7 @@
     <div class="sb-cell"><span class="k">在线人数</span><span class="v" id="sbPilots">--</span></div>
     <div class="sb-cell"><span class="k">PING</span><span class="v" id="sbPing">23ms</span></div>
     <div class="sb-spacer"></div>
-    <div class="sb-cell"><span class="k">EVEJS</span><span class="v">v0.1.14</span></div>
+    <div class="sb-cell"><span class="k">EVEJS</span><span class="v">v0.1.15</span></div>
     <div class="sb-cell"><span class="k">PATH</span><span class="v" id="sbPath">/opt/evejs</span></div>
     <div class="sb-cell warn"><span class="k">ALERTS</span><span class="v">2</span></div>
     <div class="sb-cell"><span class="k">主服务启动维持时间</span><span class="v" id="sbSession">00:00:00</span></div>
@@ -1240,6 +1311,24 @@ Object.assign(TRANSLATE,{
   '专用 GPU 内存': {'en':'Dedicated GPU Memory','ja':'専用 GPU メモリ','ko':'전용 GPU 메모리','fr':'Mémoire GPU dédiée','de':'Dedizierter GPU-Speicher','nl':'Toegewezen GPU-geheugen','ru':'Выделенная память GPU'},
   'GPU 内存': {'en':'GPU Memory','ja':'GPU メモリ','ko':'GPU 메모리','fr':'Mémoire GPU','de':'GPU-Speicher','nl':'GPU-geheugen','ru':'Память GPU'},
   '虚拟内存': {'en':'Virtual Memory','ja':'仮想メモリ','ko':'가상 메모리','fr':'Mémoire virtuelle','de':'Virtueller Speicher','nl':'Virtueel geheugen','ru':'Виртуальная память'},
+  '磁盘卷': {'en':'Disk Volume','ja':'ディスクボリューム','ko':'디스크 볼륨','fr':'Volume de disque','de':'Datenträgervolume','nl':'Schijfvolume','ru':'Том диска'},
+  'EVEJS 所在盘': {'en':'EVEJS Drive','ja':'EVEJS ドライブ','ko':'EVEJS 드라이브','fr':'Disque EVEJS','de':'EVEJS-Laufwerk','nl':'EVEJS-schijf','ru':'Диск EVEJS'},
+  '备份': {'en':'Backup','ja':'バックアップ','ko':'백업','fr':'Sauvegarde','de':'Sicherung','nl':'Back-up','ru':'Резервная копия'},
+  '恢复': {'en':'Restore','ja':'復元','ko':'복원','fr':'Restaurer','de':'Wiederherstellen','nl':'Herstellen','ru':'Восстановить'},
+  '数据库恢复': {'en':'Database Restore','ja':'データベース復元','ko':'데이터베이스 복원','fr':'Restauration de la base','de':'Datenbank wiederherstellen','nl':'Database herstellen','ru':'Восстановление базы данных'},
+  '恢复前会自动备份当前数据库。恢复完成后请重新启动服务。': {'en':'The current database is backed up automatically before restore. Restart services after restoring.','ja':'復元前に現在のデータベースを自動バックアップします。復元後はサービスを再起動してください。','ko':'복원 전에 현재 데이터베이스를 자동으로 백업합니다. 복원 후 서비스를 다시 시작하세요.','fr':'La base actuelle est sauvegardée automatiquement avant la restauration. Redémarrez les services après restauration.','de':'Die aktuelle Datenbank wird vor der Wiederherstellung automatisch gesichert. Starten Sie die Dienste danach neu.','nl':'De huidige database wordt automatisch geback-upt vóór herstel. Start de services daarna opnieuw.','ru':'Текущая база данных автоматически копируется перед восстановлением. После восстановления перезапустите сервисы.'},
+  '恢复所选版本': {'en':'Restore Selected','ja':'選択した版を復元','ko':'선택 버전 복원','fr':'Restaurer la version sélectionnée','de':'Ausgewählte Version wiederherstellen','nl':'Geselecteerde versie herstellen','ru':'Восстановить выбранную версию'},
+  '数据表': {'en':'Tables','ja':'テーブル','ko':'테이블','fr':'Tables','de':'Tabellen','nl':'Tabellen','ru':'Таблицы'},
+  '表名': {'en':'Table Name','ja':'テーブル名','ko':'테이블 이름','fr':'Nom de table','de':'Tabellenname','nl':'Tabelnaam','ru':'Имя таблицы'},
+  '行数': {'en':'Rows','ja':'行数','ko':'행 수','fr':'Lignes','de':'Zeilen','nl':'Rijen','ru':'Строки'},
+  '列数': {'en':'Columns','ja':'列数','ko':'열 수','fr':'Colonnes','de':'Spalten','nl':'Kolommen','ru':'Столбцы'},
+  '索引': {'en':'Indexes','ja':'インデックス','ko':'인덱스','fr':'Index','de':'Indizes','nl':'Indexen','ru':'Индексы'},
+  '大小': {'en':'Size','ja':'サイズ','ko':'크기','fr':'Taille','de':'Größe','nl':'Grootte','ru':'Размер'},
+  '操作': {'en':'Actions','ja':'操作','ko':'작업','fr':'Actions','de':'Aktionen','nl':'Acties','ru':'Действия'},
+  '选择数据表': {'en':'Select Table','ja':'テーブルを選択','ko':'테이블 선택','fr':'Sélectionner une table','de':'Tabelle auswählen','nl':'Tabel selecteren','ru':'Выбрать таблицу'},
+  '新增行': {'en':'Add Row','ja':'行を追加','ko':'행 추가','fr':'Ajouter une ligne','de':'Zeile hinzufügen','nl':'Rij toevoegen','ru':'Добавить строку'},
+  '删除行': {'en':'Delete Row','ja':'行を削除','ko':'행 삭제','fr':'Supprimer la ligne','de':'Zeile löschen','nl':'Rij verwijderen','ru':'Удалить строку'},
+  '保存行': {'en':'Save Row','ja':'行を保存','ko':'행 저장','fr':'Enregistrer la ligne','de':'Zeile speichern','nl':'Rij opslaan','ru':'Сохранить строку'},
   '位置': {'en':'Location','ja':'位置','ko':'위치','fr':'Emplacement','de':'Ort','nl':'Locatie','ru':'Местоположение'},
   '安全等级': {'en':'Security Status','ja':'セキュリティ','ko':'보안 등급','fr':'Statut de sécurité','de':'Sicherheitsstatus','nl':'Veiligheidsstatus','ru':'Уровень безопасности'}
 });
@@ -2591,7 +2680,7 @@ document.addEventListener('click',e=>{ if(e.target.classList&&e.target.classList
 
 
 /* ============ UPDATE SYSTEM ============ */
-const CURRENT_VER='v0.1.14';
+const CURRENT_VER='v0.1.15';
 const LATEST_VER='v0.2.0';
 const UPDATE_INFO={
   version: LATEST_VER,
@@ -2835,7 +2924,7 @@ function tickMetrics(){
   document.getElementById('bNet').style.width=(net/2000*100)+'%';
   document.getElementById('sbNet').textContent=net+' MB/s';
   document.getElementById('sbPing').textContent=(20+Math.floor(Math.random()*12))+'ms';
-  document.getElementById('dbQps').textContent=(40+Math.random()*5).toFixed(1)+'K';
+  const qps=document.getElementById('dbQps'); if(qps) qps.textContent=(40+Math.random()*5).toFixed(1)+'K';
   document.getElementById('monClock').textContent='LIVE · '+ts();
   const s=Math.floor((Date.now()-sessionStart)/1000);
   document.getElementById('sbSession').textContent=[Math.floor(s/3600),Math.floor(s/60)%60,s%60].map(x=>String(x).padStart(2,'0')).join(':');
