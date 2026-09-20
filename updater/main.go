@@ -20,6 +20,7 @@ func main() {
 	parentPID := flag.Int("parent-pid", 0, "portable wrapper pid")
 	restart := flag.Bool("restart", true, "restart target after update")
 	from := flag.String("from", "", "previous version")
+	to := flag.String("to", "", "new version")
 	flag.Parse()
 
 	logPath := filepath.Join(os.TempDir(), "EveJS-Launcher-Updater", "updater.log")
@@ -71,12 +72,27 @@ func main() {
 		_ = os.Remove(newPath)
 		os.Exit(5)
 	}
+	// 更新完成后：如果原文件名里带旧版本号，就把文件改名成带新版本号的名字。
+	// 否则用户看文件名会以为没有更新（界面里是新版本、文件名还是旧的）。
+	finalPath := targetPath
+	if *from != "" && *to != "" && *from != *to && strings.Contains(filepath.Base(targetPath), *from) {
+		candidate := filepath.Join(targetDir, strings.Replace(filepath.Base(targetPath), *from, *to, 1))
+		if candidate != targetPath {
+			if err := os.Rename(targetPath, candidate); err == nil {
+				finalPath = candidate
+				logf("renamed updated exe to %s", finalPath)
+			} else {
+				logf("rename to versioned name failed: %v", err)
+			}
+		}
+	}
+
 	if *restart {
 		args := []string{"--updated"}
 		if *from != "" {
 			args = append(args, "--from", *from)
 		}
-		cmd := exec.Command(targetPath, args...)
+		cmd := exec.Command(finalPath, args...)
 		cmd.Dir = targetDir
 		cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: false}
 		if err := cmd.Start(); err != nil {
@@ -91,7 +107,7 @@ func main() {
 	time.Sleep(3 * time.Second)
 	_ = os.Remove(backupPath)
 	_ = os.Remove(sourcePath)
-	logf("update complete: %s", targetPath)
+	logf("update complete: %s", finalPath)
 }
 
 func waitPID(pid int, timeout time.Duration, logf func(string, ...any)) {

@@ -268,6 +268,7 @@ export async function applyUpdate(): Promise<{ ok: boolean; reason?: string }> {
       "--pid", String(process.pid),
       "--parent-pid", String(process.ppid),
       "--from", app.getVersion(),
+      "--to", manifest?.version || "",
       "--restart"
     ];
     const child = spawn(helperCopy, args, {

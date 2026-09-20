@@ -1,0 +1,65 @@
+{
+  "version": "0.1.18",
+  "changelog": {
+    "zh": [
+      {
+        "type": "fix",
+        "text": "修复左侧导航「模组 / 插件」角标一直显示演示时期的数字 8：改为实时显示真实模组数量；同时清理同类演示遗留——删除会写入随机假数据的演示版 tickMetrics、把底栏写死的 PING 23ms 改为真实 TCP 建连耗时、把写死的 ALERTS 2 改为真实告警数（环境自检失败 + 服务异常 + 有可用更新）、并补上左下角 NET I/O 与内存进度条的真实更新"
+      },
+      {
+        "type": "fix",
+        "text": "修复自动更新后「文件名里的版本号不变」导致用户以为没更新：更新器新增 --to 参数，替换完成后若原文件名含旧版本号则自动改名为新版本号（例如 EvEJS-Launcher-Portable-0.1.17.exe → 0.1.18.exe）；文件名不含版本号或旧版启动器调用时保持原名，避免破坏快捷方式"
+      },
+      {
+        "type": "new",
+        "text": "模组管理新增统计面板：模组总数、已启用、已停用、冲突数、模组占用空间（递归统计每个模组目录大小）"
+      },
+      {
+        "type": "new",
+        "text": "新增模组冲突鉴定：清单声明的互斥、重复 id、多个 loader 引用同一个服务端模块（静态扫描）、依赖缺失；冲突会列出涉及模组并区分「活跃」与「未生效」"
+      },
+      {
+        "type": "new",
+        "text": "模组管理新增「导入 ZIP」：选择 ZIP → 自动定位模组包根 → 校验清单 → 安装到 mods/<id>，导入后默认禁用；同名目录会被拒绝"
+      },
+      {
+        "type": "new",
+        "text": "模组卡片支持拖拽自定义加载顺序，顺序保存到 _launcher/mods/mod-order.json，并作为 NODE_OPTIONS 注入顺序的基础（仍受 loadAfter/loadBefore 约束）"
+      },
+      {
+        "type": "opt",
+        "text": "中文字体可读性优化：等宽字体栈补充中文字体（Microsoft YaHei UI / PingFang SC），避免中文回退成宋体；全局上调 86 处过小字号（8/9/9.5/10px），最小字号提升到 9.5px"
+      }
+    ],
+    "en": [
+      {
+        "type": "fix",
+        "text": "Fixed the Mod / Plugin nav badge that kept showing the demo value 8 (it now reflects the real mod count); also cleaned up the same class of demo leftovers — removed the demo tickMetrics that wrote random fake values, replaced the hard-coded PING 23ms with a real TCP connect latency, replaced the hard-coded ALERTS 2 with a real alert count (failed env checks + errored services + available update) and wired the sidebar NET I/O and memory bars to real metrics"
+      },
+      {
+        "type": "fix",
+        "text": "Fixed the auto-update leaving a stale version number in the file name (users thought nothing was updated): the updater now takes a --to argument and renames the replaced file when the original name contained the old version (e.g. EvEJS-Launcher-Portable-0.1.17.exe -> 0.1.18.exe). Names without a version, or updates triggered by older launcher builds, keep the original name so shortcuts keep working."
+      },
+      {
+        "type": "new",
+        "text": "Mod management now shows a statistics panel: total mods, enabled, disabled, conflicts and total disk usage (recursive per-mod folder size)"
+      },
+      {
+        "type": "new",
+        "text": "Added mod conflict detection: declared conflicts, duplicate ids, multiple loaders referencing the same server module (static scan) and missing dependencies; conflicts list the mods involved and are marked active or not yet in effect"
+      },
+      {
+        "type": "new",
+        "text": "Added Import ZIP to mod management: pick a ZIP, the launcher locates the package root, validates the manifest and installs it to mods/<id>, disabled by default; an existing folder is rejected"
+      },
+      {
+        "type": "new",
+        "text": "Mod cards can be dragged to set a custom load order, stored in _launcher/mods/mod-order.json and used as the base order for NODE_OPTIONS injection (loadAfter/loadBefore still apply)"
+      },
+      {
+        "type": "opt",
+        "text": "Improved Chinese text legibility: the monospace font stack now includes Chinese fonts (Microsoft YaHei UI / PingFang SC) so Chinese no longer falls back to SimSun, and 86 too-small font sizes (8/9/9.5/10px) were increased so the minimum is now 9.5px"
+      }
+    ]
+  }
+}

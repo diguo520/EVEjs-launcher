@@ -1,6 +1,8 @@
 import * as fs from "fs";
 import * as path from "path";
 import { launcherRuntimeRoot } from "./runtimePaths";
+import { execFile } from "child_process";
+import { promisify } from "util";
 
 /**
  * EveJS 模组（manifest schema 3）扫描与启停。
@@ -39,6 +41,31 @@ export interface ModRecord {
   activeConflicts: string[];
   valid: boolean;
   error: string;
+  /** 模组目录占用字节数（递归统计） */
+  sizeBytes: number;
+  /** 静态扫描 loader 里引用到的服务端模块文件名（冲突鉴定用，启发式） */
+  modules: string[];
+}
+
+/** 冲突种类：declared=清单声明；duplicate-id=重复 id；shared-module=引用同一服务端模块；missing-require=依赖缺失 */
+export type ModConflictKind = "declared" | "duplicate-id" | "shared-module" | "missing-require";
+
+export interface ModConflict {
+  kind: ModConflictKind;
+  /** 涉及的模组目录名 */
+  folders: string[];
+  /** 给玩家看的一句话说明 */
+  detail: string;
+  /** 是否两个模组都已启用（只有启用中的冲突才计入统计） */
+  active: boolean;
+}
+
+export interface ModStats {
+  total: number;
+  enabled: number;
+  disabled: number;
+  conflicts: number;
+  bytes: number;
 }
 
 export interface ModScanResult {
@@ -46,6 +73,10 @@ export interface ModScanResult {
   root: string;
   exists: boolean;
   mods: ModRecord[];
+  stats: ModStats;
+  conflicts: ModConflict[];
+  /** 用户自定义排序（模组目录名数组） */
+  order: string[];
 }
 
 export interface LoaderPlan {
@@ -63,6 +94,10 @@ const LOADER_ENABLED = "loader.js";
 const LOADER_DISABLED = "loader.js.disabled";
 const LOADER_DISABLED_ALT = ["loader.js.off", "loader.js.bak"];
 const DEPENDENCY_FIELDS = ["requires", "loadAfter", "loadBefore", "conflicts"] as const;
+const ORDER_FILE = "mod-order.json";
+const execFileAsync = promisify(execFile);
+/** 统计模块引用时忽略的通用文件名 */
+const IGNORED_MODULE_TOKENS = new Set(["index.js", "main.js", "loader.js", "helper.js", "package.json"]);
 
 export function modsRoot(repoRoot: string): string {
   return path.join(repoRoot, "mods");
@@ -97,6 +132,149 @@ function readDependencyArray(manifest: Record<string, unknown>, field: string): 
   return { value: raw.map((item) => (item as string).trim()), error: "" };
 }
 
+/** 递归统计目录占用字节数 */
+function directorySize(dir: string): number {
+  let total = 0;
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return 0;
+  }
+  for (const entry of entries) {
+    const full = path.join(dir, entry.name);
+    try {
+      if (entry.isDirectory()) total += directorySize(full);
+      else if (entry.isFile()) total += fs.statSync(full).size;
+    } catch {
+      /* 忽略读不到的条目 */
+    }
+  }
+  return total;
+}
+
+/**
+ * 启发式扫描 loader 源码：取形如 xxx.js 的字符串字面量。
+ * 用于判断多个模组是否都在操作同一个服务端模块（社区模组冲突的主要来源）。
+ */
+function scanLoaderModules(dir: string): string[] {
+  const candidates = [LOADER_ENABLED, ...LOADER_DISABLED_ALT, LOADER_DISABLED].map((name) => path.join(dir, name));
+  const file = candidates.find((candidate) => fs.existsSync(candidate));
+  if (!file) return [];
+  let source = "";
+  try {
+    source = fs.readFileSync(file, "utf8");
+  } catch {
+    return [];
+  }
+  const found = new Set<string>();
+  for (const match of source.matchAll(/["'`]([A-Za-z0-9_.-]+\.js)["'`]/g)) {
+    const name = match[1];
+    if (name.length < 5) continue;
+    if (IGNORED_MODULE_TOKENS.has(name.toLowerCase())) continue;
+    found.add(name);
+  }
+  return [...found].sort();
+}
+
+/** 用户自定义排序文件：_launcher/mods/mod-order.json */
+function modOrderPath(): string {
+  return path.join(launcherRuntimeRoot(), "mods", ORDER_FILE);
+}
+
+export function readModOrder(): string[] {
+  try {
+    const raw = JSON.parse(fs.readFileSync(modOrderPath(), "utf8").replace(/^\uFEFF/, "")) as unknown;
+    const list = Array.isArray(raw) ? raw : (raw as { order?: unknown } | null)?.order;
+    if (Array.isArray(list)) {
+      return list.filter((item): item is string => typeof item === "string" && item.trim().length > 0).map((item) => item.trim());
+    }
+  } catch {
+    /* 还没有自定义顺序 */
+  }
+  return [];
+}
+
+export function setModOrder(folders: string[]): { ok: boolean; reason?: string } {
+  try {
+    const dir = path.dirname(modOrderPath());
+    fs.mkdirSync(dir, { recursive: true });
+    const clean = (Array.isArray(folders) ? folders : [])
+      .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+      .map((item) => item.trim());
+    fs.writeFileSync(modOrderPath(), JSON.stringify({ order: clean }, null, 2) + "\n", "utf8");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, reason: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/** 冲突鉴定：声明互斥 + 重复 id + 引用同一服务端模块 + 依赖缺失 */
+function detectConflicts(mods: ModRecord[]): ModConflict[] {
+  const conflicts: ModConflict[] = [];
+  const byId = new Map<string, ModRecord[]>();
+  const declaredSeen = new Set<string>();
+  for (const mod of mods) {
+    const key = mod.id.toLowerCase();
+    const list = byId.get(key) || [];
+    list.push(mod);
+    byId.set(key, list);
+  }
+
+  for (const [id, list] of byId) {
+    if (list.length > 1) {
+      conflicts.push({
+        kind: "duplicate-id",
+        folders: list.map((item) => item.folder),
+        detail: "有 " + list.length + " 个模组使用了同一个 id「" + id + "」",
+        active: list.filter((item) => item.enabled).length > 1
+      });
+    }
+  }
+
+  for (const mod of mods) {
+    for (const targetId of mod.conflicts) {
+      const target = (byId.get(targetId.toLowerCase()) || [])[0];
+      if (!target) continue;
+      const pairKey = [mod.folder, target.folder].sort().join("|");
+      if (declaredSeen.has(pairKey)) continue;
+      declaredSeen.add(pairKey);
+      conflicts.push({
+        kind: "declared",
+        folders: [mod.folder, target.folder],
+        detail: "清单里声明了互斥",
+        active: mod.enabled && target.enabled
+      });
+    }
+  }
+
+  for (let i = 0; i < mods.length; i += 1) {
+    for (let j = i + 1; j < mods.length; j += 1) {
+      const shared = mods[i].modules.filter((name) => mods[j].modules.includes(name));
+      if (shared.length === 0) continue;
+      conflicts.push({
+        kind: "shared-module",
+        folders: [mods[i].folder, mods[j].folder],
+        detail: "都引用了服务端模块 " + shared.join(", ") + "（可能互相影响）",
+        active: mods[i].enabled && mods[j].enabled
+      });
+    }
+  }
+
+  for (const mod of mods) {
+    if (mod.enabled && mod.missingRequires.length > 0) {
+      conflicts.push({
+        kind: "missing-require",
+        folders: [mod.folder],
+        detail: "缺少依赖 " + mod.missingRequires.join(", "),
+        active: true
+      });
+    }
+  }
+
+  return conflicts;
+}
+
 function emptyRecord(folder: string, dir: string, manifestPath: string, error: string): ModRecord {
   return {
     folder,
@@ -120,7 +298,9 @@ function emptyRecord(folder: string, dir: string, manifestPath: string, error: s
     missingRequires: [],
     activeConflicts: [],
     valid: false,
-    error
+    error,
+    sizeBytes: 0,
+    modules: []
   };
 }
 
@@ -225,13 +405,16 @@ export function readModDir(folder: string, dir: string): ModRecord {
   record.valid = problems.length === 0;
   record.error = problems.join("；");
   if (!record.valid) record.supported = false;
+  record.sizeBytes = directorySize(dir);
+  record.modules = record.kind === "loader" ? scanLoaderModules(dir) : [];
   return record;
 }
 
 /** 扫描 <EveJS 根>/mods */
 export function scanMods(repoRoot: string): ModScanResult {
   const root = modsRoot(repoRoot);
-  const result: ModScanResult = { ok: true, root, exists: false, mods: [] };
+  const emptyStats: ModStats = { total: 0, enabled: 0, disabled: 0, conflicts: 0, bytes: 0 };
+  const result: ModScanResult = { ok: true, root, exists: false, mods: [], stats: emptyStats, conflicts: [], order: [] };
   let entries: fs.Dirent[];
   try {
     if (!fs.existsSync(root) || !fs.statSync(root).isDirectory()) return result;
@@ -244,6 +427,8 @@ export function scanMods(repoRoot: string): ModScanResult {
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
     if (entry.name.startsWith(".")) continue;
+    // 没有清单的目录不是模组（可能是 .git / 文档 / 杂物目录），忽略
+    if (!fs.existsSync(path.join(root, entry.name, MANIFEST_NAME))) continue;
     try {
       const record = readModDir(entry.name, path.join(root, entry.name));
       result.mods.push(record);
@@ -265,7 +450,25 @@ export function scanMods(repoRoot: string): ModScanResult {
     });
   }
 
-  result.mods.sort((a, b) => a.displayName.localeCompare(b.displayName));
+  // 自定义排序优先，其余按显示名
+  const order = readModOrder();
+  const rank = new Map(order.map((folder, index) => [folder, index]));
+  result.mods.sort((a, b) => {
+    const ra = rank.has(a.folder) ? (rank.get(a.folder) as number) : Number.MAX_SAFE_INTEGER;
+    const rb = rank.has(b.folder) ? (rank.get(b.folder) as number) : Number.MAX_SAFE_INTEGER;
+    if (ra !== rb) return ra - rb;
+    return a.displayName.localeCompare(b.displayName);
+  });
+
+  result.order = result.mods.map((mod) => mod.folder);
+  result.conflicts = detectConflicts(result.mods);
+  result.stats = {
+    total: result.mods.length,
+    enabled: result.mods.filter((mod) => mod.enabled).length,
+    disabled: result.mods.filter((mod) => !mod.enabled).length,
+    conflicts: result.conflicts.filter((conflict) => conflict.active).length,
+    bytes: result.mods.reduce((sum, mod) => sum + mod.sizeBytes, 0)
+  };
   return result;
 }
 
@@ -320,7 +523,8 @@ export function planLoaders(repoRoot: string): LoaderPlan {
   const ordered: ModRecord[] = [];
   const state = new Map<string, number>(); // 0=未访问 1=访问中 2=完成
   let cycle = false;
-  const fallbackOrder = [...candidates].sort((a, b) => a.folder.localeCompare(b.folder));
+  // candidates 已按 scanMods 的顺序（用户拖拽顺序）排列，保持不动
+  const fallbackOrder = [...candidates];
   const visit = (key: string, stack: Set<string>): void => {
     const current = state.get(key);
     if (current === 2) return;
@@ -422,5 +626,109 @@ export function ensureModAuthoringDoc(): { ok: boolean; path: string; written: b
     return { ok: true, path: target, written: true };
   } catch (e) {
     return { ok: false, path: target, written: false, reason: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* ZIP 导入                                                            */
+/* ------------------------------------------------------------------ */
+
+export interface ModImportResult {
+  ok: boolean;
+  folder?: string;
+  id?: string;
+  displayName?: string;
+  disabledAfterImport?: boolean;
+  reason?: string;
+}
+
+/** PowerShell 单引号字符串转义 */
+function psQuote(value: string): string {
+  return "'" + String(value).replace(/'/g, "''") + "'";
+}
+
+/** 目录名安全化：把不允许的字符换成 - */
+function safeFolderName(value: string): string {
+  const cleaned = String(value || "")
+    .trim()
+    .replace(/[\\/:*?"<>|]+/g, "-")
+    .replace(/[\u0000-\u001f]/g, "")
+    .replace(/^[. ]+|[. ]+$/g, "")
+    .slice(0, 80);
+  return cleaned;
+}
+
+/**
+ * 从 ZIP 导入模组：
+ * 解压 → 定位 evejs-launcher.mod.json → 校验 → 复制到 <EveJS 根>/mods/<id>
+ * 导入后强制为「禁用」状态（把 loader.js 改回 loader.js.disabled），避免用户意外启用未知模组。
+ */
+export async function importModZip(repoRoot: string, zipPath: string): Promise<ModImportResult> {
+  const zip = path.resolve(String(zipPath || ""));
+  if (!zip || !fs.existsSync(zip)) return { ok: false, reason: "找不到 ZIP 文件" };
+  if (path.extname(zip).toLowerCase() !== ".zip") return { ok: false, reason: "只支持 .zip 文件" };
+
+  const tempRoot = path.join(launcherRuntimeRoot(), "temp", "mod-import-" + Date.now());
+  try {
+    fs.mkdirSync(tempRoot, { recursive: true });
+    await execFileAsync(
+      "powershell.exe",
+      ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
+       "Expand-Archive -LiteralPath " + psQuote(zip) + " -DestinationPath " + psQuote(tempRoot) + " -Force"],
+      { timeout: 180_000, windowsHide: true, maxBuffer: 4 * 1024 * 1024 }
+    );
+
+    // 定位包根：根目录有清单 → 用它；否则找唯一一个含清单的子目录
+    let packageRoot = tempRoot;
+    if (!fs.existsSync(path.join(packageRoot, MANIFEST_NAME))) {
+      const dirs = fs.readdirSync(tempRoot, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory() && entry.name !== "__MACOSX")
+        .map((entry) => path.join(tempRoot, entry.name))
+        .filter((dir) => fs.existsSync(path.join(dir, MANIFEST_NAME)));
+      if (dirs.length !== 1) {
+        return { ok: false, reason: dirs.length === 0 ? "ZIP 里没有 evejs-launcher.mod.json" : "ZIP 里有多个模组包，请一次只导入一个" };
+      }
+      packageRoot = dirs[0];
+    }
+
+    const manifestPath = path.join(packageRoot, MANIFEST_NAME);
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse(fs.readFileSync(manifestPath, "utf8").replace(/^\uFEFF/, "")) as Record<string, unknown>;
+    } catch (e) {
+      return { ok: false, reason: "清单 JSON 解析失败: " + (e instanceof Error ? e.message : String(e)) };
+    }
+
+    const id = typeof parsed.id === "string" ? parsed.id.trim() : "";
+    const folder = safeFolderName(id) || safeFolderName(path.basename(zip, ".zip")) || "imported-mod";
+    const target = path.join(modsRoot(repoRoot), folder);
+    if (fs.existsSync(target)) return { ok: false, reason: "已存在同名模组目录：" + folder };
+
+    fs.mkdirSync(modsRoot(repoRoot), { recursive: true });
+    fs.cpSync(packageRoot, target, { recursive: true });
+
+    // 强制禁用
+    let disabledAfterImport = false;
+    const enabledLoader = path.join(target, LOADER_ENABLED);
+    const disabledLoader = path.join(target, LOADER_DISABLED);
+    if (fs.existsSync(enabledLoader) && !fs.existsSync(disabledLoader)) {
+      try {
+        fs.renameSync(enabledLoader, disabledLoader);
+        disabledAfterImport = true;
+      } catch {
+        /* 改名失败就保持原状 */
+      }
+    }
+
+    const record = readModDir(folder, target);
+    return { ok: true, folder, id: record.id, displayName: record.displayName, disabledAfterImport };
+  } catch (e) {
+    return { ok: false, reason: e instanceof Error ? e.message : String(e) };
+  } finally {
+    try {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    } catch {
+      /* 清理失败不影响导入结果 */
+    }
   }
 }

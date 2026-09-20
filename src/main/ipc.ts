@@ -1,4 +1,4 @@
-import { ipcMain, BrowserWindow, shell, app } from "electron";
+import { ipcMain, BrowserWindow, shell, app, dialog } from "electron";
 import * as fs from "fs";
 import * as os from "os";
 import { execFile } from "child_process";
@@ -12,7 +12,7 @@ import {
   writeSettings,
   writeClientConfig
 } from "./configStore";
-import { checkAll } from "./healthChecker";
+import { checkAll, measureTcpLatency } from "./healthChecker";
 import { runInit, getInitState, onInitChanged, type InitKey } from "./initManager";
 import {
   startService,
@@ -25,7 +25,7 @@ import {
 import { listAccounts, createAccount, deleteAccount, checkServerRunning, verifyAccount, changeAccountPassword, launchClientWithLogin, launchStoredAccount } from "./accountManager";
 import * as pty from "./ptyManager";
 import { repairClientDisplay } from "./processManager";
-import { scanMods, setModEnabled, createModsFolder, planLoaders, modsRoot, ensureModAuthoringDoc } from "./modManager";
+import { scanMods, setModEnabled, createModsFolder, planLoaders, modsRoot, ensureModAuthoringDoc, importModZip, setModOrder } from "./modManager";
 import { log } from "./logger";
 import { applyUpdate, cancelUpdateDownload, checkForUpdates, currentUpdateState, downloadUpdate } from "./updater";
 import { databaseOverview, databaseTable, databaseSaveRow, databaseInsertRow, databaseDeleteRow, databaseCreateBackup, databaseBackups, databaseRestoreBackup } from "./databaseManager";
@@ -314,6 +314,15 @@ export function registerIpc(): void {
 
   ipcMain.handle("env:check", () => detectEnv());
   ipcMain.handle("health:check", () => checkAll());
+  ipcMain.handle("health:ping", async () => {
+    let port = 26000;
+    try {
+      const parsed = readServerConfig(resolveRepoRoot()).ports.game;
+      if (Number.isFinite(parsed) && parsed > 0) port = parsed;
+    } catch { /* 用默认端口 */ }
+    const ms = await measureTcpLatency(port);
+    return { ok: ms != null, port, ms };
+  });
   ipcMain.handle("metrics:get", async () => {
     const repoRoot = resolveRepoRoot();
     const cpus = os.cpus();
@@ -467,6 +476,16 @@ export function registerIpc(): void {
     }
   });
   ipcMain.handle("mods:createFolder", () => createModsFolder(resolveRepoRoot()));
+  ipcMain.handle("mods:importZip", async () => {
+    const filters = [{ name: "Mod ZIP", extensions: ["zip"] }];
+    const win = BrowserWindow.getAllWindows()[0];
+    const picked = win
+      ? await dialog.showOpenDialog(win, { title: "Import mod ZIP", filters, properties: ["openFile"] })
+      : await dialog.showOpenDialog({ title: "Import mod ZIP", filters, properties: ["openFile"] });
+    if (picked.canceled || picked.filePaths.length === 0) return { ok: false, canceled: true };
+    return importModZip(resolveRepoRoot(), picked.filePaths[0]);
+  });
+  ipcMain.handle("mods:setOrder", (_e, folders: string[]) => setModOrder(Array.isArray(folders) ? folders : []));
   ipcMain.handle("mods:authoringDoc", () => ensureModAuthoringDoc());
   ipcMain.handle("mods:openAuthoringDoc", async () => {
     const doc = ensureModAuthoringDoc();

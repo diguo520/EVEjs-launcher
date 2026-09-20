@@ -19,6 +19,26 @@ export function checkTcp(port: number, host = "127.0.0.1", timeoutMs = 1500): Pr
   });
 }
 
+/** 测量到目标端口的 TCP 建连耗时（毫秒）；连不上返回 null */
+export function measureTcpLatency(port: number, host = "127.0.0.1", timeoutMs = 1500): Promise<number | null> {
+  return new Promise((resolve) => {
+    const sock = new net.Socket();
+    const started = Date.now();
+    let done = false;
+    const finish = (value: number | null) => {
+      if (done) return;
+      done = true;
+      sock.destroy();
+      resolve(value);
+    };
+    sock.setTimeout(timeoutMs);
+    sock.once("connect", () => finish(Date.now() - started));
+    sock.once("timeout", () => finish(null));
+    sock.once("error", () => finish(null));
+    sock.connect(port, host);
+  });
+}
+
 /** HTTP 探活：任何 2xx/3xx/4xx 响应都视为服务在线 */
 export async function checkHttp(url: string, timeoutMs = 2000): Promise<boolean> {
   try {

@@ -62,6 +62,7 @@
     renderSvcCards();
     updateSvcStatus();
     updateLaunchButtonState();
+    updateAlerts();
   }
 
   function updateLaunchButtonState() {
@@ -1065,6 +1066,8 @@
       panel.style.display = status?.exists ? "none" : "";
       MODS.length = 0;
       (status?.mods || []).forEach((mod) => MODS.push(mod));
+      MOD_STATS = status?.stats || { total: 0, enabled: 0, disabled: 0, conflicts: 0, bytes: 0 };
+      MOD_CONFLICTS = Array.isArray(status?.conflicts) ? status.conflicts : [];
       renderMods();
     } catch (error) {
       console.error("modsList failed", error);
@@ -1083,6 +1086,46 @@
       logTo("sys", "OK", "已打开模组目录 <span class=\"hi\">" + esc(result.root || "mods") + "</span>");
     } catch (error) {
       toast(String(error), "err");
+    }
+  };
+
+  /** 导入 ZIP 模组：主进程弹选择框 → 解压 → 校验 → 落到 mods/<id>（默认禁用） */
+  importModZip = async function () {
+    try {
+      const result = await api.modsImportZip();
+      if (result?.canceled) return;
+      if (!result?.ok) throw new Error(result?.reason || "导入失败");
+      const name = result.displayName || result.id || result.folder || "mod";
+      toast(name + " · " + t("模组已导入") + (result.disabledAfterImport ? "（" + t("已默认禁用") + "）" : ""), "ok");
+      logTo("sys", "OK", "已导入模组 <span class=\"hi\">" + esc(result.folder || name) + "</span>");
+      await refreshModsStatus();
+    } catch (error) {
+      toast(t("导入失败") + ": " + String(error), "err");
+    }
+  };
+
+  /** 拖拽排序：把 fromFolder 移动到 toFolder 之前，并持久化到 _launcher/mods/mod-order.json */
+  reorderMods = async function (fromFolder, toFolder) {
+    const folders = MODS.map((mod) => mod.folder);
+    const from = folders.indexOf(fromFolder);
+    const to = folders.indexOf(toFolder);
+    if (from < 0 || to < 0 || from === to) return;
+    folders.splice(to, 0, folders.splice(from, 1)[0]);
+
+    // 先本地重排，界面立刻响应
+    const byFolder = new Map(MODS.map((mod) => [mod.folder, mod]));
+    MODS.length = 0;
+    folders.forEach((folder) => { const mod = byFolder.get(folder); if (mod) MODS.push(mod); });
+    renderMods();
+
+    try {
+      const result = await api.modsSetOrder(folders);
+      if (!result?.ok) throw new Error(result?.reason || "保存失败");
+      toast(t("已保存模组加载顺序"), "ok");
+      logTo("sys", "OK", "模组加载顺序已更新（共 " + folders.length + " 个）");
+    } catch (error) {
+      toast(String(error), "err");
+      await refreshModsStatus();
     }
   };
 
@@ -1157,6 +1200,11 @@
       set("mMem", `${memUsed.toFixed(1)}<span class="u">GB / ${memTotal.toFixed(1)}GB</span>`); width("bMem", memPct); set("sbMem", `${memUsed.toFixed(1)}G`);
       set("mDisk", `${diskUsed.toFixed(0)}<span class="u">GB / ${diskTotal.toFixed(0)}GB</span>`); width("bDisk", diskPct);
       set("mNet", `${(net / 1024 / 1024).toFixed(2)}<span class="u">MB/s</span>`); width("bNet", net / 1024 / 1024 / 100);
+      // 左下角小面板：原来只有演示代码在更新，这里补成真实值
+      const netMBs = net / 1024 / 1024;
+      set("sbNet", `${netMBs.toFixed(2)} MB/s`);
+      width("sbNetBar", netMBs / 100);
+      width("sbMemBar", memPct);
       const diskLabel = document.getElementById("diskLabel");
       if (diskLabel) diskLabel.textContent = metrics?.diskRoot ? `${t("EVEJS 所在盘")} · ${metrics.diskRoot}` : t("EVEJS 所在盘");
       const volumeList = document.getElementById("diskVolumeList");
@@ -1174,6 +1222,8 @@
       const clock = document.getElementById("monClock"); if (clock) clock.textContent = "LIVE · " + new Date().toTimeString().slice(0, 8);
       const onlinePlayers = Number(metrics?.onlinePlayers);
       set("sbPilots", Number.isFinite(onlinePlayers) && onlinePlayers >= 0 ? onlinePlayers.toLocaleString() : "—");
+      void updateServerPing();
+      updateAlerts();
       set("sbSession", formatUptime(mainServerStartedAt ? (Date.now() - mainServerStartedAt) / 1000 : 0));
     } catch (error) {
       console.error("metricsGet failed", error);
@@ -1192,6 +1242,35 @@
     if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
   }
+  /** 底栏 ALERTS：环境自检失败 + 服务异常 + 有可用更新 */
+  function updateAlerts() {
+    const el = document.getElementById("sbAlerts");
+    if (!el) return;
+    const envBad = Array.isArray(ENV) ? ENV.filter((item) => item && item.status === "fail").length : 0;
+    const svcBad = SVC.filter((item) => item.state === "err").length;
+    const updBad = typeof updState === "string" && updState === "available" ? 1 : 0;
+    const total = envBad + svcBad + updBad;
+    el.textContent = String(total);
+    const cell = document.getElementById("sbAlertsCell");
+    if (cell) {
+      cell.classList.toggle("warn", total > 0);
+      cell.classList.toggle("ok", total === 0);
+    }
+  }
+
+  /** 底栏 PING：真实测量到游戏服务器端口的 TCP 建连耗时 */
+  async function updateServerPing() {
+    const el = document.getElementById("sbPing");
+    if (!el) return;
+    try {
+      const result = await api.healthPing();
+      const ms = Number(result?.ms);
+      el.textContent = result?.ok && Number.isFinite(ms) ? (ms < 1 ? "<1ms" : ms + "ms") : "—";
+    } catch {
+      el.textContent = "—";
+    }
+  }
+
   function setUpdateDot(visible) {
     const dot = document.getElementById("updDot");
     if (dot) dot.style.display = visible ? "block" : "none";
