@@ -203,6 +203,21 @@
     return html;
   }
 
+  /** 模组加载/跳过日志：在模组名后加彩色 MOD 徽章，便于在系统日志里一眼区分 */
+  const MOD_LOAD_LINE = /^\[主服务器\]\s+·\s+(.+?)\s*$/;
+  const MOD_SKIP_LINE = /^\[主服务器\]\s+跳过模组\s+(.+?)\s*[:：]\s*(.+)$/;
+  function decorateModLine(plainLine) {
+    const load = MOD_LOAD_LINE.exec(plainLine);
+    if (load) {
+      return '<span class="hi">[主服务器]</span> · <span class="mod-name-inline">' + esc(load[1]) + '</span><span class="mod-tag">MOD</span>';
+    }
+    const skip = MOD_SKIP_LINE.exec(plainLine);
+    if (skip) {
+      return '<span class="hi">[主服务器]</span> 跳过模组 <span class="mod-name-inline">' + esc(skip[1]) + '</span><span class="mod-tag skip">MOD</span>：' + esc(skip[2]);
+    }
+    return null;
+  }
+
   function appendTerminalData(tabId, data) {
     const category = tabToLog[tabId] || "sys";
     const text = String(data ?? "").replace(/\r/g, "");
@@ -214,10 +229,16 @@
       else if (upper.includes("WARN")) level = "WARN";
       else if (upper.includes(" OK ") || upper.startsWith("OK ") || upper.includes("READY")) level = "OK";
       else if (upper.includes("SYS")) level = "SYS";
-      logTo(category, level, formatLogMessage(rawLine, level, true));
+      const decorated = decorateModLine(plainLine);
+      logTo(category, level, decorated || formatLogMessage(rawLine, level, true));
     });
   }
 
+  api.onModDownloadProgress((p) => {
+    if (!p || !p.id) return;
+    MARKET_PROGRESS[p.id] = typeof p.percent === "number" ? p.percent : Math.min(99, Math.round((p.downloaded / Math.max(p.total || p.downloaded, 1)) * 100));
+    if (MOD_TAB === "market") renderMarket();
+  });
   api.onServicesChanged(applyServices);
   api.onTerminalData(appendTerminalData);
   api.onTerminalExit((tabId, code) => appendTerminalData(tabId, `[进程退出] exit code ${code}\n`));
@@ -1056,6 +1077,800 @@
     }
   };
 
+  /* ============ 作者身份（Ed25519 密钥身份，见 docs/mod-signing-and-marketplace-plan.md §3） ============ */
+  let AUTHOR = null;
+
+  function authorName() {
+    return (AUTHOR && AUTHOR.author && AUTHOR.author.name) || "";
+  }
+
+  function updateAuthorBadge() {
+    const label = document.getElementById("authorBtnLabel");
+    // 直接用 t() 渲染，避免先写中文再被 translateDOM 翻译造成的瞬间闪烁
+    if (label) label.textContent = authorName() ? t(authorName()) : t("作者身份");
+  }
+
+  async function loadAuthorProfile() {
+    try {
+      AUTHOR = await api.authorGet();
+    } catch (error) {
+      console.error("authorGet failed", error);
+    }
+    updateAuthorBadge();
+    return AUTHOR;
+  }
+
+  function fillAuthorDialog() {
+    if (!AUTHOR || !AUTHOR.author) return;
+    const a = AUTHOR.author;
+    const nameInput = document.getElementById("authorNameInput");
+    if (nameInput) {
+      // 留空让作者自己填；当前署名放在 placeholder 里当提示
+      nameInput.value = "";
+      if (a.name) nameInput.placeholder = t(a.name);
+    }
+    const idEl = document.getElementById("authorIdValue");
+    if (idEl) idEl.textContent = a.id || "—";
+    const keyEl = document.getElementById("authorKeyIdValue");
+    if (keyEl) keyEl.textContent = a.keyId || "—";
+    const sinceEl = document.getElementById("authorSinceValue");
+    if (sinceEl) sinceEl.textContent = a.since ? new Date(a.since).toLocaleString() : "—";
+    const stateEl = document.getElementById("authorKeyState");
+    if (stateEl) {
+      const alive = !!AUTHOR.privateKeyExists;
+      stateEl.textContent = alive ? "KEY OK" : "KEY MISSING";
+      stateEl.className = "author-state " + (alive ? "ok" : "bad");
+    }
+    const warnEl = document.getElementById("authorWarn");
+    if (warnEl) warnEl.style.display = AUTHOR.privateKeyExists ? "none" : "";
+  }
+
+  openAuthorDialog = async function () {
+    const modal = document.getElementById("authorModal");
+    if (!modal) return;
+    modal.classList.add("open");
+    await loadAuthorProfile();
+    fillAuthorDialog();
+    if (typeof autoTranslateAfterRender === "function") autoTranslateAfterRender();
+  };
+
+  saveAuthorName = async function () {
+    const input = document.getElementById("authorNameInput");
+    const name = (input && input.value ? input.value : "").trim();
+    if (!name) { toast(t("署名不能为空"), "warn"); return; }
+    try {
+      const res = await api.authorSetName(name);
+      if (!res || !res.ok) throw new Error((res && res.reason) || t("保存失败"));
+      AUTHOR = res;
+      updateAuthorBadge();
+      fillAuthorDialog();
+      toast(t("作者身份已更新") + " · " + res.author.name, "ok");
+      logTo("sys", "OK", "作者署名已更新为 <span class=\"hi\">" + esc(res.author.name) + "</span>");
+    } catch (error) {
+      toast(t("保存失败") + ": " + String(error), "err");
+    }
+  };
+
+  exportAuthorKeyFile = async function () {
+    try {
+      const res = await api.authorExportKey();
+      if (res && res.canceled) return;
+      if (!res || !res.ok) throw new Error((res && res.reason) || t("导出失败"));
+      toast(t("密钥已导出") + " · " + res.path, "ok");
+      logTo("sys", "OK", "作者密钥已导出到 <span class=\"hi\">" + esc(res.path) + "</span> · 含私钥，请妥善保管");
+    } catch (error) {
+      toast(t("导出密钥失败") + ": " + String(error), "err");
+    }
+  };
+
+  importAuthorKeyFile = async function () {
+    try {
+      const res = await api.authorImportKey();
+      if (res && res.canceled) return;
+      if (!res || !res.ok) throw new Error((res && res.reason) || t("导入失败"));
+      await loadAuthorProfile();
+      fillAuthorDialog();
+      toast(t("密钥已导入") + " · keyId " + res.keyId, "ok");
+      logTo("sys", "OK", "作者身份已从密钥文件还原 · keyId <span class=\"hi\">" + esc(res.keyId || "") + "</span>");
+    } catch (error) {
+      toast(t("导入密钥失败") + ": " + String(error), "err");
+    }
+  };
+
+  openAuthorKeyFolder = async function () {
+    try {
+      const res = await api.authorOpenKeyFolder();
+      if (!res || !res.ok) throw new Error((res && res.reason) || t("打开失败"));
+    } catch (error) {
+      toast(String(error), "err");
+    }
+  };
+
+  copyAuthorId = function () {
+    const id = (AUTHOR && AUTHOR.author && AUTHOR.author.id) || "";
+    if (!id) return;
+    const done = () => toast(t("作者标识已复制"), "ok");
+    const fail = () => toast(t("复制失败，请手动选择"), "warn");
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(id).then(done).catch(fail);
+    } else {
+      fail();
+    }
+  };
+
+  /* 模组页签与动作按钮：用脚本绑定，不依赖 inline onclick 的作用域解析 */
+  function bindModTabs() {
+    const strip = document.getElementById("modTabs");
+    if (strip && !strip.dataset.bound) {
+      strip.dataset.bound = "1";
+      strip.querySelectorAll(".mod-tab").forEach((el) => {
+        el.addEventListener("click", () => {
+          if (typeof switchModTab === "function") switchModTab(el.dataset.mtab || "installed");
+        });
+      });
+    }
+    const actions = [
+      ["modActCreate", "openCreateModDialog"],
+      ["modActSubmit", "openSubmitModDialog"],
+      ["modActAuthor", "openAuthorDialog"],
+      ["modActDoc", "openModAuthoringDoc"]
+    ];
+    actions.forEach(([id, fn]) => {
+      const el = document.getElementById(id);
+      if (el && !el.dataset.bound) {
+        el.dataset.bound = "1";
+        el.addEventListener("click", () => {
+          const f = window[fn];
+          if (typeof f === "function") f();
+          else if (typeof window[fn] === "undefined") toast(t("功能还没准备好") + ": " + fn, "warn");
+        });
+      }
+    });
+  }
+  /* ============ 模组详情弹窗（对应参考图的 MOD 详情） ============ */
+  let MOD_DETAIL = null;
+
+  /** 把 README.md 拆成「功能要点」与「详细介绍」；不是我们生成的 README 时退化为整篇正文 */
+  function parseReadmeText(text) {
+    const out = { highlights: [], readme: "" };
+    const raw = String(text || "");
+    if (!raw.trim()) return out;
+    const lines = raw.split("\n");
+    let section = "";
+    const body = [];
+    const free = [];
+    for (const line of lines) {
+      const h2 = /^##\s*(.+?)\s*$/.exec(line);
+      if (h2) { section = h2[1].trim(); continue; }
+      if (/^#\s/.test(line)) continue;
+      const bullet = /^[-*]\s+(.+)$/.exec(line);
+      if ((/功能要点|Highlights/i.test(section) || (!section && bullet)) && bullet) {
+        out.highlights.push(bullet[1].trim());
+        continue;
+      }
+      if (/详细介绍|说明|Details|Description/i.test(section)) body.push(line);
+      else if (!section) free.push(line);
+    }
+    out.readme = (body.length ? body.join("\n") : free.join("\n")).trim().slice(0, 4000);
+    out.highlights = out.highlights.slice(0, 12);
+    return out;
+  }
+
+  function mdCell(label, value) {
+    return '<div class="md-cell"><div class="k">' + esc(t(label)) + '</div><div class="v">' + esc(value == null || value === "" ? "—" : value) + '</div></div>';
+  }
+
+  function renderModDetail() {
+    const body = document.getElementById("mdBody");
+    const title = document.getElementById("mdTitle");
+    if (!body || !MOD_DETAIL) return;
+    const d = MOD_DETAIL;
+    const m = d.mod || d.entry || {};
+    const isMarket = d.kind === "market";
+    if (title) title.textContent = m.displayName || m.id || t("模组详情");
+
+    const author = (m.author && m.author.name) || "";
+    const cat = modCategoryLabel(m);
+    const ver = m.version ? "v" + String(m.version).replace(/^v/i, "") : "";
+    const localVer = isMarket ? (marketLocalVersion(m.id) ? "v" + marketLocalVersion(m.id) : "") : ver;
+    const sub = [author, t(cat), ver].filter(Boolean).join(" · ");
+
+    const chips = [];
+    if (!isMarket) {
+      if (m.signatureState === "valid") chips.push(['on', t("已签名")]);
+      else if (m.signatureState === "invalid") chips.push(['bad', t("签名校验失败")]);
+      else chips.push(['', t("未签名")]);
+      chips.push([m.enabled ? "on" : "", m.enabled ? t("已启用") : t("已停用")]);
+    } else {
+      const local = marketLocalVersion(m.id);
+      chips.push([local ? "" : "on", local ? t("已安装") : t("可安装")]);
+      if (local && m.version && local !== m.version) chips.push(["warn", t("可更新")]);
+    }
+    if (cat) chips.push(["", t(cat)]);
+    (Array.isArray(m.tags) ? m.tags : []).forEach((x) => chips.push(["", x]));
+    if (m.requiresRestart || m.restart === "game_server") chips.push(["", t("需重启")]);
+
+    const grid = [
+      mdCell("最新版本", ver),
+      mdCell("本地版本", localVer),
+      mdCell("体积", fmtBytes(isMarket ? m.sizeBytes : m.sizeBytes)),
+      mdCell("重启要求", (m.requiresRestart || m.restart === "game_server") ? t("需要重启服务端") : t("不需要重启")),
+      mdCell("分类", t(cat || "未分类")),
+      mdCell("互斥模组", (Array.isArray(m.conflicts) && m.conflicts.length) ? m.conflicts.join(", ") : t("无")),
+      mdCell("兼容版本", (Array.isArray(m.evejsVersions) && m.evejsVersions.length) ? m.evejsVersions.join(", ") : t("未声明")),
+      mdCell("更新时间", fmtTime(isMarket ? Date.parse(String(m.updatedAt || m.publishedAt || "")) : m.updatedAt)),
+      mdCell("来源", isMarket ? t("模组市场") : t("本机"))
+    ];
+    if (isMarket && m.rating) grid.splice(4, 0, mdCell("评分", m.rating + (m.ratingCount ? " (" + m.ratingCount + ")" : "")));
+    if (isMarket && m.sha256) grid.push(mdCell("SHA256", String(m.sha256).slice(0, 16) + "…"));
+
+    const highlightList = (d.highlights && d.highlights.length)
+      ? '<div class="md-sec"><h4>// ' + t("功能要点") + '</h4><ul class="md-list">' + d.highlights.map((h) => "<li>" + esc(h) + "</li>").join("") + "</ul></div>"
+      : "";
+    const readmeBlock = d.readme
+      ? '<div class="md-sec"><h4>// ' + t("模组说明") + '</h4><div class="md-body">' + esc(d.readme) + "</div></div>"
+      : '<div class="md-sec"><h4>// ' + t("模组说明") + '</h4><div class="md-note">' + t("这个模组没有写说明（README.md 为空）") + "</div></div>";
+    const changelog = (isMarket && m.changelog)
+      ? '<div class="md-sec"><h4>// ' + t("本次更新") + '</h4><div class="md-body">' + esc(m.changelog) + "</div></div>"
+      : "";
+
+    body.innerHTML = '<div class="md-sub">' + esc(sub || "—") + "</div>"
+      + '<div class="md-chips">' + chips.map(([cls, text]) => '<span class="md-chip ' + cls + '">' + esc(text) + "</span>").join("") + "</div>"
+      + '<div class="md-grid">' + grid.join("") + "</div>"
+      + highlightList + readmeBlock + changelog
+      + '<div class="md-sec"><h4>// ' + t("玩家评价") + '</h4><div class="md-note">' + t("评分与评价需要服务器汇总，当前版本先在索引里展示聚合评分。") + "</div></div>";
+
+    const folderBtn = document.getElementById("mdOpenFolder");
+    if (folderBtn) folderBtn.style.display = isMarket ? "none" : "";
+    const resign = document.getElementById("mdResign");
+    if (resign) resign.style.display = isMarket ? "none" : "";
+    const install = document.getElementById("mdInstall");
+    if (install) install.style.display = isMarket ? "" : "none";
+  }
+
+  function openModDetailModal() {
+    const modal = document.getElementById("modDetailModal");
+    if (!modal) return;
+    modal.classList.add("open");
+  }
+
+  openInstalledModDetail = async function (folder) {
+    const mod = MODS.find((m) => m.folder === folder);
+    if (!mod) return;
+    let parsed = { highlights: [], readme: "" };
+    try {
+      const res = await api.modsReadme(folder);
+      if (res && res.text) parsed = parseReadmeText(res.text);
+    } catch (error) {
+      console.error("readme failed", error);
+    }
+    if (!parsed.readme && mod.description) parsed.readme = mod.description;
+    MOD_DETAIL = { kind: "installed", mod, readme: parsed.readme, highlights: parsed.highlights };
+    renderModDetail();
+    openModDetailModal();
+  };
+
+  openMarketModDetail = function (id) {
+    const entry = MARKET.find((e) => e.id === id);
+    if (!entry) return;
+    MOD_DETAIL = {
+      kind: "market",
+      entry,
+      readme: Array.isArray(entry.readme) ? entry.readme.join("\n\n") : (entry.description || ""),
+      highlights: Array.isArray(entry.highlights) ? entry.highlights : []
+    };
+    renderModDetail();
+    openModDetailModal();
+  };
+
+  mdOpenFolder = function () {
+    if (!MOD_DETAIL || !MOD_DETAIL.mod) return;
+    if (typeof revealModFolder === "function") revealModFolder(MOD_DETAIL.mod.folder);
+  };
+
+  mdResign = async function () {
+    if (!MOD_DETAIL || !MOD_DETAIL.mod) return;
+    closeModal("modDetailModal");
+    if (typeof signMod === "function") await signMod(MOD_DETAIL.mod.folder);
+  };
+
+  mdInstall = function () {
+    if (!MOD_DETAIL || !MOD_DETAIL.entry) return;
+    const id = MOD_DETAIL.entry.id;
+    closeModal("modDetailModal");
+    if (typeof installMarketMod === "function") void installMarketMod(id);
+  };
+  /* ============ 模组页签的数据与动作（渲染在 eve-launcher.html 里） ============ */
+  loadMyMods = async function () {
+    try {
+      const res = await api.modsMyMods();
+      MY_MODS = (res && res.items) || [];
+    } catch (error) {
+      console.error("myMods failed", error);
+      MY_MODS = [];
+    }
+    if (typeof updateModTabs === "function") updateModTabs();
+    if (typeof renderMods === "function") renderMods();
+  };
+
+  loadMarket = async function (force, silent) {
+    const grid = document.getElementById("modsGrid");
+    if (!silent && grid && typeof t === "function") grid.innerHTML = '<div style="grid-column:1/-1;padding:34px;text-align:center;color:var(--txt-mute);font-size:12px">' + t("加载索引中…") + "</div>";
+    try {
+      const res = await api.modsMarketList(!!force);
+      MARKET = (res && res.mods) || [];
+      MARKET_DELISTED = (res && res.delisted) || [];   // 被维护者下架的条目：市场里不再列出
+      MOD_UPDATES = (res && res.updates) || [];
+      MARKET_FETCHED_AT = (res && res.fetchedAt) || Date.now();
+      MOD_BLOCKED = (res && res.blocked) || [];
+      if (!silent && res && res.reason) toast(res.reason, res.cached ? "warn" : "err");
+      else if (!silent && force) toast(t("索引已刷新") + " · " + MARKET.length + " " + t("个模组"), "ok");
+    } catch (error) {
+      console.error("marketList failed", error);
+      MARKET = [];
+      if (!silent) toast(t("索引加载失败") + ": " + String(error), "err");
+    }
+    if (typeof updateModTabs === "function") updateModTabs();
+    // 只有用户正停在市场页时才重绘网格；静默拉取时不打扰其它页签
+    if (typeof renderMods === "function" && MOD_TAB === "market") renderMods();
+  };
+
+  installMarketMod = async function (id) {
+    const entry = MARKET.find((e) => e.id === id);
+    if (!entry) return;
+    MARKET_PROGRESS[id] = 0;
+    if (typeof renderMarket === "function") renderMarket();
+    try {
+      const res = await api.modsMarketInstall(entry);
+      if (!res || !res.ok) throw new Error((res && res.reason) || t("安装失败"));
+      const verb = res.mode === "update" ? t("已更新") : t("已安装");
+      toast(verb + " · " + (res.folder || id) + " v" + (res.version || ""), "ok");
+      logTo("sys", "OK", verb + " 模组 <span class=\"hi\">" + esc(res.folder || id) + "</span> v" + esc(res.version || ""));
+      MOD_UPDATES = MOD_UPDATES.filter((u) => u.id !== id);
+    } catch (error) {
+      toast(t("安装失败") + ": " + String(error), "err");
+    } finally {
+      delete MARKET_PROGRESS[id];
+      await refreshModsStatus();
+      if (typeof renderMarket === "function") renderMarket();
+    }
+  };
+
+  exportMyModsCsv = async function () {
+    if (!MY_MODS.length) { toast(t("没有可导出的模组"), "warn"); return; }
+    const header = ["id", "name", "version", "status", "category", "signed", "repo", "pr"];
+    const rows = MY_MODS.map((m) => [m.id, m.displayName || "", m.version || "", MOD_STATUS_LABEL[m.status] || m.status, m.category || "", m.signed ? "yes" : "no", m.sourceRepo || "", m.prUrl || ""]);
+    const csv = [header].concat(rows).map((r) => r.map((c) => "\"" + String(c).replace(/"/g, "\"\"") + "\"").join(",")).join("\r\n") + "\r\n";
+    try {
+      const res = await api.modsSaveText("my-evejs-mods.csv", "\ufeff" + csv);
+      if (res && res.canceled) return;
+      if (!res || !res.ok) throw new Error((res && res.reason) || t("导出失败"));
+      toast(t("已导出") + " · " + res.path, "ok");
+    } catch (error) {
+      toast(t("导出失败") + ": " + String(error), "err");
+    }
+  };
+
+  refreshMyModsTab = function () {
+    if (MOD_TAB === "mine") void loadMyMods();
+  };
+  /* ============ 提交模组（签名 → 打包 → 索引分片 → GitHub PR，见 docs/…plan.md §5.4） ============ */
+  let SM_ITEM = null;
+  let SM_COMPARE = "";
+
+  function smVal(id) { const el = document.getElementById(id); return el ? String(el.value || "") : ""; }
+  function smSet(id, v) { const el = document.getElementById(id); if (el) el.value = v; }
+  function smIsMine(m) {
+    if (!m) return false;
+    if (m.authorId && AUTHOR && AUTHOR.author && m.authorId === AUTHOR.author.id) return true;
+    if (m.signatureKeyId && AUTHOR && AUTHOR.author && m.signatureKeyId === AUTHOR.author.keyId) return true;
+    return false;
+  }
+
+  function smFillMods() {
+    const sel = document.getElementById("smMod");
+    if (!sel) return;
+    const mine = MODS.filter((m) => smIsMine(m));
+    const others = MODS.filter((m) => !smIsMine(m));
+    const opt = (m) => '<option value="' + esc(m.folder) + '">' + esc((m.displayName || m.id) + "  v" + (m.version || "?")) + (smIsMine(m) ? t("（我的）") : "") + "</option>";
+    const parts = [];
+    if (mine.length) parts.push('<optgroup label="' + esc(t("我创建的")) + '">' + mine.map(opt).join("") + "</optgroup>");
+    if (others.length) parts.push('<optgroup label="' + esc(t("其它模组")) + '">' + others.map(opt).join("") + "</optgroup>");
+    sel.innerHTML = parts.join("") || "<option value=\"\">" + esc(t("mods 目录里还没有模组")) + "</option>";
+    if (mine.length) sel.value = mine[0].folder;
+  }
+
+  smOnModChange = function () {
+    const folder = smVal("smMod");
+    const mod = MODS.find((m) => m.folder === folder);
+    if (!mod) return;
+    if (!smVal("smCategory")) smSet("smCategory", mod.category || "玩法");
+    if (!smVal("smTags") && mod.tags && mod.tags.length) smSet("smTags", mod.tags.join(", "));
+  };
+
+  async function smRefreshTokenState() {
+    const el = document.getElementById("smTokenState");
+    if (!el) return;
+    try {
+      const st = await api.modsGithubTokenStatus();
+      if (!st || !st.hasToken) {
+        el.textContent = t("还没有保存令牌");
+      } else if (st.encrypted) {
+        el.textContent = t("令牌已加密保存（仅本机可用）");
+      } else {
+        el.textContent = t("令牌只保存在内存里（当前环境不支持加密存储）");
+      }
+      const btn = document.getElementById("smSubmit");
+      if (btn) btn.disabled = !(st && st.hasToken) || !SM_ITEM;
+      const reg = document.getElementById("smRegister");
+      if (reg) reg.disabled = !(st && st.hasToken) || !SM_ITEM;
+    } catch (error) {
+      el.textContent = String(error);
+    }
+  }
+
+  openSubmitModDialog = async function () {
+    const modal = document.getElementById("submitModModal");
+    if (!modal) return;
+    await loadAuthorProfile();
+    await refreshModsStatus();
+    smFillMods();
+    SM_ITEM = null;
+    SM_COMPARE = "";
+    const res = document.getElementById("smResult");
+    if (res) res.style.display = "none";
+    const sub = document.getElementById("smSubmitResult");
+    if (sub) { sub.style.display = "none"; sub.textContent = ""; }
+    const reveal = document.getElementById("smReveal");
+    if (reveal) reveal.disabled = true;
+    smSet("smToken", "");
+    const repoNameEl = document.getElementById("smRepoName");
+    if (repoNameEl && !repoNameEl.value) {
+      const firstId = (MODS.filter((m) => smIsMine(m))[0] || MODS[0] || {}).id || "my-mod";
+      repoNameEl.placeholder = "evejs-mod-" + String(firstId).toLowerCase().replace(/[^a-z0-9-]+/g, "-");
+    }
+    smOnModChange();
+    await smRefreshTokenState();
+    if (typeof autoTranslateAfterRender === "function") autoTranslateAfterRender();
+    modal.classList.add("open");
+  };
+
+  smPrepare = async function () {
+    const btn = document.getElementById("smPrepare");
+    const folder = smVal("smMod");
+    if (!folder) { toast(t("请先选择一个模组"), "warn"); return; }
+    const urls = [];
+    const gh = smVal("smUrlGithub").trim();
+    if (gh) urls.push({ mirror: "github", url: gh, priority: 1 });
+    if (btn) btn.disabled = true;
+    try {
+      const res = await api.modsSubmitPrepare({
+        folder,
+        changelog: smVal("smChangelog"),
+        category: smVal("smCategory"),
+        tags: cmSplitList(smVal("smTags")),
+        repo: smVal("smRepo"),
+        downloadUrls: urls
+      });
+      if (!res || !res.ok) throw new Error((res && res.reason) || t("打包失败"));
+      SM_ITEM = res.item;
+      const text = [
+        t("标识") + ": " + SM_ITEM.id,
+        t("版本") + ": " + SM_ITEM.version,
+        "ZIP: " + SM_ITEM.zipPath,
+        "SHA256: " + SM_ITEM.sha256,
+        "SIZE: " + SM_ITEM.sizeBytes + " bytes",
+        t("分支") + ": " + SM_ITEM.branch
+      ].join("\n");
+      const textEl = document.getElementById("smResultText");
+      if (textEl) textEl.textContent = text;
+      smSet("smShard", JSON.stringify(SM_ITEM.indexDraft, null, 2));
+      const resBox = document.getElementById("smResult");
+      if (resBox) resBox.style.display = "";
+      const reveal = document.getElementById("smReveal");
+      if (reveal) reveal.disabled = false;
+      await smRefreshTokenState();
+      toast(t("已生成待提交包") + " · " + SM_ITEM.id + " v" + SM_ITEM.version, "ok");
+      logTo("sys", "OK", "已生成待提交包 <span class=\"hi\">" + esc(SM_ITEM.id) + "</span> · sha256 " + esc(SM_ITEM.sha256.slice(0, 12)) + "…");
+    } catch (error) {
+      toast(t("打包失败") + ": " + String(error), "err");
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  };
+
+  smRevealZip = async function () {
+    if (!SM_ITEM) return;
+    try {
+      const res = await api.modsRevealSubmissionZip(SM_ITEM.zipPath);
+      if (!res || !res.ok) throw new Error((res && res.reason) || t("打开失败"));
+    } catch (error) {
+      toast(String(error), "err");
+    }
+  };
+
+  smCopyShard = function () {
+    const text = smVal("smShard");
+    if (!text) return;
+    const done = () => toast(t("分片 JSON 已复制"), "ok");
+    const fail = () => toast(t("复制失败，请手动选择"), "warn");
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done).catch(fail);
+    else fail();
+  };
+
+  smSaveToken = async function () {
+    const token = smVal("smToken").trim();
+    if (!token) { toast(t("令牌不能为空"), "warn"); return; }
+    try {
+      const res = await api.modsGithubTokenSave(token);
+      if (!res || !res.ok) throw new Error((res && res.reason) || t("保存失败"));
+      smSet("smToken", "");
+      toast(res.encrypted ? t("令牌已加密保存") : t("令牌只保存在内存里"), res.encrypted ? "ok" : "warn");
+      if (res.reason) toast(res.reason, "warn");
+      await smRefreshTokenState();
+    } catch (error) {
+      toast(t("保存失败") + ": " + String(error), "err");
+    }
+  };
+
+  smClearToken = async function () {
+    try {
+      await api.modsGithubTokenClear();
+      toast(t("令牌已清除"), "warn");
+      await smRefreshTokenState();
+    } catch (error) {
+      toast(String(error), "err");
+    }
+  };
+
+  smCheckToken = async function () {
+    const typed = smVal("smToken").trim();
+    try {
+      const res = await api.modsGithubTokenCheck(typed || undefined);
+      if (!res || !res.ok) throw new Error((res && res.reason) || t("令牌无效"));
+      toast(t("令牌有效") + " · " + res.login, "ok");
+    } catch (error) {
+      toast(t("令牌校验失败") + ": " + String(error), "err");
+    }
+  };
+
+  smRegisterSource = async function () {
+    if (!SM_ITEM) { toast(t("请先执行①生成并打包"), "warn"); return; }
+    const box = document.getElementById("smSubmitResult");
+    try {
+      const res = await api.modsRegisterSource(SM_ITEM.id, SM_ITEM.version);
+      SM_COMPARE = (res && res.compareUrl) || SM_COMPARE;
+      if (res && res.ok) {
+        if (box) { box.style.display = ""; box.innerHTML = t("PR 已创建") + ": <span class=\"hi\">" + esc(res.prUrl || "") + "</span>"; }
+        toast(t("收录申请已提交") + " · " + (res.branch || ""), "ok");
+      } else {
+        const reason = (res && res.reason) || t("提交失败");
+        if (box) { box.style.display = ""; box.textContent = reason; }
+        toast(t("提交失败") + ": " + reason, "err");
+      }
+    } catch (error) {
+      toast(t("提交失败") + ": " + String(error), "err");
+    }
+  };
+
+  smSubmit = async function () {
+    if (!SM_ITEM) { toast(t("请先执行①生成并打包"), "warn"); return; }
+    const btn = document.getElementById("smSubmit");
+    const box = document.getElementById("smSubmitResult");
+    if (btn) btn.disabled = true;
+    if (box) { box.style.display = ""; box.textContent = t("正在提交（fork → 分支 → PR），请稍候…"); }
+    try {
+      const repoInput = smVal("smRepoName").trim();
+      const res = await api.modsPublishOwnRepo(SM_ITEM.id, SM_ITEM.version, repoInput, "");   // 只走 GitHub，不再要 Gitee
+      if (res && res.ok) {
+        const lines = [
+          t("已发布到我的仓库") + ": " + (res.repoUrl || (res.owner + "/" + res.repo)),
+          res.releaseUrl ? "Release: " + res.releaseUrl : "",
+          res.assetUrl ? "ZIP: " + res.assetUrl : "",
+          res.repoCreated ? t("（仓库是本次新建的）") : "",
+          "",
+          t("下一步：点 ③ 申请收录（一次性）")
+        ].filter(Boolean);
+        if (box) { box.style.display = ""; box.textContent = lines.join("\n"); }
+        toast(t("已发布到我的仓库") + " · " + (res.repo || ""), "ok");
+        logTo("sys", "OK", "模组 <span class=\"hi\">" + esc(SM_ITEM.id) + "</span> 已发布到 <span class=\"hi\">" + esc(res.repoUrl || "") + "</span>");
+      } else {
+        const reason = (res && res.reason) || t("提交失败");
+        const hint = res && res.repoUrl ? "\n" + t("仓库已就绪，可手动上传 ZIP 到 Release") + ": " + res.repoUrl : "";
+        if (box) { box.style.display = ""; box.textContent = reason + hint; }
+        toast(t("提交失败") + ": " + reason, "err");
+      }
+    } catch (error) {
+      if (box) box.textContent = String(error);
+      toast(t("提交失败") + ": " + String(error), "err");
+    } finally {
+      if (btn) btn.disabled = false;
+      await smRefreshTokenState();
+    }
+  };
+
+  smOpenCompare = async function () {
+    if (!SM_COMPARE) {
+      const r = t("还没有提交记录，请先点②或直接到索引仓库手动开 PR");
+      toast(r, "warn");
+      return;
+    }
+    try {
+      await api.openExternal(SM_COMPARE);
+    } catch (error) {
+      toast(String(error), "err");
+    }
+  };
+
+  /* ============ 创建模组（模板来自主进程 modScaffold.ts，唯一基准 welcome-mod） ============ */
+  let MOD_TEMPLATES = [];
+  let cmIdTouched = false;
+
+  function cmSlug(name) {
+    return String(name || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9\-_.]+/g, "-")
+      .replace(/^[-_.]+|[-_.]+$/g, "")
+      .slice(0, 64);
+  }
+  function cmFallbackId() {
+    return "mod-" + Date.now().toString(36);
+  }
+  function cmSplitList(value) {
+    return String(value || "").split(/[,，]/).map((x) => x.trim()).filter(Boolean);
+  }
+  function cmSplitLines(value) {
+    return String(value || "").split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
+  }
+  function cmTemplate() {
+    const sel = document.getElementById("cmTemplate");
+    const id = sel ? sel.value : "";
+    return MOD_TEMPLATES.find((t) => t.id === id) || MOD_TEMPLATES[0] || null;
+  }
+
+  async function loadModTemplates() {
+    if (MOD_TEMPLATES.length) return MOD_TEMPLATES;
+    try {
+      const res = await api.modsTemplates();
+      MOD_TEMPLATES = (res && res.templates) || [];
+    } catch (error) {
+      console.error("modsTemplates failed", error);
+    }
+    return MOD_TEMPLATES;
+  }
+
+  cmOnName = function () {
+    if (cmIdTouched) return;
+    const name = document.getElementById("cmName");
+    const idEl = document.getElementById("cmId");
+    if (!idEl) return;
+    const slug = cmSlug(name && name.value ? name.value : "");
+    idEl.value = slug || cmFallbackId();
+    cmPreview();
+  };
+  cmOnId = function () {
+    cmIdTouched = true;
+    cmPreview();
+  };
+
+  cmPreview = function () {
+    const pre = document.getElementById("cmPreview");
+    if (!pre) return;
+    const idEl = document.getElementById("cmId");
+    const id = cmSlug(idEl && idEl.value ? idEl.value : "") || "<id>";
+    const tpl = cmTemplate();
+    const files = (tpl && tpl.files) || ["evejs-launcher.mod.json", "loader.js", "README.md", "CHANGELOG.md"];
+    const lines = ["mods/" + id + "/"];
+    files.forEach((f, i) => lines.push("  " + (i === files.length - 1 ? "└─ " : "├─ ") + f));
+    if (tpl) {
+      lines.push("");
+      lines.push(t("模板") + ": " + t(tpl.name) + " —— " + t(tpl.desc));
+    }
+    pre.textContent = lines.join("\n");
+  };
+
+  openCreateModDialog = async function () {
+    const modal = document.getElementById("createModModal");
+    if (!modal) return;
+    const templates = await loadModTemplates();
+    const sel = document.getElementById("cmTemplate");
+    if (sel && !sel.options.length && templates.length) {
+      sel.innerHTML = templates.map((tpl) => '<option value="' + esc(tpl.id) + '">' + esc(t(tpl.name)) + '</option>').join("");
+    }
+    cmIdTouched = false;
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+    set("cmName", "");
+    set("cmId", "");
+    set("cmVersion", "1.0.0");
+    set("cmCategory", "");
+    set("cmTags", "");
+    set("cmDesc", "");
+    set("cmReadme", "");
+    set("cmHighlights", "");
+    set("cmConflicts", "");
+    const restart = document.getElementById("cmRestart");
+    if (restart) restart.checked = true;
+    const enabled = document.getElementById("cmEnabled");
+    if (enabled) enabled.checked = false;
+    const signEl = document.getElementById("cmSign");
+    if (signEl) signEl.checked = true;
+    cmPreview();
+    if (typeof autoTranslateAfterRender === "function") autoTranslateAfterRender();
+    modal.classList.add("open");
+  };
+
+  submitCreateMod = async function () {
+    const btn = document.getElementById("cmSubmit");
+    const val = (id) => { const el = document.getElementById(id); return el ? String(el.value || "") : ""; };
+    const checked = (id) => { const el = document.getElementById(id); return !!(el && el.checked); };
+    const tpl = cmTemplate();
+    const draft = {
+      id: cmSlug(val("cmId")) || cmSlug(val("cmName")) || cmFallbackId(),
+      displayName: val("cmName").trim(),
+      version: val("cmVersion").trim() || "1.0.0",
+      description: val("cmDesc").trim(),
+      templateId: (tpl && tpl.id) || "broadcast",
+      category: val("cmCategory").trim(),
+      tags: cmSplitList(val("cmTags")),
+      readme: val("cmReadme"),
+      highlights: cmSplitLines(val("cmHighlights")),
+      conflicts: cmSplitList(val("cmConflicts")),
+      requiresRestart: checked("cmRestart"),
+      enabled: checked("cmEnabled"),
+      sign: checked("cmSign")
+    };
+    if (!draft.displayName) { toast(t("模组名不能为空"), "warn"); return; }
+    if (btn) btn.disabled = true;
+    try {
+      const res = await api.modsCreate(draft);
+      if (!res || !res.ok) throw new Error((res && res.reason) || t("创建失败"));
+      const extra = [];
+      if (res.signed) extra.push(t("已签名"));
+      if (draft.enabled) extra.push(t("已启用"));
+      if (res.reason) toast(res.reason, "warn");
+      toast(t("模组已创建") + " · " + res.folder + (extra.length ? " · " + extra.join(" · ") : ""), "ok");
+      logTo("sys", "OK", "已创建模组 <span class=\"hi\">" + esc(res.folder || "") + "</span>（模板 " + esc(draft.templateId) + "）");
+      closeModal("createModModal");
+      await refreshModsStatus();
+    } catch (error) {
+      toast(t("创建失败") + ": " + String(error), "err");
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  };
+
+  /** 用本机作者私钥给一个模组的 manifest 签名（Ed25519，见 docs/…plan.md §9） */
+  signMod = async function (folder) {
+    try {
+      if (!AUTHOR || !AUTHOR.author) await loadAuthorProfile();
+      if (!AUTHOR || !AUTHOR.privateKeyExists) {
+        toast(t("请先设置作者身份或导入密钥"), "warn");
+        return;
+      }
+      // 归属保护：别人的模组不能用我的密钥签（那会把我的作者标识写进它的清单）
+      const mod = MODS.find((m) => m.folder === folder);
+      const me = AUTHOR.author;
+      if (mod && mod.authorId && mod.authorId !== me.id) {
+        toast(t("这不是你的模组") + " · " + t("作者") + ": " + (mod.authorName || mod.authorId), "err");
+        logTo("sys", "WARN", "拒绝签名 <span class=\"hi\">" + esc(folder) + "</span>：该模组作者是 " + esc(mod.authorName || mod.authorId));
+        return;
+      }
+      if (mod && !mod.authorId) {
+        const question = t("该模组的清单里没有作者标识。") + "\n\n"
+          + t("签名会把「你的作者身份」写进它的清单，之后它会出现在「我创建的」里。") + "\n"
+          + t("如果这不是你自己做的模组，请不要签。") + "\n\n"
+          + t("确定要签名吗？");
+        if (!window.confirm(question)) return;
+      }
+      const res = await api.modsSign(folder);
+      if (!res || !res.ok) throw new Error((res && res.reason) || t("签名失败"));
+      toast(t("签名已写入") + " · keyId " + res.keyId, "ok");
+      logTo("sys", "OK", "模组 <span class=\"hi\">" + esc(folder) + "</span> 已用 keyId <span class=\"hi\">" + esc(res.keyId || "") + "</span> 重新签名");
+      await refreshModsStatus();
+    } catch (error) {
+      toast(t("签名失败") + ": " + String(error), "err");
+    }
+  };
   async function refreshModsStatus() {
     const panel = document.getElementById("modsMissingPanel");
     if (!panel) return;
@@ -1068,6 +1883,7 @@
       (status?.mods || []).forEach((mod) => MODS.push(mod));
       MOD_STATS = status?.stats || { total: 0, enabled: 0, disabled: 0, conflicts: 0, bytes: 0 };
       MOD_CONFLICTS = Array.isArray(status?.conflicts) ? status.conflicts : [];
+      if (typeof updateModBanner === "function") updateModBanner();
       renderMods();
     } catch (error) {
       console.error("modsList failed", error);
@@ -1224,7 +2040,8 @@
       set("sbPilots", Number.isFinite(onlinePlayers) && onlinePlayers >= 0 ? onlinePlayers.toLocaleString() : "—");
       void updateServerPing();
       updateAlerts();
-      set("sbSession", formatUptime(mainServerStartedAt ? (Date.now() - mainServerStartedAt) / 1000 : 0));
+      // 主服务没在跑时不显示 00:00:00，保持「--:--:--」这种未初始化样式
+      set("sbSession", mainServerStartedAt ? formatUptime((Date.now() - mainServerStartedAt) / 1000) : "--:--:--");
     } catch (error) {
       console.error("metricsGet failed", error);
     }
@@ -1462,6 +2279,7 @@
     }
   }
 
+  bindModTabs();
   setTimeout(() => checkUpdateNotice(true), 5000);
   setInterval(() => checkUpdateNotice(), UPDATE_NOTICE_INTERVAL_MS);
   window.addEventListener("focus", () => checkUpdateNotice());
@@ -1469,7 +2287,7 @@
   if (databaseNav) databaseNav.addEventListener("click", () => loadDatabaseOverview());
   if (document.getElementById("view-database")?.classList.contains("active")) loadDatabaseOverview();
   const modulesNav = document.querySelector('.nav-item[data-view="modules"]');
-  if (modulesNav) modulesNav.addEventListener("click", () => refreshModsStatus());
+  if (modulesNav) modulesNav.addEventListener("click", () => { bindModTabs(); refreshModsStatus(); });
   if (document.getElementById("view-modules")?.classList.contains("active")) refreshModsStatus();
 
   // 资源指标 / 在线人数：原来只在启动时拉取一次，这里改为定时刷新
@@ -1494,6 +2312,8 @@
     await loadConfigFromBackend();
     await tickMetrics();
     await refreshModsStatus();
+    await loadAuthorProfile();
+    void loadMarket(false, true);   // 后台静默拉一次索引，让页签上的「N 可更新」徽章不用进市场页就能显示
     api.initState().then((state) => { if (state?.busy) logTo("sys", "SYS", esc(state.message || state.label || "初始化任务运行中")); }).catch(() => {});
     logTo("sys", "OK", "EVEJS COMMAND 启动器已连接 Electron 后端");
   })();

@@ -1,0 +1,329 @@
+{
+  "version": "0.1.19",
+  "changelog": {
+    "zh": [
+      {
+        "type": "new",
+        "text": "实时日志新增级别筛选（全部 / INFO / WARN / ERROR）与「共 N 条 · 显示 M 条」统计条"
+      },
+      {
+        "type": "new",
+        "text": "系统日志中模组加载行显示彩色 MOD 徽章，跳过模组为琥珀色"
+      },
+      {
+        "type": "fix",
+        "text": "修复账号管理「All statuses」与模组管理「All types」下拉筛选切换语言后失效"
+      },
+      {
+        "type": "fix",
+        "text": "数据库管理「数据 / 结构」页签补齐多语言翻译"
+      },
+      {
+        "type": "fix",
+        "text": "环境自检 9 张卡片的标题与说明文案随语言切换"
+      },
+      {
+        "type": "fix",
+        "text": "实时日志正文随语言切换，新到的日志也会立即按当前语言显示，不再残留中文"
+      },
+      {
+        "type": "fix",
+        "text": "修复顶部语言选择器选中文后按钮仍显示 English（语言名不再被翻译逻辑还原成旧值），底部状态栏环境自检文案同步翻译"
+      },
+      {
+        "type": "new",
+        "text": "模组页新增「作者身份」：本机 Ed25519 密钥身份（作者标识 + 密钥指纹），可改署名、导出/导入 .eve-key 备份还原身份"
+      },
+      {
+        "type": "fix",
+        "text": "修复启动时首帧资源指标（CPU/内存/GPU/网络）拿不到的问题：tickMetrics 由 launcher-bridge.js 调度，内联脚本不再提前调用导致 ReferenceError"
+      },
+      {
+        "type": "new",
+        "text": "模组签名校验（Ed25519）：模组卡片显示「已签名 / 签名失败 / 未签名」三态，可用本机作者密钥一键签名；清单被改动后签名失效并禁止启用"
+      },
+      {
+        "type": "new",
+        "text": "模组页新增「创建模组」：以已跑通的 welcome-mod 骨架生成 evejs-launcher.mod.json + loader.js + README + CHANGELOG，带真实文件树预览，可选立即启用/立即签名（默认禁用）"
+      },
+      {
+        "type": "new",
+        "text": "模组页新增「提交模组」：一键重签 → 打包 ZIP(.NET) → 算 sha256 → 生成索引分片草稿，并可填写 GitHub 令牌用 API 自动 fork/建分支/开 PR（失败可降级为手动 PR 页面）"
+      },
+      {
+        "type": "new",
+        "text": "模组页新增「我创建的」：合并本地 / 索引 / 本机提交台账，显示 仅本地·待提交·已提交·已上架·已下架·本地比已上架新 六种状态，支持打开目录、提新版、打开 PR、导出 CSV"
+      },
+      {
+        "type": "new",
+        "text": "模组页新增「模组市场」：拉取签名索引（GitHub Pages + jsDelivr 双镜像 + 本地缓存 TTL 30 分钟），先验签再信任，按 EveJS 版本过滤不兼容条目"
+      },
+      {
+        "type": "new",
+        "text": "模组市场支持一键安装 / 更新：多镜像回退下载 + sha256 校验 + 进度条；已装模组走覆盖更新并保留启用状态、排序位置与用户设置"
+      },
+      {
+        "type": "new",
+        "text": "已安装页新增冲突横幅与加载顺序面板，一眼看出哪些模组冲突、实际按什么顺序加载"
+      },
+      {
+        "type": "opt",
+        "text": "模组页布局调整：创建模组 / 提交模组 / 作者身份 / 模组制作规范 四个按钮移到「模组市场」页签右侧；启动器底部「主服务启动维持时间」初始显示 --:--:--"
+      },
+      {
+        "type": "fix",
+        "text": "修复「我创建的」页签点下去像没反应：该页不再等待联网拉索引（改为只读本地缓存），并且页签与动作按钮改用脚本绑定，切换立即生效"
+      },
+      {
+        "type": "fix",
+        "text": "修复「我创建的」「模组市场」列表非空时不显示的问题：渲染函数用到了只存在于 bridge 内部的 esc()，导致每次渲染抛 ReferenceError、网格不更新（表现成点页签没反应）"
+      },
+      {
+        "type": "opt",
+        "text": "模组卡片字段统一：显示「简介」作为说明，类型标签 LOADER 改为「分类」，id/restart 行改为「标签 / MOD大小 / 本地版本」；分类改为下拉菜单（玩法·经济·AI·画面·工具），创建模组与提交模组表单同步"
+      },
+      {
+        "type": "new",
+        "text": "模组新增「详情」弹窗：作者·分类·版本、状态徽章、最新/本地版本·体积·重启要求·互斥模组·兼容版本·来源 八项统计、功能要点、模组说明（读 README.md）与本次更新，底部可直接打开目录 / 重新签名 / 安装更新"
+      },
+      {
+        "type": "fix",
+        "text": "签名归属保护下沉到主进程：清单里已声明别的作者标识、或 author.keyId 与本机密钥不一致时直接拒绝签名（渲染层的提示可以被绕过，这层必须在主进程）"
+      },
+      {
+        "type": "opt",
+        "text": "提交模组弹窗去掉「国内镜像直链（Gitee Releases）」，只保留 GitHub Releases 直链（留空则由「② 发布到我的仓库」自动生成），相关多语言词条一并清理"
+      },
+      {
+        "type": "fix",
+        "text": "修复底部「主服务启动维持时间」没保持 --:--:-- 初始化样式：指标每秒刷新时主服务未运行会写成 00:00:00，现在未运行就显示 --:--:--"
+      },
+      {
+        "type": "opt",
+        "text": "删除模组页的 // LOAD ORDER 面板（DOM、渲染函数与调用一并移除）"
+      },
+      {
+        "type": "opt",
+        "text": "搜索框右侧下拉从「全部类型（LOADER/SOURCE…）」改为「创建模组」的分类（玩法·经济·AI·画面·工具），已安装与模组市场两个列表都按分类过滤；没有分类的老模组显示「未分类」而不是 LOADER"
+      },
+      {
+        "type": "opt",
+        "text": "模组卡片精简：撤掉签名相关显示（已签名/未签名/未验证徽章与卡片上的「签名」按钮，改由详情弹窗承载）；名字下面那行改为 MOD 标签，分类徽章移到右上角原签名位置；删掉 ENABLED/DISABLED 文字，「详情」移到左下角"
+      },
+      {
+        "type": "opt",
+        "text": "模组卡片的「目录」改为「更新时间」（取模组目录内最新一次文件改动时间，如 2026-09-21 17:16）；详情弹窗的统计格也补上「更新时间」（现为 9 格）"
+      },
+      {
+        "type": "fix",
+        "text": "修复创建模组弹窗「构建选项」三个勾选框错位：它们原来嵌在 .modal-field 里，被 .modal-field input{width:100%} 撑成整行、标签被压成逐字换行；现改为独立的 .cm-opts 行并把复选框宽度交还给浏览器原生尺寸"
+      },
+      {
+        "type": "opt",
+        "text": "创建模组的模板预设英文化并标注为案例：Welcome Broadcast (Example) / Blank Skeleton，广播模板说明改为「加载模组后会在游戏本地聊天框看到一条『欢迎回来，飞行员』的信息」"
+      },
+      {
+        "type": "fix",
+        "text": "修复切语言后多个弹窗仍显示中文：① 说明段里的行内 code/b 标签把整句拆成多个文本节点（现改为单节点整句翻译）② 字典里首尾带空格的 key 永远查不到（启动时统一去空格）③ 补上「我的第一个模组」「聊天, 新手」「这一版改了什么」等占位符与五个分类词条；并新增「切英文后扫描三个弹窗」的冒烟探针防回归"
+      },
+      {
+        "type": "new",
+        "text": "新增索引仓库脚手架（EVEjs-mods：sources.json + 作者仓库清单 + keygen 生成 Ed25519 密钥 + CI 抓取合并签名产出 mod-index.json + GitHub Pages 发布），并落地「id 先到先得 / author.id↔公钥绑定 / 来源可见」三条归属规则，已完成本地跨端验证"
+      },
+      {
+        "type": "new",
+        "text": "启动器内置索引签名公钥（BUILTIN_PUBKEYS），可验证 diguo520.github.io/EVEjs-mods/mod-index.json 的签名"
+      },
+      {
+        "type": "new",
+        "text": "模组市场增加「上次检查时间 + 检查更新」按钮，用户可主动强制刷新索引（不再受 30 分钟缓存限制）"
+      },
+      {
+        "type": "new",
+        "text": "索引仓库多镜像抓取（raw → jsDelivr → github/raw）+ 本地清单覆盖 INDEX_LOCAL_LISTINGS；下载镜像改为 jsDelivr 优先（国内可达性），并支持无 secret 时的本机手动构建发布"
+      },
+      {
+        "type": "new",
+        "text": "「模组市场」页签增加「N 可更新」徽章，并在启动时后台静默拉一次索引，不用点进市场页就能看到有模组可更新"
+      },
+      {
+        "type": "fix",
+        "text": "修复两处语言问题：① 作者名按钮（如「指挥官」）会先显示中文再被翻译造成闪烁，改为直接用当前语言渲染；② 冲突横幅（都引用了服务端模块…）切换语言时不再即时刷新，已在切语言时重绘"
+      },
+      {
+        "type": "new",
+        "text": "模组市场顶部新增四张统计卡（市场收录 / 本地已装 / 可更新 / 累计下载，含精选数·合计体积·覆盖率·最热单品）；索引新增 downloads 字段，由 CI 读取作者仓库 GitHub Release 的下载计数，市场卡片上也会显示下载次数"
+      },
+      {
+        "type": "fix",
+        "text": "模组三页签（已安装 / 我创建的 / 模组市场）的统计卡改为「同一个位置随页签切换内容」，不再每个页签各加一块统计；模组市场每张卡片新增自己的下载次数行（下载次数 + 体积 + 更新时间 + 本地版本），索引构建同时统计 GitHub Release 资产与 jsDelivr CDN 命中，模组统计相关文案补齐 7 种语言翻译"
+      },
+      {
+        "type": "new",
+        "text": "模组审核链路：索引仓库新增 moderation.json + scripts/moderate.mjs（list / approve / reject / delist / restore / pr-text），维护者可拒绝收录或从市场下架某个模组并填写中英原因；被下架的模组不再出现在市场且禁止安装，作者可在「我创建的」看到红色「已下架 / 已拒绝收录」徽章与具体原因"
+      }
+    ],
+    "en": [
+      {
+        "type": "new",
+        "text": "Realtime log gains level filters (All / INFO / WARN / ERROR) and a total/shown counter bar"
+      },
+      {
+        "type": "new",
+        "text": "Mod load/skip lines in the system log now carry a colored MOD badge (amber when skipped)"
+      },
+      {
+        "type": "fix",
+        "text": "Fixed All statuses / All types dropdown filters becoming untranslatable after the first language switch"
+      },
+      {
+        "type": "fix",
+        "text": "Localized the Data / Structure tabs in the database manager"
+      },
+      {
+        "type": "fix",
+        "text": "Environment self-check cards now translate their titles and detail text with the UI language"
+      },
+      {
+        "type": "fix",
+        "text": "Realtime log body now follows the UI language, including newly arriving lines, with no leftover Chinese"
+      },
+      {
+        "type": "fix",
+        "text": "Fixed the top language switcher still showing English after selecting Chinese; the footer env self-check text now follows the language too"
+      },
+      {
+        "type": "new",
+        "text": "New Author Identity in the mods view: a local Ed25519 key identity (author ID + key fingerprint) with rename, and .eve-key export/import to restore it"
+      },
+      {
+        "type": "fix",
+        "text": "Fixed the first-frame resource metrics (CPU/RAM/GPU/network) failing on startup: tickMetrics is owned by launcher-bridge.js and is no longer called too early by the inline script"
+      },
+      {
+        "type": "new",
+        "text": "Mod signature verification (Ed25519): mod cards show Signed / Invalid / Unsigned, one-click signing with your local author key, and tampered manifests are blocked from being enabled"
+      },
+      {
+        "type": "new",
+        "text": "New Create Mod in the mods view: scaffolds evejs-launcher.mod.json + loader.js + README + CHANGELOG from the proven welcome-mod skeleton, with a file-tree preview and optional enable/sign (disabled by default)"
+      },
+      {
+        "type": "new",
+        "text": "New Submit Mod in the mods view: re-sign, pack the ZIP, hash it, and build the index shard draft, then open a fork/branch/PR automatically via the GitHub API (with a manual-PR fallback)"
+      },
+      {
+        "type": "new",
+        "text": "New My Mods view: merges local mods, the index and your submissions into six statuses (local / draft / submitted / listed / delisted / local-newer), with open folder, new version, open PR and CSV export"
+      },
+      {
+        "type": "new",
+        "text": "New Mod Market: fetches the signed index (GitHub Pages + jsDelivr, 30-minute cache), verifies the index signature before trusting it, and hides entries incompatible with your EveJS version"
+      },
+      {
+        "type": "new",
+        "text": "Market install/update: download with mirror fallback, sha256 verification and a progress bar; updates keep the enabled state, load order and user settings"
+      },
+      {
+        "type": "new",
+        "text": "Installed view gains a conflict banner and a load-order panel so conflicts and the effective load order are visible at a glance"
+      },
+      {
+        "type": "opt",
+        "text": "Mods layout: Create mod / Submit mod / Author identity / Mod authoring guide now sit to the right of the Mod Market tab; the status-bar uptime starts at --:--:--"
+      },
+      {
+        "type": "fix",
+        "text": "Fixed My Mods appearing unresponsive: it no longer waits on a network index fetch (cache-only) and the tabs/actions are bound programmatically so switching is instant"
+      },
+      {
+        "type": "fix",
+        "text": "Fixed My Mods / Mod Market showing nothing when the list is non-empty: the HTML render functions called esc(), which only existed inside the bridge, so every render threw a ReferenceError and the grid never updated"
+      },
+      {
+        "type": "opt",
+        "text": "Mod card fields unified: shows the Summary as description, LOADER is replaced by Category, and the id/restart row becomes Tags / Mod size / Local version; category is now a dropdown (Gameplay · Economy · AI · Graphics · Tools) in both the create and submit forms"
+      },
+      {
+        "type": "new",
+        "text": "New mod details dialog: author/category/version, status chips, eight stat cells (latest/local version, size, restart, conflicts, compatible versions, source), highlights, description (read from README.md) and changelog, with Open folder / Re-sign / Install-update actions"
+      },
+      {
+        "type": "fix",
+        "text": "Moved the signing ownership guard into the main process: signing is refused when the manifest already declares another author ID, or when author.keyId does not match the local key"
+      },
+      {
+        "type": "opt",
+        "text": "Removed the China-mirror (Gitee Releases) field from the submit dialog — only the GitHub Releases direct link remains (leave it empty and step 2 fills it in automatically); the unused translation strings were dropped too"
+      },
+      {
+        "type": "fix",
+        "text": "Fixed the status-bar main-server uptime not staying at --:--:-- until the server runs: the per-second metrics refresh used to overwrite it with 00:00:00"
+      },
+      {
+        "type": "opt",
+        "text": "Removed the // LOAD ORDER panel from the mods view (DOM, render function and its call site)"
+      },
+      {
+        "type": "opt",
+        "text": "The dropdown next to the search box now filters by the Create-Mod categories (Gameplay · Economy · AI · Graphics · Tools) instead of mod kinds, on both the Installed and Market lists; mods without a category show Uncategorized instead of LOADER"
+      },
+      {
+        "type": "opt",
+        "text": "Streamlined mod cards: removed the signature indicators (Signed/Unsigned/Unverified badges and the on-card Sign button — the details dialog carries them now), the line under the name now shows the mod tags, the category badge moved to the top-right where the signature used to sit, ENABLED/DISABLED text is gone, and Details moved to the bottom-left"
+      },
+      {
+        "type": "opt",
+        "text": "Replaced the card's Folder field with Updated (the newest file change time inside the mod folder, e.g. 2026-09-21 17:16); the details dialog grid gained the same Updated cell (now 9 cells)"
+      },
+      {
+        "type": "fix",
+        "text": "Fixed the misaligned Build-options checkboxes in the create-mod dialog: they sat inside .modal-field, so .modal-field input{width:100%} stretched each checkbox to full width and squeezed the labels into one character per line; they now use a dedicated .cm-opts row with native checkbox sizing"
+      },
+      {
+        "type": "opt",
+        "text": "Create-Mod presets renamed to English and marked as examples (Welcome Broadcast (Example) / Blank Skeleton); the broadcast template now reads \"after loading you will see a Welcome back, pilot message in the in-game local chat\""
+      },
+      {
+        "type": "fix",
+        "text": "Fixed Chinese left in several dialogs after switching language: inline code/b tags split sentences into fragments (now single-node sentences), dictionary keys with leading/trailing spaces never matched (normalized at startup), and added the missing placeholders plus the five category words; a new smoke probe scans all three dialogs after switching to English"
+      },
+      {
+        "type": "new",
+        "text": "Added the index-repo scaffold (EVEjs-mods: sources.json author list, keygen for the Ed25519 key, CI that fetches+merges+signs mod-index.json, GitHub Pages publishing) with the three ownership rules (first-come id, author.id↔key binding, visible source); verified end-to-end locally"
+      },
+      {
+        "type": "new",
+        "text": "The launcher now embeds the index signing public key (BUILTIN_PUBKEYS) so it can verify the signature of diguo520.github.io/EVEjs-mods/mod-index.json"
+      },
+      {
+        "type": "new",
+        "text": "Mod market gains a Last-checked time and a Check-for-updates button so users can force-refresh the index instead of waiting out the 30-minute cache"
+      },
+      {
+        "type": "new",
+        "text": "Index repo fetches author listings from multiple mirrors (raw → jsDelivr → github/raw) with an INDEX_LOCAL_LISTINGS offline override; download mirrors now prefer jsDelivr, and a secret-less manual build/publish path is supported"
+      },
+      {
+        "type": "new",
+        "text": "The Mod Market tab shows an \"N updatable\" badge, and the index is fetched in the background at startup so pending updates are visible without opening the market tab"
+      },
+      {
+        "type": "fix",
+        "text": "Fixed two language issues: the author-name button flashed the raw Chinese before being translated (now rendered directly in the current language), and the conflict banner did not refresh when switching language (now re-rendered on language change)"
+      },
+      {
+        "type": "new",
+        "text": "The Mod Market gains four stat cards (in market / installed / updatable / total downloads with featured count, total size, coverage and top item); the index now carries a downloads field aggregated from GitHub Release download counts by CI, and cards show the download count"
+      },
+      {
+        "type": "fix",
+        "text": "The three mod tabs (Installed / Mine / Market) now switch the content of one shared stats row instead of adding a separate stats block per tab; every market card gained its own download line (downloads + size + updated + local version), the index build now counts both GitHub Release assets and jsDelivr CDN hits, and the mod stats strings are translated into all 7 languages"
+      },
+      {
+        "type": "new",
+        "text": "Moderation pipeline: the index repo gained moderation.json plus scripts/moderate.mjs (list / approve / reject / delist / restore / pr-text) so the maintainer can reject a submission or delist a mod from the market with a bilingual reason; delisted mods disappear from the market and cannot be installed, while the author sees a red Delisted / Not accepted badge with the exact reason in My mods"
+      }
+    ]
+  }
+}

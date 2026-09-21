@@ -424,7 +424,302 @@ function createWindow(): void {
         } catch (e) {
           console.log("[SMOKE] database-state ERROR:", e);
         }
-        console.log("[SMOKE] quit");
+        // 模组页三页签探针：**用真实 DOM 点击**（走 inline onclick 那条路）确认页签真的会换列表。
+        try {
+          const modsState = await mainWindow?.webContents.executeJavaScript(`(async () => {
+            const beforeNav = { tab: typeof MOD_TAB === "string" ? MOD_TAB : "?", active: document.querySelector("#modTabs .mod-tab.active")?.dataset?.mtab ?? "", modalOpen: !!document.getElementById("updateModal")?.classList.contains("open") };
+            const item = document.querySelector('.nav-item[data-view="modules"]');
+            if (!item) return JSON.stringify({ opened: false, reason: "no nav item" });
+            item.click();
+            if (typeof closeModal === "function") closeModal("updateModal");
+            await new Promise((r) => setTimeout(r, 1200));
+            const flat = (txt) => String(txt || "").split("\\n").join(" ").split("\\r").join(" ").trim().slice(0, 46);
+            const snap = () => ({
+              tab: typeof MOD_TAB === "string" ? MOD_TAB : "?",
+              active: document.querySelector("#modTabs .mod-tab.active")?.dataset?.mtab ?? "",
+              mkCards: document.querySelectorAll("#modsGrid .mk-card").length,
+              modCards: document.querySelectorAll("#modsGrid .mod").length,
+              firstText: flat(document.getElementById("modsGrid")?.textContent)
+            });
+            const clickTab = async (name) => {
+              const el = document.querySelector('#modTabs .mod-tab[data-mtab="' + name + '"]');
+              if (!el) return "no tab element";
+              el.click();
+              await new Promise((r) => setTimeout(r, 900));
+              return "ok";
+            };
+            const out = {
+              beforeNav: beforeNav,
+              hasSwitch: typeof switchModTab === "function",
+              hasActions: document.querySelectorAll("#modTabActions .mini-btn").length,
+              installed: snap()
+            };
+            try {
+              const authorBtn = document.getElementById("modActAuthor");
+              if (authorBtn) { authorBtn.click(); await new Promise((r) => setTimeout(r, 700)); }
+              out.authorModalOpened = !!document.getElementById("authorModal")?.classList.contains("open");
+              if (typeof closeModal === "function") closeModal("authorModal");
+              const statText = () => (document.getElementById("modStats")?.textContent ?? "").split(String.fromCharCode(10)).join(" ").replace(/ +/g, " ").trim().slice(0, 70);
+              out.statsInstalled = statText();
+              out.clickMine = await clickTab("mine");
+              out.mine = snap();
+              out.statsMine = statText();
+              out.clickMarket = await clickTab("market");
+              out.market = snap();
+              out.statsMarket = statText();
+              out.clickInstalled = await clickTab("installed");
+              out.backToInstalled = snap();
+            } catch (e) {
+              out.error = String(e && e.message ? e.message : e);
+            }
+            // 维护者审核链路：真实索引里被 reject/delist 的模组，市场不该再出现，作者在「我创建的」要能看到原因
+            try {
+              if (typeof loadMarket === "function") await loadMarket(true, true);
+              if (typeof loadMyMods === "function") await loadMyMods();
+              await new Promise((r) => setTimeout(r, 400));
+              const mineItems = (MY_MODS || []).map((m) => ({
+                id: m.id,
+                status: m.status,
+                action: m.moderationAction || "",
+                reason: typeof modReasonText === "function" ? modReasonText(m.moderationReason) : ""
+              }));
+              MOD_TAB = "mine";
+              if (typeof updateModTabs === "function") updateModTabs();
+              if (typeof renderMyMods === "function") renderMyMods();
+              await new Promise((r) => setTimeout(r, 250));
+              const row = document.querySelector("#modsGrid .mk-reason");
+              out.moderation = {
+                marketIds: (MARKET || []).map((m) => m.id),
+                delistedIds: (typeof MARKET_DELISTED !== "undefined" ? MARKET_DELISTED : []).map((d) => d.id),
+                mine: mineItems,
+                reasonBlock: row ? (row.textContent || "").trim().slice(0, 120) : "",
+                reasonHasCjk: row ? /[\u4e00-\u9fff]/.test(row.textContent || "") : false
+              };
+            } catch (e) {
+              out.moderationError = String(e && e.message ? e.message : e).slice(0, 200);
+            }
+            // 用一条真实形状的数据直接测 renderMyMods（这是唯一没被覆盖到的渲染路径）
+            try {
+              MY_MODS = [{ id: "fake-mod", displayName: "假模组", version: "1.0.0", category: "玩法", status: "local", folder: "fake-mod", localVersion: "1.0.0", listedVersion: "", signed: true, sourceRepo: "", prUrl: "", sizeBytes: 100, updatedAt: 0 }];
+              MOD_TAB = "mine";
+              if (typeof renderMyMods === "function") renderMyMods();   // 直接渲染，避免被 loadMyMods 覆盖
+              await new Promise((r) => setTimeout(r, 200));
+              out.synthetic = snap();
+              out.syntheticHtml = (document.getElementById("modsGrid")?.innerHTML ?? "").slice(0, 200);
+              // 市场网格同样要能用真实形状的数据渲染（renderMarket 也用了 esc）
+              MARKET = [
+                { id: "fake-market", displayName: "市场假模组", version: "2.0.0", author: { id: "au-x", name: "某人" }, description: "描述", category: "经济", tags: ["标签"], requiresRestart: true, sizeBytes: 7340032, downloads: 12345, updatedAt: "2026-09-01T00:00:00.000Z", downloadUrls: [{ mirror: "github", url: "https://example.com/a.zip", priority: 1 }] },
+                { id: "fake-nodl", displayName: "没统计到下载", version: "1.0.0", author: { name: "某人" }, description: "描述", category: "工具", tags: ["标签"], downloadUrls: [{ mirror: "github", url: "https://example.com/b.zip", priority: 1 }] }
+              ];
+              MOD_TAB = "market";
+              if (typeof renderMarket === "function") renderMarket();
+              await new Promise((r) => setTimeout(r, 200));
+              out.syntheticMarket = snap();
+              out.syntheticMarketHtml = (document.getElementById("modsGrid")?.innerHTML ?? "").slice(0, 160);
+              // 每张市场卡片都要有自己的下载次数行；没有 downloads 字段时显示「待统计」
+              const marketCards = Array.from(document.querySelectorAll("#modsGrid .mk-card"));
+              const dlTexts = marketCards.map((c) => (c.querySelector(".mk-dl")?.textContent ?? "").trim());
+              out.marketDownloadRow = {
+                cards: marketCards.length,
+                dlSpans: document.querySelectorAll("#modsGrid .mk-dl").length,
+                dlTexts: dlTexts,
+                statsRegions: document.querySelectorAll("#view-modules .mod-stats").length
+              };
+              // 已安装卡片：字段应为 分类 / 标签 / MOD大小 / 本地版本，并有「详情」按钮
+              MODS.push({ folder: "fake-installed", id: "fake-installed", displayName: "已装假模组", version: "3.1.4", description: "这是简介字段", category: "经济", tags: ["经济", "工具"], kind: "loader", restart: "game_server", enabled: true, supported: true, valid: true, sizeBytes: 7340032, signatureState: "valid", signatureTrusted: true, signatureKeyId: "abc", authorId: "au-x", authorName: "某人", conflicts: [] });
+              MOD_TAB = "installed";
+              if (typeof renderInstalledMods === "function") renderInstalledMods();
+              await new Promise((r) => setTimeout(r, 200));
+              const cardHtml = document.getElementById("modsGrid")?.innerHTML ?? "";
+              out.card = {
+                hasDetailBtn: cardHtml.includes("data-detail-folder"),
+                showsCategory: cardHtml.includes("经济"),
+                hasLoaderWord: cardHtml.includes("LOADER"),
+                hasSize: cardHtml.includes("MOD"),
+                noRestartField: !cardHtml.includes("restart:")
+              };
+              out.cardText = (document.getElementById("modsGrid")?.textContent ?? "").split(String.fromCharCode(10)).join(" ").trim().slice(0, 120);
+              // 市场页签的「N 可更新」徽章（模拟 4 个可更新）
+              MOD_UPDATES = [{ id: "a" }, { id: "b" }, { id: "c" }, { id: "d" }];
+              if (typeof updateModTabs === "function") updateModTabs();
+              await new Promise((r) => setTimeout(r, 150));
+              // 作者按钮标签：切语言后应直接是当前语言（修掉「先中文再被翻译」的闪烁）
+              out.authorLabel = {
+                text: (document.getElementById("authorBtnLabel")?.textContent ?? "").trim(),
+                hasCjk: /[\u4e00-\u9fff]/.test(document.getElementById("authorBtnLabel")?.textContent ?? "")
+              };
+              out.tabBadge = {
+                text: (document.getElementById("mtMarketUp")?.textContent ?? "").trim(),
+                visible: (document.getElementById("mtMarketUp")?.style.display ?? "none") !== "none",
+                marketCount: (document.getElementById("mtMarket")?.textContent ?? "").trim()
+              };
+              MOD_UPDATES = [];
+              if (typeof updateModTabs === "function") updateModTabs();
+              // 详情弹窗：打开并检查内容
+              if (typeof openInstalledModDetail === "function") await openInstalledModDetail("fake-installed");
+              await new Promise((r) => setTimeout(r, 300));
+              out.detail = {
+                open: !!document.getElementById("modDetailModal")?.classList.contains("open"),
+                title: document.getElementById("mdTitle")?.textContent ?? "",
+                hasHighlightSection: (document.getElementById("mdBody")?.textContent ?? "").includes("功能"),
+                cells: document.querySelectorAll("#mdBody .md-cell").length,
+                text: (document.getElementById("mdBody")?.textContent ?? "").split(String.fromCharCode(10)).join(" ").trim().slice(0, 140)
+              };
+              if (typeof closeModal === "function") closeModal("modDetailModal");
+              // 收尾停在市场页签：主进程紧接着截图，用来肉眼核对卡片布局
+              MOD_TAB = "market";
+              if (typeof updateModTabs === "function") updateModTabs();
+              if (typeof renderMarket === "function") renderMarket();
+              await new Promise((r) => setTimeout(r, 250));
+              // 滚到卡片区，让截图能看到卡片底部的下载次数行
+              document.getElementById("modsGrid")?.scrollIntoView({ block: "start" });
+              document.querySelector("#view-modules .view-scroll, #view-modules")?.scrollBy?.(0, 700);
+              await new Promise((r) => setTimeout(r, 250));
+            } catch (e) {
+              out.syntheticError = String(e && e.stack ? e.stack : e).slice(0, 300);
+            }
+            return JSON.stringify(out);
+          })()`);
+        // 构建选项行布局探针：复选框不应被撑宽、标签不应被压成逐字换行
+        try {
+          const layoutState = await mainWindow?.webContents.executeJavaScript(`(async () => {
+            if (typeof openCreateModDialog === "function") await openCreateModDialog();
+            await new Promise((r) => setTimeout(r, 400));
+            const row = document.querySelector("#createModModal .cm-opts");
+            if (!row) return JSON.stringify({ found: false });
+            const labels = [...row.querySelectorAll("label")].map((el) => ({
+              w: el.offsetWidth,
+              h: el.offsetHeight,
+              text: (el.textContent || "").trim()
+            }));
+            const boxes = [...row.querySelectorAll('input[type="checkbox"]')].map((el) => ({ w: el.offsetWidth, h: el.offsetHeight }));
+            const out = {
+              found: true,
+              rowW: row.offsetWidth,
+              rowH: row.offsetHeight,
+              labels: labels,
+              boxes: boxes,
+              oneLine: labels.every((l) => l.h <= 30),
+              boxNotStretched: boxes.every((b) => b.w <= 30)
+            };
+            if (typeof closeModal === "function") closeModal("createModModal");
+            return JSON.stringify(out);
+          })()`);
+          console.log("[SMOKE] build-options-layout:", layoutState);
+        } catch (e) {
+          console.log("[SMOKE] build-options-layout ERROR:", e);
+        }        // 语言残留探针：切英文后，模组相关弹窗里不该再出现中文（这些是用户实际截图反馈过的位置）
+        try {
+          const i18nState = await mainWindow?.webContents.executeJavaScript(`(async () => {
+            const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+            const cjk = /[\\u4e00-\\u9fff]/;
+            const clean = (s) => String(s || "").split(" ").join(" ").trim().slice(0, 40);
+            if (typeof setLang === "function") setLang("en");
+            await wait(500);
+            const out = { lang: typeof curLang === "string" ? curLang : "?", leftovers: [], spots: {} };
+            const scanModal = (id, label) => {
+              const modal = document.getElementById(id);
+              if (!modal) { out.spots[label] = "no modal"; return; }
+              const bad = [];
+              modal.querySelectorAll("span,label,b,code,pre,li,h4,p,div").forEach((el) => {
+                if (el.children.length) return;
+                const txt = (el.textContent || "").trim();
+                if (txt && cjk.test(txt)) bad.push(clean(txt));
+              });
+              modal.querySelectorAll("input,textarea").forEach((el) => {
+                const ph = el.getAttribute("placeholder") || "";
+                if (ph && cjk.test(ph)) bad.push("placeholder:" + clean(ph));
+              });
+              modal.querySelectorAll("option").forEach((el) => {
+                const txt = (el.textContent || "").trim();
+                if (txt && cjk.test(txt) && txt.length <= 6) bad.push("option:" + clean(txt));
+              });
+              out.spots[label] = bad;
+              bad.forEach((x) => out.leftovers.push(label + " → " + x));
+            };
+            try {
+              if (typeof openCreateModDialog === "function") { await openCreateModDialog(); await wait(400); scanModal("createModModal", "创建模组"); closeModal("createModModal"); }
+              if (typeof openSubmitModDialog === "function") { await openSubmitModDialog(); await wait(400); scanModal("submitModModal", "提交模组"); closeModal("submitModModal"); }
+              if (typeof openAuthorDialog === "function") { await openAuthorDialog(); await wait(400); scanModal("authorModal", "作者身份"); closeModal("authorModal"); }
+            } catch (e) {
+              out.error = String(e && e.message ? e.message : e);
+            }
+            return JSON.stringify(out);
+          })()`);
+          console.log("[SMOKE] i18n-leftovers:", i18nState);
+        // 冲突横幅本地化探针：切英文后横幅文案里不该有中文（词条 + {1} 参数替换）
+        try {
+          const conflictState = await mainWindow?.webContents.executeJavaScript(`(async () => {
+            const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+            const cjk = /[\\u4e00-\\u9fff]/;
+            const out = {};
+            const sample = { kind: "shared-module", folders: ["a", "b"], detail: "都引用了服务端模块 chatHub.js（可能互相影响）", i18nKey: "conflict.sharedModule", i18nArgs: ["chatHub.js"], active: true };
+            if (typeof setLang === "function") setLang("en");
+            await wait(400);
+            out.text = typeof conflictText === "function" ? conflictText(sample) : "(no conflictText)";
+            out.hasCjk = cjk.test(out.text);
+            out.noPlaceholder = !/\\{\\d\\}/.test(out.text);
+            // 再真的渲染一次横幅
+            if (typeof MOD_CONFLICTS !== "undefined") {
+              const backup = MOD_CONFLICTS.slice();
+              MOD_CONFLICTS.length = 0;
+              MOD_CONFLICTS.push(sample);
+              if (typeof updateModBanner === "function") updateModBanner();
+              await wait(200);
+              out.banner = (document.getElementById("modBanner")?.textContent ?? "").split(String.fromCharCode(10)).join(" ").trim().slice(0, 90);
+              out.bannerHasCjk = cjk.test(out.banner);
+              MOD_CONFLICTS.length = 0; backup.forEach((x) => MOD_CONFLICTS.push(x));
+              if (typeof updateModBanner === "function") updateModBanner();
+            }
+            if (typeof setLang === "function") setLang("zh");
+            return JSON.stringify(out);
+          })()`);
+          console.log("[SMOKE] conflict-i18n:", conflictState);
+        } catch (e) {
+          console.log("[SMOKE] conflict-i18n ERROR:", e);
+        }
+        } catch (e) {
+          console.log("[SMOKE] i18n-leftovers ERROR:", e);
+        }
+        try {
+          const modsImage = await mainWindow?.webContents.capturePage();
+          if (modsImage) {
+            const modsShotDir = path.resolve(__dirname, "../../../docs");
+            fs.mkdirSync(modsShotDir, { recursive: true });
+            const modsShot = path.join(modsShotDir, "ui-mods-market.png");
+            fs.writeFileSync(modsShot, modsImage.toPNG());
+            console.log("[SMOKE] mods screenshot saved:", modsShot);
+          }
+        } catch (e) {
+          console.log("[SMOKE] mods screenshot ERROR:", e);
+        }
+        // 审核效果截图：用真实索引数据渲染「我创建的」，把维护者给的下架/拒绝原因拍下来
+        try {
+          await mainWindow?.webContents.executeJavaScript(`(async () => {
+            if (typeof loadMyMods === "function") await loadMyMods();
+            await new Promise((r) => setTimeout(r, 400));
+            MOD_TAB = "mine";
+            if (typeof updateModTabs === "function") updateModTabs();
+            if (typeof renderMyMods === "function") renderMyMods();
+            document.querySelector("#view-modules .acc-toolbar")?.scrollIntoView({ block: "start" });
+            await new Promise((r) => setTimeout(r, 250));
+            return "ok";
+          })()`);
+          const moderationImage = await mainWindow?.webContents.capturePage();
+          if (moderationImage) {
+            const modShotDir = path.resolve(__dirname, "../../../docs");
+            fs.mkdirSync(modShotDir, { recursive: true });
+            const modShot = path.join(modShotDir, "ui-moderation.png");
+            fs.writeFileSync(modShot, moderationImage.toPNG());
+            console.log("[SMOKE] moderation screenshot saved:", modShot);
+          }
+        } catch (e) {
+          console.log("[SMOKE] moderation screenshot ERROR:", e);
+        }
+        console.log("[SMOKE] mods-state:", modsState);
+        } catch (e) {
+          console.log("[SMOKE] mods-state ERROR:", e);
+        }        console.log("[SMOKE] quit");
         app.exit(0);
       }, 2800);
     });

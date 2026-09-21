@@ -25,7 +25,24 @@ import {
 import { listAccounts, createAccount, deleteAccount, checkServerRunning, verifyAccount, changeAccountPassword, launchClientWithLogin, launchStoredAccount } from "./accountManager";
 import * as pty from "./ptyManager";
 import { repairClientDisplay } from "./processManager";
-import { scanMods, setModEnabled, createModsFolder, planLoaders, modsRoot, ensureModAuthoringDoc, importModZip, setModOrder } from "./modManager";
+import { scanMods, setModEnabled, createModsFolder, planLoaders, modsRoot, ensureModAuthoringDoc, importModZip, setModOrder, signModFolder, readModReadme } from "./modManager";
+import { getAuthor, setAuthorName, exportAuthorKey, importAuthorKey, authorDataDir } from "./authorStore";
+import { createMod, SCAFFOLD_TEMPLATES, type CreateModDraft } from "./modScaffold";
+import { fetchModIndex, installEntry, findUpdates, satisfiesEvejs, indexUrls as indexUrlsForUi, type MarketEntry } from "./modRegistry";
+import {
+  prepareSubmission,
+  submitToGitHub,
+  listSubmissions,
+  tokenState,
+  setToken,
+  removeToken,
+  checkToken,
+  indexRepo,
+  publishOwnRepo,
+  registerSource,
+  listMyMods,
+  type PrepareInput
+} from "./modSubmit";
 import { log } from "./logger";
 import { applyUpdate, cancelUpdateDownload, checkForUpdates, currentUpdateState, downloadUpdate } from "./updater";
 import { databaseOverview, databaseTable, databaseSaveRow, databaseInsertRow, databaseDeleteRow, databaseCreateBackup, databaseBackups, databaseRestoreBackup } from "./databaseManager";
@@ -486,6 +503,108 @@ export function registerIpc(): void {
     return importModZip(resolveRepoRoot(), picked.filePaths[0]);
   });
   ipcMain.handle("mods:setOrder", (_e, folders: string[]) => setModOrder(Array.isArray(folders) ? folders : []));
+  /* ---------- 提交模组（签名 → 打包 → 索引分片 → GitHub PR，见 docs/…plan.md §5.4） ---------- */
+  ipcMain.handle("mods:submitPrepare", (_e, input: PrepareInput) => prepareSubmission(resolveRepoRoot(), input ?? ({} as PrepareInput)));
+  ipcMain.handle("mods:submitGithub", (_e, id: string, version: string) => submitToGitHub(String(id ?? ""), String(version ?? "")));
+  ipcMain.handle("mods:publishOwnRepo", (_e, id: string, version: string, repo: string, giteeUrl?: string) =>
+    publishOwnRepo(String(id ?? ""), String(version ?? ""), String(repo ?? ""), typeof giteeUrl === "string" ? giteeUrl : "")
+  );
+  ipcMain.handle("mods:registerSource", (_e, id: string, version: string) => registerSource(String(id ?? ""), String(version ?? "")));
+  ipcMain.handle("mods:mySubmissions", () => ({ ...listSubmissions(), indexRepo: indexRepo() }));
+  ipcMain.handle("mods:myMods", () => listMyMods(resolveRepoRoot()));
+
+  /* ---------- 模组市场（签名索引 + 作者自托管 ZIP，见 docs/…plan.md §7） ---------- */
+  ipcMain.handle("mods:marketList", async (_e, force?: boolean) => {
+    const repoRoot = resolveRepoRoot();
+    const market = await fetchModIndex(!!force);
+    const evejsVersion = readEvejsVersion(repoRoot);
+    const entries = market.ok && market.index && Array.isArray(market.index.mods) ? market.index.mods : [];
+    // 被维护者下架的条目不再出现在市场（作者在「我创建的」里能看到下架原因）
+    const listed = entries.filter((entry) => !entry || entry.delisted !== true);
+    const delisted = entries.filter((entry) => entry && entry.delisted === true).map((entry) => ({
+      id: entry.id,
+      displayName: entry.displayName || entry.id,
+      reason: entry.delistReason || null,
+      by: entry.moderatedBy || "",
+      at: entry.moderatedAt || ""
+    }));
+    const compatible = listed.filter((entry) => satisfiesEvejs(entry, evejsVersion));
+    const blocked = listed
+      .filter((entry) => !satisfiesEvejs(entry, evejsVersion))
+      .map((entry) => ({ id: entry.id, evejsVersions: entry.evejsVersions || [] }));
+    const updates = market.ok && market.index ? findUpdates(scanMods(repoRoot).mods, market.index) : [];
+    return {
+      ...market,
+      mods: compatible,
+      blocked,
+      delisted,
+      moderation: market.ok && market.index ? market.index.moderation || {} : {},
+      updates,
+      evejsVersion,
+      indexUrls: indexUrlsForUi()
+    };
+  });
+  ipcMain.handle("mods:readme", (_e, folder: string) => readModReadme(resolveRepoRoot(), String(folder ?? "")));
+  ipcMain.handle("mods:openModFolder", async (_e, folder: string) => {
+    const safe = String(folder ?? "").trim();
+    if (!safe || /[\\/]/.test(safe)) return { ok: false, reason: "目录名非法" };
+    const dir = path.join(modsRoot(resolveRepoRoot()), safe);
+    if (!fs.existsSync(dir)) return { ok: false, reason: "目录不存在：" + dir };
+    shell.showItemInFolder(dir);
+    return { ok: true, dir };
+  });
+  ipcMain.handle("mods:marketInstall", async (_e, entry: MarketEntry, _mode?: string) => {
+    if (entry && entry.delisted === true) {
+      return { ok: false, reason: "该模组已被维护者下架，不能安装或更新" };
+    }
+    const win = BrowserWindow.getAllWindows()[0];
+    return installEntry(resolveRepoRoot(), entry ?? ({} as MarketEntry), (p) => {
+      try {
+        win?.webContents.send("mod:downloadProgress", p);
+      } catch {
+        /* 窗口关了就忽略 */
+      }
+    });
+  });
+  ipcMain.handle("mods:saveText", async (_e, defaultName: string, content: string) => {
+    const win = BrowserWindow.getAllWindows()[0];
+    const options = { defaultPath: String(defaultName || "export.txt"), filters: [{ name: "Text", extensions: ["txt", "csv", "json"] }] };
+    const picked = win ? await dialog.showSaveDialog(win, options) : await dialog.showSaveDialog(options);
+    if (picked.canceled || !picked.filePath) return { ok: false, canceled: true };
+    try {
+      fs.writeFileSync(picked.filePath, String(content ?? ""), "utf8");
+      return { ok: true, path: picked.filePath };
+    } catch (err) {
+      return { ok: false, reason: err instanceof Error ? err.message : String(err) };
+    }
+  });
+  ipcMain.handle("mods:githubTokenStatus", () => tokenState());
+  ipcMain.handle("mods:githubTokenSave", (_e, token: string) => setToken(String(token ?? "")));
+  ipcMain.handle("mods:githubTokenClear", () => removeToken());
+  ipcMain.handle("mods:githubTokenCheck", (_e, token?: string) => checkToken(typeof token === "string" ? token : undefined));
+  ipcMain.handle("mods:revealSubmissionZip", async (_e, zipPath: string) => {
+    const file = String(zipPath ?? "");
+    if (!file || !fs.existsSync(file)) return { ok: false, reason: "ZIP 不存在（可能已被清理，请重新生成）" };
+    shell.showItemInFolder(file);
+    return { ok: true, path: file };
+  });
+
+  ipcMain.handle("mods:templates", () => ({ ok: true, templates: SCAFFOLD_TEMPLATES }));
+  ipcMain.handle("mods:create", (_e, draft: CreateModDraft) => {
+    try {
+      const repoRoot = resolveRepoRoot();
+      return createMod(repoRoot, draft ?? ({} as CreateModDraft), readEvejsVersion(repoRoot));
+    } catch (err) {
+      return { ok: false, reason: err instanceof Error ? err.message : String(err) };
+    }
+  });
+  ipcMain.handle("mods:sign", (_e, folder: string) => {
+    try {
+      return signModFolder(resolveRepoRoot(), String(folder ?? ""));
+    } catch (err) {
+      return { ok: false, reason: err instanceof Error ? err.message : String(err) };
+    }
+  });
   ipcMain.handle("mods:authoringDoc", () => ensureModAuthoringDoc());
   ipcMain.handle("mods:openAuthoringDoc", async () => {
     const doc = ensureModAuthoringDoc();
@@ -510,6 +629,36 @@ export function registerIpc(): void {
     const error = await shell.openPath(root);
     return error ? { ok: false, reason: error, root } : { ok: true, root };
   });
+
+  /* ---------- 作者身份（Ed25519 密钥身份，见 docs/mod-signing-and-marketplace-plan.md §3） ---------- */
+  ipcMain.handle("author:get", () => getAuthor());
+  ipcMain.handle("author:setName", (_e, name: string) => setAuthorName(String(name ?? "")));
+  ipcMain.handle("author:exportKey", async () => {
+    const win = BrowserWindow.getAllWindows()[0];
+    const options = {
+      title: "Export author key",
+      defaultPath: "author-" + Date.now() + ".eve-key",
+      filters: [{ name: "EveJS author key", extensions: ["eve-key"] }, { name: "All files", extensions: ["*"] }]
+    };
+    const picked = win ? await dialog.showSaveDialog(win, options) : await dialog.showSaveDialog(options);
+    if (picked.canceled || !picked.filePath) return { ok: false, canceled: true };
+    return exportAuthorKey(picked.filePath);
+  });
+  ipcMain.handle("author:importKey", async () => {
+    const win = BrowserWindow.getAllWindows()[0];
+    const filters = [{ name: "EveJS author key", extensions: ["eve-key", "pem", "key"] }, { name: "All files", extensions: ["*"] }];
+    const picked = win
+      ? await dialog.showOpenDialog(win, { title: "Import author key", filters, properties: ["openFile"] })
+      : await dialog.showOpenDialog({ title: "Import author key", filters, properties: ["openFile"] });
+    if (picked.canceled || picked.filePaths.length === 0) return { ok: false, canceled: true };
+    return importAuthorKey(picked.filePaths[0]);
+  });
+  ipcMain.handle("author:openKeyFolder", async () => {
+    const dir = authorDataDir();
+    const error = await shell.openPath(dir);
+    return error ? { ok: false, reason: error, dir } : { ok: true, dir };
+  });
+
   ipcMain.handle("settings:get", () => readSettings());
   ipcMain.handle("settings:set", (_e, patch: Record<string, unknown>) => writeSettings(patch));
 

@@ -160,6 +160,90 @@
   .mini-btn svg{width:13px;height:13px}
   .mini-btn:hover{background:rgba(0,212,255,0.18);border-color:var(--cyan)}
   .mini-btn.start{color:var(--green);border-color:rgba(46,230,166,0.3);background:rgba(46,230,166,0.06)}
+  /* ===== AUTHOR IDENTITY ===== */
+  /* ===== MOD DETAIL DIALOG ===== */
+  .md-sub{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--txt-mute);margin-bottom:10px}
+  .md-chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
+  .md-chip{font-family:'Share Tech Mono',monospace;font-size:9px;padding:2px 7px;border:1px solid var(--line);color:var(--txt-soft)}
+  .md-chip.on{color:var(--green);border-color:rgba(46,230,166,0.4);background:rgba(46,230,166,0.06)}
+  .md-chip.warn{color:var(--amber);border-color:rgba(255,157,4,0.4)}
+  .md-chip.bad{color:var(--red);border-color:rgba(255,86,86,0.4)}
+  .md-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+  .md-cell{border:1px solid var(--line);padding:8px 10px;background:rgba(5,8,13,0.4);min-width:0}
+  .md-cell .k{font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:.14em;color:var(--txt-mute)}
+  .md-cell .v{margin-top:3px;font-size:12px;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .md-sec{margin-top:16px}
+  .md-sec h4{margin:0 0 8px;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:.16em;color:var(--txt-mute)}
+  .md-list{margin:0;padding:0;list-style:none;font-size:11.5px;line-height:1.95;color:var(--txt-soft)}
+  .md-list li:before{content:"✓ ";color:var(--green)}
+  .md-body{font-size:11.5px;line-height:1.9;color:var(--txt-soft);white-space:pre-wrap;word-break:break-word}
+  .md-note{font-size:10.5px;color:var(--txt-mute);line-height:1.8}
+  /* ===== 构建选项（复选框行）===== */
+  .cm-opts{display:flex;flex-wrap:wrap;gap:10px 24px;margin:0 0 14px;font-family:'Cascadia Mono','Consolas','Microsoft YaHei UI','PingFang SC','Noto Sans CJK SC',monospace}
+  .cm-opts label{display:flex;align-items:center;gap:7px;flex:0 0 auto;margin:0;cursor:pointer;font-size:12px;letter-spacing:0;color:var(--txt-soft);white-space:nowrap}
+  .cm-opts label:hover{color:var(--txt)}
+  .cm-opts input[type="checkbox"]{width:auto;height:auto;flex:0 0 auto;margin:0;accent-color:#00d4ff;cursor:pointer}
+
+  /* ===== MOD CARD: CATEGORY BADGE / TAGS LINE ===== */
+  .mod-cat{flex:0 0 auto;align-self:flex-start;font-family:'Cascadia Mono','Consolas',monospace;font-size:10px;letter-spacing:.06em;padding:2px 8px;border:1px solid rgba(0,212,255,0.4);color:var(--cyan);background:rgba(0,212,255,0.08)}
+  .mod-tags-inline{font-family:'Cascadia Mono','Consolas',monospace;font-size:10px;color:var(--txt-mute);letter-spacing:.04em;margin-top:2px}
+
+  /* ===== MOD SIGNATURE BADGE ===== */
+  .mod-sig{flex:0 0 auto;font-family:'Cascadia Mono','Consolas',monospace;font-size:9px;letter-spacing:.12em;padding:2px 6px;border:1px solid var(--line);align-self:flex-start}
+  .mod-sig.signed{color:var(--green);border-color:rgba(46,230,166,0.35);background:rgba(46,230,166,0.07)}
+  .mod-sig.invalid{color:var(--red);border-color:rgba(255,86,86,0.4);background:rgba(255,86,86,0.08)}
+  .mod-sig.unknown{color:var(--amber);border-color:rgba(255,157,4,0.4);background:rgba(255,157,4,0.07)}
+  .mod-sig.unsigned{color:var(--txt-mute);border-color:var(--line);background:rgba(255,255,255,0.02)}
+  .mod-act-btn{background:transparent;border:1px solid var(--line);color:var(--cyan);font-family:'Cascadia Mono','Consolas',monospace;font-size:10px;padding:5px 12px;cursor:pointer;transition:.18s}
+  .mod-act-btn:hover{background:rgba(0,212,255,0.14);border-color:var(--cyan)}
+  /* ===== MOD SUB-TABS / BANNER / ORDER PANEL / MARKET ===== */
+  .mod-tabs{display:flex;gap:6px;margin-bottom:12px}
+  .mod-tab{padding:7px 14px;border:1px solid var(--line);color:var(--txt-mute);font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:.08em;cursor:pointer;transition:.18s;clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px)}
+  .mod-tab:hover{color:var(--cyan);border-color:rgba(0,212,255,0.35)}
+  .mod-tab.active{color:var(--cyan);background:rgba(0,212,255,0.1);border-color:var(--cyan)}
+  .mod-tab .n{color:var(--txt-soft);font-size:10px}
+  .mod-tab .up{margin-left:6px;padding:1px 6px;font-size:10px;color:var(--amber);background:rgba(255,157,4,0.16);border:1px solid rgba(255,157,4,0.35)}
+  .mod-banner{margin-bottom:12px;padding:10px 12px;background:rgba(255,157,4,0.07);border-left:3px solid var(--amber);font-size:11px;line-height:1.7;color:var(--txt-soft)}
+  .mod-banner.err{background:rgba(255,86,86,0.08);border-left-color:var(--red)}
+  .mod-order{margin-top:14px;padding:12px;border:1px solid var(--line);background:rgba(5,8,13,0.4)}
+  .mod-order h4{margin:0 0 8px;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:.16em;color:var(--txt-mute)}
+  .mod-order ol{margin:0;padding-left:20px;font-size:11px;color:var(--txt-soft);line-height:1.9}
+  .mk-stats{grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:4px}
+  .mk-stat{background:rgba(18,26,40,0.6);border:1px solid var(--line);padding:12px 14px;clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,12px 100%,0 calc(100% - 12px))}
+  .mk-stat .k{font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:.14em;color:var(--txt-mute);display:flex;align-items:center;gap:6px}
+  .mk-stat .v{font-family:'Orbitron','Segoe UI Semibold','Segoe UI',sans-serif;font-weight:700;font-size:22px;color:#fff;margin:4px 0 2px}
+  .mk-stat .s{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--txt-soft)}
+  .mk-stat.hot .v{color:var(--amber)}
+  .mk-dl{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--cyan)}
+  .mk-meta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--txt-mute)}
+  .mk-meta .mk-dl{color:var(--cyan)}
+  .mk-bar{display:flex;align-items:center;gap:8px;font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--txt-mute);padding:0 2px 4px}
+  .mk-card{border:1px solid var(--line);background:rgba(5,8,13,0.4);padding:12px;display:flex;flex-direction:column;gap:8px}
+  .mk-head{display:flex;align-items:flex-start;gap:8px}
+  .mk-name{flex:1;font-size:13px;color:var(--txt)}
+  .mk-sub{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--txt-mute)}
+  .mk-desc{font-size:11px;line-height:1.7;color:var(--txt-soft);min-height:32px}
+  .mk-tags{display:flex;flex-wrap:wrap;gap:6px}
+  .mk-tag{font-family:'Share Tech Mono',monospace;font-size:9px;padding:2px 6px;border:1px solid var(--line);color:var(--txt-mute)}
+  .mk-foot{display:flex;align-items:center;gap:8px;margin-top:auto}
+  .mk-btn{flex:1;padding:7px;border:1px solid var(--line);background:rgba(0,212,255,0.08);color:var(--cyan);font-family:'Share Tech Mono',monospace;font-size:10px;cursor:pointer;transition:.18s}
+  .mk-btn:hover{background:rgba(0,212,255,0.16)}
+  .mk-btn:disabled{opacity:.5;cursor:default}
+  .mk-prog{height:4px;background:rgba(255,255,255,0.08);overflow:hidden}
+  .mk-prog i{display:block;height:100%;background:var(--cyan)}
+  .mk-badge{font-family:'Share Tech Mono',monospace;font-size:9px;padding:2px 6px;border:1px solid var(--line)}
+  .mk-badge.up{color:var(--amber);border-color:rgba(255,157,4,0.4)}
+  .mk-badge.new{color:var(--green);border-color:rgba(46,230,166,0.4)}
+  .mk-badge.bad{color:var(--red);border-color:rgba(255,86,86,0.45)}
+  .mk-reason{margin-top:2px;padding:8px 10px;background:rgba(255,86,86,0.08);border-left:3px solid var(--red);font-size:11px;line-height:1.65;color:var(--txt-soft)}
+  .mk-reason b{color:var(--red);font-weight:600}
+  .author-kv{display:flex;align-items:center;gap:10px}
+  .author-kv code{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:rgba(5,8,13,0.6);border:1px solid var(--line);padding:9px 11px;font-family:'Cascadia Mono','Consolas','SFMono-Regular','Microsoft YaHei UI','PingFang SC','Noto Sans CJK SC',monospace;font-size:12px;color:var(--cyan)}
+  .author-kv .mini-btn{flex:0 0 auto;padding:8px 14px;font-size:10px}
+  .author-state{flex:0 0 auto;font-family:'Cascadia Mono','Consolas',monospace;font-size:10px;letter-spacing:.14em;padding:4px 8px;border:1px solid var(--line)}
+  .author-state.ok{color:var(--green);border-color:rgba(46,230,166,0.35);background:rgba(46,230,166,0.06)}
+  .author-state.bad{color:var(--red);border-color:rgba(255,86,86,0.35);background:rgba(255,86,86,0.06)}
+  .author-warn{margin-top:4px;padding:10px 12px;background:rgba(255,86,86,0.07);border-left:3px solid var(--red);font-family:'Cascadia Mono','Consolas','Microsoft YaHei UI',monospace;font-size:10.5px;line-height:1.6;color:var(--txt-soft)}
   .mini-btn.start:hover{background:rgba(46,230,166,0.16);box-shadow:0 0 14px rgba(46,230,166,0.2)}
   .mini-btn.stop{color:var(--red);border-color:rgba(255,59,84,0.3)}
   .mini-btn.stop:hover{background:rgba(255,59,84,0.12)}
@@ -202,7 +286,20 @@
   .tab.active .cnt{color:var(--cyan)}
 
   /* ===== CONSOLE ===== */
-  .console{background:rgba(5,8,13,0.85);border:1px solid var(--line);font-family:'Cascadia Mono','Consolas','SFMono-Regular','Microsoft YaHei UI','PingFang SC','Noto Sans CJK SC',monospace;font-size:12px;line-height:1.7;height:100%;overflow-y:auto;padding:12px 14px;clip-path:polygon(0 0,calc(100% - 14px) 0,100% 14px,100% 100%,14px 100%,0 calc(100% - 14px))}
+  .log-bar{display:flex;align-items:center;gap:10px;padding:7px 12px;border-top:1px solid var(--line);background:rgba(5,8,13,0.55);font-family:inherit;font-size:11px;color:var(--txt-dim)}
+.log-bar .spacer{flex:1}
+.log-filters{display:flex;align-items:center;gap:6px}
+.log-filter{background:transparent;border:1px solid transparent;color:var(--txt-dim);font-family:inherit;font-size:11px;padding:2px 8px;cursor:pointer;letter-spacing:.06em}
+.log-filter:hover{color:var(--txt);border-color:var(--line)}
+.log-filter.active{border-color:currentColor;background:rgba(0,212,255,0.08)}
+.log-filter.info{color:var(--cyan)}
+.log-filter.warn{color:var(--amber)}
+.log-filter.err{color:var(--red)}
+.log-filter b{font-weight:600;margin-left:4px}
+.mod-name-inline{color:var(--cyan)}
+.mod-tag{display:inline-block;margin-left:6px;padding:0 5px;border:1px solid currentColor;color:var(--cyan);font-size:10px;letter-spacing:.08em;vertical-align:middle}
+.mod-tag.skip{color:var(--amber)}
+.console{background:rgba(5,8,13,0.85);border:1px solid var(--line);font-family:'Cascadia Mono','Consolas','SFMono-Regular','Microsoft YaHei UI','PingFang SC','Noto Sans CJK SC',monospace;font-size:12px;line-height:1.7;height:100%;overflow-y:auto;padding:12px 14px;clip-path:polygon(0 0,calc(100% - 14px) 0,100% 14px,100% 100%,14px 100%,0 calc(100% - 14px))}
   .console::-webkit-scrollbar{width:6px}
   .console::-webkit-scrollbar-thumb{background:rgba(0,212,255,0.25)}
   .log-line{display:flex;gap:10px;padding:1px 0;animation:logIn .25s ease}
@@ -502,7 +599,8 @@
   .mod:hover{border-color:var(--line-strong)}
   .mod.removed{opacity:.45;border-style:dashed}
   .mod-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:10px}
-.mod-stat{background:rgba(0,212,255,0.04);border:1px solid var(--line);padding:10px 13px;clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px)}
+.mod-stat .s{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--txt-soft);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mod-stat{background:rgba(0,212,255,0.04);border:1px solid var(--line);padding:10px 13px;clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px)}
 .mod-stat .n{font-family:'Orbitron','Segoe UI Semibold','Segoe UI',sans-serif;font-size:19px;color:#fff;letter-spacing:.02em}
 .mod-stat .l{font-size:11px;color:var(--txt-dim);margin-top:3px;letter-spacing:.06em}
 .mod-stat.warn .n{color:var(--amber)}
@@ -536,8 +634,6 @@
   .toggle.on{background:rgba(46,230,166,0.2);border-color:rgba(46,230,166,0.5)}
   .toggle .knob{position:absolute;top:1px;left:1px;width:14px;height:14px;background:var(--txt-mute);transition:.2s;clip-path:polygon(3px 0,100% 0,calc(100% - 3px) 100%,0 100%)}
   .toggle.on .knob{left:21px;background:var(--green);box-shadow:0 0 6px var(--green)}
-  .mod-state{font-family:'Cascadia Mono','Consolas','SFMono-Regular','Microsoft YaHei UI','PingFang SC','Noto Sans CJK SC',monospace;font-size:10px;letter-spacing:.16em}
-  .mod-state.on{color:var(--green)} .mod-state.off{color:var(--txt-mute)} .mod-state.removed{color:var(--amber)}
 
   /* ===== MODAL ===== */
   .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(3px);z-index:200;display:none;align-items:center;justify-content:center;padding:20px}
@@ -770,6 +866,114 @@
   </div>
 </div>
 
+<!-- ===== CREATE MOD MODAL ===== -->
+<div class="modal-overlay" id="createModModal">
+  <div class="modal" style="width:640px">
+    <div class="modal-head"><span class="tag">// CREATE MOD</span><span class="title">创建模组</span><button class="x" onclick="closeModal('createModModal')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+    <div class="modal-body">
+      <div class="cmd-notice" style="margin:0 0 14px;font-size:10px">骨架以已跑通的 welcome-mod 为基准生成：evejs-launcher.mod.json + loader.js + README.md + CHANGELOG.md。新模组默认禁用，不会自动加载。</div>
+      <div class="modal-field"><label>模板</label><select id="cmTemplate" onchange="cmPreview()"></select></div>
+      <div class="modal-field"><label>模组名</label><input id="cmName" placeholder="我的第一个模组" oninput="cmOnName()" autocomplete="off"></div>
+      <div class="modal-field"><label>标识 (id / 目录名)</label><input id="cmId" placeholder="my-first-mod" oninput="cmOnId()" autocomplete="off"></div>
+      <div style="display:flex;gap:12px">
+        <div class="modal-field" style="flex:0 0 140px"><label>版本</label><input id="cmVersion" value="1.0.0" autocomplete="off"></div>
+        <div class="modal-field" style="flex:1"><label>分类</label><select id="cmCategory"><option value="玩法">玩法</option><option value="经济">经济</option><option value="AI">AI</option><option value="画面">画面</option><option value="工具">工具</option></select></div>
+      </div>
+      <div class="modal-field"><label>标签（逗号分隔）</label><input id="cmTags" placeholder="聊天, 新手" autocomplete="off"></div>
+      <div class="modal-field"><label>简介</label><input id="cmDesc" placeholder="一句话说明这个模组做什么" autocomplete="off"></div>
+      <div class="modal-field"><label>详细介绍（写进 README）</label><textarea id="cmReadme" rows="4" placeholder="可以分段，支持 Markdown"></textarea></div>
+      <div class="modal-field"><label>功能要点（每行一条，写进 README）</label><textarea id="cmHighlights" rows="3" placeholder="玩家上线后收到一条系统消息"></textarea></div>
+      <div class="modal-field"><label>冲突模组 id（逗号分隔，可留空）</label><input id="cmConflicts" placeholder="other-mod" autocomplete="off"></div>
+      <div class="modal-field" style="margin-bottom:6px"><label>构建选项</label></div>
+      <div class="cm-opts">
+        <label><input type="checkbox" id="cmRestart" checked><span>需要重启服务端</span></label>
+        <label><input type="checkbox" id="cmEnabled"><span>建好后立即启用</span></label>
+        <label><input type="checkbox" id="cmSign" checked><span>建好后立即签名</span></label>
+      </div>
+      <div class="modal-field"><label>将生成</label><pre id="cmPreview" style="margin:0;padding:12px;background:rgba(5,8,13,0.6);border:1px solid var(--line);font-family:'Cascadia Mono','Consolas',monospace;font-size:11px;line-height:1.7;color:var(--txt-soft);white-space:pre-wrap"></pre></div>
+    </div>
+    <div class="modal-foot">
+      <button class="mini-btn" onclick="closeModal('createModModal')">取消</button>
+      <button class="mini-btn start" id="cmSubmit" onclick="submitCreateMod()">创建</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MOD DETAIL MODAL ===== -->
+<div class="modal-overlay" id="modDetailModal">
+  <div class="modal" style="width:720px">
+    <div class="modal-head"><span class="tag">// DETAIL</span><span class="title" id="mdTitle">模组详情</span><button class="x" onclick="closeModal('modDetailModal')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+    <div class="modal-body" id="mdBody"></div>
+    <div class="modal-foot">
+      <button class="mini-btn" id="mdOpenFolder" onclick="mdOpenFolder()" style="flex:0 0 auto;padding:9px 18px">打开目录</button>
+      <button class="mini-btn" id="mdResign" onclick="mdResign()" style="flex:0 0 auto;padding:9px 18px">重新签名</button>
+      <button class="mini-btn" id="mdInstall" onclick="mdInstall()" style="flex:0 0 auto;padding:9px 18px;display:none">安装 / 更新</button>
+      <button class="mini-btn" onclick="closeModal('modDetailModal')" style="flex:0 0 auto;padding:9px 18px">关闭</button>
+    </div>
+  </div>
+</div>
+<!-- ===== SUBMIT MOD MODAL ===== -->
+<div class="modal-overlay" id="submitModModal">
+  <div class="modal" style="width:680px">
+    <div class="modal-head"><span class="tag">// SUBMIT</span><span class="title">提交模组</span><button class="x" onclick="closeModal('submitModModal')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+    <div class="modal-body">
+      <div class="cmd-notice" style="margin:0 0 14px;font-size:10px">第 ① 步完全离线（重签 → 打包 → sha256 → 生成上架清单）；第 ② 步把 ZIP 与 evejs-mod.json 发到你自己的 GitHub 仓库（不动索引仓库）；第 ③ 步只是一次性的「登记我的仓库」，此后发新版都不用再提 PR。</div>
+      <div class="modal-field"><label>选择模组</label><select id="smMod" onchange="smOnModChange()"></select></div>
+      <div class="modal-field"><label>更新说明（会写进索引与 PR）</label><textarea id="smChangelog" rows="2" placeholder="这一版改了什么"></textarea></div>
+      <div style="display:flex;gap:12px">
+        <div class="modal-field" style="flex:1"><label>分类</label><select id="smCategory"><option value="玩法">玩法</option><option value="经济">经济</option><option value="AI">AI</option><option value="画面">画面</option><option value="工具">工具</option></select></div>
+        <div class="modal-field" style="flex:1"><label>标签（逗号分隔）</label><input id="smTags" placeholder="聊天, 新手" autocomplete="off"></div>
+      </div>
+      <div class="modal-field"><label>源码 / 项目地址（选填）</label><input id="smRepo" placeholder="https://github.com/you/your-mod" autocomplete="off"></div>
+      <div class="modal-field"><label>GitHub Releases 直链（ZIP，留空则由 ② 自动生成）</label><input id="smUrlGithub" placeholder="https://github.com/…/releases/download/v1.0.0/mod-1.0.0.zip" autocomplete="off"></div>
+      <div style="display:flex;gap:10px;margin-bottom:14px">
+        <button class="mini-btn start" id="smPrepare" onclick="smPrepare()" style="flex:1">① 生成并打包</button>
+        <button class="mini-btn" id="smReveal" onclick="smRevealZip()" style="flex:0 0 auto;padding:8px 14px" disabled>打开 ZIP 目录</button>
+      </div>
+      <div id="smResult" style="display:none">
+        <div class="modal-field"><label>打包结果</label><pre id="smResultText" style="margin:0;padding:12px;background:rgba(5,8,13,0.6);border:1px solid var(--line);font-family:'Cascadia Mono','Consolas',monospace;font-size:11px;line-height:1.7;color:var(--txt-soft);white-space:pre-wrap"></pre></div>
+        <div class="modal-field"><label>索引分片（可直接贴进索引仓库 mods/&lt;id&gt;.json）</label><textarea id="smShard" rows="6" readonly spellcheck="false"></textarea><button class="mini-btn" onclick="smCopyShard()" style="margin-top:8px;padding:6px 14px;flex:0 0 auto">复制分片 JSON</button></div>
+      </div>
+      <div style="border-top:1px solid var(--line);margin:16px 0 14px"></div>
+      <div class="modal-field"><label>GitHub 令牌（只用于提交，需 fine-grained：Contents + Pull requests 读写）</label>
+        <div style="display:flex;gap:8px"><input id="smToken" type="password" placeholder="github_pat_…" autocomplete="off" style="flex:1"><button class="mini-btn" onclick="smSaveToken()" style="flex:0 0 auto;padding:8px 14px">保存</button><button class="mini-btn" onclick="smCheckToken()" style="flex:0 0 auto;padding:8px 14px">校验</button><button class="mini-btn stop" onclick="smClearToken()" style="flex:0 0 auto;padding:8px 14px">清除</button></div>
+        <div id="smTokenState" style="font-size:10.5px;color:var(--txt-mute);margin-top:6px">—</div>
+      </div>
+      <div class="modal-field"><label>我的仓库（owner/repo，留空则自动建 <code>evejs-mod-&lt;id&gt;</code>）</label><input id="smRepoName" placeholder="my-evejs-mod" autocomplete="off"></div>
+      <div style="display:flex;gap:10px">
+        <button class="mini-btn start" id="smSubmit" onclick="smSubmit()" style="flex:1" disabled>② 发布到我的仓库（建仓库 → 写 evejs-mod.json → 发 Release）</button>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:10px">
+        <button class="mini-btn" id="smRegister" onclick="smRegisterSource()" style="flex:1">③ 申请收录（一次性 PR 到索引仓库）</button>
+        <button class="mini-btn" id="smCompare" onclick="smOpenCompare()" style="flex:0 0 auto;padding:8px 14px">打开 PR 页面</button>
+      </div>
+      <div id="smSubmitResult" style="display:none;margin-top:10px;font-size:11px;line-height:1.7;color:var(--txt-soft)"></div>
+    </div>
+    <div class="modal-foot"><button class="mini-btn" onclick="closeModal('submitModModal')">关闭</button></div>
+  </div>
+</div>
+
+<!-- ===== AUTHOR IDENTITY MODAL ===== -->
+<div class="modal-overlay" id="authorModal">
+  <div class="modal">
+    <div class="modal-head"><span class="tag">// AUTHOR</span><span class="title">作者身份</span><button class="x" onclick="closeModal('authorModal')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+    <div class="modal-body">
+      <div class="cmd-notice" style="margin:0 0 14px;font-size:10px">署名只是给人看的名字；真正认人靠下面的作者标识与密钥指纹。私钥只存在本机 _launcher/data/mod-keys/，永不外传、永不打包。</div>
+      <div class="modal-field"><label>署名</label><input id="authorNameInput" maxlength="64" placeholder="指挥官" autocomplete="off"></div>
+      <div class="modal-field"><label>作者标识</label><div class="author-kv"><code id="authorIdValue">—</code><button class="mini-btn" onclick="copyAuthorId()">复制</button></div></div>
+      <div class="modal-field"><label>密钥指纹 (keyId)</label><div class="author-kv"><code id="authorKeyIdValue">—</code><span class="author-state" id="authorKeyState">—</span></div></div>
+      <div class="modal-field"><label>身份创建于</label><div class="author-kv"><code id="authorSinceValue">—</code></div></div>
+      <div class="author-warn" id="authorWarn" style="display:none">私钥文件缺失，无法再签发更新。请导入 <code>.eve-key</code> 备份还原这个身份。</div>
+    </div>
+    <div class="modal-foot">
+      <button class="mini-btn" onclick="openAuthorKeyFolder()">密钥目录</button>
+      <button class="mini-btn" onclick="importAuthorKeyFile()">导入密钥</button>
+      <button class="mini-btn" onclick="exportAuthorKeyFile()">导出密钥</button>
+      <button class="mini-btn start" id="authorSaveBtn" onclick="saveAuthorName()">保存署名</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===== DATABASE RESTORE MODAL ===== -->
 <div class="modal-overlay" id="dbRestoreModal">
   <div class="modal" style="width:620px">
@@ -890,6 +1094,16 @@
               </div>
               <div class="panel-body" style="flex:1;display:flex;flex-direction:column;padding:0;min-height:0">
                 <div class="console" id="dashConsole" style="flex:1;border:none;clip-path:none;min-height:0"></div>
+            <div class="log-bar">
+              <span id="dashLogTotal">—</span>
+              <span class="spacer"></span>
+              <div class="log-filters" id="dashLogFilters">
+                <button class="log-filter active" data-lvl="all">全部</button>
+                <button class="log-filter info" data-lvl="INFO">INFO<b id="cntInfo">0</b></button>
+                <button class="log-filter warn" data-lvl="WARN">WARN<b id="cntWarn">0</b></button>
+                <button class="log-filter err" data-lvl="ERR">ERROR<b id="cntErr">0</b></button>
+              </div>
+            </div>
               </div>
             </div>
           </div>
@@ -1092,18 +1306,38 @@
       <!-- ===== MODULES ===== -->
       <section class="view" id="view-modules">
         <div class="section-title"><span class="bar"></span><h2>模组 / 插件</h2><span class="sub">// MOD PACKAGES · MANIFEST SCHEMA 3</span></div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+          <div class="mod-tabs" id="modTabs" style="margin-bottom:0">
+            <div class="mod-tab active" data-mtab="installed" onclick="switchModTab('installed')">已安装 · <span class="n" id="mtInstalled">0</span></div>
+            <div class="mod-tab" data-mtab="mine" onclick="switchModTab('mine')">我创建的 · <span class="n" id="mtMine">0</span></div>
+            <div class="mod-tab" data-mtab="market" onclick="switchModTab('market')">模组市场 · <span class="n" id="mtMarket">0</span><span class="up" id="mtMarketUp" style="display:none">0</span></div>
+          </div>
+          <div style="flex:1"></div>
+          <div id="modTabActions" style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="mini-btn start" id="modActCreate" style="flex:0 0 auto;padding:8px 14px" title="创建模组 / Create mod"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>创建模组</button>
+            <button class="mini-btn" id="modActSubmit" style="flex:0 0 auto;padding:8px 14px" title="提交模组 / Submit mod"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>提交模组</button>
+            <button class="mini-btn" id="modActAuthor" style="flex:0 0 auto;padding:8px 14px" title="作者身份 / Author identity"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span id="authorBtnLabel">作者身份</span></button>
+            <button class="mini-btn" id="modActDoc" style="flex:0 0 auto;padding:8px 14px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>模组制作规范</button>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-body" style="padding:14px 16px">
+            <div class="mod-stats" id="modStats"></div>
+          </div>
+        </div>
+        <div class="mod-banner" id="modBanner" style="display:none"></div>
         <div class="acc-toolbar">
           <div class="acc-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input id="modSearch" placeholder="搜索模组名称或 ID…" oninput="renderMods()"></div>
           <select class="acc-select" id="modFilter" onchange="renderMods()">
-            <option value="all">全部类型</option>
-            <option value="loader">LOADER</option>
-            <option value="source-integrated">SOURCE</option>
-            <option value="client-package">CLIENT</option>
-            <option value="settings">SETTINGS</option>
+            <option value="all">全部分类</option>
+            <option value="玩法">玩法</option>
+            <option value="经济">经济</option>
+            <option value="AI">AI</option>
+            <option value="画面">画面</option>
+            <option value="工具">工具</option>
           </select>
           <button class="mini-btn" onclick="openModsFolder()" style="padding:8px 14px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>打开 mods 目录</button>
           <button class="mini-btn" onclick="importModZip()" style="padding:8px 14px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>导入 ZIP</button>
-          <button class="mini-btn" onclick="openModAuthoringDoc()" style="padding:8px 14px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>模组制作规范</button>
           <button class="mini-btn start" onclick="refreshModsList()" style="padding:8px 16px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="23 4 23 10 17 10"/><path d="M20.5 15a9 9 0 1 1-2.1-9.4L23 10"/></svg>刷新列表</button>
         </div>
         <div class="panel" id="modsMissingPanel" style="display:none;border-color:rgba(255,157,46,0.35)">
@@ -1116,12 +1350,6 @@
               </div>
               <button class="mini-btn start" id="modsCreateBtn" style="flex:0 0 auto;padding:9px 20px" onclick="createModsFolder()">创建 mods 文件夹</button>
             </div>
-          </div>
-        </div>
-        <div class="panel">
-          <div class="panel-body" style="padding:14px 16px">
-            <div class="mod-stats" id="modStats"></div>
-            <div class="mod-conflict-list" id="modConflicts"></div>
           </div>
         </div>
         <div class="panel">
@@ -1229,7 +1457,7 @@
     <div class="sb-cell"><span class="k">EVEJS</span><span class="v" id="sbEvejs">—</span></div>
     <div class="sb-cell"><span class="k">PATH</span><span class="v" id="sbPath">/opt/evejs</span></div>
     <div class="sb-cell ok" id="sbAlertsCell"><span class="k">ALERTS</span><span class="v" id="sbAlerts">0</span></div>
-    <div class="sb-cell"><span class="k">主服务启动维持时间</span><span class="v" id="sbSession">00:00:00</span></div>
+    <div class="sb-cell"><span class="k">主服务启动维持时间</span><span class="v" id="sbSession">--:--:--</span></div>
     <div class="sb-cell" style="border-right:none;color:var(--amber)">© B站的波坤太叔</div>
   </footer>
 </div>
@@ -1354,6 +1582,10 @@ Object.assign(TRANSLATE,{
   '导入失败': {'en':'Import failed','ja':'インポートに失敗しました','ko':'가져오기 실패','fr':'Échec de l’import','de':'Import fehlgeschlagen','nl':'Importeren mislukt','ru':'Ошибка импорта'},
   '已保存模组加载顺序': {'en':'Mod load order saved','ja':'模組の読み込み順を保存しました','ko':'모드 로드 순서를 저장했습니다','fr':'Ordre de chargement enregistré','de':'Mod-Ladereihenfolge gespeichert','nl':'Laadvolgorde opgeslagen','ru':'Порядок загрузки сохранён'},
   '拖动卡片可调整加载顺序': {'en':'Drag cards to change load order','ja':'カードをドラッグして読み込み順を変更','ko':'카드를 끌어 로드 순서를 변경','fr':'Glissez les cartes pour changer l’ordre','de':'Karten ziehen, um die Reihenfolge zu ändern','nl':'Sleep kaarten om de volgorde te wijzigen','ru':'Перетащите карточки, чтобы изменить порядок'},
+  '数据': {'en':'Data','ja':'データ','ko':'데이터','fr':'Données','de':'Daten','nl':'Gegevens','ru':'Данные'},
+  '结构': {'en':'Structure','ja':'構造','ko':'구조','fr':'Structure','de':'Struktur','nl':'Structuur','ru':'Структура'},
+  '全部': {'en':'All','ja':'すべて','ko':'전체','fr':'Tout','de':'Alle','nl':'Alles','ru':'Все'},
+  '共 {n} 条 · 显示 {m} 条': {'en':'{n} total · {m} shown','ja':'{n} 件 · 表示 {m} 件','ko':'{n}개 · 표시 {m}개','fr':'{n} au total · {m} affichés','de':'{n} gesamt · {m} angezeigt','nl':'{n} totaal · {m} getoond','ru':'{n} всего · {m} показано'},
   '操作失败': {'en':'Operation failed','ja':'操作に失敗しました','ko':'작업 실패','fr':'Échec de l\'opération','de':'Vorgang fehlgeschlagen','nl':'Bewerking mislukt','ru':'Операция не удалась'},
   '刷新列表': {'en':'Refresh list','ja':'一覧を更新','ko':'목록 새로고침','fr':'Actualiser la liste','de':'Liste aktualisieren','nl':'Lijst vernieuwen','ru':'Обновить список'},
   '点击启用': {'en':'Click to enable','ja':'クリックで有効化','ko':'클릭하여 활성화','fr':'Cliquer pour activer','de':'Zum Aktivieren klicken','nl':'Klik om in te schakelen','ru':'Нажмите, чтобы включить'},
@@ -1361,6 +1593,592 @@ Object.assign(TRANSLATE,{
   '模组已启用，请重启游戏服务生效': {'en':'Mod enabled — restart the game server to apply','ja':'模組を有効化しました。反映にはゲームサーバーの再起動が必要です','ko':'모드를 활성화했습니다. 적용하려면 게임 서버를 재시작하세요','fr':'Mod activé — redémarrez le serveur de jeu pour appliquer','de':'Mod aktiviert – Spielserver neu starten, um zu übernehmen','nl':'Mod ingeschakeld — herstart de gameserver om toe te passen','ru':'Мод включён — перезапустите игровой сервер'},
   '模组已禁用，请重启游戏服务生效': {'en':'Mod disabled — restart the game server to apply','ja':'模組を無効化しました。反映にはゲームサーバーの再起動が必要です','ko':'모드를 비활성화했습니다. 적용하려면 게임 서버를 재시작하세요','fr':'Mod désactivé — redémarrez le serveur de jeu pour appliquer','de':'Mod deaktiviert – Spielserver neu starten, um zu übernehmen','nl':'Mod uitgeschakeld — herstart de gameserver om toe te passen','ru':'Мод отключён — перезапустите игровой сервер'}
 
+});
+
+/* ===== 主进程直出中文的片段翻译 =====
+   实时日志 / 环境检测 / 服务状态里的文案由主进程按中文拼装后直接推送，
+   无法用静态字典精确命中完整句子。这里维护「中文片段 -> 译法」表，
+   按片段长度从长到短就地替换；未提供该语言的条目回退英文，
+   保证任何非中文语言下都不会残留中文。 */
+const LOOSE_PHRASES = [
+  ['[主服务器]', {en:'[Main Server]',ja:'[メインサーバー]',ko:'[메인 서버]',fr:'[Serveur principal]',de:'[Hauptserver]',nl:'[Hoofdserver]',ru:'[Главный сервер]'}],
+  ['[市场服务]', {en:'[Market Server]',ja:'[マーケットサーバー]',ko:'[마켓 서버]',fr:'[Serveur marche]',de:'[Marktserver]',nl:'[Marktserver]',ru:'[Рыночный сервер]'}],
+  ['[客户端]', {en:'[Client]',ja:'[クライアント]',ko:'[클라이언트]',fr:'[Client]',de:'[Client]',nl:'[Client]',ru:'[Клиент]'}],
+  ['[启动器]', {en:'[Launcher]',ja:'[ランチャー]',ko:'[런처]',fr:'[Lanceur]',de:'[Launcher]',nl:'[Launcher]',ru:'[Лончер]'}],
+  ['[进程退出]', {en:'[Process exited]',ja:'[プロセス終了]',ko:'[프로세스 종료]',fr:'[Processus termine]',de:'[Prozess beendet]',nl:'[Proces beeindigd]',ru:'[Процесс завершён]'}],
+
+  ['Phase 3-4 已接入 · ENGAGE 一键启动 / 停止全部 · 服务页签实时日志', 'Phase 3-4 wired up · ENGAGE one-click start / stop all · per-service live logs'],
+  ['一键启动不拉起客户端，请使用登录入口启动', 'one-click start does not launch the client - use the login entry'],
+  ['未找到 tq 同级的 ResFiles 资源缓存，如报资源错误请检查客户端安装', 'ResFiles cache not found next to tq - check the client install if resource errors occur'],
+  ['直连启动 exefile（/noconsole，不再产生 CCP 控制台窗口）…', 'launching exefile directly (/noconsole, no CCP console window)…'],
+  ['自动登录失败：密码不能包含冒号（客户端 /login: 参数限制）', 'auto-login failed: password cannot contain a colon (client /login: limitation)'],
+  ['release 二进制缺失，请先构建（cargo build --release）', 'release binary missing - build it first (cargo build --release)'],
+  ['主服务器启动后异常退出（详见终端日志）', 'main server crashed after startup (see terminal log)'],
+  ['市场服务启动后异常退出（详见终端日志）', 'market server crashed after startup (see terminal log)'],
+  ['主服务器 26000 端口 60s 未监听', 'main server port 26000 not listening within 60s'],
+  ['市场服务 40110 端口 30s 未监听', 'market server port 40110 not listening within 30s'],
+  ['角色 ID 非法，已忽略自动选角：', 'invalid character ID, auto-select ignored: '],
+  ['已启动并请求直达角色（characterId=', 'started and requested direct character (characterId='],
+  ['启动过程异常退出，清理残留…', 'crashed during startup, cleaning up…'],
+  ['启动超时，正在清理…', 'start timed out, cleaning up…'],
+  ['启动 npm start（server/）…', 'starting npm start (server/)…'],
+  ['启动 market-server.exe …', 'starting market-server.exe …'],
+  ['证书准备未成功（继续启动）：', 'certificate setup failed (continuing): '],
+  ['显示设置重置失败（继续启动）：', 'display reset failed (continuing): '],
+  ['画质预设应用失败（继续启动）：', 'graphics preset failed (continuing): '],
+  ['已重置游戏窗口显示设置', 'game window display settings reset'],
+  ['已准备 EveJS 证书信任', 'EveJS certificate trust prepared'],
+  ['已应用安全窗口模式', 'safe window mode applied'],
+  ['已应用低配画质预设', 'low graphics preset applied'],
+  ['已重置为窗口模式', 'reset to windowed mode'],
+  ['一键启动序列开始', 'one-click start sequence began'],
+  ['主服务器失败，序列中止：', 'main server failed, sequence aborted: '],
+  ['客户端由登录入口单独启动', 'client is launched separately from the login entry'],
+  ['外部进程，跳过停止', 'external process, skipping stop'],
+  ['外部进程，未接管停止', 'external process, not managed (stop skipped)'],
+  ['已监听（外部已启动）', 'listening (started externally)'],
+  ['已在监听，视为运行中', 'already listening, treated as running'],
+  ['端口已监听，启动成功', 'port listening, started successfully'],
+  ['未启动：客户端路径无效', 'not started: invalid client path'],
+  ['客户端路径无效，请先在配置面板设置', 'invalid client path - set it in the config panel first'],
+  ['客户端路径无效，请先在配置中心设置', 'invalid client path - set it in the config center first'],
+  ['客户端路径无效', 'invalid client path'],
+  ['客户端程序不存在：', 'client executable not found: '],
+  ['客户端配置读取失败', 'failed to read client config'],
+  ['客户端启动中（PID ', 'client starting (PID '],
+  ['客户端已启动（PID ', 'client started (PID '],
+  ['客户端已退出（exit ', 'client exited (exit '],
+  ['密码不能包含冒号', 'password cannot contain a colon'],
+  ['显示设置重置失败', 'failed to reset display settings'],
+  ['server/index.js 不存在', 'server/index.js not found'],
+  ['已跳过（启动选项关闭）', 'skipped (start option off)'],
+  ['启动序列完成', 'start sequence complete'],
+  ['全部服务已停止', 'all services stopped'],
+  ['停止全部服务', 'stop all services'],
+  ['启动超时：', 'start timed out: '],
+  ['启动失败：', 'start failed: '],
+  ['启动失败', 'start failed'],
+  ['启动中…', 'starting…'],
+  ['停止中…', 'stopping…'],
+  ['运行中（PID ', 'running (PID '],
+  ['正在停止', 'stopping'],
+  ['已全部停止', 'all stopped'],
+  ['未运行', 'not running'],
+  ['已注入', 'injected'],
+  ['个模组 loader', 'mod loader(s)'],
+  ['跳过模组', 'skipped mod'],
+  ['异常退出', 'crashed'],
+  ['已启动', 'started'],
+  ['已停止', 'stopped'],
+  ['已退出', 'exited'],
+  ['不存在', 'not found'],
+  ['输出日志：', 'log output: '],
+  ['未启动：', 'not started: '],
+  [' 已在运行', ' is already running'],
+  [' 内监听', ''],
+  ['未在', ' not listening within '],
+  ['端口 ', 'port '],
+  ['游戏客户端', 'Game Client'],
+  ['主服务器异常退出', 'Main Server crashed'],
+  ['市场服务异常退出', 'Market Server crashed'],
+  ['客户端启动失败', 'Client failed to start'],
+  ['主服务器', 'Main Server'],
+  ['市场服务', 'Market Server'],
+  ['客户端', 'Client'],
+  ['二进制不存在', 'binary not found'],
+  ['二进制缺失', 'binary missing'],
+  ['二进制已构建', 'binary built'],
+  ['二进制', 'binary'],
+  ['>>> 一键启动序列开始', '>>> one-click start sequence began'],
+  ['>>> 一键停止序列开始', '>>> one-click stop sequence began'],
+  ['>>> 全部服务已启动 · 集群 ONLINE', '>>> all services started · cluster ONLINE'],
+  ['>>> 全部服务已停止 · 集群 OFFLINE', '>>> all services stopped · cluster OFFLINE'],
+  ['>>> 启动器已更新至 ', '>>> launcher updated to '],
+  ['已重置游戏窗口显示设置（窗口模式 · 主屏左上角）', 'game window display settings reset (windowed · top-left of primary screen)'],
+  ['已进入角色选择，点击空槽位即可创建角色', 'entered character select - click an empty slot to create a character'],
+  ['已保存凭据直达角色', 'credentials saved - going straight to the character'],
+  ['已从数据库删除', 'deleted from the database'],
+  ['EV_EJS_PLACEHOLDER', 'EV_EJS_PLACEHOLDER'],
+  ['EVEJS COMMAND 启动器已连接 Electron 后端', 'EVEJS COMMAND launcher connected to the Electron backend'],
+  ['导入自定义指令成功', 'custom commands imported'],
+  ['初始化任务运行中', 'initialization task running'],
+  ['密码已修改 · 需重新登录', 'Password changed · please sign in again'],
+  ['环境自检门禁通过', 'env check gate passed'],
+  [' 及其角色已从数据库删除', ' and all its characters were deleted'],
+  [' 已创建于账号 ', ' created under account '],
+  [' 已删除 · 账号 ', ' deleted · account '],
+  [' 已保存凭据直达角色', ' credentials saved - straight to the character'],
+  [' 直达角色选择', ' straight to character select'],
+  [' 直达角色', ' straight to the character'],
+  [' 环境自检门禁通过', ' env check gate passed'],
+  [' 服务已停止', ' service stopped'],
+  [' 已就绪 · ', ' ready · '],
+  [' 已启动 · ', ' started · '],
+  [' 已停止 · ', ' stopped · '],
+  [' 初始化完成', ' initialization complete'],
+  ['初始化完成', 'initialization complete'],
+  [' 已保存', ' saved'],
+  [' 已添加', ' added'],
+  [' 已删除', ' deleted'],
+  [' 已创建', ' created'],
+  [' 保留', ' kept'],
+  [' 个）', ' items)'],
+  [' 条自定义指令', ' custom commands'],
+  ['集群', 'cluster'],
+  ['登录成功', 'login successful'],
+  ['数据库表 ', 'Table '],
+  ['数据库已备份', 'database backed up'],
+  ['数据库已恢复', 'database restored'],
+  ['安全备份', 'safety backup'],
+  ['已打开模组目录 ', 'opened mods directory '],
+  ['已导入模组 ', 'imported mod '],
+  ['已创建模组目录 ', 'created mods directory '],
+  ['模组加载顺序已更新（共 ', 'mod load order updated ('],
+  ['模组制作规范: ', 'mod authoring guide: '],
+  ['模组 ', 'mod '],
+  ['已启用', 'enabled'],
+  ['已禁用', 'disabled'],
+  ['账号 ', 'account '],
+  ['角色 ', 'character '],
+  ['启动角色 ', 'launching character '],
+  ['一键启动序列开始', 'one-click start sequence began'],
+  ['一键停止序列开始', 'one-click stop sequence began'],
+  ['一键启动序列完成', 'one-click start sequence complete'],
+  ['全部服务已启动', 'all services started'],
+  ['全部服务已停止', 'all services stopped'],
+  ['关键环境未通过，已中止启动', 'critical environment check failed - startup aborted'],
+  ['一键启动失败', 'one-click start failed'],
+  ['停止失败', 'stop failed'],
+  ['操作失败', 'operation failed'],
+  ['新账号 ', 'new account '],
+  ['自定义指令 ', 'custom command '],
+  ['导出 ', 'exported '],
+  ['未完成，请查看上方日志', 'incomplete - see the log above'],
+  ['未完成', 'incomplete'],
+  ['正在执行「', 'running "'],
+  ['」初始化，请等待完成', '" initialization - wait for it to finish'],
+  [' 结束 —— ', ' finished - '],
+  [' 结束（exit ', ' finished (exit '],
+  [' 完成 ✓', ' done ✓'],
+  [' 开始 ═', ' started ═'],
+  [' 结束 ', ' finished '],
+  ['[初始化]', '[Init]'],
+  ['主服务器依赖', 'main server dependencies'],
+  ['市场服务二进制', 'market server binary'],
+  ['客户端证书 CA', 'client certificate CA'],
+  ['本地数据库', 'local database'],
+  ['客户端路径', 'client path'],
+  ['初始化', 'initialization'],
+  ['已存在相同名称的模组目录：', 'a mod directory with the same name already exists: '],
+  ['ZIP 里有多个模组包，请一次只导入一个', 'multiple mod packages in the ZIP - import one at a time'],
+  ['ZIP 里没有 evejs-launcher.mod.json', 'no evejs-launcher.mod.json in the ZIP'],
+  ['已存在同名模组目录：', 'a mod directory with the same name already exists: '],
+  ['与已启用模组冲突: ', 'conflicts with enabled mod: '],
+  ['清单 JSON 解析失败: ', 'manifest JSON parse failed: '],
+  ['清单校验失败: ', 'manifest validation failed: '],
+  ['缺少依赖: ', 'missing dependency: '],
+  ['缺少依赖 ', 'missing dependency '],
+  ['未找到 loader.js.disabled', 'loader.js.disabled not found'],
+  ['已存在，未做改动', 'already exists, no change made'],
+  ['只支持 .zip 文件', 'only .zip files are supported'],
+  ['找不到 ZIP 文件', 'ZIP file not found'],
+  ['目前只支持', 'currently only supports'],
+  ['不能引用自己', 'cannot reference itself'],
+  ['清单必须是 JSON 对象', 'manifest must be a JSON object'],
+  ['超过 1 MiB', 'exceeds 1 MiB'],
+  ['不是文件', 'is not a file'],
+  ['路径非法', 'invalid path'],
+  ['已存在', 'already exists'],
+  ['必须是', 'must be'],
+  ['超长', 'too long'],
+  ['缺少', 'missing'],
+  ['未知', 'unknown'],
+  ['：', ': '],
+  ['）', ')'],
+  ['（', ' ('],
+
+  ['未检测到 VS Build Tools（vswhere 未找到 / VC\\Tools\\MSVC 缺失）', 'VS Build Tools not detected (vswhere found nothing / VC\\Tools\\MSVC missing)'],
+  ['按 StartMarketServer.bat 使用 VS Build Tools 构建一次（cargo build --release）', 'Build once with StartMarketServer.bat and VS Build Tools (cargo build --release)'],
+  ['未检测到 Rust 工具链（rustc / cargo）', 'Rust toolchain not detected (rustc / cargo)'],
+  ['请手动安装 Node.js 24+（LTS 版本即可）', 'Install Node.js 24+ manually (LTS is fine)'],
+  ['请手动安装 Rust（官方 rustup 方式）', 'Install Rust manually (official rustup)'],
+  ['安装时勾选「使用 C++ 的桌面开发」工作负载', 'Select the Desktop development with C++ workload during install'],
+  ['本地数据库缺失（manifest/sqlite 不存在）', 'local database missing (no manifest/sqlite)'],
+  ['运行 tools\\DatabaseCreator\\CreateDatabase.bat 初始化数据库', 'Run tools\\DatabaseCreator\\CreateDatabase.bat to initialize the database'],
+  ['在 server 目录执行 npm ci 安装依赖', 'Run npm ci in the server directory to install dependencies'],
+  ['未找到 target/release/market-server.exe', 'target/release/market-server.exe not found'],
+  ['在 EvEJSConfig.bat / 配置面板中填写客户端安装路径', 'Set the client install path in EvEJSConfig.bat / the config panel'],
+  ['运行 SetupEveJS.bat 或检查 EVEJS_CA_PEM 指向', 'Run SetupEveJS.bat or check the EVEJS_CA_PEM target'],
+  ['server/node_modules 已就绪', 'server/node_modules is ready'],
+  ['缺少 server/node_modules（express 未安装）', 'server/node_modules missing (express not installed)'],
+  ['未检测到可用 Node（当前: ', 'No usable Node detected (current: '],
+  ['工具链不完整（仅检测到 ', 'incomplete toolchain (only found '],
+  ['_local/gameStore 已初始化', '_local/gameStore initialized'],
+  ['release 二进制已构建', 'release binary built'],
+  ['未配置 EVEJS_CLIENT_PATH', 'EVEJS_CLIENT_PATH not configured'],
+  ['CA 证书就绪', 'CA certificate ready'],
+  ['CA 证书缺失', 'CA certificate missing'],
+  ['已安装：', 'installed: '],
+  ['路径不存在: ', 'path not found: '],
+  ['客户端: ', 'client: '],
+  ['（满足 ≥24）', ' (meets ≥24)'],
+  [' 线程（阈值 8 GB / 8 线程）', ' threads (threshold 8 GB / 8 threads)'],
+  ['内存 ', 'Memory '],
+
+  ['npm ci · 安装主服务器依赖', 'npm ci · install main server dependencies'],
+  ['CreateDatabase.bat /force · 初始化数据库', 'CreateDatabase.bat /force · initialize database'],
+  ['cargo build --release · 构建市场服务', 'cargo build --release · build market server'],
+  ['打开 ClientSETUP 证书与补丁向导', 'open ClientSETUP certificate & patch wizard'],
+  ['自动探测 EVE 客户端路径', 'auto-detect EVE client path'],
+  ['该项暂不支持启动器内初始化', 'this item cannot be initialized from the launcher'],
+  ['当前没有可初始化项目', 'nothing to initialize right now'],
+  ['初始化启动失败', 'initialization failed to start'],
+  ['初始化中…', 'initializing…'],
+  ['进行中…', 'in progress…'],
+  ['扫描中…', 'scanning…'],
+  ['环境自检失败: ', 'environment self-check failed: '],
+  ['环境自检完成', 'environment self-check complete'],
+  ['环境自检', 'Env check'],
+  ['清空当前日志', 'clear current log'],
+  ['已清空当前日志', 'current log cleared']
+];
+const LOOSE_SORTED = LOOSE_PHRASES.slice().sort((a, b) => b[0].length - a[0].length);
+/** 主进程直出文案的规则翻译：lang 为 zh 时原样返回 */
+function translateLoose(text, lang){
+  if(text == null) return text;
+  const raw = String(text);
+  if(!raw || lang === 'zh') return raw;
+  let out = raw;
+  for(let i = 0; i < LOOSE_SORTED.length; i++){
+    const zh = LOOSE_SORTED[i][0];
+    if(!zh || out.indexOf(zh) === -1) continue;
+    const table = LOOSE_SORTED[i][1];
+    const rep = typeof table === 'string' ? table : (table[lang] || table.en);
+    if(rep == null) continue;
+    out = out.split(zh).join(rep);
+  }
+  return out;
+}
+/** 需要做片段翻译的容器（日志行 / 环境自检卡 / 服务卡） */
+const LOOSE_SCOPE = '#checkList,.check-card,.svc-card,.log-line,#dashConsole,#fullConsole,#dashLogConsole,.statusbar';
+
+Object.assign(TRANSLATE, {
+  '加载模组后会在游戏本地聊天框看到一条「欢迎回来，飞行员」的信息。': {'en':'After loading, you will see a "Welcome back, pilot" message in the in-game local chat channel.','ja':'読み込むと、ゲーム内のローカルチャットに「おかえりなさい、パイロット」というメッセージが表示されます。','ko':'모드를 로드하면 게임 내 로컬 채팅에 「다시 오신 것을 환영합니다, 파일럿」 메시지가 표시됩니다.','fr':'Après le chargement, vous verrez « Bon retour, pilote » dans le canal local du jeu.','de':'Nach dem Laden erscheint „Willkommen zurück, Pilot“ im lokalen Ingame-Chat.','nl':'Na het laden zie je "Welkom terug, piloot" in de lokale in-game chat.','ru':'После загрузки в локальном игровом чате появится сообщение «С возвращением, пилот».'},
+  '同样的加载骨架，业务逻辑留空，适合从零写起': {'en':'Same loading skeleton with the business logic left empty — a clean starting point','ja':'同じ読み込み骨格で、業務ロジックは空。ゼロから書くのに最適です','ko':'동일한 로딩 뼈대에 비즈니스 로직만 비어 있어 처음부터 작성하기 좋습니다','fr':'Même squelette de chargement, logique métier vide : idéal pour partir de zéro','de':'Dasselbe Ladegerüst, Geschäftslogik leer – ideal für einen Neuanfang','nl':'Hetzelfde laadskelet, bedrijfslogica leeg — ideaal om vanaf nul te beginnen','ru':'Тот же каркас загрузки без бизнес-логики — удобно писать с нуля'}
+});
+
+Object.assign(TRANSLATE, {
+  'conflict.duplicateId': {'en':'{1} mods share the same id "{2}"','ja':'{1} つの模組が同じ id「{2}」を使っています','ko':'{1}개 모드가 같은 id 「{2}」를 사용합니다','fr':'{1} mods utilisent le même id « {2} »','de':'{1} Mods verwenden dieselbe ID „{2}“','nl':'{1} mods gebruiken dezelfde id "{2}"','ru':'{1} модов используют один id «{2}»'},
+  'conflict.declared': {'en':'Declared as mutually exclusive in the manifest','ja':'マニフェストで相互排他が宣言されています','ko':'매니페스트에 상호 배타로 선언됨','fr':'Déclaré mutuellement exclusif dans le manifeste','de':'Im Manifest als gegenseitig ausschließend deklariert','nl':'In het manifest als wederzijds uitsluitend opgegeven','ru':'В манифесте объявлены взаимоисключающими'},
+  'conflict.sharedModule': {'en':'Both require the server module {1} (may affect each other)','ja':'どちらもサービスモジュール {1} を参照しています（相互に影響する可能性）','ko':'둘 다 서버 모듈 {1} 을 참조합니다(서로 영향을 줄 수 있음)','fr':'Les deux utilisent le module serveur {1} (interactions possibles)','de':'Beide nutzen das Servermodul {1} (gegenseitige Beeinflussung möglich)','nl':'Beide gebruiken de servermodule {1} (kunnen elkaar beïnvloeden)','ru':'Оба используют серверный модуль {1} (возможно взаимное влияние)'},
+  'conflict.missingRequire': {'en':'Missing dependency: {1}','ja':'依存関係がありません: {1}','ko':'종속성 없음: {1}','fr':'Dépendance manquante : {1}','de':'Fehlende Abhängigkeit: {1}','nl':'Ontbrekende afhankelijkheid: {1}','ru':'Отсутствует зависимость: {1}'},
+});
+
+Object.assign(TRANSLATE, {
+  '选择模组': {'en':'Pick a mod','ja':'模組を選択','ko':'모드 선택','fr':'Choisir un mod','de':'Mod auswählen','nl':'Mod kiezen','ru':'Выбрать мод'},
+  'GitHub Releases 直链（ZIP，留空则由 ② 自动生成）': {'en':'GitHub Releases direct link (ZIP — leave empty and step 2 fills it in)','ja':'GitHub Releases 直リンク（ZIP。空欄なら ② が自動生成）','ko':'GitHub Releases 직접 링크(ZIP, 비우면 ②가 자동 생성)','fr':'Lien direct GitHub Releases (ZIP — laissez vide, l\'étape 2 le remplit)','de':'GitHub-Releases-Direktlink (ZIP – leer lassen, Schritt ② füllt ihn)','nl':'GitHub Releases directe link (ZIP — leeg laten, stap ② vult hem)','ru':'Прямая ссылка GitHub Releases (ZIP — оставьте пустой, шаг ② подставит) '},
+  '指挥官': {'en':'Commander','ja':'司令官','ko':'지휘관','fr':'Commandant','de':'Kommandant','nl':'Commandant','ru':'Командир'},
+});
+
+Object.assign(TRANSLATE, {
+  '我的第一个模组': {'en':'My first mod','ja':'最初の模組','ko':'나의 첫 모드','fr':'Mon premier mod','de':'Mein erster Mod','nl':'Mijn eerste mod','ru':'Мой первый мод'},
+  '聊天, 新手': {'en':'chat, beginner','ja':'チャット、初心者','ko':'채팅, 초보자','fr':'chat, débutant','de':'Chat, Anfänger','nl':'chat, beginner','ru':'чат, новичок'},
+  '这一版改了什么': {'en':'What changed in this version','ja':'この版で変わったこと','ko':'이번 버전에서 바뀐 점','fr':'Ce qui a changé','de':'Was sich geändert hat','nl':'Wat is er veranderd','ru':'Что изменилось в этой версии'},
+  '玩法': {'en':'Gameplay','ja':'ゲームプレイ','ko':'게임플레이','fr':'Gameplay','de':'Gameplay','nl':'Gameplay','ru':'Геймплей'},
+  '经济': {'en':'Economy','ja':'経済','ko':'경제','fr':'Économie','de':'Wirtschaft','nl':'Economie','ru':'Экономика'},
+  '画面': {'en':'Graphics','ja':'グラフィック','ko':'그래픽','fr':'Graphismes','de':'Grafik','nl':'Graphics','ru':'Графика'},
+  '工具': {'en':'Tools','ja':'ツール','ko':'도구','fr':'Outils','de':'Werkzeuge','nl':'Hulpmiddelen','ru':'Инструменты'},
+  '骨架以已跑通的 welcome-mod 为基准生成：evejs-launcher.mod.json + loader.js + README.md + CHANGELOG.md。新模组默认禁用，不会自动加载。': {'en':'The skeleton is generated from the proven welcome-mod: evejs-launcher.mod.json + loader.js + README.md + CHANGELOG.md. New mods stay disabled and are not loaded automatically.','ja':'実績のある welcome-mod を基に生成します：evejs-launcher.mod.json + loader.js + README.md + CHANGELOG.md。新しい模組は既定で無効で、自動では読み込まれません。','ko':'검증된 welcome-mod 을 기준으로 생성합니다: evejs-launcher.mod.json + loader.js + README.md + CHANGELOG.md. 새 모드는 기본적으로 비활성화되며 자동으로 로드되지 않습니다.','fr':'Le squelette est généré à partir de welcome-mod : evejs-launcher.mod.json + loader.js + README.md + CHANGELOG.md. Les nouveaux mods restent désactivés.','de':'Das Gerüst entsteht aus dem erprobten welcome-mod: evejs-launcher.mod.json + loader.js + README.md + CHANGELOG.md. Neue Mods bleiben deaktiviert.','nl':'De basis wordt gegenereerd op basis van welcome-mod: evejs-launcher.mod.json + loader.js + README.md + CHANGELOG.md. Nieuwe mods blijven uitgeschakeld.','ru':'Каркас создаётся по проверенному welcome-mod: evejs-launcher.mod.json + loader.js + README.md + CHANGELOG.md. Новые моды остаются отключёнными.'},
+  '第 ① 步完全离线（重签 → 打包 → sha256 → 生成上架清单）；第 ② 步把 ZIP 与 evejs-mod.json 发到你自己的 GitHub 仓库（不动索引仓库）；第 ③ 步只是一次性的「登记我的仓库」，此后发新版都不用再提 PR。': {'en':'Step 1 is fully offline (re-sign → pack → sha256 → build the listing). Step 2 uploads the ZIP and evejs-mod.json to YOUR OWN GitHub repo (the index repo is untouched). Step 3 is a one-time repository registration — after that, new versions need no PR.','ja':'① は完全オフライン（再署名 → パッケージ → sha256 → 上架リスト作成）。② で ZIP と evejs-mod.json を自分の GitHub リポジトリへ（索引リポジトリは触りません）。③ は一度きりの登録で、以降の更新に PR は不要です。','ko':'① 단계는 완전 오프라인(재서명 → 패키징 → sha256 → 상장 목록 생성)이며, ② 단계에서 ZIP과 evejs-mod.json 을 내 GitHub 저장소에 올립니다(색인 저장소는 건드리지 않음). ③ 단계는 1회성 등록이고 이후 새 버전에는 PR이 필요 없습니다.','fr':'L\'étape 1 est hors ligne (re-signature → paquet → sha256 → liste). L\'étape 2 envoie le ZIP et evejs-mod.json sur VOTRE dépôt GitHub. L\'étape 3 est un enregistrement unique ; ensuite, plus de PR.','de':'Schritt ① läuft offline (neu signieren → packen → sha256 → Listeneintrag). Schritt ② lädt ZIP und evejs-mod.json in DEIN eigenes GitHub-Repo. Schritt ③ ist eine einmalige Registrierung – danach keine PR mehr.','nl':'Stap ① is volledig offline (opnieuw ondertekenen → inpakken → sha256 → vermelding). Stap ② zet de ZIP en evejs-mod.json in JOUW GitHub-repo. Stap ③ is eenmalig; daarna geen PR meer.','ru':'Шаг ① полностью офлайн (переподпись → упаковка → sha256 → запись). Шаг ② загружает ZIP и evejs-mod.json в ВАШ репозиторий GitHub. Шаг ③ — однократная регистрация, дальше PR не нужен.'},
+  '署名只是给人看的名字；真正认人靠下面的作者标识与密钥指纹。私钥只存在本机 _launcher/data/mod-keys/，永不外传、永不打包。': {'en':'The display name is just a label; identity is verified by the author ID and key fingerprint below. The private key lives only on this machine in _launcher/data/mod-keys/ and is never shared or bundled.','ja':'表示名は単なるラベルで、本人確認は下の作者 ID と鍵指紋で行います。秘密鍵は本機の _launcher/data/mod-keys/ にのみ存在し、外部に渡ることも同梱されることもありません。','ko':'표시 이름은 단순한 라벨이며, 신원은 아래 작성자 ID와 키 지문으로 확인합니다. 개인 키는 이 컴퓨터의 _launcher/data/mod-keys/ 에만 있고 외부에 공유되거나 패키징되지 않습니다.','fr':'Le nom affiché n\'est qu\'un libellé ; l\'identité est vérifiée par l\'ID d\'auteur et l\'empreinte ci-dessous. La clé privée reste dans _launcher/data/mod-keys/ et n\'est jamais partagée.','de':'Der Anzeigename ist nur ein Label; die Identität prüft man über Autoren-ID und Fingerabdruck unten. Der private Schlüssel liegt nur in _launcher/data/mod-keys/.','nl':'De weergavenaam is slechts een label; de identiteit wordt bepaald door auteur-ID en vingerafdruk hieronder. De privésleutel staat alleen in _launcher/data/mod-keys/.','ru':'Отображаемое имя — только метка; личность подтверждается ID автора и отпечатком ключа ниже. Закрытый ключ хранится только в _launcher/data/mod-keys/.'},
+});
+
+Object.assign(TRANSLATE, {
+  '更新时间': {'en':'Updated','ja':'更新日時','ko':'업데이트 시각','fr':'Mis à jour','de':'Aktualisiert','nl':'Bijgewerkt','ru':'Обновлено'}
+});
+
+Object.assign(TRANSLATE, {
+  '无标签': {'en':'No tags','ja':'タグなし','ko':'태그 없음','fr':'Aucun tag','de':'Keine Tags','nl':'Geen tags','ru':'Без тегов'}
+});
+
+Object.assign(TRANSLATE, {
+  '全部分类': {'en':'All categories','ja':'すべてのカテゴリ','ko':'모든 분류','fr':'Toutes les catégories','de':'Alle Kategorien','nl':'Alle categorieën','ru':'Все категории'},
+  '未分类': {'en':'Uncategorized','ja':'未分類','ko':'미분류','fr':'Non classé','de':'Nicht kategorisiert','nl':'Niet gecategoriseerd','ru':'Без категории'},
+  '分类': {'en':'Category','ja':'カテゴリ','ko':'분류','fr':'Catégorie','de':'Kategorie','nl':'Categorie','ru':'Категория'},
+});
+
+Object.assign(TRANSLATE, {
+  '未验证': {'en':'Unverified','ja':'未検証','ko':'미검증','fr':'Non vérifié','de':'Nicht verifiziert','nl':'Niet geverifieerd','ru':'Не проверено'},
+  '签名密钥': {'en':'Signing key','ja':'署名鍵','ko':'서명 키','fr':'Clé de signature','de':'Signaturschlüssel','nl':'Ondertekeningssleutel','ru':'Ключ подписи'},
+  '这不是你的模组': {'en':'This is not your mod','ja':'これはあなたの模組ではありません','ko':'내 모드가 아닙니다','fr':'Ce n\'est pas votre mod','de':'Das ist nicht dein Mod','nl':'Dit is niet jouw mod','ru':'Это не ваш мод'},
+  '作者': {'en':'Author','ja':'作者','ko':'작성자','fr':'Auteur','de':'Autor','nl':'Auteur','ru':'Автор'},
+  '该模组的清单里没有作者标识。': {'en':'This mod\'s manifest has no author ID.','ja':'この模組のマニフェストには作者 ID がありません。','ko':'이 모드의 매니페스트에 작성자 ID가 없습니다.','fr':'Le manifeste de ce mod n\'a pas d\'ID d\'auteur.','de':'Das Manifest dieses Mods hat keine Autoren-ID.','nl':'Het manifest van deze mod heeft geen auteur-ID.','ru':'В манифесте этого мода нет ID автора.'},
+  '签名会把「你的作者身份」写进它的清单，之后它会出现在「我创建的」里。': {'en':'Signing writes YOUR author identity into its manifest, after which it will show up under My Mods.','ja':'署名すると「あなたの作者情報」がこのマニフェストに書き込まれ、「自分の作成」に表示されます。','ko':'서명하면 ‘내 작성자 정보’가 이 매니페스트에 기록되어 ‘내가 만든 것’에 표시됩니다.','fr':'Signer écrit VOTRE identité d\'auteur dans son manifeste ; il apparaîtra ensuite dans Mes mods.','de':'Beim Signieren wird DEINE Autorenidentität in das Manifest geschrieben; danach erscheint er unter Meine Mods.','nl':'Ondertekenen schrijft JOUW auteursidentiteit in het manifest; daarna verschijnt de mod onder Mijn mods.','ru':'При подписи ВАШ профиль автора будет записан в манифест, и мод появится в «Созданные мной».'},
+  '如果这不是你自己做的模组，请不要签。': {'en':'If you did not make this mod, do not sign it.','ja':'自分で作った模組でなければ署名しないでください。','ko':'직접 만든 모드가 아니라면 서명하지 마세요.','fr':'Si vous n\'avez pas créé ce mod, ne le signez pas.','de':'Wenn du diesen Mod nicht selbst erstellt hast, signiere ihn nicht.','nl':'Als je deze mod niet zelf hebt gemaakt, onderteken hem dan niet.','ru':'Если вы не автор этого мода, не подписывайте его.'},
+  '确定要签名吗？': {'en':'Sign it anyway?','ja':'署名しますか？','ko':'서명할까요?','fr':'Signer quand même ?','de':'Trotzdem signieren?','nl':'Toch ondertekenen?','ru':'Всё равно подписать?'},
+  '未签名模组仍可使用': {'en':'Unsigned mods still work','ja':'未署名の模組も使用できます','ko':'서명 없는 모드는 계속 사용할 수 있습니다','fr':'Les mods non signés fonctionnent toujours','de':'Nicht signierte Mods funktionieren weiterhin','nl':'Niet-ondertekende mods blijven werken','ru':'Моды без подписи продолжают работать'},
+});
+
+Object.assign(TRANSLATE, {
+  '市场收录': {'en':'In market','ja':'市場収録','ko':'마켓 등록','fr':'Dans le marché','de':'Im Markt','nl':'In de markt','ru':'В каталоге'},
+  '精选': {'en':'Featured','ja':'特選','ko':'추천','fr':'Sélection','de':'Empfohlen','nl':'Uitgelicht','ru':'Избранное'},
+  '合计': {'en':'total','ja':'合計','ko':'합계','fr':'au total','de':'gesamt','nl':'totaal','ru':'всего'},
+  '本地已装': {'en':'Installed','ja':'インストール済み','ko':'설치됨','fr':'Installés','de':'Installiert','nl':'Geïnstalleerd','ru':'Установлено'},
+  '覆盖市场': {'en':'coverage','ja':'カバー率','ko':'커버리지','fr':'couverture','de':'Abdeckung','nl':'dekking','ru':'покрытие'},
+  '本地版本落后于市场': {'en':'local is behind the market','ja':'ローカルが市場より古い','ko':'로컬이 마켓보다 낮음','fr':'la version locale est en retard','de':'lokal ist älter als der Markt','nl':'lokaal loopt achter','ru':'локальная версия устарела'},
+  '全部为最新': {'en':'everything is up to date','ja':'すべて最新です','ko':'모두 최신입니다','fr':'tout est à jour','de':'alles ist aktuell','nl':'alles is up-to-date','ru':'всё актуально'},
+  '累计下载': {'en':'Total downloads','ja':'累計ダウンロード','ko':'누적 다운로드','fr':'Téléchargements cumulés','de':'Downloads gesamt','nl':'Totaal downloads','ru':'Всего загрузок'},
+  '未统计': {'en':'not tracked','ja':'未集計','ko':'집계 안 됨','fr':'non suivi','de':'nicht erfasst','nl':'niet bijgehouden','ru':'не отслеживается'},
+  '最热单品': {'en':'top item','ja':'人気 No.1','ko':'최다 다운로드','fr':'le plus téléchargé','de':'Top-Artikel','nl':'populairste item','ru':'самый популярный'},
+  '次': {'en':'times','ja':'回','ko':'회','fr':'fois','de':'mal','nl':'keer','ru':'раз'},
+  '需要作者用 Release 发布 ZIP': {'en':'needs the ZIP published as a GitHub Release','ja':'ZIP を GitHub Release で公開する必要があります','ko':'ZIP을 GitHub Release로 게시해야 집계됩니다','fr':'le ZIP doit être publié dans une Release GitHub','de':'ZIP muss als GitHub-Release veröffentlicht sein','nl':'de ZIP moet als GitHub Release zijn gepubliceerd','ru':'нужно опубликовать ZIP в GitHub Release'},
+  '下载': {'en':'Downloads','ja':'ダウンロード','ko':'다운로드','fr':'Téléchargements','de':'Downloads','nl':'Downloads','ru':'Загрузки'},
+});
+
+Object.assign(TRANSLATE, {
+  '上次检查': {'en':'Last checked','ja':'最終確認','ko':'마지막 확인','fr':'Dernière vérification','de':'Zuletzt geprüft','nl':'Laatst gecontroleerd','ru':'Последняя проверка'},
+  '检查更新': {'en':'Check for updates','ja':'更新を確認','ko':'업데이트 확인','fr':'Vérifier les mises à jour','de':'Nach Updates suchen','nl':'Controleren op updates','ru':'Проверить обновления'},
+});
+
+Object.assign(TRANSLATE, {
+  '详情': {'en':'Details','ja':'詳細','ko':'상세','fr':'Détails','de':'Details','nl':'Details','ru':'Подробнее'},
+  '模组详情': {'en':'Mod details','ja':'模組の詳細','ko':'모드 상세','fr':'Détails du mod','de':'Mod-Details','nl':'Moddetails','ru':'Детали мода'},
+  '标签': {'en':'Tags','ja':'タグ','ko':'태그','fr':'Tags','de':'Tags','nl':'Tags','ru':'Теги'},
+  'MOD大小': {'en':'Mod size','ja':'MOD サイズ','ko':'모드 크기','fr':'Taille du mod','de':'Mod-Größe','nl':'Modgrootte','ru':'Размер мода'},
+  '本地版本': {'en':'Local version','ja':'ローカル版','ko':'로컬 버전','fr':'Version locale','de':'Lokale Version','nl':'Lokale versie','ru':'Локальная версия'},
+  '最新版本': {'en':'Latest version','ja':'最新版','ko':'최신 버전','fr':'Dernière version','de':'Neueste Version','nl':'Nieuwste versie','ru':'Последняя версия'},
+  '体积': {'en':'Size','ja':'サイズ','ko':'용량','fr':'Taille','de':'Größe','nl':'Grootte','ru':'Размер'},
+  '重启要求': {'en':'Restart','ja':'再起動','ko':'재시작','fr':'Redémarrage','de':'Neustart','nl':'Herstart','ru':'Перезапуск'},
+  '不需要重启': {'en':'No restart needed','ja':'再起動不要','ko':'재시작 불필요','fr':'Aucun redémarrage','de':'Kein Neustart nötig','nl':'Geen herstart nodig','ru':'Перезапуск не нужен'},
+  '互斥模组': {'en':'Conflicting mods','ja':'競合する模組','ko':'충돌 모드','fr':'Mods en conflit','de':'Konflikt-Mods','nl':'Conflicterende mods','ru':'Конфликтующие моды'},
+  '无': {'en':'None','ja':'なし','ko':'없음','fr':'Aucun','de':'Keine','nl':'Geen','ru':'Нет'},
+  '兼容版本': {'en':'Compatible versions','ja':'対応バージョン','ko':'호환 버전','fr':'Versions compatibles','de':'Kompatible Versionen','nl':'Compatibele versies','ru':'Совместимые версии'},
+  '未声明': {'en':'Not declared','ja':'未宣言','ko':'선언되지 않음','fr':'Non déclaré','de':'Nicht angegeben','nl':'Niet opgegeven','ru':'Не указано'},
+  '来源': {'en':'Source','ja':'入手元','ko':'출처','fr':'Source','de':'Quelle','nl':'Bron','ru':'Источник'},
+  '本机': {'en':'This machine','ja':'本機','ko':'이 컴퓨터','fr':'Cette machine','de':'Dieser Rechner','nl':'Deze pc','ru':'Этот компьютер'},
+  '本机安装': {'en':'Installed locally','ja':'ローカル導入','ko':'로컬 설치','fr':'Installé localement','de':'Lokal installiert','nl':'Lokaal geïnstalleerd','ru':'Установлено локально'},
+  '评分': {'en':'Rating','ja':'評価','ko':'평점','fr':'Note','de':'Bewertung','nl':'Beoordeling','ru':'Оценка'},
+  '功能要点': {'en':'Highlights','ja':'機能ポイント','ko':'기능 요점','fr':'Points clés','de':'Highlights','nl':'Hoogtepunten','ru':'Ключевые возможности'},
+  '模组说明': {'en':'About this mod','ja':'模組の説明','ko':'모드 설명','fr':'À propos de ce mod','de':'Über diesen Mod','nl':'Over deze mod','ru':'О моде'},
+  '这个模组没有写说明（README.md 为空）': {'en':'This mod has no description yet (README.md is empty)','ja':'この模組には説明がありません（README.md が空）','ko':'이 모드에는 설명이 없습니다(README.md 비어 있음)','fr':'Ce mod n\'a pas de description (README.md vide)','de':'Dieser Mod hat keine Beschreibung (README.md leer)','nl':'Deze mod heeft geen beschrijving (README.md leeg)','ru':'У мода нет описания (README.md пуст)'},
+  '本次更新': {'en':'What changed','ja':'今回の更新','ko':'이번 업데이트','fr':'Nouveautés','de':'Änderungen','nl':'Wat is er nieuw','ru':'Что изменилось'},
+  '玩家评价': {'en':'Player reviews','ja':'プレイヤー評価','ko':'플레이어 평가','fr':'Avis des joueurs','de':'Spielerbewertungen','nl':'Spelersbeoordelingen','ru':'Отзывы игроков'},
+  '评分与评价需要服务器汇总，当前版本先在索引里展示聚合评分。': {'en':'Ratings and reviews need a server to aggregate; for now the index only carries an aggregate score.','ja':'評価とレビューはサーバーでの集計が必要です。現状はインデックスの集計値のみ表示します。','ko':'평점과 리뷰는 서버 집계가 필요합니다. 현재는 색인의 집계 값만 표시합니다.','fr':'Les notes et avis nécessitent un serveur ; l\'index ne fournit qu\'une moyenne globale.','de':'Bewertungen brauchen einen Server; der Index liefert nur einen Durchschnitt.','nl':'Beoordelingen vereisen een server; de index bevat alleen een gemiddelde.','ru':'Рейтинги и отзывы требуют сервера; индекс пока содержит только среднюю оценку.'},
+  '已停用': {'en':'Disabled','ja':'無効','ko':'비활성화됨','fr':'Désactivé','de':'Deaktiviert','nl':'Uitgeschakeld','ru':'Отключён'},
+  '重新签名': {'en':'Re-sign','ja':'再署名','ko':'다시 서명','fr':'Re-signer','de':'Neu signieren','nl':'Opnieuw ondertekenen','ru':'Переподписать'},
+  '说明': {'en':'Description','ja':'説明','ko':'설명','fr':'Description','de':'Beschreibung','nl':'Beschrijving','ru':'Описание'},
+  '模组市场': {'en':'Mod market','ja':'模組マーケット','ko':'모드 마켓','fr':'Marché des mods','de':'Mod-Markt','nl':'Modmarkt','ru':'Рынок модов'},
+});
+
+Object.assign(TRANSLATE, {
+  '还没有属于你的模组': {'en':'No mods of yours yet','ja':'まだあなたの模組はありません','ko':'아직 내 모드가 없습니다','fr':'Aucun mod à vous pour l\'instant','de':'Noch keine eigenen Mods','nl':'Nog geen eigen mods','ru':'Ваших модов пока нет'},
+  '用「创建模组」建一个，或用「提交模组」把已有模组发布到你自己的仓库。带你的作者标识或签名的模组会自动出现在这里。': {'en':'Use Create mod to make one, or Submit mod to publish an existing mod to your own repo. Mods carrying your author ID or signature show up here automatically.','ja':'「模組を作成」で作るか、「模組を投稿」で既存の模組を自分のリポジトリへ公開してください。あなたの作者 ID か署名がある模組はここに自動で表示されます。','ko':'‘모드 만들기’로 새로 만들거나 ‘모드 제출’로 기존 모드를 내 저장소에 게시하세요. 내 작성자 ID나 서명이 있는 모드는 여기에 자동으로 표시됩니다.','fr':'Utilisez Créer un mod, ou Soumettre un mod pour publier un mod existant sur votre dépôt. Les mods portant votre ID d\'auteur ou votre signature apparaissent ici.','de':'Nutze „Mod erstellen“ oder „Mod einreichen“, um einen vorhandenen Mod in deinem Repo zu veröffentlichen. Mods mit deiner Autoren-ID oder Signatur erscheinen hier.','nl':'Gebruik Mod maken, of Mod indienen om een bestaande mod naar je eigen repo te publiceren. Mods met jouw auteur-ID of handtekening verschijnen hier.','ru':'Создайте мод кнопкой «Создать мод» или опубликуйте существующий через «Отправить мод». Моды с вашим ID автора или подписью появятся здесь.'},
+  '索引里还没有模组': {'en':'No mods in the index yet','ja':'インデックスにまだ模組がありません','ko':'색인에 아직 모드가 없습니다','fr':'Aucun mod dans l\'index','de':'Noch keine Mods im Index','nl':'Nog geen mods in de index','ru':'В индексе пока нет модов'},
+  '可能索引仓库还没建好，或网络不通。点下面的按钮重新拉取一次。': {'en':'The index repository may not exist yet, or the network is blocked. Click below to fetch again.','ja':'索引リポジトリが未作成か、ネットワーク不通の可能性があります。下のボタンで再取得してください。','ko':'색인 저장소가 아직 없거나 네트워크가 막혔을 수 있습니다. 아래 버튼으로 다시 시도하세요.','fr':'Le dépôt d\'index n\'existe peut-être pas encore, ou le réseau est bloqué. Cliquez ci-dessous pour réessayer.','de':'Das Index-Repo existiert evtl. noch nicht oder das Netzwerk ist blockiert. Unten erneut laden.','nl':'De indexrepo bestaat misschien nog niet of het netwerk is geblokkeerd. Klik hieronder om opnieuw te laden.','ru':'Возможно, репозиторий индекса ещё не создан или сеть заблокирована. Нажмите ниже, чтобы повторить.'},
+  '重新拉取索引': {'en':'Fetch index again','ja':'インデックスを再取得','ko':'색인 다시 가져오기','fr':'Recharger l\'index','de':'Index erneut laden','nl':'Index opnieuw laden','ru':'Обновить индекс'},
+  '带你的作者标识或签名的模组会自动出现在这里。': {'en':'Mods carrying your author ID or signature show up here automatically.','ja':'あなたの作者 ID か署名がある模組はここに自動で表示されます。','ko':'내 작성자 ID나 서명이 있는 모드는 여기에 자동으로 표시됩니다.','fr':'Les mods portant votre ID d\'auteur ou votre signature apparaissent ici.','de':'Mods mit deiner Autoren-ID oder Signatur erscheinen hier.','nl':'Mods met jouw auteur-ID of handtekening verschijnen hier.','ru':'Моды с вашим ID автора или подписью появятся здесь.'},
+  '功能还没准备好': {'en':'Not ready yet','ja':'まだ準備できていません','ko':'아직 준비되지 않았습니다','fr':'Pas encore prêt','de':'Noch nicht bereit','nl':'Nog niet gereed','ru':'Ещё не готово'},
+});
+
+Object.assign(TRANSLATE, {
+  '已安装': {'en':'Installed','ja':'インストール済み','ko':'설치됨','fr':'Installés','de':'Installiert','nl':'Geïnstalleerd','ru':'Установлено'},
+  '检测到模组冲突': {'en':'Mod conflicts detected','ja':'模組の競合を検出','ko':'모드 충돌 감지','fr':'Conflits de mods détectés','de':'Mod-Konflikte erkannt','nl':'Modconflicten gevonden','ru':'Обнаружены конфликты модов'},
+  '个正在启用': {'en':'active','ja':'有効中','ko':'활성','fr':'actifs','de':'aktiv','nl':'actief','ru':'активных'},
+  '仅本地': {'en':'Local only','ja':'ローカルのみ','ko':'로컬만','fr':'Local uniquement','de':'Nur lokal','nl':'Alleen lokaal','ru':'Только локально'},
+  '待提交': {'en':'Ready to submit','ja':'投稿待ち','ko':'제출 대기','fr':'Prêt à soumettre','de':'Bereit zum Einreichen','nl':'Klaar om in te dienen','ru':'Готово к отправке'},
+  '已提交（待合并）': {'en':'Submitted (pending merge)','ja':'投稿済み（マージ待ち）','ko':'제출됨(병합 대기)','fr':'Soumis (en attente de fusion)','de':'Eingereicht (wartet auf Merge)','nl':'Ingediend (wacht op merge)','ru':'Отправлено (ждёт слияния)'},
+  '已上架': {'en':'Listed','ja':'掲載中','ko':'등록됨','fr':'Publié','de':'Gelistet','nl':'Vermeld','ru':'В каталоге'},
+  '已下架': {'en':'Delisted','ja':'掲載終了','ko':'등록 해제','fr':'Retiré','de':'Entfernt','nl':'Verwijderd','ru':'Снято с публикации'},
+  '本地比已上架新': {'en':'Local is newer than listed','ja':'ローカルが掲載版より新しい','ko':'로컬이 등록 버전보다 최신','fr':'Local plus récent que la version publiée','de':'Lokal neuer als gelistet','nl':'Lokaal nieuwer dan vermeld','ru':'Локально новее опубликованного'},
+  '还没有属于你的模组 —— 点上方「创建模组」开始': {'en':'No mods of yours yet — click Create mod above to start','ja':'まだあなたの模組はありません。上の「模組を作成」から始めてください','ko':'아직 내 모드가 없습니다. 위의 ‘모드 만들기’로 시작하세요','fr':'Aucun mod à vous — cliquez sur Créer un mod','de':'Noch keine eigenen Mods – oben „Mod erstellen“ nutzen','nl':'Nog geen eigen mods — klik hierboven op Mod maken','ru':'Ваших модов пока нет — нажмите «Создать мод»'},
+  '加载索引中…': {'en':'Loading index…','ja':'インデックスを読み込み中…','ko':'색인 불러오는 중…','fr':'Chargement de l\'index…','de':'Index wird geladen…','nl':'Index laden…','ru':'Загрузка индекса…'},
+  '索引里还没有模组（或索引暂时不可用）': {'en':'No mods in the index (or the index is unavailable)','ja':'インデックスに模組がありません（一時的に利用不可の可能性）','ko':'색인에 모드가 없습니다(색인 사용 불가)','fr':'Aucun mod dans l\'index (ou index indisponible)','de':'Keine Mods im Index (oder Index nicht erreichbar)','nl':'Geen mods in de index (of index onbereikbaar)','ru':'В индексе нет модов (или индекс недоступен)'},
+  '索引已刷新': {'en':'Index refreshed','ja':'インデックスを更新しました','ko':'색인을 새로 고쳤습니다','fr':'Index actualisé','de':'Index aktualisiert','nl':'Index vernieuwd','ru':'Индекс обновлён'},
+  '索引加载失败': {'en':'Failed to load index','ja':'インデックスの読み込みに失敗','ko':'색인 로드 실패','fr':'Échec du chargement de l\'index','de':'Index konnte nicht geladen werden','nl':'Index laden mislukt','ru':'Не удалось загрузить индекс'},
+  '可安装': {'en':'Available','ja':'導入可能','ko':'설치 가능','fr':'Disponible','de':'Verfügbar','nl':'Beschikbaar','ru':'Доступен'},
+  '可更新': {'en':'Update','ja':'更新あり','ko':'업데이트 있음','fr':'Mise à jour','de':'Update','nl':'Update','ru':'Обновление'},
+  '已安装过了': {'en':'Already installed','ja':'インストール済み','ko':'이미 설치됨','fr':'Déjà installé','de':'Bereits installiert','nl':'Al geïnstalleerd','ru':'Уже установлено'},
+  '安装': {'en':'Install','ja':'インストール','ko':'설치','fr':'Installer','de':'Installieren','nl':'Installeren','ru':'Установить'},
+  '更新': {'en':'Update','ja':'更新','ko':'업데이트','fr':'Mettre à jour','de':'Aktualisieren','nl':'Bijwerken','ru':'Обновить'},
+  '重装': {'en':'Reinstall','ja':'再インストール','ko':'재설치','fr':'Réinstaller','de':'Neu installieren','nl':'Opnieuw installeren','ru':'Переустановить'},
+  '下载中': {'en':'Downloading','ja':'ダウンロード中','ko':'다운로드 중','fr':'Téléchargement','de':'Wird geladen','nl':'Downloaden','ru':'Загрузка'},
+  '未知作者': {'en':'Unknown author','ja':'不明な作者','ko':'알 수 없는 작성자','fr':'Auteur inconnu','de':'Unbekannter Autor','nl':'Onbekende auteur','ru':'Неизвестный автор'},
+  '需重启': {'en':'Restart required','ja':'要再起動','ko':'재시작 필요','fr':'Redémarrage requis','de':'Neustart nötig','nl':'Herstart nodig','ru':'Нужен перезапуск'},
+  '源码': {'en':'Source','ja':'ソース','ko':'소스','fr':'Source','de':'Quelle','nl':'Bron','ru':'Источник'},
+  '提新版 / 提交': {'en':'New version / Submit','ja':'新版 / 投稿','ko':'새 버전 / 제출','fr':'Nouvelle version / Soumettre','de':'Neue Version / Einreichen','nl':'Nieuwe versie / Indienen','ru':'Новая версия / Отправить'},
+  '打开目录': {'en':'Open folder','ja':'フォルダーを開く','ko':'폴더 열기','fr':'Ouvrir le dossier','de':'Ordner öffnen','nl':'Map openen','ru':'Открыть папку'},
+  '打开 PR': {'en':'Open PR','ja':'PR を開く','ko':'PR 열기','fr':'Ouvrir la PR','de':'PR öffnen','nl':'PR openen','ru':'Открыть PR'},
+  '安装失败': {'en':'Install failed','ja':'インストールに失敗','ko':'설치 실패','fr':'Échec de l\'installation','de':'Installation fehlgeschlagen','nl':'Installatie mislukt','ru':'Не удалось установить'},
+  '已安装': {'en':'Installed','ja':'インストール済み','ko':'설치됨','fr':'Installé','de':'Installiert','nl':'Geïnstalleerd','ru':'Установлено'},
+  '已更新': {'en':'Updated','ja':'更新しました','ko':'업데이트됨','fr':'Mis à jour','de':'Aktualisiert','nl':'Bijgewerkt','ru':'Обновлено'},
+  '已导出': {'en':'Exported','ja':'エクスポートしました','ko':'내보냈습니다','fr':'Exporté','de':'Exportiert','nl':'Geëxporteerd','ru':'Экспортировано'},
+  '导出失败': {'en':'Export failed','ja':'エクスポートに失敗','ko':'내보내기 실패','fr':'Échec de l\'export','de':'Export fehlgeschlagen','nl':'Exporteren mislukt','ru':'Ошибка экспорта'},
+  '没有可导出的模组': {'en':'No mods to export','ja':'エクスポートできる模組がありません','ko':'내보낼 모드가 없습니다','fr':'Aucun mod à exporter','de':'Keine Mods zum Exportieren','nl':'Geen mods om te exporteren','ru':'Нет модов для экспорта'},
+});
+
+Object.assign(TRANSLATE, {
+  '我的仓库（owner/repo，留空则自动建 evejs-mod-<id>）': {'en':'My repo (owner/repo; leave blank to auto-create evejs-mod-<id>)','ja':'自分のリポジトリ（owner/repo。空なら evejs-mod-<id> を自動作成）','ko':'내 저장소(owner/repo, 비우면 evejs-mod-<id> 자동 생성)','fr':'Mon dépôt (owner/repo ; vide = création auto de evejs-mod-<id>)','de':'Mein Repo (owner/repo; leer = evejs-mod-<id> wird angelegt)','nl':'Mijn repo (owner/repo; leeg = evejs-mod-<id> wordt aangemaakt)','ru':'Мой репозиторий (owner/repo; пусто — создастся evejs-mod-<id>)'},
+  '② 发布到我的仓库（建仓库 → 写 evejs-mod.json → 发 Release）': {'en':'2) Publish to my repo (create repo → write evejs-mod.json → create Release)','ja':'② 自分のリポジトリへ公開（作成 → evejs-mod.json → Release）','ko':'② 내 저장소에 게시(생성 → evejs-mod.json → Release)','fr':'2) Publier sur mon dépôt (créer → evejs-mod.json → Release)','de':'2) In mein Repo veröffentlichen (Repo → evejs-mod.json → Release)','nl':'2) Publiceren naar mijn repo (repo → evejs-mod.json → Release)','ru':'2) Опубликовать в мой репозиторий (репозиторий → evejs-mod.json → Release)'},
+  '③ 申请收录（一次性 PR 到索引仓库）': {'en':'3) Request listing (one-time PR to the index repo)','ja':'③ 収録申請（索引リポジトリへ一度だけ PR）','ko':'③ 등록 요청(색인 저장소에 1회 PR)','fr':'3) Demander l\'inscription (PR unique vers l\'index)','de':'3) Aufnahme beantragen (einmalige PR)','nl':'3) Opname aanvragen (eenmalige PR)','ru':'3) Заявка на включение (однократный PR)'},
+  '已发布到我的仓库': {'en':'Published to my repo','ja':'自分のリポジトリに公開しました','ko':'내 저장소에 게시했습니다','fr':'Publié sur mon dépôt','de':'In mein Repo veröffentlicht','nl':'Gepubliceerd naar mijn repo','ru':'Опубликовано в мой репозиторий'},
+  '（仓库是本次新建的）': {'en':'(repo was created just now)','ja':'（リポジトリは今回作成）','ko':'(저장소를 방금 만들었습니다)','fr':'(dépôt créé à l\'instant)','de':'(Repo gerade angelegt)','nl':'(repo zojuist aangemaakt)','ru':'(репозиторий только что создан)'},
+  '下一步：点 ③ 申请收录（一次性）': {'en':'Next: click step 3 to request listing (one-time)','ja':'次へ：③ で収録申請（一度だけ）','ko':'다음: ③ 등록 요청(1회)','fr':'Ensuite : étape 3 pour l\'inscription (unique)','de':'Weiter: Schritt ③ für die Aufnahme (einmalig)','nl':'Volgende: stap ③ voor opname (eenmalig)','ru':'Далее: шаг ③ для включения (однократно)'},
+  '仓库已就绪，可手动上传 ZIP 到 Release': {'en':'Repo is ready — you can upload the ZIP to a Release manually','ja':'リポジトリは準備済み。手動で Release に ZIP をアップロードできます','ko':'저장소가 준비되었습니다. Release에 ZIP을 직접 업로드하세요','fr':'Dépôt prêt — vous pouvez téléverser le ZIP manuellement','de':'Repo bereit – ZIP kann manuell hochgeladen werden','nl':'Repo is gereed — upload de ZIP handmatig','ru':'Репозиторий готов — загрузите ZIP вручную'},
+  '收录申请已提交': {'en':'Listing request submitted','ja':'収録申請を送信しました','ko':'등록 요청을 제출했습니다','fr':'Demande d\'inscription envoyée','de':'Aufnahmeantrag gesendet','nl':'Opnameaanvraag verstuurd','ru':'Заявка отправлена'},
+  '请先执行「② 发布到我的仓库」': {'en':'Run step 2 (publish to my repo) first','ja':'先に②を実行してください','ko':'먼저 ②를 실행하세요','fr':'Lancez d\'abord l\'étape 2','de':'Bitte zuerst Schritt ② ausführen','nl':'Voer eerst stap ② uit','ru':'Сначала выполните шаг ②'},
+});
+
+Object.assign(TRANSLATE, {
+  '提交模组': {'en':'Submit mod','ja':'模組を投稿','ko':'모드 제출','fr':'Soumettre un mod','de':'Mod einreichen','nl':'Mod indienen','ru':'Отправить мод'},
+  '（我的）': {'en':'(mine)','ja':'（自分の）','ko':'(내 것)','fr':'(le mien)','de':'(meins)','nl':'(van mij)','ru':'(мой)'},
+  '我创建的': {'en':'Created by me','ja':'自分の作成','ko':'내가 만든 것','fr':'Créés par moi','de':'Von mir erstellt','nl':'Door mij gemaakt','ru':'Созданные мной'},
+  '其它模组': {'en':'Other mods','ja':'その他の模組','ko':'다른 모드','fr':'Autres mods','de':'Andere Mods','nl':'Andere mods','ru':'Другие моды'},
+  '更新说明（会写进索引与 PR）': {'en':'Changelog (goes into the index and the PR)','ja':'更新内容（インデックスと PR に記載）','ko':'변경 사항(색인과 PR에 기록)','fr':'Notes de version (index et PR)','de':'Änderungen (Index und PR)','nl':'Wijzigingen (index en PR)','ru':'Что изменилось (в индекс и PR)'},
+  '源码 / 项目地址（选填）': {'en':'Source / project URL (optional)','ja':'ソース / プロジェクト URL（任意）','ko':'소스 / 프로젝트 URL(선택)','fr':'URL source / projet (facultatif)','de':'Quell-/Projekt-URL (optional)','nl':'Bron-/project-URL (optioneel)','ru':'Ссылка на источник (необязательно)'},
+  'GitHub Releases 直链（ZIP）': {'en':'GitHub Releases direct link (ZIP)','ja':'GitHub Releases 直リンク（ZIP）','ko':'GitHub Releases 직접 링크(ZIP)','fr':'Lien direct GitHub Releases (ZIP)','de':'GitHub-Releases-Direktlink (ZIP)','nl':'GitHub Releases directe link (ZIP)','ru':'Прямая ссылка GitHub Releases (ZIP)'},
+  '① 生成并打包': {'en':'1) Generate and pack','ja':'① 生成して固める','ko':'① 생성 후 패키징','fr':'1) Générer et empaqueter','de':'1) Erzeugen und packen','nl':'1) Genereren en inpakken','ru':'1) Собрать пакет'},
+  '打开 ZIP 目录': {'en':'Open ZIP folder','ja':'ZIP フォルダーを開く','ko':'ZIP 폴더 열기','fr':'Ouvrir le dossier du ZIP','de':'ZIP-Ordner öffnen','nl':'ZIP-map openen','ru':'Открыть папку ZIP'},
+  '打包结果': {'en':'Pack result','ja':'固めた結果','ko':'패키징 결과','fr':'Résultat du paquet','de':'Paket-Ergebnis','nl':'Resultaat','ru':'Результат сборки'},
+  '索引分片（可直接贴进索引仓库 mods/<id>.json）': {'en':'Index shard (paste into the index repo as mods/<id>.json)','ja':'インデックス断片（索引リポジトリの mods/<id>.json に貼り付け）','ko':'색인 조각(색인 저장소 mods/<id>.json에 붙여넣기)','fr':'Fragment d\'index (à coller dans mods/<id>.json)','de':'Index-Fragment (in mods/<id>.json einfügen)','nl':'Indexfragment (in mods/<id>.json plakken)','ru':'Фрагмент индекса (в mods/<id>.json)'},
+  '复制分片 JSON': {'en':'Copy shard JSON','ja':'断片 JSON をコピー','ko':'조각 JSON 복사','fr':'Copier le JSON','de':'Fragment-JSON kopieren','nl':'Fragment-JSON kopiëren','ru':'Скопировать JSON фрагмента'},
+  'GitHub 令牌（只用于提交，需 fine-grained：Contents + Pull requests 读写）': {'en':'GitHub token (submit only; fine-grained with Contents + Pull requests read/write)','ja':'GitHub トークン（投稿専用、fine-grained で Contents と Pull requests の読み書き）','ko':'GitHub 토큰(제출 전용, fine-grained Contents + Pull requests 읽기/쓰기)','fr':'Jeton GitHub (soumission uniquement ; fine-grained Contents + Pull requests)','de':'GitHub-Token (nur fürs Einreichen; fine-grained Contents + Pull requests)','nl':'GitHub-token (alleen voor indienen; fine-grained Contents + Pull requests)','ru':'Токен GitHub (только для отправки; fine-grained Contents + Pull requests)'},
+  '保存': {'en':'Save','ja':'保存','ko':'저장','fr':'Enregistrer','de':'Speichern','nl':'Opslaan','ru':'Сохранить'},
+  '校验': {'en':'Verify','ja':'検証','ko':'검증','fr':'Vérifier','de':'Prüfen','nl':'Verifiëren','ru':'Проверить'},
+  '清除': {'en':'Clear','ja':'クリア','ko':'지우기','fr':'Effacer','de':'Löschen','nl':'Wissen','ru':'Очистить'},
+  '② 用 GitHub 提交（fork → 分支 → PR）': {'en':'2) Submit via GitHub (fork → branch → PR)','ja':'② GitHub で投稿（fork → branch → PR）','ko':'② GitHub로 제출(fork → branch → PR)','fr':'2) Soumettre via GitHub (fork → branche → PR)','de':'2) Über GitHub einreichen (Fork → Branch → PR)','nl':'2) Indienen via GitHub (fork → branch → PR)','ru':'2) Отправить через GitHub (fork → branch → PR)'},
+  '打开 PR 页面': {'en':'Open PR page','ja':'PR ページを開く','ko':'PR 페이지 열기','fr':'Ouvrir la page de PR','de':'PR-Seite öffnen','nl':'PR-pagina openen','ru':'Открыть страницу PR'},
+  '还没有保存令牌': {'en':'No token saved yet','ja':'トークンが未保存です','ko':'저장된 토큰이 없습니다','fr':'Aucun jeton enregistré','de':'Noch kein Token gespeichert','nl':'Nog geen token opgeslagen','ru':'Токен ещё не сохранён'},
+  '令牌已加密保存（仅本机可用）': {'en':'Token saved encrypted (this machine only)','ja':'トークンを暗号化して保存しました（本機のみ）','ko':'토큰을 암호화해 저장했습니다(이 PC 전용)','fr':'Jeton enregistré chiffré (cette machine uniquement)','de':'Token verschlüsselt gespeichert (nur dieser Rechner)','nl':'Token versleuteld opgeslagen (alleen deze pc)','ru':'Токен сохранён зашифрованно (только этот компьютер)'},
+  '令牌只保存在内存里（当前环境不支持加密存储）': {'en':'Token kept in memory only (encryption unavailable here)','ja':'トークンはメモリのみ（この環境では暗号化保存不可）','ko':'토큰은 메모리에만 저장됩니다(암호화 저장 불가)','fr':'Jeton en mémoire uniquement (chiffrement indisponible)','de':'Token nur im Speicher (Verschlüsselung nicht verfügbar)','nl':'Token alleen in geheugen (versleuteling niet beschikbaar)','ru':'Токен только в памяти (шифрование недоступно)'},
+  '令牌已加密保存': {'en':'Token saved (encrypted)','ja':'トークンを暗号化して保存しました','ko':'토큰을 암호화해 저장했습니다','fr':'Jeton enregistré (chiffré)','de':'Token gespeichert (verschlüsselt)','nl':'Token opgeslagen (versleuteld)','ru':'Токен сохранён (зашифрован)'},
+  '令牌只保存在内存里': {'en':'Token kept in memory only','ja':'トークンはメモリのみ','ko':'토큰은 메모리에만 저장됨','fr':'Jeton conservé en mémoire','de':'Token nur im Speicher','nl':'Token alleen in geheugen','ru':'Токен только в памяти'},
+  '令牌已清除': {'en':'Token cleared','ja':'トークンを削除しました','ko':'토큰을 지웠습니다','fr':'Jeton effacé','de':'Token gelöscht','nl':'Token gewist','ru':'Токен удалён'},
+  '令牌有效': {'en':'Token is valid','ja':'トークンは有効です','ko':'토큰이 유효합니다','fr':'Jeton valide','de':'Token ist gültig','nl':'Token is geldig','ru':'Токен действителен'},
+  '令牌无效': {'en':'Token is invalid','ja':'トークンが無効です','ko':'토큰이 유효하지 않습니다','fr':'Jeton invalide','de':'Token ist ungültig','nl':'Token is ongeldig','ru':'Токен недействителен'},
+  '令牌校验失败': {'en':'Token check failed','ja':'トークン検証に失敗','ko':'토큰 검증 실패','fr':'Échec de la vérification du jeton','de':'Token-Prüfung fehlgeschlagen','nl':'Token-controle mislukt','ru':'Проверка токена не удалась'},
+  '令牌不能为空': {'en':'Token cannot be empty','ja':'トークンを入力してください','ko':'토큰을 입력하세요','fr':'Le jeton ne peut pas être vide','de':'Token darf nicht leer sein','nl':'Token mag niet leeg zijn','ru':'Токен не может быть пустым'},
+  '请先选择一个模组': {'en':'Pick a mod first','ja':'先に模組を選択してください','ko':'먼저 모드를 선택하세요','fr':'Choisissez d\'abord un mod','de':'Bitte zuerst einen Mod wählen','nl':'Kies eerst een mod','ru':'Сначала выберите мод'},
+  '已生成待提交包': {'en':'Submission package ready','ja':'投稿パッケージを生成しました','ko':'제출 패키지를 만들었습니다','fr':'Paquet prêt','de':'Paket bereit','nl':'Pakket gereed','ru':'Пакет готов'},
+  '打包失败': {'en':'Pack failed','ja':'固めに失敗しました','ko':'패키징 실패','fr':'Échec de l\'empaquetage','de':'Packen fehlgeschlagen','nl':'Inpakken mislukt','ru':'Не удалось собрать пакет'},
+  '正在提交（fork → 分支 → PR），请稍候…': {'en':'Submitting (fork → branch → PR), please wait…','ja':'投稿中（fork → branch → PR）お待ちください…','ko':'제출 중(fork → branch → PR), 잠시만…','fr':'Envoi en cours (fork → branche → PR)…','de':'Wird eingereicht (Fork → Branch → PR) …','nl':'Bezig met indienen (fork → branch → PR)…','ru':'Отправка (fork → branch → PR)…'},
+  'PR 已创建': {'en':'PR created','ja':'PR を作成しました','ko':'PR을 만들었습니다','fr':'PR créée','de':'PR erstellt','nl':'PR aangemaakt','ru':'PR создан'},
+  '提交失败': {'en':'Submit failed','ja':'投稿に失敗しました','ko':'제출 실패','fr':'Échec de la soumission','de':'Einreichen fehlgeschlagen','nl':'Indienen mislukt','ru':'Не удалось отправить'},
+  '可改用「打开 PR 页面」手动提交': {'en':'You can switch to Open PR page to submit manually','ja':'「PR ページを開く」で手動投稿できます','ko':'「PR 페이지 열기」로 수동 제출할 수 있습니다','fr':'Utilisez « Ouvrir la page de PR » pour soumettre manuellement','de':'Alternativ „PR-Seite öffnen“ zum manuellen Einreichen','nl':'Gebruik anders ‘PR-pagina openen’ om handmatig in te dienen','ru':'Можно отправить вручную через «Открыть страницу PR»'},
+  '还没有提交记录，请先点②或直接到索引仓库手动开 PR': {'en':'No submission yet — click step 2 first, or open a PR manually in the index repo','ja':'まだ投稿記録がありません。② を実行するか、索引リポジトリで手動 PR を作成してください','ko':'제출 기록이 없습니다. ②를 누르거나 색인 저장소에서 수동으로 PR을 만드세요','fr':'Aucune soumission ; cliquez sur ② ou ouvrez une PR manuellement','de':'Noch keine Einreichung – Schritt ② nutzen oder manuell eine PR öffnen','nl':'Nog geen inzending — klik ② of open handmatig een PR','ru':'Отправок нет — нажмите ② или создайте PR вручную'},
+  '分片 JSON 已复制': {'en':'Shard JSON copied','ja':'断片 JSON をコピーしました','ko':'조각 JSON을 복사했습니다','fr':'JSON du fragment copié','de':'Fragment-JSON kopiert','nl':'Fragment-JSON gekopieerd','ru':'JSON фрагмента скопирован'},
+  '请先执行①生成并打包': {'en':'Run step 1 (generate and pack) first','ja':'先に①を実行してください','ko':'먼저 ①을 실행하세요','fr':'Lancez d\'abord l\'étape 1','de':'Bitte zuerst Schritt 1 ausführen','nl':'Voer eerst stap 1 uit','ru':'Сначала выполните шаг 1'},
+  '分支': {'en':'Branch','ja':'ブランチ','ko':'브랜치','fr':'Branche','de':'Branch','nl':'Branch','ru':'Ветка'},
+  '标识': {'en':'ID','ja':'ID','ko':'ID','fr':'ID','de':'ID','nl':'ID','ru':'ID'},
+});
+
+Object.assign(TRANSLATE, {
+  '创建模组': {'en':'Create mod','ja':'模組を作成','ko':'모드 만들기','fr':'Créer un mod','de':'Mod erstellen','nl':'Mod maken','ru':'Создать мод'},
+  '模板': {'en':'Template','ja':'テンプレート','ko':'템플릿','fr':'Modèle','de':'Vorlage','nl':'Sjabloon','ru':'Шаблон'},
+  '模组名': {'en':'Mod name','ja':'模組名','ko':'모드 이름','fr':'Nom du mod','de':'Mod-Name','nl':'Modnaam','ru':'Название мода'},
+  '标识 (id / 目录名)': {'en':'ID (folder name)','ja':'ID（フォルダー名）','ko':'ID(폴더 이름)','fr':'ID (nom de dossier)','de':'ID (Ordnername)','nl':'ID (mapnaam)','ru':'ID (имя папки)'},
+  '版本': {'en':'Version','ja':'バージョン','ko':'버전','fr':'Version','de':'Version','nl':'Versie','ru':'Версия'},
+  '分类': {'en':'Category','ja':'カテゴリ','ko':'분류','fr':'Catégorie','de':'Kategorie','nl':'Categorie','ru':'Категория'},
+  '标签（逗号分隔）': {'en':'Tags (comma separated)','ja':'タグ（カンマ区切り）','ko':'태그(쉼표 구분)','fr':'Tags (séparés par des virgules)','de':'Tags (durch Komma getrennt)','nl':'Tags (komma-gescheiden)','ru':'Теги (через запятую)'},
+  '简介': {'en':'Summary','ja':'概要','ko':'요약','fr':'Résumé','de':'Kurzbeschreibung','nl':'Samenvatting','ru':'Краткое описание'},
+  '详细介绍（写进 README）': {'en':'Details (written into README)','ja':'詳細（README に記載）','ko':'상세 설명(README에 기록)','fr':'Détails (écrits dans le README)','de':'Details (landen im README)','nl':'Details (in README)','ru':'Подробности (в README)'},
+  '功能要点（每行一条，写进 README）': {'en':'Highlights (one per line, written into README)','ja':'機能ポイント（1 行 1 項目、README に記載）','ko':'기능 요점(한 줄에 하나, README에 기록)','fr':'Points clés (un par ligne, dans le README)','de':'Highlights (eine pro Zeile, ins README)','nl':'Hoogtepunten (één per regel, in README)','ru':'Ключевые пункты (по одному в строке)'},
+  '冲突模组 id（逗号分隔，可留空）': {'en':'Conflicting mod IDs (comma separated, optional)','ja':'競合する模組 ID（カンマ区切り、任意）','ko':'충돌 모드 ID(쉼표 구분, 선택)','fr':'ID des mods en conflit (séparés par des virgules)','de':'Konflikt-Mod-IDs (durch Komma getrennt)','nl':'Conflicterende mod-ID\'s (komma-gescheiden)','ru':'ID конфликтующих модов (через запятую)'},
+  '构建选项': {'en':'Build options','ja':'ビルドオプション','ko':'빌드 옵션','fr':'Options de build','de':'Build-Optionen','nl':'Build-opties','ru':'Параметры сборки'},
+  '需要重启服务端': {'en':'Restart the game server','ja':'ゲームサーバーを再起動','ko':'게임 서버 재시작','fr':'Redémarrer le serveur de jeu','de':'Spielserver neu starten','nl':'Gameserver herstarten','ru':'Перезапустить игровой сервер'},
+  '建好后立即启用': {'en':'Enable right after creation','ja':'作成後すぐに有効化','ko':'만든 뒤 바로 활성화','fr':'Activer juste après la création','de':'Direkt nach dem Erstellen aktivieren','nl':'Direct na aanmaken inschakelen','ru':'Включить сразу после создания'},
+  '建好后立即签名': {'en':'Sign right after creation','ja':'作成後すぐに署名','ko':'만든 뒤 바로 서명','fr':'Signer juste après la création','de':'Direkt nach dem Erstellen signieren','nl':'Direct na aanmaken ondertekenen','ru':'Подписать сразу после создания'},
+  '将生成': {'en':'Will generate','ja':'生成されるファイル','ko':'생성될 파일','fr':'Sera généré','de':'Wird erzeugt','nl':'Wordt aangemaakt','ru':'Будет создано'},
+  '创建': {'en':'Create','ja':'作成','ko':'만들기','fr':'Créer','de':'Erstellen','nl':'Aanmaken','ru':'Создать'},
+  '创建失败': {'en':'Create failed','ja':'作成に失敗しました','ko':'만들기 실패','fr':'Échec de la création','de':'Erstellen fehlgeschlagen','nl':'Aanmaken mislukt','ru':'Не удалось создать'},
+  '模组已创建': {'en':'Mod created','ja':'模組を作成しました','ko':'모드를 만들었습니다','fr':'Mod créé','de':'Mod erstellt','nl':'Mod aangemaakt','ru':'Мод создан'},
+  '已启用': {'en':'Enabled','ja':'有効','ko':'활성화됨','fr':'Activé','de':'Aktiviert','nl':'Ingeschakeld','ru':'Включён'},
+  '模组名不能为空': {'en':'Mod name cannot be empty','ja':'模組名を入力してください','ko':'모드 이름을 입력하세요','fr':'Le nom du mod ne peut pas être vide','de':'Mod-Name darf nicht leer sein','nl':'Modnaam mag niet leeg zijn','ru':'Название мода не может быть пустым'},
+  '一句话说明这个模组做什么': {'en':'One line about what this mod does','ja':'この模組が何をするか一言で','ko':'이 모드가 하는 일을 한 줄로','fr':'En une ligne, ce que fait ce mod','de':'Kurz, was dieser Mod tut','nl':'In één regel wat deze mod doet','ru':'Одной строкой, что делает мод'},
+  '可以分段，支持 Markdown': {'en':'Multiple paragraphs allowed, Markdown supported','ja':'複数段落可、Markdown 対応','ko':'여러 단락 가능, Markdown 지원','fr':'Plusieurs paragraphes, Markdown pris en charge','de':'Mehrere Absätze, Markdown unterstützt','nl':'Meerdere alinea\'s, Markdown ondersteund','ru':'Несколько абзацев, Markdown поддерживается'},
+  '玩家上线后收到一条系统消息': {'en':'Players receive a system message after logging in','ja':'ログイン後にシステムメッセージを受け取る','ko':'로그인 후 시스템 메시지를 받습니다','fr':'Les joueurs reçoivent un message système après connexion','de':'Spieler erhalten nach dem Login eine Systemnachricht','nl':'Spelers ontvangen een systeembericht na inloggen','ru':'Игроки получают системное сообщение после входа'},
+});
+
+Object.assign(TRANSLATE, {
+  '已签名': {'en':'Signed','ja':'署名済み','ko':'서명됨','fr':'Signé','de':'Signiert','nl':'Ondertekend','ru':'Подписано'},
+  '签名失败': {'en':'Signature invalid','ja':'署名が無効','ko':'서명 무효','fr':'Signature invalide','de':'Signatur ungültig','nl':'Ongeldige handtekening','ru':'Подпись недействительна'},
+  '未签名': {'en':'Unsigned','ja':'未署名','ko':'서명 없음','fr':'Non signé','de':'Nicht signiert','nl':'Niet ondertekend','ru':'Без подписи'},
+  '签名': {'en':'Sign','ja':'署名','ko':'서명','fr':'Signer','de':'Signieren','nl':'Ondertekenen','ru':'Подписать'},
+  '签名已写入': {'en':'Signature written','ja':'署名を書き込みました','ko':'서명을 기록했습니다','fr':'Signature enregistrée','de':'Signatur geschrieben','nl':'Handtekening opgeslagen','ru':'Подпись записана'},
+  '签名校验未通过（内容已被修改），已禁止启用': {'en':'Signature check failed (content was modified) — enabling is blocked','ja':'署名検証に失敗しました（内容が変更されています）。有効化は禁止されています','ko':'서명 검증 실패(내용이 변경됨) — 활성화가 차단되었습니다','fr':'Vérification de signature échouée (contenu modifié) — activation bloquée','de':'Signaturprüfung fehlgeschlagen (Inhalt geändert) – Aktivierung gesperrt','nl':'Handtekeningcontrole mislukt (inhoud gewijzigd) — inschakelen geblokkeerd','ru':'Проверка подписи не прошла (содержимое изменено) — включение запрещено'},
+  '请先设置作者身份或导入密钥': {'en':'Set up your author identity or import a key first','ja':'先に作者アイデンティティを設定するか鍵をインポートしてください','ko':'먼저 작성자 신원을 설정하거나 키를 가져오세요','fr':'Configurez d\'abord votre identité d\'auteur ou importez une clé','de':'Bitte zuerst Autorenidentität einrichten oder Schlüssel importieren','nl':'Stel eerst uw auteursidentiteit in of importeer een sleutel','ru':'Сначала настройте профиль автора или импортируйте ключ'},
+  '用本机作者密钥重新签名 manifest': {'en':'Re-sign the manifest with your local author key','ja':'ローカルの作者キーでマニフェストに再署名します','ko':'로컬 작성자 키로 매니페스트에 다시 서명합니다','fr':'Re-signer le manifeste avec votre clé d\'auteur locale','de':'Manifest mit dem lokalen Autorenschlüssel neu signieren','nl':'Manifest opnieuw ondertekenen met uw lokale auteursleutel','ru':'Переподписать манифест локальным ключом автора'},
+  '未签名模组仍可使用': {'en':'Unsigned mods still work','ja':'未署名の模組も使用できます','ko':'서명 없는 모드는 계속 사용할 수 있습니다','fr':'Les mods non signés fonctionnent toujours','de':'Nicht signierte Mods funktionieren weiterhin','nl':'Niet-ondertekende mods blijven werken','ru':'Моды без подписи продолжают работать'},
+});
+
+Object.assign(TRANSLATE, {
+  '作者身份': {'en':'Author identity','ja':'作者アイデンティティ','ko':'작성자 신원','fr':'Identité d\'auteur','de':'Autorenidentität','nl':'Auteursidentiteit','ru':'Профиль автора'},
+  '署名': {'en':'Display name','ja':'表示名','ko':'표시 이름','fr':'Nom affiché','de':'Anzeigename','nl':'Weergavenaam','ru':'Отображаемое имя'},
+  '作者标识': {'en':'Author ID','ja':'作者 ID','ko':'작성자 ID','fr':'ID d\'auteur','de':'Autoren-ID','nl':'Auteur-ID','ru':'ID автора'},
+  '密钥指纹 (keyId)': {'en':'Key fingerprint (keyId)','ja':'鍵指紋 (keyId)','ko':'키 지문 (keyId)','fr':'Empreinte de clé (keyId)','de':'Schlüsselfingerabdruck (keyId)','nl':'Vingerafdruk (keyId)','ru':'Отпечаток ключа (keyId)'},
+  '身份创建于': {'en':'Identity created','ja':'作成日時','ko':'생성 시각','fr':'Créé le','de':'Erstellt am','nl':'Aangemaakt op','ru':'Создано'},
+  '密钥目录': {'en':'Key folder','ja':'鍵フォルダー','ko':'키 폴더','fr':'Dossier des clés','de':'Schlüsselordner','nl':'Sleutelmap','ru':'Папка ключей'},
+  '导入密钥': {'en':'Import key','ja':'鍵をインポート','ko':'키 가져오기','fr':'Importer la clé','de':'Schlüssel importieren','nl':'Sleutel importeren','ru':'Импорт ключа'},
+  '导出密钥': {'en':'Export key','ja':'鍵をエクスポート','ko':'키 내보내기','fr':'Exporter la clé','de':'Schlüssel exportieren','nl':'Sleutel exporteren','ru':'Экспорт ключа'},
+  '保存署名': {'en':'Save name','ja':'表示名を保存','ko':'이름 저장','fr':'Enregistrer le nom','de':'Namen speichern','nl':'Naam opslaan','ru':'Сохранить имя'},
+  '署名不能为空': {'en':'Display name cannot be empty','ja':'表示名を入力してください','ko':'표시 이름을 입력하세요','fr':'Le nom affiché ne peut pas être vide','de':'Anzeigename darf nicht leer sein','nl':'Weergavenaam mag niet leeg zijn','ru':'Имя не может быть пустым'},
+  '保存失败': {'en':'Save failed','ja':'保存に失敗しました','ko':'저장 실패','fr':'Échec de l\'enregistrement','de':'Speichern fehlgeschlagen','nl':'Opslaan mislukt','ru':'Не удалось сохранить'},
+  '作者身份已更新': {'en':'Author identity updated','ja':'作者情報を更新しました','ko':'작성자 정보가 업데이트됨','fr':'Identité d\'auteur mise à jour','de':'Autorenidentität aktualisiert','nl':'Auteursidentiteit bijgewerkt','ru':'Профиль автора обновлён'},
+  '密钥已导出': {'en':'Key exported','ja':'鍵をエクスポートしました','ko':'키를 내보냈습니다','fr':'Clé exportée','de':'Schlüssel exportiert','nl':'Sleutel geëxporteerd','ru':'Ключ экспортирован'},
+  '密钥已导入': {'en':'Key imported','ja':'鍵をインポートしました','ko':'키를 가져왔습니다','fr':'Clé importée','de':'Schlüssel importiert','nl':'Sleutel geïmporteerd','ru':'Ключ импортирован'},
+  '导出密钥失败': {'en':'Failed to export key','ja':'鍵のエクスポートに失敗','ko':'키 내보내기 실패','fr':'Échec de l\'export de la clé','de':'Schlüsselexport fehlgeschlagen','nl':'Exporteren van sleutel mislukt','ru':'Не удалось экспортировать ключ'},
+  '导入密钥失败': {'en':'Failed to import key','ja':'鍵のインポートに失敗','ko':'키 가져오기 실패','fr':'Échec de l\'import de la clé','de':'Schlüsselimport fehlgeschlagen','nl':'Importeren van sleutel mislukt','ru':'Не удалось импортировать ключ'},
+  '导出失败': {'en':'Export failed','ja':'エクスポートに失敗','ko':'내보내기 실패','fr':'Échec de l\'export','de':'Export fehlgeschlagen','nl':'Exporteren mislukt','ru':'Ошибка экспорта'},
+  '打开失败': {'en':'Open failed','ja':'開けませんでした','ko':'열기 실패','fr':'Échec de l\'ouverture','de':'Öffnen fehlgeschlagen','nl':'Openen mislukt','ru':'Не удалось открыть'},
+  '作者标识已复制': {'en':'Author ID copied','ja':'作者 ID をコピーしました','ko':'작성자 ID를 복사했습니다','fr':'ID d\'auteur copié','de':'Autoren-ID kopiert','nl':'Auteur-ID gekopieerd','ru':'ID автора скопирован'},
+  '复制失败，请手动选择': {'en':'Copy failed — select it manually','ja':'コピーに失敗しました。手動で選択してください','ko':'복사 실패 — 직접 선택하세요','fr':'Échec de la copie — sélectionnez manuellement','de':'Kopieren fehlgeschlagen – bitte manuell markieren','nl':'Kopiëren mislukt — selecteer handmatig','ru':'Не удалось скопировать — выделите вручную'},
+  '署名只是给人看的名字；真正认人靠下面的作者标识与密钥指纹。私钥只存在本机 ': {'en':'The display name is just a label; identity is verified by the author ID and key fingerprint below. The private key lives only on this machine at ','ja':'表示名は単なるラベルです。本人確認は下の作者 ID と鍵指紋で行います。秘密鍵は本機の ','ko':'표시 이름은 단순한 라벨입니다. 신원 확인은 아래 작성자 ID와 키 지문으로 합니다. 개인 키는 이 컴퓨터의 ','fr':'Le nom affiché n\'est qu\'un libellé ; l\'identité est vérifiée par l\'ID d\'auteur et l\'empreinte de clé ci-dessous. La clé privée reste sur cette machine dans ','de':'Der Anzeigename ist nur ein Label; die Identität wird über Autoren-ID und Schlüsselfingerabdruck unten geprüft. Der private Schlüssel liegt nur auf diesem Rechner unter ','nl':'De weergavenaam is slechts een label; de identiteit wordt bepaald door de auteur-ID en vingerafdruk hieronder. De privésleutel staat alleen op deze machine in ','ru':'Отображаемое имя — только метка; личность подтверждается ID автора и отпечатком ключа ниже. Закрытый ключ хранится только на этой машине в '},
+  '，永不外传、永不打包。': {'en':' and is never shared or bundled.','ja':' にあり、外部に渡ることも同梱されることもありません。','ko':' 에 있으며, 외부에 공유되거나 패키징되지 않습니다.','fr':' et n\'est jamais partagée ni intégrée.','de':' und wird niemals weitergegeben oder mitgeliefert.','nl':' en wordt nooit gedeeld of meegeleverd.','ru':' и никогда не передаётся и не включается в сборку.'},
+  '私钥文件缺失，无法再签发更新。请导入 ': {'en':'Private key file is missing — you can no longer sign updates. Import ','ja':'秘密鍵ファイルが見つかりません。更新に署名できません。','ko':'개인 키 파일이 없습니다. 더 이상 업데이트에 서명할 수 없습니다. ','fr':'Fichier de clé privée manquant — vous ne pouvez plus signer de mises à jour. Importez ','de':'Die Datei mit dem privaten Schlüssel fehlt – Sie können keine Updates mehr signieren. Importieren Sie ','nl':'Bestand met privésleutel ontbreekt — u kunt geen updates meer ondertekenen. Importeer ','ru':'Файл закрытого ключа отсутствует — подписывать обновления больше нельзя. Импортируйте '},
+  ' 备份还原这个身份。': {'en':' to restore this identity.','ja':' をインポートしてこの身元を復元してください。','ko':' 를 가져와 이 신원을 복원하세요.','fr':' pour restaurer cette identité.','de':' um diese Identität wiederherzustellen.','nl':' om deze identiteit te herstellen.','ru':' чтобы восстановить этот профиль.'},
+});
+
+Object.assign(TRANSLATE, {
+  '系统': {'en':'System','ja':'システム','ko':'시스템','fr':'Systeme','de':'System','nl':'Systeem','ru':'Система'},
+  '客户端': {'en':'Client','ja':'クライアント','ko':'클라이언트','fr':'Client','de':'Client','nl':'Client','ru':'Клиент'},
+  '清空': {'en':'Clear','ja':'クリア','ko':'지우기','fr':'Effacer','de':'Leeren','nl':'Wissen','ru':'Очистить'},
+  '复制': {'en':'Copy','ja':'コピー','ko':'복사','fr':'Copier','de':'Kopieren','nl':'Kopieren','ru':'Копировать'},
+  '全部': {'en':'All','ja':'すべて','ko':'전체','fr':'Tout','de':'Alle','nl':'Alle','ru':'Все'}
+});
+
+// 模组市场卡片：每张卡片自己的下载次数 + 模组统计区文案（对齐原型）
+Object.assign(TRANSLATE, {
+  "次下载": {'en':"downloads",'ja':"ダウンロード",'ko':"다운로드",'fr':"téléchargements",'de':"Downloads",'nl':"downloads",'ru':"загрузок"},
+  "下载次数待统计": {'en':"Download count not available yet",'ja':"ダウンロード数は未集計",'ko':"다운로드 수 미집계",'fr':"Nombre de téléchargements indisponible",'de':"Downloadzahl noch nicht erfasst",'nl':"Aantal downloads nog niet beschikbaar",'ru':"Число загрузок пока не собрано"},
+  "更新于": {'en':"Updated",'ja':"更新",'ko':"업데이트",'fr':"Mis à jour",'de':"Aktualisiert",'nl':"Bijgewerkt",'ru':"Обновлено"},
+  "本地": {'en':"Local",'ja':"ローカル",'ko':"로컬",'fr':"Local",'de':"Lokal",'nl':"Lokaal",'ru':"Локально"},
+  "我的模组": {'en':"My mods",'ja':"マイMOD",'ko':"내 모드",'fr':"Mes mods",'de':"Meine Mods",'nl':"Mijn mods",'ru':"Мои моды"},
+  "已出现在模组市场": {'en':"Already visible in the market",'ja':"マーケットに掲載済み",'ko':"마켓에 등록됨",'fr':"Déjà visible dans le marché",'de':"Bereits im Markt sichtbar",'nl':"Al zichtbaar in de markt",'ru':"Уже отображается на рынке"},
+  "等待收录审核": {'en':"Waiting for listing review",'ja':"掲載審査待ち",'ko':"등록 심사 대기",'fr':"En attente de validation",'de':"Wartet auf Aufnahme-Prüfung",'nl':"Wacht op beoordeling",'ru':"Ожидает проверки"},
+  "还没发布到自己仓库": {'en':"Not published to your repo yet",'ja':"まだ自分のリポジトリに未公開",'ko':"아직 자신의 저장소에 미게시",'fr':"Pas encore publié sur votre dépôt",'de':"Noch nicht im eigenen Repo veröffentlicht",'nl':"Nog niet naar je repo gepubliceerd",'ru':"Ещё не опубликовано в вашем репозитории"},
+  "覆盖": {'en':"Covers",'ja':"カテゴリ数",'ko':"분류",'fr':"Couvre",'de':"Deckt ab",'nl':"Dekt",'ru':"Охватывает"},
+  "参与本次加载": {'en':"participate in this load",'ja':"が今回のロードに参加",'ko':"가 이번 로드에 참여",'fr':"participent à ce chargement",'de':"nehmen an diesem Ladevorgang teil",'nl':"doen mee aan deze laadbeurt",'ru':"участвуют в этой загрузке"},
+  "保留在磁盘，不参与加载": {'en':"Kept on disk, not loaded",'ja':"ディスクに残し、ロードしない",'ko':"디스크에 보관, 로드하지 않음",'fr':"Conservé sur le disque, non chargé",'de':"Bleibt auf der Festplatte, wird nicht geladen",'nl':"Blijft op schijf, wordt niet geladen",'ru':"Остаётся на диске, не загружается"},
+  "占用空间合计": {'en':"Total disk usage",'ja':"合計使用容量",'ko':"총 사용 용량",'fr':"Espace total utilisé",'de':"Gesamter Speicherplatz",'nl':"Totale schijfruimte",'ru':"Всего занято"},
+  "模组目录占用": {'en':"Mods folder usage",'ja':"MOD フォルダ使用量",'ko':"모드 폴더 사용량",'fr':"Occupation du dossier des mods",'de':"Belegung des Mod-Ordners",'nl':"Gebruik van de mods-map",'ru':"Занято в папке модов"},
+  "有冲突正在生效": {'en':"Conflicts are active",'ja':"競合が有効です",'ko':"충돌이 적용 중",'fr':"Des conflits sont actifs",'de':"Konflikte sind aktiv",'nl':"Conflicten zijn actief",'ru':"Конфликты активны"},
+  "加载顺序无冲突": {'en':"No load-order conflicts",'ja':"読み込み順の競合なし",'ko':"로드 순서 충돌 없음",'fr':"Aucun conflit d'ordre",'de':"Keine Ladereihenfolge-Konflikte",'nl':"Geen laadvolgorde-conflicten",'ru':"Конфликтов порядка загрузки нет"}
+});
+
+// 模组审核：拒绝收录 / 下架原因（维护者在索引仓库 moderate.mjs 里填）
+Object.assign(TRANSLATE, {
+  "已拒绝收录": {'en':"Not accepted",'ja':"掲載お断り",'ko':"등록 거절",'fr':"Non accepté",'de':"Nicht aufgenommen",'nl':"Niet geaccepteerd",'ru':"Отклонено"},
+  "拒绝收录原因": {'en':"Reason not accepted",'ja':"不採用の理由",'ko':"등록 거절 사유",'fr':"Motif du refus",'de':"Grund der Ablehnung",'nl':"Reden van afwijzing",'ru':"Причина отказа"},
+  "下架原因": {'en':"Reason delisted",'ja':"掲載終了の理由",'ko':"등록 해제 사유",'fr':"Motif du retrait",'de':"Grund der Entfernung",'nl':"Reden van verwijdering",'ru':"Причина снятия"},
+  "维护者": {'en':"Maintainer",'ja':"管理者",'ko':"관리자",'fr':"Mainteneur",'de':"Betreuer",'nl':"Beheerder",'ru':"Модератор"}
+});
+
+// 字典 key 两端不能有空格：translateDOM 用 trim 后的文本查表，带首尾空格的 key 永远命中不了
+Object.keys(TRANSLATE).forEach(function (k) {
+  const trimmed = k.trim();
+  if (trimmed !== k) {
+    if (!TRANSLATE[trimmed]) TRANSLATE[trimmed] = TRANSLATE[k];
+    delete TRANSLATE[k];
+  }
 });
 
 // 保存所有元素的原始中文文本，用于切换回中文或避免重复翻译
@@ -1383,6 +2201,8 @@ function translateDOM(root){
       // 跳过 script/style/textarea
       const tag = p.tagName;
       if(tag==='SCRIPT'||tag==='STYLE'||tag==='TEXTAREA') return NodeFilter.FILTER_REJECT;
+      // 语言切换器里的语言名按各自母语显示，永不翻译（否则会被还原成旧值）
+      if(p.closest && p.closest('.lang-wrap')) return NodeFilter.FILTER_REJECT;
       return node.nodeValue.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
     }
   });
@@ -1393,22 +2213,49 @@ function translateDOM(root){
     const raw = node.nodeValue;
     const trimmed = raw.trim();
     if(!trimmed) return;
-    // 保存原文（首次）
-    if(!i18nOriginals.has(node)) i18nOriginals.set(node, raw);
-    const orig = i18nOriginals.get(node);
+    // 保存原文（首次）。单文本节点元素把原文挂在父元素上，
+    // 这样即使文本节点被别处替换（例如 textContent=），原文锚点也不会丢，切多少次语言都能翻。
+    // 原文缓存：单文本节点元素挂在父元素上（文本节点被 textContent= 换掉也不丢），
+    // 其余挂节点上。state = {orig, out}：orig 是原文，out 是我们上次写出的译文；
+    // 若当前文本既不是 orig 也不是 out，说明是业务代码改写的，按新原文重新锚定，
+    // 避免「切回中文被还原成旧值 / 计数停在旧数字」。
+    const anchor = node.parentElement;
+    let state;
+    if(anchor && anchor.childNodes && anchor.childNodes.length === 1){
+      state = anchor._i18nState;
+      if(!state){ state = { orig: raw, out: raw }; anchor._i18nState = state; }
+      else if(raw !== state.out && raw !== state.orig){ state.orig = raw; state.out = raw; }
+    } else {
+      state = i18nOriginals.get(node);
+      if(!state){ state = { orig: raw, out: raw }; i18nOriginals.set(node, state); }
+      else if(raw !== state.out && raw !== state.orig){ state.orig = raw; state.out = raw; }
+    }
+    const orig = state.orig;
     const origTrim = orig.trim();
     if(curLang==='zh'){
       // 恢复原文
-      if(raw !== orig) node.nodeValue = orig;
+      if(raw !== orig){ node.nodeValue = orig; state.out = orig; }
       return;
     }
+    const lead = orig.match(/^\s*/)[0];
+    const trail = orig.match(/\s*$/)[0];
     // 查字典翻译
     const entry = TRANSLATE[origTrim];
     if(entry && entry[curLang]){
-      // 保留前后空白
-      const lead = orig.match(/^\s*/)[0];
-      const trail = orig.match(/\s*$/)[0];
-      node.nodeValue = lead + entry[curLang] + trail;
+      const v = lead + entry[curLang] + trail;
+      if(raw !== v) node.nodeValue = v;
+      state.out = v;
+      return;
+    }
+    // 主进程直出的中文（实时日志 / 环境检测 / 服务状态 / 初始化进度）走片段规则翻译
+    const scopeEl = node.parentElement;
+    if(scopeEl && scopeEl.closest && scopeEl.closest(LOOSE_SCOPE)){
+      const loose = translateLoose(origTrim, curLang);
+      if(loose && loose !== origTrim){
+        const v = lead + loose + trail;
+        if(raw !== v) node.nodeValue = v;
+        state.out = v;
+      }
     }
   });
   // 翻译 input placeholder
@@ -1427,20 +2274,23 @@ function translateDOM(root){
     const entry = TRANSLATE[orig];
     if(entry && entry[curLang]) el.setAttribute('title', entry[curLang]);
   });
-  // 翻译 select option
-  root.querySelectorAll('option').forEach(el => {
-    if(!el._i18nOpt) el._i18nOpt = el.textContent;
-    const orig = el._i18nOpt;
-    if(curLang==='zh'){ if(el.textContent!==orig) el.textContent = orig; return; }
-    const entry = TRANSLATE[orig];
-    if(entry && entry[curLang]) el.textContent = entry[curLang];
-  });
 }
 function setLang(k){
   curLang=k;
   localStorage.setItem('evejs-language',k);
   document.documentElement.lang=k==='zh'?'zh-CN':k;
   document.getElementById('langLabel').textContent=I18N[k].name;
+  // 日志正文按最新语言重绘（LOGS 里保存的是中文原文，渲染时再翻译）
+  try{
+    ['dashConsole','fullConsole'].forEach(id=>{
+      const el=document.getElementById(id);
+      if(el){ el.dataset.logCat=''; el.dataset.logFilter=''; el.dataset.logCount='-1'; el.dataset.lastLogId=''; }
+    });
+    if(typeof renderLog==='function'){
+      renderLog('dashConsole',curDashLog,'dash');
+      renderLog('fullConsole',curFullLog);
+    }
+  }catch(_err){}
   // 重新渲染动态内容（用中文渲染，再翻译）
   if(typeof renderSvcCards==='function') renderSvcCards();
   if(typeof renderEnvCheck==='function') renderEnvCheck();
@@ -1453,6 +2303,7 @@ function setLang(k){
   if(typeof switchContent==='function') switchContent(curContent||'commands',cmdFilter||'all',curCmdStat||'all');
   if(typeof updateSvcStatus==='function') updateSvcStatus();
   if(typeof updateCustomMeta==='function') updateCustomMeta();
+  if(typeof updateModBanner==='function') updateModBanner();   // 冲突横幅用词条拼装，切语言要重绘
   // 翻译整个文档
   translateDOM(document);
   buildLangMenu();
@@ -2435,39 +3286,16 @@ loadCustomCmds();
 mergeCustomCmds();
 
 /* ============ LOG SYSTEM (tabbed) ============ */
-const LOG_TEMPLATES={
-  sys:[
-    {lvl:'SYS',msg:'<span class="hi">cluster[TRANQUILITY]</span> heartbeat · tick=<span class="num">1.0Hz</span>'},
-    {lvl:'INFO',msg:'launcher env check · <span class="gd">9/9 OK</span>'},
-    {lvl:'OK',msg:'backup snapshot verified · <span class="num">847GB</span>'},
-    {lvl:'WARN',msg:'memory pressure on AMARR node · <span class="num">78%</span>'}
-  ],
-  node:[
-    {lvl:'OK',msg:'main server listening on :<span class="num">26000</span>'},
-    {lvl:'INFO',msg:'loaded universe · <span class="num">8,285</span> systems · <span class="num">36,842</span> types'},
-    {lvl:'INFO',msg:'session manager · <span class="num">28,471</span> active sockets'},
-    {lvl:'SYS',msg:'tick complete · drift=<span class="num">0.3ms</span>'}
-  ],
-  market:[
-    {lvl:'OK',msg:'market engine (rust) ready · build <span class="hi">a3f9c2e</span>'},
-    {lvl:'INFO',msg:'matched <span class="num">1,284</span> orders in <span class="num">12ms</span>'},
-    {lvl:'INFO',msg:'esi-bridge synced <span class="num">42,118</span> rows'}
-  ],
-  client:[
-    {lvl:'OK',msg:'exefile patched · CA cert valid'},
-    {lvl:'INFO',msg:'client handshake · version Exodus 2024.11'},
-    {lvl:'WARN',msg:'client reconnect from <span class="hi">192.168.1.42</span>'}
-  ]
-};
 const LOGS={sys:[],node:[],market:[],client:[]};
 let curDashLog='sys', curFullLog='sys';
 function ts(){return new Date().toISOString().slice(11,19)}
 function logTo(cat,lvl,msg){
   LOGS[cat].push({ts:ts(),lvl,msg});
   if(LOGS[cat].length>200) LOGS[cat].shift();
-  if(cat===curDashLog) renderLog('dashConsole',cat);
+  if(cat===curDashLog) renderLog('dashConsole',cat,'dash');
   if(cat===curFullLog) renderLog('fullConsole',cat);
   updateLogCounts();
+  updateLogBar();
 }
 function makeLogLine(l){
   const line=document.createElement('div');
@@ -2480,20 +3308,31 @@ function makeLogLine(l){
   level.textContent=l.lvl||'';
   const msg=document.createElement('span');
   msg.className='msg';
-  msg.innerHTML=l.msg||'';
+  msg.innerHTML=(typeof translateLoose==='function')?translateLoose(l.msg||'',curLang):(l.msg||'');
   line.append(time,level,msg);
   return line;
 }
-function renderLog(elId,cat){
+const LOG_FILTER={dash:"all",full:"all"};
+/** 把内部级别归成三个筛选组：INFO（含 OK/SYS）、WARN、ERR */
+function levelGroup(lvl){
+  const v=String(lvl||"").toUpperCase();
+  if(v==="ERR"||v==="ERROR") return "ERR";
+  if(v==="WARN") return "WARN";
+  return "INFO";
+}
+function renderLog(elId,cat,filterKey){
   const el=document.getElementById(elId);
   if(!el) return;
+  const filter=(filterKey&&LOG_FILTER[filterKey])||"all";
+  const allRows=LOGS[cat]||[];
+  const rows=filter==="all"?allRows:allRows.filter(r=>levelGroup(r.lvl)===filter);
   const wasAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 16;
-  const rows=LOGS[cat]||[];
-  const previousCat=el.dataset.logCat||'';
+  const previousCat=el.dataset.logCat||"";
+  const previousFilter=el.dataset.logFilter||"";
   const previousCount=Number(el.dataset.logCount||-1);
-  const previousLast=el.dataset.lastLogId||'';
-  const canAppend=previousCat===cat && previousCount>=0 && previousCount<=rows.length &&
-    (previousCount===0 || String(rows[previousCount-1]?.id||'')===previousLast);
+  const previousLast=el.dataset.lastLogId||"";
+  const canAppend=previousCat===cat && previousFilter===filter && previousCount>=0 && previousCount<=rows.length &&
+    (previousCount===0 || String(rows[previousCount-1]?.id||"")===previousLast);
   if(canAppend){
     if(rows.length>previousCount){
       const fragment=document.createDocumentFragment();
@@ -2509,8 +3348,25 @@ function renderLog(elId,cat){
   }
   const last=rows[rows.length-1];
   el.dataset.logCat=cat;
+  el.dataset.logFilter=filter;
   el.dataset.logCount=String(rows.length);
-  el.dataset.lastLogId=String(last?.id||'');
+  el.dataset.lastLogId=String(last?.id||"");
+}
+/** 实时日志底部统计条：共 N 条 · 显示 M 条 + 各级别数量 */
+function updateLogBar(){
+  const bar=document.getElementById("dashLogTotal");
+  if(!bar) return;
+  const rows=LOGS[curDashLog]||[];
+  const count=g=>rows.filter(r=>levelGroup(r.lvl)===g).length;
+  const info=count("INFO"), warn=count("WARN"), err=count("ERR");
+  const filter=LOG_FILTER.dash||"all";
+  const shown=filter==="all"?rows.length:count(filter);
+  bar.textContent=t("共 {n} 条 · 显示 {m} 条").replace("{n}",rows.length).replace("{m}",shown);
+  const set=(id,v)=>{const el=document.getElementById(id); if(el) el.textContent=String(v);};
+  set("cntInfo",info); set("cntWarn",warn); set("cntErr",err);
+  document.querySelectorAll("#dashLogFilters .log-filter").forEach(btn=>{
+    btn.classList.toggle("active",(btn.dataset.lvl||"all")===filter);
+  });
 }
 function updateLogCounts(){
   const set=(id,value)=>{ const el=document.getElementById(id); if(el) el.textContent=value; };
@@ -2519,17 +3375,6 @@ function updateLogCounts(){
   set('cntMarket',LOGS.market.length);
   set('cntClient',LOGS.client.length);
   set('cntServer',(LOGS.server||[]).length);
-}
-function pushRandomLog(){
-  const cats=['sys','node','market','client'];
-  cats.forEach(c=>{
-    const tpl=LOG_TEMPLATES[c];
-    const e=tpl[Math.floor(Math.random()*tpl.length)];
-    logTo(c,e.lvl,e.msg);
-  });
-}
-function seedLogs(){
-  for(let i=0;i<6;i++) pushRandomLog();
 }
 function clearCurrentLog(){
   LOGS[curFullLog]=[]; renderLog('fullConsole',curFullLog); updateLogCounts();
@@ -2566,15 +3411,338 @@ let MOD_STATS={total:0,enabled:0,disabled:0,conflicts:0,bytes:0};
 let MOD_CONFLICTS=[];
 const KIND_LABEL={loader:'LOADER','source-integrated':'SOURCE','client-package':'CLIENT',settings:'SETTINGS'};
 const MOD_ICON={loader:'shield','source-integrated':'chart','client-package':'globe',settings:'factory'};
+/* 创建模组 / 提交模组 / 卡片共用的分类取值（下拉菜单） */
+const MOD_CATEGORIES = ["玩法", "经济", "AI", "画面", "工具"];
+function modCategoryLabel(m) {
+  if (!m) return "";
+  return m.category || "";   // 只认「创建模组」里的分类；没有就返回空，由调用方显示「未分类」
+}
+/** 毫秒时间戳 → 本地时间「2026-09-22 01:05」（取不到就显示 —） */
+function fmtTime(ms) {
+  const t = Number(ms) || 0;
+  if (t <= 0) return "—";
+  const d = new Date(t);
+  const p = (n) => String(n).padStart(2, "0");
+  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + " " + p(d.getHours()) + ":" + p(d.getMinutes());
+}
+/** 字节数 → 人读的 KB / MB / GB */
+function fmtBytes(n) {
+  const v = Number(n) || 0;
+  if (v <= 0) return "—";
+  if (v < 1024) return v + " B";
+  if (v < 1024 * 1024) return (v / 1024).toFixed(1) + " KB";
+  if (v < 1024 * 1024 * 1024) return (v / 1048576).toFixed(1) + " MB";
+  return (v / 1073741824).toFixed(2) + " GB";
+}
+
+/* escape：bridge 里的 esc 在 IIFE 内部、HTML 拿不到，所以这里要有一份等价的（含单引号） */
+function esc(v){
+  return String(v == null ? "" : v)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
 function modAttr(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-function renderMods(){
+/* ============ 模组三页签：已安装 / 我创建的 / 模组市场 ============ */
+let MOD_TAB = "installed";
+let MY_MODS = [];
+let MARKET = [];
+let MOD_UPDATES = [];
+let MARKET_DELISTED = [];   // 被维护者下架的条目（作者在「我创建的」看原因）
+let MOD_BLOCKED = [];
+let MARKET_PROGRESS = {};
+let MARKET_FETCHED_AT = 0;
+let MARKET_SORT = "hot";      // hot | name | size | updated
+let MARKET_ONLY_NEW = false;  // 只看未安装
+const MOD_STATUS_LABEL = {
+  local: "仅本地",
+  draft: "待提交",
+  submitted: "已提交（待合并）",
+  listed: "已上架",
+  delisted: "已下架",
+  rejected: "已拒绝收录",
+  "update-pending": "本地比已上架新"
+};
+
+function updateModTabs() {
+  document.querySelectorAll("#modTabs .mod-tab").forEach((el) => {
+    el.classList.toggle("active", el.dataset.mtab === MOD_TAB);
+  });
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = String(v); };
+  set("mtInstalled", MODS.length);
+  set("mtMine", MY_MODS.length);
+  set("mtMarket", MARKET.length);
+  // 「N 可更新」徽章：有可更新模组时才显示
+  const up = Array.isArray(MOD_UPDATES) ? MOD_UPDATES.length : 0;
+  const badge = document.getElementById("mtMarketUp");
+  if (badge) {
+    badge.style.display = up > 0 ? "" : "none";
+    badge.textContent = up + " " + t("可更新");
+  }
+  // 统计区域跟着页签/数据一起刷新
+  if (typeof renderModStats === "function") renderModStats();
+}
+
+/**
+ * 统一的统计区域：**同一个位置**，随当前页签切换内容
+ * （对应原型：已安装的 5 张卡 / 我创建的 / 模组市场的 4 张卡 都在同一处换）
+ */
+function renderModStats() {
+  const el = document.getElementById("modStats");
+  if (!el) return;
+  const nf = (n) => Number(n || 0).toLocaleString();
+  const cnt = (fn) => (Array.isArray(MOD_UPDATES) ? 0 : 0) + (Array.isArray(MY_MODS) ? MY_MODS.filter(fn).length : 0);
+  let items = [];
+  if (MOD_TAB === "market") {
+    const sumBytes = MARKET.reduce((a, e) => a + (Number(e.sizeBytes) || 0), 0);
+    const featured = MARKET.filter((e) => e && e.featured).length;
+    // 索引里带 downloads 的条目才算「统计得到的下载数」，一个都没有时显示「未统计」
+    const dlKnown = MARKET.filter((e) => e && e.downloads != null && Number.isFinite(Number(e.downloads)));
+    const dlList = dlKnown.map((e) => Number(e.downloads));
+    const totalDl = dlList.reduce((a, n) => a + n, 0);
+    const hotDl = dlList.length ? Math.max.apply(null, dlList) : 0;
+    const installedInMarket = MARKET.filter((e) => !!marketLocalVersion(e.id)).length;
+    const coverPct = MARKET.length ? Math.round((installedInMarket / MARKET.length) * 100) : 0;
+    const mb = (sumBytes / 1048576).toFixed(sumBytes >= 10485760 ? 0 : 1);
+    items = [
+      { n: nf(MARKET.length), l: t("市场收录"), s: t("精选") + " " + featured + " · " + t("合计") + " " + mb + " MB", cls: "" },
+      { n: nf(installedInMarket), l: t("本地已装"), s: t("覆盖市场") + " " + coverPct + "%", cls: "ok" },
+      { n: nf((MOD_UPDATES || []).length), l: t("可更新"), s: (MOD_UPDATES || []).length ? t("本地版本落后于市场") : t("全部为最新"), cls: (MOD_UPDATES || []).length ? "warn" : "ok" },
+      { n: dlKnown.length ? nf(totalDl) : t("未统计"), l: t("累计下载"), s: hotDl ? t("最热单品") + " " + nf(hotDl) + " " + t("次") : t("需要作者用 Release 发布 ZIP"), cls: "" }
+    ];
+  } else if (MOD_TAB === "mine") {
+    const mine = Array.isArray(MY_MODS) ? MY_MODS : [];
+    const listed = mine.filter((m) => m.status === "listed" || m.status === "update-pending").length;
+    const reviewing = mine.filter((m) => m.status === "submitted" || m.status === "draft").length;
+    const local = mine.filter((m) => m.status === "local").length;
+    items = [
+      { n: nf(mine.length), l: t("我的模组"), s: t("署名") + " " + (document.getElementById("authorBtnLabel")?.textContent || "—"), cls: "" },
+      { n: nf(listed), l: t("已上架"), s: t("已出现在模组市场"), cls: "ok" },
+      { n: nf(reviewing), l: t("待提交"), s: t("等待收录审核"), cls: reviewing ? "warn" : "" },
+      { n: nf(local), l: t("仅本地"), s: t("还没发布到自己仓库"), cls: "" }
+    ];
+  } else {
+    const s2 = MOD_STATS || {};
+    const active = Number(s2.conflicts || 0);
+    const potential = (Array.isArray(MOD_CONFLICTS) ? MOD_CONFLICTS : []).filter((c) => !c.active).length;
+    const enabled = Number(s2.enabled || 0);
+    const total = Number(s2.total || 0);
+    items = [
+      { n: nf(total), l: t("模组总数"), s: t("覆盖") + " " + new Set(MODS.map((m) => m.category).filter(Boolean)).size + " " + t("分类"), cls: "" },
+      { n: nf(enabled), l: t("已启用"), s: (total ? Math.round((enabled / total) * 100) : 0) + "% " + t("参与本次加载"), cls: "ok" },
+      { n: nf(Number(s2.disabled || 0)), l: t("已停用"), s: t("保留在磁盘，不参与加载"), cls: "" },
+      { n: fmtBytes(s2.bytes), l: t("占用空间合计"), s: t("模组目录占用"), cls: "" },
+      { n: nf(active), l: t("冲突数"), s: active ? t("有冲突正在生效") : (potential ? potential + " " + t("未生效") : t("加载顺序无冲突")), cls: active ? "bad" : "ok" }
+    ];
+  }
+  el.innerHTML = items.map((it) => '<div class="mod-stat ' + (it.cls || '') + '"><div class="n">' + esc(it.n) + '</div><div class="l">' + esc(it.l) + '</div><div class="s">' + esc(it.s || '') + '</div></div>').join('');
+}
+
+function renderMods() {
+  updateModTabs();
+  if (MOD_TAB === "mine") return renderMyMods();
+  if (MOD_TAB === "market") return renderMarket();
+  return renderInstalledMods();
+}
+
+function switchModTab(tab) {
+  MOD_TAB = tab === "mine" || tab === "market" ? tab : "installed";
+  updateModTabs();
+  if (MOD_TAB === "mine" && typeof loadMyMods === "function") void loadMyMods();
+  if (MOD_TAB === "market" && typeof loadMarket === "function") void loadMarket(false);
+  renderMods();
+}
+
+/* 冲突横幅 + 加载顺序面板（对应原型的 ModConflictBanner / ModLoadOrderPanel） */
+/** 冲突详情：优先用主进程给的 i18nKey + 参数按当前语言拼，取不到就退回中文原文 */
+function conflictText(c) {
+  if (!c) return "";
+  const key = c.i18nKey;
+  const table = key ? TRANSLATE[key] : null;
+  let out = table && table[curLang] ? table[curLang] : (c.detail || "");
+  (c.i18nArgs || []).forEach((arg, i) => { out = out.split("{" + (i + 1) + "}").join(arg); });
+  return out;
+}
+function updateModBanner() {
+  const el = document.getElementById("modBanner");
+  if (!el) return;
+  const list = Array.isArray(MOD_CONFLICTS) ? MOD_CONFLICTS : [];
+  if (!list.length) { el.style.display = "none"; el.textContent = ""; return; }
+  const active = list.filter((c) => c.active);
+  const shown = (active.length ? active : list).slice(0, 6);
+  el.className = "mod-banner" + (active.length ? " err" : "");
+  el.style.display = "";
+  const title = t("检测到模组冲突") + " " + list.length + (active.length ? " · " + active.length + " " + t("个正在启用") : "");
+  el.innerHTML = "<b>" + esc(title) + "</b><br>" + shown.map((c) => esc("· " + (conflictText(c) || (c.folders || []).join(" / ")))).join("<br>");
+}
+
+
+
+function renderMyMods() {
+  const grid = document.getElementById("modsGrid");
+  if (!grid) return;
+  if (!MY_MODS.length) {
+    grid.innerHTML = '<div class="mk-card" style="grid-column:1/-1;text-align:center;padding:28px">' + '<div class="mk-name">' + t("还没有属于你的模组") + "</div>" + '<div class="mk-desc" style="min-height:0">' + t("用「创建模组」建一个，或用「提交模组」把已有模组发布到你自己的仓库。带你的作者标识或签名的模组会自动出现在这里。") + "</div>" + '<div class="mk-foot" style="justify-content:center">' + '<button class="mk-btn" id="mineEmptyCreate" style="flex:0 0 auto;padding:8px 18px">' + t("创建模组") + "</button></div></div>";
+    const mc = document.getElementById("mineEmptyCreate");
+    if (mc) mc.addEventListener("click", () => { if (typeof openCreateModDialog === "function") openCreateModDialog(); });
+    if (typeof autoTranslateAfterRender === "function") autoTranslateAfterRender();
+    return;
+  }
+  grid.innerHTML = MY_MODS.map((m) => {
+    const badgeCls = m.status === "listed" ? "new" : m.status === "update-pending" ? "up" : (m.status === "delisted" || m.status === "rejected") ? "bad" : "";
+    const statusLabel = t(MOD_STATUS_LABEL[m.status] || m.status);
+    // 维护者审核结果：把原因直接摊在卡片上，作者一眼能看到为什么
+    const reasonText = modReasonText(m.moderationReason);
+    const reasonTitle = m.status === "rejected" ? t("拒绝收录原因") : t("下架原因");
+    const reasonBlock = reasonText
+      ? '<div class="mk-reason"><b>' + esc(reasonTitle) + '</b><br>' + esc(reasonText) +
+        (m.moderatedBy ? '<br><span style="color:var(--txt-mute)">' + t("维护者") + ": " + esc(m.moderatedBy) + "</span>" : "") + "</div>"
+      : "";
+    const listed = m.listedVersion && m.listedVersion !== m.version ? " · " + t("已上架") + " v" + m.listedVersion : "";
+    const src = m.sourceRepo ? '<span class="mk-tag">' + esc(m.sourceRepo) + "</span>" : "";
+    const openBtn = m.folder ? '<button class="mk-btn" onclick="revealModFolder(\'' + esc(m.folder) + '\')">' + t("打开目录") + "</button>" : "";
+    const prBtn = m.prUrl ? '<button class="mk-btn" onclick="openExternalUrl(\'' + esc(m.prUrl) + '\')">' + t("打开 PR") + "</button>" : "";
+    return '<div class="mk-card">'
+      + '<div class="mk-head"><div class="mk-name">' + esc(m.displayName || m.id) + "</div>"
+      + '<span class="mk-badge ' + badgeCls + '">' + esc(statusLabel) + "</span></div>"
+      + '<div class="mk-sub">' + esc(m.id) + " · v" + esc(m.version || "?") + esc(listed) + "</div>"
+      + '<div class="mk-sub">' + (m.signed ? t("已签名") : t("未签名")) + (m.category ? " · " + esc(m.category) : "") + "</div>"
+      + '<div class="mk-tags">' + src + "</div>"
+      + reasonBlock
+      + '<div class="mk-foot">' + openBtn
+      + '<button class="mk-btn" onclick="openSubmitModDialog()">' + t("提新版 / 提交") + "</button>"
+      + prBtn + "</div></div>";
+  }).join("");
+  if (typeof autoTranslateAfterRender === "function") autoTranslateAfterRender();
+}
+
+function marketLocalVersion(id) {
+  const local = MODS.find((m) => m.id === id);
+  return local ? local.version || "" : "";
+}
+
+/** 审核原因取当前语言；没有英文就退回中文 */
+function modReasonText(reason) {
+  if (!reason) return "";
+  const zh = String(reason.zh || "");
+  const en = String(reason.en || "");
+  return curLang === "zh" ? (zh || en) : (en || zh);
+}
+
+/** 市场条目的下载次数；索引里没有这个字段时返回 null（界面显示「待统计」） */
+function marketDownloads(e) {
+  if (!e || e.downloads == null) return null;
+  const n = Number(e.downloads);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+/** 市场条目的更新时间（publishedAt / updatedAt 可能是 ISO 字符串或毫秒时间戳） */
+function marketUpdatedMs(e) {
+  if (!e) return 0;
+  const raw = e.updatedAt != null ? e.updatedAt : e.publishedAt;
+  if (typeof raw === "number") return raw;
+  if (typeof raw === "string" && raw) {
+    const parsed = Date.parse(raw);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+}
+
+function renderMarket() {
+  const grid = document.getElementById("modsGrid");
+  if (!grid) return;
+  if (!MARKET.length) {
+    grid.innerHTML = '<div class="mk-card" style="grid-column:1/-1;text-align:center;padding:28px">' + '<div class="mk-name">' + t("索引里还没有模组") + "</div>" + '<div class="mk-desc" style="min-height:0">' + t("可能索引仓库还没建好，或网络不通。点下面的按钮重新拉取一次。") + "</div>" + '<div class="mk-foot" style="justify-content:center">' + '<button class="mk-btn" id="marketEmptyRefresh" style="flex:0 0 auto;padding:8px 18px">' + t("重新拉取索引") + "</button></div></div>";
+    const mr = document.getElementById("marketEmptyRefresh");
+    if (mr) mr.addEventListener("click", () => { if (typeof loadMarket === "function") void loadMarket(true); });
+    if (typeof autoTranslateAfterRender === "function") autoTranslateAfterRender();
+    return;
+  }
+  const mq = (document.getElementById("modSearch")?.value || "").toLowerCase().trim();
+  const mf = document.getElementById("modFilter")?.value || "all";
+  const listed = MARKET.filter((e) => {
+    if (mq && !((e.displayName || "").toLowerCase().includes(mq) || (e.id || "").toLowerCase().includes(mq))) return false;
+    if (mf !== "all" && (e.category || "") !== mf) return false;
+    if (MARKET_ONLY_NEW && marketLocalVersion(e.id)) return false;   // 只看未安装
+    return true;
+  }).sort((a, b) => {
+    if (MARKET_SORT === "name") return String(a.displayName || a.id).localeCompare(String(b.displayName || b.id));
+    if (MARKET_SORT === "size") return (Number(b.sizeBytes) || 0) - (Number(a.sizeBytes) || 0);
+    if (MARKET_SORT === "updated") return Date.parse(String(b.publishedAt || b.updatedAt || "")) - Date.parse(String(a.publishedAt || a.updatedAt || ""));
+    return (Number(b.downloads) || 0) - (Number(a.downloads) || 0);   // hot：按下载量
+  });
+  if (!listed.length) {
+    grid.innerHTML = '<div style="grid-column:1/-1;padding:34px;text-align:center;color:var(--txt-mute);font-size:12px">' + t("没有匹配的模组") + "</div>";
+    if (typeof autoTranslateAfterRender === "function") autoTranslateAfterRender();
+    return;
+  }
+  const when = MARKET_FETCHED_AT ? new Date(MARKET_FETCHED_AT).toTimeString().slice(0, 5) : "—";
+  const bar = '<div class="mk-bar" style="grid-column:1/-1"><span>' + t("上次检查") + ": " + esc(when) + "</span>"
+    + '<span style="flex:1"></span>'
+    + '<button class="mk-btn" style="flex:0 0 auto;padding:6px 14px" onclick="loadMarket(true)">' + t("检查更新") + "</button></div>";
+  grid.innerHTML = bar + listed.map((e) => {
+    const localVer = marketLocalVersion(e.id);
+    const isUpdate = !!localVer && !!e.version && localVer !== e.version;
+    const badge = !localVer
+      ? '<span class="mk-badge new">' + t("可安装") + "</span>"
+      : isUpdate
+        ? '<span class="mk-badge up">' + t("可更新") + " v" + esc(e.version) + "</span>"
+        : '<span class="mk-badge">' + t("已安装") + "</span>";
+    const tags = [e.category].concat(Array.isArray(e.tags) ? e.tags : []).filter(Boolean).slice(0, 4);
+    const percent = MARKET_PROGRESS[e.id];
+    const busy = typeof percent === "number";
+    const label = busy ? t("下载中") + " " + percent + "%" : !localVer ? t("安装") : isUpdate ? t("更新") : t("重装");
+    const repoBtn = e.repo ? '<button class="mk-btn" onclick="openExternalUrl(\'' + esc(e.repo) + '\')">' + t("源码") + "</button>" : "";
+    const mdBtn = '<button class="mk-btn" onclick="openMarketModDetail(\'' + esc(e.id) + '\')">' + t("详情") + "</button>";
+    const prog = busy ? '<div class="mk-prog"><i style="width:' + percent + '%"></i></div>' : "";
+    const restartTag = e.requiresRestart ? '<span class="mk-tag">' + t("需重启") + "</span>" : "";
+    // 卡片专属下载次数（对齐原型：每张市场卡片都有自己的下载量）
+    const dlN = marketDownloads(e);
+    // 拿不到下载数时也用「— 次下载」占位，保证每张卡片的这一行版式一致
+    const dlTxt = dlN === null ? "— " + t("次下载") : dlN.toLocaleString() + " " + t("次下载");
+    const updMs = marketUpdatedMs(e);
+    const metaBits = ['<span class="mk-dl">' + esc(dlTxt) + "</span>"];
+    if (Number(e.sizeBytes) > 0) metaBits.push("<span>" + esc(fmtBytes(e.sizeBytes)) + "</span>");
+    if (updMs > 0) metaBits.push("<span>" + t("更新于") + " " + esc(fmtTime(updMs)) + "</span>");
+    if (localVer) metaBits.push("<span>" + t("本地") + " " + esc(String(localVer).replace(/^v/i, "")) + "</span>");
+    return '<div class="mk-card">'
+      + '<div class="mk-head"><div class="mk-name">' + esc(e.displayName || e.id) + "</div>" + badge + "</div>"
+      + '<div class="mk-sub">' + esc(e.id) + " · v" + esc(e.version || "?") + " · " + (e.author && e.author.name ? esc(e.author.name) : t("未知作者")) + "</div>"
+      + '<div class="mk-desc">' + esc(e.description || "") + "</div>"
+      + '<div class="mk-tags">' + tags.map((x) => '<span class="mk-tag">' + esc(x) + "</span>").join("") + restartTag + "</div>"
+      + '<div class="mk-meta">' + metaBits.join("") + "</div>"
+      + prog
+      + '<div class="mk-foot"><button class="mk-btn"' + (busy ? " disabled" : "") + ' onclick="installMarketMod(\'' + esc(e.id) + '\')">' + esc(label) + "</button>" + mdBtn + repoBtn + "</div></div>";
+  }).join("");
+  if (typeof autoTranslateAfterRender === "function") autoTranslateAfterRender();
+}
+
+function revealModFolder(folder) {
+  api.modsOpenModFolder(folder).then((res) => { if (!res || !res.ok) toast((res && res.reason) || "打开失败", "err"); }).catch((e) => toast(String(e), "err"));
+}
+
+function openExternalUrl(url) {
+  if (!url) return;
+  api.openExternal(url).catch((e) => toast(String(e), "err"));
+}
+/* 签名三态徽章：已签名 / 签名失败 / 未签名（老模组不拦截） */
+/** 卡片右上角的分类徽章（原来放签名徽章的位置） */
+function categoryBadge(m){
+  return '<span class="mod-cat" title="'+modAttr(t('分类'))+'">'+modAttr(t(modCategoryLabel(m) || '未分类'))+'</span>';
+}
+function detailButton(m){
+  return '<button class="mod-act-btn" data-detail-folder="'+modAttr(m.folder)+'">'+t('详情')+'</button>';
+}
+function renderInstalledMods(){
   const grid=document.getElementById('modsGrid');
   if(!grid) return;
   const q=(document.getElementById('modSearch')?.value||'').toLowerCase().trim();
   const filt=document.getElementById('modFilter')?.value||'all';
   const rows=MODS.filter(m=>{
     if(q && !((m.displayName||'').toLowerCase().includes(q)||(m.id||'').toLowerCase().includes(q))) return false;
-    if(filt!=='all' && m.kind!==filt) return false;
+    if(filt!=='all' && (m.category||'')!==filt) return false;   // 按「创建模组」里的分类筛选
     return true;
   });
   if(!MODS.length){
@@ -2583,54 +3751,63 @@ function renderMods(){
     grid.innerHTML='<div style="grid-column:1/-1;padding:34px;text-align:center;color:var(--txt-mute);font-size:12px">'+t('没有匹配的模组')+'</div>';
   } else {
     grid.innerHTML=rows.map(m=>{
-      const stateCls=!m.supported?'removed':(m.enabled?'on':'off');
-      const stateTxt=!m.supported?'○ '+t('暂不支持'):(m.enabled?'● ENABLED':'○ DISABLED');
       const notes=[];
       if(m.error) notes.push(m.error);
       if(m.missingRequires&&m.missingRequires.length) notes.push(t('缺少依赖')+': '+m.missingRequires.join(', '));
       if(m.activeConflicts&&m.activeConflicts.length) notes.push(t('冲突')+': '+m.activeConflicts.join(', '));
       if(!m.supported && m.unsupportedReason) notes.push(m.unsupportedReason);
-      const toggle=m.supported
+      const sigBlocked=(m.signatureState==='invalid' && m.signatureTrusted);
+      if(sigBlocked) notes.push(t('签名校验未通过（内容已被修改），已禁止启用')+': '+m.signatureError);
+      const toggle=(m.supported && !sigBlocked)
         ? '<div class="toggle '+(m.enabled?'on':'')+'" data-mod-folder="'+modAttr(m.folder)+'" title="'+t(m.enabled?'点击禁用':'点击启用')+'"><span class="knob"></span></div>'
         : '';
       const ver=m.version?('v'+String(m.version).replace(/^v/i,'')):'';
+      const tagsText=(m.tags&&m.tags.length)?m.tags.join(' · '):'';
       const draggable=(!q&&filt==='all');
         const dragAttrs=draggable?('" draggable="true" data-drag-folder="'+modAttr(m.folder)+'"'):'"';
       return '<div class="mod '+(m.enabled?'':'disabled')+dragAttrs+'>'
         +'<div class="mod-head"><div class="mod-icon">'+(I[MOD_ICON[m.kind]]||I.shield)+'</div><div style="flex:1">'
         +'<div class="mod-name">'+modAttr(m.displayName||m.id)+'</div>'
-        +'<div class="mod-ver">'+modAttr(ver)+' <span class="mod-kind">'+(KIND_LABEL[m.kind]||m.kind||'')+'</span></div>'
-        +'</div></div>'
+        +'<div class="mod-tags-inline">'+(tagsText ? modAttr(tagsText) : '<span style="color:var(--txt-mute)">'+t('无标签')+'</span>')+'</div>'
+        +'</div>' + categoryBadge(m) + '</div>'
         +'<div class="mod-desc">'+(modAttr(m.description)||'<span style="color:var(--txt-mute)">'+t('无描述')+'</span>')+'</div>'
-        +'<div class="mod-meta"><span>id: <span class="v">'+modAttr(m.id)+'</span></span><span>restart: <span class="v">'+modAttr(m.restart||'—')+'</span></span><span>'+t('目录')+': <span class="v">'+modAttr(m.folder)+'</span></span></div>'
+        +'<div class="mod-meta">'
+        +'<span>'+t('MOD大小')+': <span class="v">'+modAttr(fmtBytes(m.sizeBytes))+'</span></span>'
+        +'<span>'+t('本地版本')+': <span class="v">'+modAttr(ver||'—')+'</span></span>'
+        +'<span>'+t('更新时间')+': <span class="v">'+modAttr(fmtTime(m.updatedAt))+'</span></span>'
+        +'</div>'
         +(notes.length?'<div style="font-size:11px;color:var(--amber);line-height:1.6;margin-bottom:8px">'+notes.map(n=>modAttr(n)).join('<br>')+'</div>':'')
-        +'<div class="mod-foot"><span class="mod-state '+stateCls+'">'+stateTxt+'</span>'+toggle+'</div>'
+        +'<div class="mod-foot">'
+        + detailButton(m)
+        + toggle
+        +'</div>'
         +'</div>';
     }).join('');
   }
+  // 已安装页的批量操作条（对齐原型的 全部启用 / 全部停用）
+  const installedGrid=document.getElementById('modsGrid');
+  if(installedGrid && MODS.length && !document.getElementById('modsBulkBar')){
+    const bar=document.createElement('div');
+    bar.id='modsBulkBar';
+    bar.className='mk-bar';
+    bar.style.gridColumn='1/-1';
+    bar.innerHTML='<span>'+t('显示')+' '+rows.length+' / '+MODS.length+'</span><span style="flex:1"></span>'
+      +'<button class="mk-btn" style="flex:0 0 auto;padding:6px 14px" onclick="bulkToggle(true)">'+t('全部启用')+'</button>'
+      +'<button class="mk-btn" style="flex:0 0 auto;padding:6px 14px" onclick="bulkToggle(false)">'+t('全部停用')+'</button>';
+    installedGrid.prepend(bar);
+  }
+  grid.querySelectorAll('.mod-act-btn[data-detail-folder]').forEach(el=>{
+    el.addEventListener('click',(ev)=>{ ev.stopPropagation(); if(typeof openInstalledModDetail==='function') openInstalledModDetail(el.dataset.detailFolder); });
+  });
+  grid.querySelectorAll('.mod-act-btn[data-sign-folder]').forEach(el=>{
+    el.addEventListener('click',(ev)=>{ ev.stopPropagation(); void signMod(el.dataset.signFolder); });
+  });
   grid.querySelectorAll('.toggle[data-mod-folder]').forEach(el=>{
     el.addEventListener('click',()=>{ void toggleMod(el.dataset.modFolder, !el.classList.contains('on')); });
   });
   const enabled=MODS.filter(m=>m.enabled).length;
   const badge=document.getElementById('modBadge');
   if(badge) badge.textContent=String(MODS.length);
-  // ---- 统计面板 ----
-  const statsEl=document.getElementById('modStats');
-  if(statsEl){
-    const fmt=(v)=>{const b=Number(v||0);if(b<1024)return b+' B';if(b<1048576)return (b/1024).toFixed(1)+' KB';if(b<1073741824)return (b/1048576).toFixed(1)+' MB';return (b/1073741824).toFixed(2)+' GB';};
-    const s=MOD_STATS||{};
-    const items=[
-      {n:String(s.total||0),l:t('模组总数'),cls:''},
-      {n:String(s.enabled||0),l:t('已启用'),cls:'ok'},
-      {n:String(s.disabled||0),l:t('已停用'),cls:''},
-      (()=>{const active=Number(s.conflicts||0);const potential=(Array.isArray(MOD_CONFLICTS)?MOD_CONFLICTS:[]).filter(c=>!c.active).length;
-        const cls=active>0?'bad':(potential>0?'warn':'ok');
-        const label=active>0?t('冲突数'):(potential>0?t('冲突数')+' ('+potential+' '+t('未生效')+')':t('冲突数'));
-        return {n:String(active),l:label,cls:cls};})(),
-      {n:fmt(s.bytes),l:t('模组占用空间'),cls:''}
-    ];
-    statsEl.innerHTML=items.map(it=>'<div class="mod-stat '+(it.cls||'')+'"><div class="n">'+modAttr(it.n)+'</div><div class="l">'+modAttr(it.l)+'</div></div>').join('');
-  }
   const confEl=document.getElementById('modConflicts');
   if(confEl){
     const all=Array.isArray(MOD_CONFLICTS)?MOD_CONFLICTS:[];
@@ -2659,6 +3836,16 @@ function renderMods(){
   if(summary) summary.textContent=MODS.length+' '+t('个模组')+' · '+enabled+' '+t('个活跃');
   if(typeof autoTranslateAfterRender==='function') autoTranslateAfterRender();
 }
+
+/* 实时日志级别筛选（与上方页签叠加生效） */
+document.querySelectorAll("#dashLogFilters .log-filter").forEach(btn=>{
+  btn.addEventListener("click",()=>{
+    const lvl=btn.dataset.lvl||"all";
+    LOG_FILTER.dash=(lvl==="all"||LOG_FILTER.dash===lvl)?"all":lvl;
+    renderLog("dashConsole",curDashLog,"dash");
+    updateLogBar();
+  });
+});
 
 function closeModal(id){ document.getElementById(id).classList.remove('open'); }
 // close modal on overlay click
@@ -2869,7 +4056,7 @@ document.querySelectorAll('.nav-item').forEach(item=>item.addEventListener('clic
 /* ============ TABS ============ */
 document.getElementById('dashTabs').querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
   document.querySelectorAll('#dashTabs .tab').forEach(x=>x.classList.remove('active'));
-  t.classList.add('active'); curDashLog=t.dataset.log; renderLog('dashConsole',curDashLog);
+  t.classList.add('active'); curDashLog=t.dataset.log; renderLog('dashConsole',curDashLog,'dash'); updateLogBar();
 }));
 document.getElementById('fullTabs').querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
   document.querySelectorAll('#fullTabs .tab').forEach(x=>x.classList.remove('active'));
@@ -2893,9 +4080,11 @@ renderSvcCards(); renderEnvCheck(); renderAccounts(); renderCmdStats(); renderCm
 document.getElementById('langLabel').textContent=I18N[curLang].name;
 document.documentElement.lang=curLang==='zh'?'zh-CN':curLang;
 if(curLang!=='zh') setTimeout(()=>translateDOM(document),0);
-tickClock(); tickMetrics();
+tickClock();
 setInterval(tickClock,1000);
-/* 资源指标刷新由 launcher-bridge.js 统一调度 */
+/* 资源指标（CPU/内存/GPU/网络）由 launcher-bridge.js 统一定时调度：
+   tickMetrics 定义在 bridge 里，本段内联脚本先于 bridge 执行，
+   所以这里**不要**直接调用 tickMetrics()，否则会抛 ReferenceError、首次指标拿不到。 */
 </script>
   <script src="./launcher-bridge.js"></script>
 </body>

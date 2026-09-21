@@ -11,3 +11,5 @@ launcher-settings.json
 *.backup
 *.new
 _launcher/
+.gocache/
+.gotmp/
