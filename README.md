@@ -1,12 +1,200 @@
-# EvEJS 启动器 / EvEJS Launcher
+# EvEJS Launcher / EvEJS 启动器
 
-EVE Online Neocom 风格的一站式启动器：管服务、看日志、管账号、改数据库、做模组。
 An EVE Online Neocom-style all-in-one launcher for EvEJS: services, logs, accounts, database and the mod ecosystem.
+EVE Online Neocom 风格的一站式启动器：管服务、看日志、管账号、改数据库、做模组。
 
-**中文** ｜ [English](#english)
+**English** ｜ [中文](#中文)
 
-- 下载：[最新 Release](https://github.com/diguo520/EVEjs-launcher/releases/latest)
-- 模组索引仓库：[diguo520/EVEjs-mods](https://github.com/diguo520/EVEjs-mods)
+- Download: [Latest Release](https://github.com/diguo520/EVEjs-launcher/releases/latest)
+- Mod index repo: [diguo520/EVEjs-mods](https://github.com/diguo520/EVEjs-mods)
+
+---
+
+## English
+
+### What is this
+
+`EvEJS Launcher` is the graphical launcher for a standalone EvEJS server (Electron, Windows portable exe, no installation). It folds everything that used to be done with shell commands, config edits and log tailing into one EVE-styled UI: start/stop the main server and market service, watch server logs live, manage accounts and characters, browse and edit the SQLite database, look up commands, and run a **complete mod ecosystem** (identity -> create -> submit -> market -> moderation).
+
+### Features
+
+#### Control deck
+- **One-click start brings up only the main server + market service**; the game client is launched on demand from Account management -> character Login (no extra start button)
+- Per-service start/stop, status pills, crash/error surfacing
+- Resource monitoring: CPU, memory, **GPU utilisation / dedicated GPU memory / shared GPU memory**, **virtual memory**, network I/O and **per-volume disk usage** (the volume holding EvEJS is marked)
+- Status bar: online players (from the server), main-server uptime (`--:--:--` while stopped), environment self-check progress, ALERTS count and local time
+
+#### Server logs
+- Reads `server/logs/server.log` (UTF-8, last 5000 lines) — no command input needed
+- Live stream with module filters (system / main server / market service / client) and level filters (All / INFO / WARN / ERROR)
+- Colouring: IPs, ports and `[process exit] exit code` are highlighted; **ERR / WARN tint the whole line**
+- Auto-scrolls to the newest line, but **never yanks you back while you are reading older entries** (follow resumes at the bottom)
+- Mod load lines in the system log carry a coloured `MOD` badge (amber when the mod is skipped/disabled)
+
+#### Accounts and characters
+- Create accounts (optionally **granting GM rights**), show ban status
+- Character portraits and details: ISK, skill points (SP), ship, location, security status
+- **Character login goes straight into the game**: clicking Login auto-authenticates into that character — no character-select screen and no second client window
+- If an account has no character yet, you can go straight into character creation
+
+#### Command manual
+- Category / command-type filters, a command generator (parameterised output plus copy), tabs and counters
+
+#### Database manager
+- Table list with statistics computed from **real data**
+- Browse and **edit** rows (insert / update / delete with a row inspector panel)
+- Structure tab (columns, types, primary key) and SQL preview
+- **Backup / restore**: backups land in `<server root>/__backup/databackup` named with date + time, listed incrementally, and any version can be restored (a safety backup is taken first)
+
+#### Mod ecosystem (the headline of this release)
+Three tabs sharing **one stats region that swaps content per tab**:
+
+1. **Installed** — enable/disable switches, category, tags, size, local version, updated time, detail dialog, conflict banner, drag-and-drop load order
+2. **My mods** — merges local / index / submission-ledger sources; statuses include local, draft, submitted, listed, delisted, **not accepted** and "local is newer"; moderation results show in red with the reason and the moderator
+3. **Market** — signed index (**verified before trusted**), multi-mirror download (jsDelivr -> raw -> github), SHA256 checks, install / update / reinstall, progress bar, detail dialog, category filter and **a per-card download count**
+4. Header actions: **Create mod** · **Submit mod** · **Author identity** · **Mod authoring guide**
+
+Under the hood:
+
+- **Author identity** — local Ed25519 key (author id + key fingerprint), renameable, exportable/importable as `.eve-key`
+- **Create mod** — scaffolds a working mod from the proven welcome-mod skeleton (manifest / `loader.js` / README / CHANGELOG), optionally enabling and signing it right away
+- **Submit mod** — re-sign -> pack ZIP -> SHA256 -> publish to **your own repository** (create repo / release / upload asset) -> request listing
+- **Signature verification** — signed / invalid / unsigned; a tampered manifest cannot be enabled; **signing is not ownership** (the main process refuses to sign a manifest that already declares another author)
+- **Conflict detection** — declared conflicts, duplicate ids, several loaders touching the same server module, missing dependencies; active vs not-yet-effective
+- **Load order** — drag to reorder, persisted to `_launcher/mods/mod-order.json`
+- **ZIP import** — locates the package root, validates the manifest, installs to `mods/<id>` and leaves it disabled
+- **Authoring guide** — `_launcher/mods/MOD_AUTHORING.md`, released on first run and openable from the UI
+
+#### Configuration centre
+- Reads/writes the server config (`server.json`) and the client config (`EvEJSConfig.bat`)
+- **Server root, client directory and the PATH entry are all user-defined** — nothing assumes `/opt/evejs` or `E:\Games\EVE\`
+- One-click start options (start the market service too, auto login, ...)
+
+#### Environment self-check
+Nine read-only checks: Node.js runtime, Rust/Cargo toolchain, VS C++ build tools, dependencies, database, market binary, client path, CA certificate and more — failures come with a hint.
+
+#### Auto-update
+- Checks the update manifest on the GitHub Release by default; override via `updateManifestUrl` or a `launcher.config.json` next to the portable exe
+- One check shortly after startup, every 30 minutes while running, and when the window regains focus
+- **The changelog follows your UI language**: Chinese reads `changelog.zh`, English and everything else reads `changelog.en`
+- Downloads are verified by SHA256 and installed by a standalone `evejs-updater.exe` after the launcher exits; the main and market services must be stopped first, failures keep a `.backup` for rollback, and a stale version number in the file name is renamed automatically
+
+#### Languages and remembered preferences
+- Eight UI languages: 中文 / English / 日本語 / 한국어 / Français / Deutsch / Nederlands / Русский
+- First run defaults to English, afterwards your choice is remembered
+- Window size and position are remembered, so you do not have to resize every launch
+
+#### Portable layout
+- Portable exe, no installer
+- Every runtime artefact lives in `_launcher/` next to the launcher (`cache` / `temp` / `logs` / `data` / `crash`), and **all folders and files use ASCII names**
+- The launcher does not write into your C: user profile; caches, temp files, logs and keys all live under `_launcher/`
+
+### Screenshots
+
+> Taken from the v0.1.16 base UI; the mod page was upgraded in v0.1.19 to the Installed / My mods / Market tabs with per-card download counts.
+
+#### Dashboard
+
+![Dashboard](docs/screenshots/01-dashboard.png)
+
+#### Account Management
+
+![Account Management](docs/screenshots/02-account-management.png)
+
+#### Command Manual
+
+![Command Manual](docs/screenshots/03-command-manual.png)
+
+#### Database
+
+![Database](docs/screenshots/04-database.png)
+
+#### Mod / Plugin
+
+![Mod / Plugin](docs/screenshots/05-mod-plugin.png)
+
+### Download and install
+
+1. Grab `EvEJS-Launcher-Portable-<version>.exe` from [Releases](https://github.com/diguo520/EVEjs-launcher/releases/latest)
+2. Drop it into your EvEJS server root (next to `server/` and `config/`) and run it
+3. Open Configuration centre once to confirm the server and client paths; fix any red items in the environment self-check
+
+### Requirements
+
+- Windows 10 1809+ (x64)
+- Node.js >= 24 (to run the server)
+- An EvEJS server checkout (contains `server/autostart.js`)
+
+### Building from source
+
+```bash
+npm install               # dependencies (npmmirror registry)
+npm run dev               # Vite HMR + Electron
+npm run build             # main process (tsc) + renderer (vite)
+npm run smoke             # build + smoke test (exits automatically)
+npm run package:portable  # Windows x64 portable build
+npm run build:updater     # compile the Go updater (needs a Go toolchain)
+```
+
+### Project layout
+
+```text
+launcher/
+├─ src/main/                 # Electron main process
+│  ├─ index.ts               # window / single instance / smoke test
+│  ├─ processManager.ts      # service start-stop state machine
+│  ├─ ptyManager.ts          # node-pty (ConPTY, falls back to spawn)
+│  ├─ modManager.ts          # mod scan / enable / conflicts / load order / authoring guide
+│  ├─ modRegistry.ts         # market index fetch + signature check + install
+│  ├─ modSigner.ts           # Ed25519 sign / verify / built-in index key
+│  ├─ modScaffold.ts         # create-mod scaffolding
+│  ├─ modSubmit.ts           # submission ledger / My mods
+│  ├─ modPack.ts             # ZIP packing (.NET ZipFile)
+│  ├─ authorStore.ts         # author identity and .eve-key
+│  ├─ github*.ts             # GitHub token / PR / publish to your own repo
+│  ├─ databaseManager.ts     # SQLite browse / edit / backup / restore
+│  ├─ configStore.ts         # server.json + EvEJSConfig.bat
+│  └─ envDetector.ts / healthChecker.ts / ipc.ts / logger.ts
+├─ src/preload/index.ts      # contextBridge bridge
+├─ src/renderer/public/      # renderer (single-file HTML + bridge, no frontend framework)
+├─ updater/                  # standalone updater (Go)
+├─ scripts/                  # account CLI / database CLI / renderer syntax check / release notes
+├─ release-notes/            # per-version changelogs (vX.Y.Z.json, bilingual; drives the update dialog and the Release body)
+└─ docs/                     # design docs and screenshots
+```
+
+### For mod authors: quick start
+
+1. Launcher -> Mod / Plugin -> **Author identity**: create your identity (**export the `.eve-key` and keep it safe**, lose it and you cannot sign updates)
+2. **Create mod**: pick a template, fill name / category / version / description to get a runnable skeleton
+3. Write your logic (mounted through a loader, **no server files are modified**), then use **Submit mod** to re-sign and pack
+4. In Submit mod, hit **Publish to my repo**: the launcher creates the repo, writes the listing, creates a Release and uploads the ZIP
+5. Hit **Request listing** to open a one-off PR against the index repo; once merged your mod shows up in everyone's market
+6. Future versions only need steps 3-4 (push to your own repo) and the index refreshes automatically
+
+### For the index maintainer
+
+The index repo [diguo520/EVEjs-mods](https://github.com/diguo520/EVEjs-mods) ships a moderation CLI:
+
+```bash
+node scripts/moderate.mjs list                       # reviewer dashboard
+node scripts/moderate.mjs approve <owner/repo>       # accept a listing
+node scripts/moderate.mjs reject <id|owner/repo> --zh "reason" --en "reason"
+node scripts/moderate.mjs delist <id|owner/repo> --zh "reason" --en "reason"
+node scripts/moderate.mjs restore <id|owner/repo>    # undo a moderation result
+node scripts/build-index.mjs && git commit -am "chore(index): refresh" && git push
+```
+
+- `delist` removes the mod from the market and blocks installs/updates; the author sees a red "Delisted + reason" badge in My mods
+- `reject` keeps the mod out of the index entirely; the author still sees "Not accepted + reason"
+
+### Notes and known limits
+
+- The environment self-check is **read-only**; it will not install anything for you
+- `node-pty` is optional; without it the launcher falls back to `spawn` pipes
+- The launcher **never modifies server files**; mods are mounted through loaders
+- Moderation happens at the **index layer**: ZIPs stay in the author's own repository and the maintainer only controls market visibility
+- The NSIS installer target is configured but not published yet; only the portable build ships today
 
 ---
 
@@ -197,190 +385,3 @@ node scripts/build-index.mjs && git commit -am "chore(index): refresh" && git pu
 - 模组审核是**索引层**动作：ZIP 始终托管在作者自己的仓库，维护者只决定它在市场里可见与否
 - NSIS 安装版配置已就绪但尚未正式发布，当前只发便携版
 
----
-
-## English
-
-### What is this
-
-`EvEJS Launcher` is the graphical launcher for a standalone EvEJS server (Electron, Windows portable exe, no installation). It folds everything that used to be done with shell commands, config edits and log tailing into one EVE-styled UI: start/stop the main server and market service, watch server logs live, manage accounts and characters, browse and edit the SQLite database, look up commands, and run a **complete mod ecosystem** (identity -> create -> submit -> market -> moderation).
-
-### Features
-
-#### Control deck
-- **One-click start brings up only the main server + market service**; the game client is launched on demand from Account management -> character Login (no extra start button)
-- Per-service start/stop, status pills, crash/error surfacing
-- Resource monitoring: CPU, memory, **GPU utilisation / dedicated GPU memory / shared GPU memory**, **virtual memory**, network I/O and **per-volume disk usage** (the volume holding EvEJS is marked)
-- Status bar: online players (from the server), main-server uptime (`--:--:--` while stopped), environment self-check progress, ALERTS count and local time
-
-#### Server logs
-- Reads `server/logs/server.log` (UTF-8, last 5000 lines) — no command input needed
-- Live stream with module filters (system / main server / market service / client) and level filters (All / INFO / WARN / ERROR)
-- Colouring: IPs, ports and `[process exit] exit code` are highlighted; **ERR / WARN tint the whole line**
-- Auto-scrolls to the newest line, but **never yanks you back while you are reading older entries** (follow resumes at the bottom)
-- Mod load lines in the system log carry a coloured `MOD` badge (amber when the mod is skipped/disabled)
-
-#### Accounts and characters
-- Create accounts (optionally **granting GM rights**), show ban status
-- Character portraits and details: ISK, skill points (SP), ship, location, security status
-- **Character login goes straight into the game**: clicking Login auto-authenticates into that character — no character-select screen and no second client window
-- If an account has no character yet, you can go straight into character creation
-
-#### Command manual
-- Category / command-type filters, a command generator (parameterised output plus copy), tabs and counters
-
-#### Database manager
-- Table list with statistics computed from **real data**
-- Browse and **edit** rows (insert / update / delete with a row inspector panel)
-- Structure tab (columns, types, primary key) and SQL preview
-- **Backup / restore**: backups land in `<server root>/__backup/databackup` named with date + time, listed incrementally, and any version can be restored (a safety backup is taken first)
-
-#### Mod ecosystem (the headline of this release)
-Three tabs sharing **one stats region that swaps content per tab**:
-
-1. **Installed** — enable/disable switches, category, tags, size, local version, updated time, detail dialog, conflict banner, drag-and-drop load order
-2. **My mods** — merges local / index / submission-ledger sources; statuses include local, draft, submitted, listed, delisted, **not accepted** and "local is newer"; moderation results show in red with the reason and the moderator
-3. **Market** — signed index (**verified before trusted**), multi-mirror download (jsDelivr -> raw -> github), SHA256 checks, install / update / reinstall, progress bar, detail dialog, category filter and **a per-card download count**
-4. Header actions: **Create mod** · **Submit mod** · **Author identity** · **Mod authoring guide**
-
-Under the hood:
-
-- **Author identity** — local Ed25519 key (author id + key fingerprint), renameable, exportable/importable as `.eve-key`
-- **Create mod** — scaffolds a working mod from the proven welcome-mod skeleton (manifest / `loader.js` / README / CHANGELOG), optionally enabling and signing it right away
-- **Submit mod** — re-sign -> pack ZIP -> SHA256 -> publish to **your own repository** (create repo / release / upload asset) -> request listing
-- **Signature verification** — signed / invalid / unsigned; a tampered manifest cannot be enabled; **signing is not ownership** (the main process refuses to sign a manifest that already declares another author)
-- **Conflict detection** — declared conflicts, duplicate ids, several loaders touching the same server module, missing dependencies; active vs not-yet-effective
-- **Load order** — drag to reorder, persisted to `_launcher/mods/mod-order.json`
-- **ZIP import** — locates the package root, validates the manifest, installs to `mods/<id>` and leaves it disabled
-- **Authoring guide** — `_launcher/mods/MOD_AUTHORING.md`, released on first run and openable from the UI
-
-#### Configuration centre
-- Reads/writes the server config (`server.json`) and the client config (`EvEJSConfig.bat`)
-- **Server root, client directory and the PATH entry are all user-defined** — nothing assumes `/opt/evejs` or `E:\Games\EVE\`
-- One-click start options (start the market service too, auto login, ...)
-
-#### Environment self-check
-Nine read-only checks: Node.js runtime, Rust/Cargo toolchain, VS C++ build tools, dependencies, database, market binary, client path, CA certificate and more — failures come with a hint.
-
-#### Auto-update
-- Checks the update manifest on the GitHub Release by default; override via `updateManifestUrl` or a `launcher.config.json` next to the portable exe
-- One check shortly after startup, every 30 minutes while running, and when the window regains focus
-- **The changelog follows your UI language**: Chinese reads `changelog.zh`, English and everything else reads `changelog.en`
-- Downloads are verified by SHA256 and installed by a standalone `evejs-updater.exe` after the launcher exits; the main and market services must be stopped first, failures keep a `.backup` for rollback, and a stale version number in the file name is renamed automatically
-
-#### Languages and remembered preferences
-- Eight UI languages: 中文 / English / 日本語 / 한국어 / Français / Deutsch / Nederlands / Русский
-- First run defaults to English, afterwards your choice is remembered
-- Window size and position are remembered, so you do not have to resize every launch
-
-#### Portable layout
-- Portable exe, no installer
-- Every runtime artefact lives in `_launcher/` next to the launcher (`cache` / `temp` / `logs` / `data` / `crash`), and **all folders and files use ASCII names**
-- The launcher does not write into your C: user profile; caches, temp files, logs and keys all live under `_launcher/`
-
-### Screenshots
-
-> Taken from the v0.1.16 base UI; the mod page was upgraded in v0.1.19 to the Installed / My mods / Market tabs with per-card download counts.
-
-#### Dashboard
-
-![Dashboard](docs/screenshots/01-dashboard.png)
-
-#### Account Management
-
-![Account Management](docs/screenshots/02-account-management.png)
-
-#### Command Manual
-
-![Command Manual](docs/screenshots/03-command-manual.png)
-
-#### Database
-
-![Database](docs/screenshots/04-database.png)
-
-#### Mod / Plugin
-
-![Mod / Plugin](docs/screenshots/05-mod-plugin.png)
-
-### Download and install
-
-1. Grab `EvEJS-Launcher-Portable-<version>.exe` from [Releases](https://github.com/diguo520/EVEjs-launcher/releases/latest)
-2. Drop it into your EvEJS server root (next to `server/` and `config/`) and run it
-3. Open Configuration centre once to confirm the server and client paths; fix any red items in the environment self-check
-
-### Requirements
-
-- Windows 10 1809+ (x64)
-- Node.js >= 24 (to run the server)
-- An EvEJS server checkout (contains `server/autostart.js`)
-
-### Building from source
-
-```bash
-npm install               # dependencies (npmmirror registry)
-npm run dev               # Vite HMR + Electron
-npm run build             # main process (tsc) + renderer (vite)
-npm run smoke             # build + smoke test (exits automatically)
-npm run package:portable  # Windows x64 portable build
-npm run build:updater     # compile the Go updater (needs a Go toolchain)
-```
-
-### Project layout
-
-```text
-launcher/
-├─ src/main/                 # Electron main process
-│  ├─ index.ts               # window / single instance / smoke test
-│  ├─ processManager.ts      # service start-stop state machine
-│  ├─ ptyManager.ts          # node-pty (ConPTY, falls back to spawn)
-│  ├─ modManager.ts          # mod scan / enable / conflicts / load order / authoring guide
-│  ├─ modRegistry.ts         # market index fetch + signature check + install
-│  ├─ modSigner.ts           # Ed25519 sign / verify / built-in index key
-│  ├─ modScaffold.ts         # create-mod scaffolding
-│  ├─ modSubmit.ts           # submission ledger / My mods
-│  ├─ modPack.ts             # ZIP packing (.NET ZipFile)
-│  ├─ authorStore.ts         # author identity and .eve-key
-│  ├─ github*.ts             # GitHub token / PR / publish to your own repo
-│  ├─ databaseManager.ts     # SQLite browse / edit / backup / restore
-│  ├─ configStore.ts         # server.json + EvEJSConfig.bat
-│  └─ envDetector.ts / healthChecker.ts / ipc.ts / logger.ts
-├─ src/preload/index.ts      # contextBridge bridge
-├─ src/renderer/public/      # renderer (single-file HTML + bridge, no frontend framework)
-├─ updater/                  # standalone updater (Go)
-├─ scripts/                  # account CLI / database CLI / renderer syntax check / release notes
-├─ release-notes/            # per-version changelogs (vX.Y.Z.json, bilingual; drives the update dialog and the Release body)
-└─ docs/                     # design docs and screenshots
-```
-
-### For mod authors: quick start
-
-1. Launcher -> Mod / Plugin -> **Author identity**: create your identity (**export the `.eve-key` and keep it safe**, lose it and you cannot sign updates)
-2. **Create mod**: pick a template, fill name / category / version / description to get a runnable skeleton
-3. Write your logic (mounted through a loader, **no server files are modified**), then use **Submit mod** to re-sign and pack
-4. In Submit mod, hit **Publish to my repo**: the launcher creates the repo, writes the listing, creates a Release and uploads the ZIP
-5. Hit **Request listing** to open a one-off PR against the index repo; once merged your mod shows up in everyone's market
-6. Future versions only need steps 3-4 (push to your own repo) and the index refreshes automatically
-
-### For the index maintainer
-
-The index repo [diguo520/EVEjs-mods](https://github.com/diguo520/EVEjs-mods) ships a moderation CLI:
-
-```bash
-node scripts/moderate.mjs list                       # reviewer dashboard
-node scripts/moderate.mjs approve <owner/repo>       # accept a listing
-node scripts/moderate.mjs reject <id|owner/repo> --zh "reason" --en "reason"
-node scripts/moderate.mjs delist <id|owner/repo> --zh "reason" --en "reason"
-node scripts/moderate.mjs restore <id|owner/repo>    # undo a moderation result
-node scripts/build-index.mjs && git commit -am "chore(index): refresh" && git push
-```
-
-- `delist` removes the mod from the market and blocks installs/updates; the author sees a red "Delisted + reason" badge in My mods
-- `reject` keeps the mod out of the index entirely; the author still sees "Not accepted + reason"
-
-### Notes and known limits
-
-- The environment self-check is **read-only**; it will not install anything for you
-- `node-pty` is optional; without it the launcher falls back to `spawn` pipes
-- The launcher **never modifies server files**; mods are mounted through loaders
-- Moderation happens at the **index layer**: ZIPs stay in the author's own repository and the maintainer only controls market visibility
-- The NSIS installer target is configured but not published yet; only the portable build ships today
