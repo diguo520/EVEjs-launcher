@@ -97,6 +97,37 @@ export async function ensureFork(
   return { ok: false, reason: fork.reason || mine.reason || "fork 不可用" };
 }
 
+/**
+ * 读仓库里的一个文件（优先 Contents API，退回 raw CDN）。返回文本与 sha。
+ * 用途：往 sources.json 追加一行前，必须先拿到**当前**内容 —— 读不到就绝不能继续，
+ * 否则会拿空列表去覆盖，把别人的收录全删掉（0.1.19 实测踩过）。
+ */
+export async function readRepoFile(
+  token: string,
+  repo: string,
+  filePath: string,
+  baseBranch = "main"
+): Promise<{ ok: boolean; text?: string; sha?: string; reason?: string }> {
+  const viaApi = await call<{ content?: string; sha?: string; encoding?: string }>(
+    token,
+    "GET",
+    "/repos/" + repo + "/contents/" + filePath + "?ref=" + encodeURIComponent(baseBranch)
+  );
+  if (viaApi.ok && viaApi.data && typeof viaApi.data.content === "string" && viaApi.data.content) {
+    const cleaned = viaApi.data.content.replace(/\n/g, "");
+    return { ok: true, text: Buffer.from(cleaned, "base64").toString("utf8"), sha: viaApi.data.sha || "" };
+  }
+  try {
+    const res = await net.fetch("https://raw.githubusercontent.com/" + repo + "/" + baseBranch + "/" + filePath, {
+      headers: { "User-Agent": UA }
+    });
+    if (res.ok) return { ok: true, text: await res.text(), sha: "" };
+    return { ok: false, reason: viaApi.reason || ("raw HTTP " + res.status) };
+  } catch (e) {
+    return { ok: false, reason: viaApi.reason || (e instanceof Error ? e.message : String(e)) };
+  }
+}
+
 export interface SubmitFileInput {
   token: string;
   upstream: string;
@@ -179,6 +210,16 @@ export async function submitFileViaPullRequest(input: SubmitFileInput): Promise<
     base,
     body: input.prBody
   });
+  if (pr.status === 422) {
+    // 这个分支已经有 PR 了（重复点「申请收录」）：文件已经更新，直接把已有 PR 找回来，算成功。
+    const existingPr = await call<Array<{ html_url?: string }>>(
+      input.token,
+      "GET",
+      "/repos/" + input.upstream + "/pulls?state=all&head=" + encodeURIComponent(login + ":" + input.branch)
+    );
+    const url = existingPr.ok && Array.isArray(existingPr.data) && existingPr.data[0] ? existingPr.data[0].html_url : "";
+    if (url) return { ok: true, prUrl: url, branch: input.branch, login, forkRepo };
+  }
   if (!pr.ok) {
     // 分支已经推上去了 —— 即使开 PR 失败也要把分支名与 fork 告诉用户
     return {

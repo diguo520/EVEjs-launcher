@@ -89,6 +89,9 @@ const api = {
     ipcRenderer.on("mod:downloadProgress", h);
     return () => ipcRenderer.removeListener("mod:downloadProgress", h);
   },
+  onModPublishProgress: (cb: (p: { stage: string; percent: number }) => void) => {
+    ipcRenderer.on("mod:publishProgress", (_e, p) => cb(p));
+  },
   modsPublishOwnRepo: (id: string, version: string, repo: string, giteeUrl?: string) =>
     ipcRenderer.invoke("mods:publishOwnRepo", id, version, repo, giteeUrl),
   modsRegisterSource: (id: string, version: string) => ipcRenderer.invoke("mods:registerSource", id, version),

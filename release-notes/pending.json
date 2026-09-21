@@ -1,6 +1,42 @@
 {
   "target": 8,
-  "completed": 0,
+  "completed": 7,
   "nextVersion": "0.1.20",
-  "changes": []
+  "changes": [
+    {
+      "type": "fix",
+      "zh": "修正「提交模组」里 GitHub 令牌的权限说明：写清 fine-grained 令牌的生成路径（Settings → Developer settings → Personal access tokens → Fine-grained tokens）与需要勾选的四项（Contents / Pull requests / Administration = Read and write，Metadata 自动 Read-only），并提醒别用只有 scope 的 Tokens (classic) 页面",
+      "en": "Clarified the GitHub token instructions in Submit mod: it now spells out the fine-grained token path (Settings -> Developer settings -> Personal access tokens -> Fine-grained tokens) and the four permissions to tick (Contents / Pull requests / Administration = Read and write, Metadata auto Read-only), and warns against the scope-only Tokens (classic) page"
+    },
+    {
+      "type": "fix",
+      "zh": "修复「发布到我的仓库」只报 GitHub 403 却看不出缺哪项权限：现在错误信息会带上具体端点（如 POST /user/repos），并在 403 时直接说明需要 Contents / Administration = Read and write；自动建仓库被拒时给出两种解法（补 Administration 权限，或先手动建仓库再填 owner/repo）",
+      "en": "Fixed the opaque GitHub 403 from Publish to my repo: errors now name the exact endpoint (e.g. POST /user/repos) and a 403 spells out whether Contents / Administration = Read and write is missing; when repo creation is denied it offers two fixes (grant Administration, or create the repo yourself and fill in owner/repo)"
+    },
+    {
+      "type": "fix",
+      "zh": "修复「发布到我的仓库」上传 ZIP 时报 net::ERR_INVALID_ARGUMENT：上传请求里手动设置的 Content-Length 属于 fetch 受限头，Chromium 会直接拒绝；改为交给底层自动计算，并新增 node https 直传兜底（net.fetch 失败时自动重试一次），同名资产先删后传的重发逻辑保持不变",
+      "en": "Fixed net::ERR_INVALID_ARGUMENT when uploading the ZIP in Publish to my repo: the manually set Content-Length is a forbidden fetch header and Chromium rejects the request outright. The length is now computed by the stack, with a node https fallback that retries once if net.fetch fails; the delete-then-upload republish logic is unchanged"
+    },
+    {
+      "type": "opt",
+      "zh": "提交模组弹窗重做「选择模组」：改成与主题一致的下拉菜单，且只列出作者自己的模组（不再混入别人的模组，避免误提交/替别人提交）；「发布到我的仓库」新增进度条，按阶段显示（校验令牌 → 准备仓库 → 写 evejs-mod.json → 创建 Release → 上传 ZIP → 完成）",
+      "en": "Rebuilt the mod picker in Submit mod: it is now a themed dropdown that only lists the author's own mods (no more other people's mods, avoiding wrong or proxy submissions); Publish to my repo now shows a progress bar with stages (verify token -> prepare repo -> write evejs-mod.json -> create Release -> upload ZIP -> done)"
+    },
+    {
+      "type": "fix",
+      "zh": "安全与流程：移除「我创建的」卡片和提交模组弹窗里的「打开 PR / 打开 PR 页面」按钮（避免误触外链）；被维护者拒绝收录的模组，卡片按钮由「提新版 / 提交」改为「重新提交审核」，点进去自动选中该模组，走同一条 生成打包 → 发布到我的仓库 → 申请收录 流程",
+      "en": "Safety and flow: removed the Open PR / Open PR page buttons from the My mods cards and the Submit mod dialog; a mod rejected by the maintainer now shows Resubmit for review instead of Publish update, and opens the dialog with that mod preselected, reusing the same pack -> publish -> request listing flow"
+    },
+    {
+      "type": "opt",
+      "zh": "提交模组：删掉整段 GitHub 令牌权限配置说明（太长，界面里不需要）；顶部「第①步/第②步/第③步」说明改为逐行 1) 2) 3) 排版并把字号从 10px 提到 12px；按钮文案同步改成 1) / 2) / 3)（不再用 ①②③）；创建模组弹窗的说明同样放大；弹窗字段标签字号 10px → 11px",
+      "en": "Submit mod: removed the long GitHub token-permission instructions; the top three-step note is now laid out one step per line as 1) 2) 3) with the font raised from 10px to 12px, and the buttons use 1) / 2) / 3) instead of ①②③; the Create mod notice was enlarged the same way and modal field labels went from 10px to 11px"
+    },
+    {
+      "type": "fix",
+      "zh": "修复「我创建的」删不掉的幽灵条目：本地 mods/<id> 已删除、索引里也不是可安装条目（例如被拒绝收录）时，不再显示在列表里（此前会一直挂着审核记录），标题栏提示「已隐藏 N 条本地已删除的记录」",
+      "en": "Fixed ghost entries in My mods that could not be removed: when the local mods/<id> folder is gone and the index no longer has an installable entry (e.g. rejected), the item is no longer listed (previously the moderation record kept it alive), and the header now reports \"hidden N records whose local files were deleted\""
+    }
+  ]
 }

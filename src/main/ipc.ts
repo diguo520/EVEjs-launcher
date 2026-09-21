@@ -506,9 +506,22 @@ export function registerIpc(): void {
   /* ---------- 提交模组（签名 → 打包 → 索引分片 → GitHub PR，见 docs/…plan.md §5.4） ---------- */
   ipcMain.handle("mods:submitPrepare", (_e, input: PrepareInput) => prepareSubmission(resolveRepoRoot(), input ?? ({} as PrepareInput)));
   ipcMain.handle("mods:submitGithub", (_e, id: string, version: string) => submitToGitHub(String(id ?? ""), String(version ?? "")));
-  ipcMain.handle("mods:publishOwnRepo", (_e, id: string, version: string, repo: string, giteeUrl?: string) =>
-    publishOwnRepo(String(id ?? ""), String(version ?? ""), String(repo ?? ""), typeof giteeUrl === "string" ? giteeUrl : "")
-  );
+  ipcMain.handle("mods:publishOwnRepo", (_e, id: string, version: string, repo: string, giteeUrl?: string) => {
+    const win = BrowserWindow.getAllWindows()[0];
+    return publishOwnRepo(
+      String(id ?? ""),
+      String(version ?? ""),
+      String(repo ?? ""),
+      typeof giteeUrl === "string" ? giteeUrl : "",
+      (stage: string, percent: number) => {
+        try {
+          win?.webContents.send("mod:publishProgress", { stage, percent });
+        } catch {
+          /* 窗口关了就忽略 */
+        }
+      }
+    );
+  });
   ipcMain.handle("mods:registerSource", (_e, id: string, version: string) => registerSource(String(id ?? ""), String(version ?? "")));
   ipcMain.handle("mods:mySubmissions", () => ({ ...listSubmissions(), indexRepo: indexRepo() }));
   ipcMain.handle("mods:myMods", () => listMyMods(resolveRepoRoot()));

@@ -623,6 +623,8 @@ function createWindow(): void {
               const bad = [];
               modal.querySelectorAll("span,label,b,code,pre,li,h4,p,div").forEach((el) => {
                 if (el.children.length) return;
+                // 跳过「数据」节点：模组名/作者名/仓库名是用户内容，不算界面文案残留
+                if (el.closest("#smPickerMenu,.sm-picker-item,.mk-card,.db-inspector")) return;
                 const txt = (el.textContent || "").trim();
                 if (txt && cjk.test(txt)) bad.push(clean(txt));
               });

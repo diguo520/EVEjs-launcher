@@ -8,7 +8,7 @@ import { scanMods } from "./modManager";
 import { readIndexCache, compareVersion } from "./modRegistry";
 import { readSettings } from "./configStore";
 import { getToken, saveToken, clearToken, tokenStatus, type TokenStatus } from "./githubToken";
-import { submitFileViaPullRequest, pullRequestCompareUrl, validateToken } from "./githubSubmit";
+import { submitFileViaPullRequest, pullRequestCompareUrl, validateToken, readRepoFile } from "./githubSubmit";
 import { publishToOwnRepo, whoami, assetNameFor, repoUrlFor, defaultRepoNameFor } from "./githubPublish";
 
 /**
@@ -281,7 +281,8 @@ export async function publishOwnRepo(
   id: string,
   version: string,
   repoInput: string,
-  giteeUrl?: string
+  giteeUrl?: string,
+  onProgress?: (stage: string, percent: number) => void
 ): Promise<PublishOwnResult> {
   const file = readSubmissionFile();
   const item = file.items.find((x) => x.id === id && x.version === version);
@@ -323,7 +324,8 @@ export async function publishOwnRepo(
     changelog: item.changelog,
     description: item.displayName,
     listingJson: listing,
-    defaultRepoName: defaultRepoNameFor(item.id)
+    defaultRepoName: defaultRepoNameFor(item.id),
+    onProgress
   });
 
   if (!published.ok) {
@@ -369,21 +371,28 @@ export async function registerSource(id: string, version: string): Promise<Submi
   if (!token) return { ok: false, reason: "还没填 GitHub 令牌" };
   const upstream = indexRepo();
 
-  // 读上游 sources.json（raw 走 CDN，避免 API 限流）
+  // 必须先读到**当前**的 sources.json。读不到就中止 —— 绝不能拿空列表去覆盖，
+  // 否则会一次把别人已收录的来源全删掉（0.1.19 实测：网络受限时 PR #1 就是这样）。
+  const current = await readRepoFile(token, upstream, "sources.json");
+  if (!current.ok || !current.text) {
+    return {
+      ok: false,
+      reason:
+        "读不到索引仓库当前的 sources.json，为避免覆盖别人的收录已中止：" + (current.reason || "") +
+        "（令牌需要对 " + upstream + " 有 Contents = Read and write，或稍后重试）"
+    };
+  }
   let sources: { schemaVersion: number; sources: string[] } = { schemaVersion: 1, sources: [] };
   try {
-    const res = await fetch("https://raw.githubusercontent.com/" + upstream + "/main/sources.json");
-    if (res.ok) {
-      const parsed: unknown = await res.json();
-      if (parsed && typeof parsed === "object" && Array.isArray((parsed as { sources?: unknown[] }).sources)) {
-        sources = {
-          schemaVersion: 1,
-          sources: ((parsed as { sources: unknown[] }).sources.filter((v) => typeof v === "string") as string[])
-        };
-      }
-    }
-  } catch {
-    /* 读不到就当作空列表重建 */
+    const parsed: unknown = JSON.parse(current.text);
+    const list =
+      parsed && typeof parsed === "object" && Array.isArray((parsed as { sources?: unknown[] }).sources)
+        ? ((parsed as { sources: unknown[] }).sources.filter((v) => typeof v === "string") as string[])
+        : null;
+    if (!list) throw new Error("sources 字段不是字符串数组");
+    sources = { schemaVersion: 1, sources: list };
+  } catch (e) {
+    return { ok: false, reason: "索引仓库的 sources.json 解析失败，已中止：" + (e instanceof Error ? e.message : String(e)) };
   }
 
   const already = sources.sources.some((s) => s.toLowerCase() === item.sourceRepo.toLowerCase());
@@ -452,7 +461,9 @@ export interface MyModItem {
  * 「我创建的」：合并三个来源 —— 本地扫到的（author.id / 签名 keyId 是本机）、索引里的、本机提交台账。
  * 状态优先级：索引已下架 > 索引已上架 > 台账已提交 > 台账草稿 > 仅本地。
  */
-export async function listMyMods(repoRoot: string): Promise<{ ok: boolean; items: MyModItem[]; reason?: string }> {
+export async function listMyMods(
+  repoRoot: string
+): Promise<{ ok: boolean; items: MyModItem[]; hidden?: number; reason?: string }> {
   let authorId = "";
   let keyId = "";
   try {
@@ -466,8 +477,11 @@ export async function listMyMods(repoRoot: string): Promise<{ ok: boolean; items
   const items = new Map<string, MyModItem>();
   const put = (item: MyModItem) => items.set(item.id, item);
 
+  // 本地扫到的模组（后面还要用它判断哪些记录已经“没有本地文件”了）
+  const scanned = scanMods(repoRoot).mods;
+
   // 1) 本地
-  for (const mod of scanMods(repoRoot).mods) {
+  for (const mod of scanned) {
     const mine = (mod.authorId && mod.authorId === authorId) || (mod.signatureKeyId && mod.signatureKeyId === keyId);
     if (!mine) continue;
     put({
@@ -578,11 +592,29 @@ export async function listMyMods(repoRoot: string): Promise<{ ok: boolean; items
   }
 
   const order: Record<MyModStatus, number> = { rejected: 0, submitted: 1, "update-pending": 2, listed: 3, delisted: 4, draft: 5, local: 6 };
-  const list = Array.from(items.values()).sort((a, b) => {
+  const all = Array.from(items.values()).sort((a, b) => {
     const r = (order[a.status] ?? 9) - (order[b.status] ?? 9);
     return r !== 0 ? r : (b.updatedAt || 0) - (a.updatedAt || 0) || a.id.localeCompare(b.id);
   });
-  return { ok: true, items: list };
+
+  // 只显示「本地还有文件夹」或「索引里仍是可安装条目」的；其余只挂着审核记录/提交台账的
+  // 记录会被隐藏 —— 否则作者把 mods/<id> 删掉后，被拒绝收录的条目会一直留在「我创建的」里。
+  const localFolders = new Set(scanned.map((m) => m.folder));
+  const listedIds = (() => {
+    try {
+      const cached = readIndexCache();
+      const entries = cached && Array.isArray(cached.mods) ? cached.mods : [];
+      return new Set(
+        entries
+          .filter((e) => e && typeof e.id === "string" && e.delisted !== true)
+          .map((e) => String(e.id))
+      );
+    } catch {
+      return new Set<string>();
+    }
+  })();
+  const list = all.filter((it) => (it.folder && localFolders.has(it.folder)) || listedIds.has(it.id));
+  return { ok: true, items: list, hidden: all.length - list.length };
 }
 
 export interface SubmitResult {

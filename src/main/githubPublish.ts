@@ -1,5 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
+import * as https from "https";
 import { net } from "electron";
 
 /**
@@ -56,7 +57,12 @@ async function call<T>(token: string, method: string, apiPath: string, body?: un
         data && typeof data === "object" && typeof (data as Record<string, unknown>).message === "string"
           ? String((data as Record<string, unknown>).message)
           : text.slice(0, 200) || res.statusText;
-      return { ok: false, status: res.status, data: data as T, reason: "GitHub " + res.status + "：" + message };
+      return {
+        ok: false,
+        status: res.status,
+        data: data as T,
+        reason: "GitHub " + res.status + "：" + message + " [" + method + " " + apiPath + "]" + permissionHint(res.status)
+      };
     }
     return { ok: true, status: res.status, data: data as T };
   } catch (e) {
@@ -65,6 +71,24 @@ async function call<T>(token: string, method: string, apiPath: string, body?: un
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * 把 GitHub 的 403 / 404 翻译成「到底缺哪一项令牌权限」。
+ * fine-grained 令牌的权限在 Repository permissions 里：
+ *   Contents      = Read and write —— 写文件 / 建分支 / 建 Release / 传资产
+ *   Pull requests = Read and write —— 开 PR
+ *   Administration= Read and write —— 自动建仓库
+ *   Metadata      = Read-only（自动）
+ */
+function permissionHint(status: number): string {
+  if (status === 403) {
+    return "（令牌权限不足：fine-grained 令牌要在 Repository permissions 里给 Contents = Read and write；自动建仓库还要 Administration = Read and write；并且 Repository access 必须覆盖这个仓库）";
+  }
+  if (status === 404) {
+    return "（仓库或文件不存在，或者令牌的 Repository access 没有覆盖这个仓库）";
+  }
+  return "";
 }
 
 interface UserInfo {
@@ -100,7 +124,19 @@ export async function ensureOwnRepo(
     private: false,
     auto_init: true
   });
-  if (!created.ok || !created.data?.full_name) return { ok: false, reason: created.reason || "创建仓库失败" };
+  if (!created.ok || !created.data?.full_name) {
+    if (created.status === 403) {
+      return {
+        ok: false,
+        reason:
+          "创建仓库被拒绝（403）：当前令牌缺少 Administration: Read and write。两个解法 —— " +
+          "① 到 GitHub 打开这个令牌，Repository permissions 里把 Administration 设为 Read and write（Repository access 选 All repositories）后重试；" +
+          "② 先在 GitHub 手动建好仓库，再把 owner/repo 填进「我的仓库」——手动建仓库时只需要 Contents = Read and write。" +
+          (created.reason ? " 原始错误：" + created.reason : "")
+      };
+    }
+    return { ok: false, reason: created.reason || "创建仓库失败" };
+  }
   return { ok: true, repo: created.data, created: true };
 }
 
@@ -159,6 +195,75 @@ export async function ensureRelease(
   return { ok: true, release: created.data };
 }
 
+function parseJson(text: string): unknown {
+  try {
+    return text ? JSON.parse(text) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * node:https 直传兜底：net.fetch 不能手动设 Content-Length，而大二进制上传手动声明长度最稳。
+ * （走不了系统代理，所以只在 net.fetch 失败时使用。）
+ */
+function uploadAssetViaHttps(
+  uploadUrl: string,
+  token: string,
+  bytes: Buffer,
+  assetName: string
+): Promise<{ ok: boolean; url?: string; reason?: string }> {
+  return new Promise((resolve) => {
+    let target: URL;
+    try {
+      target = new URL(uploadUrl);
+    } catch (e) {
+      resolve({ ok: false, reason: "上传地址非法：" + (e instanceof Error ? e.message : String(e)) });
+      return;
+    }
+    const req = https.request(
+      {
+        method: "POST",
+        hostname: target.hostname,
+        path: target.pathname + target.search,
+        headers: {
+          Authorization: "Bearer " + token,
+          Accept: "application/vnd.github+json",
+          "Content-Type": "application/zip",
+          "Content-Length": String(bytes.length),
+          "User-Agent": UA
+        },
+        timeout: TIMEOUT_MS * 4
+      },
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (chunk: Buffer) => chunks.push(chunk));
+        res.on("end", () => {
+          const body = Buffer.concat(chunks).toString("utf8");
+          const data = parseJson(body);
+          const status = res.statusCode || 0;
+          if (status >= 200 && status < 300) {
+            const url = data && typeof data === "object" ? String((data as { browser_download_url?: string }).browser_download_url || "") : "";
+            resolve({ ok: true, url });
+            return;
+          }
+          const message =
+            data && typeof data === "object" && typeof (data as Record<string, unknown>).message === "string"
+              ? String((data as Record<string, unknown>).message)
+              : body.slice(0, 200) || String(status);
+          resolve({ ok: false, reason: "GitHub " + status + "：" + message + permissionHint(status) });
+        });
+      }
+    );
+    req.on("timeout", () => {
+      req.destroy();
+      resolve({ ok: false, reason: "上传超时（" + (TIMEOUT_MS * 4) / 1000 + "s）" });
+    });
+    req.on("error", (e) => resolve({ ok: false, reason: e instanceof Error ? e.message : String(e) }));
+    req.end(bytes);
+  });
+}
+
 /** 上传 ZIP 到 Release；同名资源已存在时先删掉再传（便于重发同一版本） */
 export async function uploadReleaseAsset(
   token: string,
@@ -188,43 +293,44 @@ export async function uploadReleaseAsset(
     }
   }
 
+  const uploadUrl =
+    UPLOADS + "/repos/" + owner + "/" + repoName + "/releases/" + releaseId + "/assets?name=" + encodeURIComponent(assetName);
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS * 4);
   try {
-    const res = await net.fetch(
-      UPLOADS + "/repos/" + owner + "/" + repoName + "/releases/" + releaseId + "/assets?name=" + encodeURIComponent(assetName),
-      {
-        method: "POST",
-        headers: {
-          Authorization: "Bearer " + token,
-          Accept: "application/vnd.github+json",
-          "Content-Type": "application/zip",
-          "Content-Length": String(bytes.length),
-          "User-Agent": UA
-        },
-        body: new Uint8Array(bytes),
-        signal: controller.signal
-      }
-    );
+    // 注意：这里**不能**手动设置 Content-Length —— Content-Length 属于 fetch 的受限头，
+    // Chromium 会直接抛 net::ERR_INVALID_ARGUMENT，用户看到的就是「上传失败：net::ERR_INVALID_ARGUMENT」。
+    // 长度交给底层自动算；真要手动控制，只能走下面的 node https 兜底。
+    const res = await net.fetch(uploadUrl, {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer " + token,
+        Accept: "application/vnd.github+json",
+        "Content-Type": "application/zip",
+        "User-Agent": UA
+      },
+      body: new Uint8Array(bytes),
+      signal: controller.signal
+    });
     const text = await res.text();
-    let data: unknown;
-    try {
-      data = text ? JSON.parse(text) : undefined;
-    } catch {
-      data = undefined;
-    }
+    const data = parseJson(text);
     if (!res.ok) {
       const message =
         data && typeof data === "object" && typeof (data as Record<string, unknown>).message === "string"
           ? String((data as Record<string, unknown>).message)
           : text.slice(0, 200) || res.statusText;
-      return { ok: false, reason: "上传资源失败：GitHub " + res.status + "：" + message };
+      return { ok: false, reason: "上传资源失败：GitHub " + res.status + "：" + message + permissionHint(res.status) };
     }
     const url = data && typeof data === "object" ? String((data as { browser_download_url?: string }).browser_download_url || "") : "";
     return { ok: true, url };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    return { ok: false, reason: message.includes("aborted") ? "上传超时" : "上传失败：" + message };
+    if (message.includes("aborted")) return { ok: false, reason: "上传超时（" + (TIMEOUT_MS * 4) / 1000 + "s）" };
+    // net.fetch 抛错（例如受限头 / 该 Electron 版本不支持二进制 body）→ 用 node https 再传一次
+    const fallback = await uploadAssetViaHttps(uploadUrl, token, bytes, assetName);
+    if (fallback.ok) return { ok: true, url: fallback.url };
+    return { ok: false, reason: "上传失败：" + message + " → 已改用 node https 重试，仍失败：" + (fallback.reason || "") };
   } finally {
     clearTimeout(timer);
   }
@@ -236,6 +342,8 @@ export interface PublishInput {
   repo: string;
   zipPath: string;
   assetName: string;
+  /** 进度回调：stage 给用户看的阶段名，percent 0-100 */
+  onProgress?: (stage: string, percent: number) => void;
   version: string;
   changelog: string;
   description: string;
@@ -261,6 +369,14 @@ export interface PublishResult {
  * 全程只动作者自己的仓库，**不碰索引仓库**。
  */
 export async function publishToOwnRepo(input: PublishInput): Promise<PublishResult> {
+  const say = (stage: string, percent: number) => {
+    try {
+      input.onProgress?.(stage, percent);
+    } catch {
+      /* 进度回调不该影响发布 */
+    }
+  };
+  say("校验 GitHub 令牌", 5);
   const me = await whoami(input.token);
   if (!me.ok || !me.login) return { ok: false, reason: me.reason || "令牌无效" };
 
@@ -272,16 +388,20 @@ export async function publishToOwnRepo(input: PublishInput): Promise<PublishResu
     return { ok: false, reason: "请填写你自己的仓库名（形如 my-evejs-mod，或 owner/my-evejs-mod）" };
   }
 
+  say("准备仓库", 20);
   const repo = await ensureOwnRepo(input.token, owner, repoName, input.description);
   if (!repo.ok || !repo.repo) return { ok: false, reason: repo.reason || "仓库不可用" };
 
+  say("写入 evejs-mod.json", 40);
   const listing = await putListingManifest(input.token, owner, repoName, input.listingJson);
   if (!listing.ok) return { ok: false, reason: listing.reason || "写入 evejs-mod.json 失败" };
 
   const tag = "v" + input.version;
+  say("创建 Release", 60);
   const release = await ensureRelease(input.token, owner, repoName, tag, input.changelog);
   if (!release.ok || !release.release) return { ok: false, reason: release.reason || "创建 Release 失败" };
 
+  say("上传 ZIP（最慢的一步，请稍候）", 75);
   const asset = await uploadReleaseAsset(input.token, owner, repoName, release.release.id, input.zipPath, input.assetName);
   if (!asset.ok) {
     return {
@@ -294,6 +414,7 @@ export async function publishToOwnRepo(input: PublishInput): Promise<PublishResu
     };
   }
 
+  say("完成", 100);
   return {
     ok: true,
     owner,

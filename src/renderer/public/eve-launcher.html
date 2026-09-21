@@ -237,6 +237,21 @@
   .mk-badge.bad{color:var(--red);border-color:rgba(255,86,86,0.45)}
   .mk-reason{margin-top:2px;padding:8px 10px;background:rgba(255,86,86,0.08);border-left:3px solid var(--red);font-size:11px;line-height:1.65;color:var(--txt-soft)}
   .mk-reason b{color:var(--red);font-weight:600}
+  /* 提交模组：自定义下拉（只列自己的模组，样式跟主题一致） */
+  .sm-picker{position:relative}
+  .sm-picker-btn{width:100%;display:flex;align-items:center;gap:8px;background:rgba(5,8,13,0.72);border:1px solid var(--line);color:var(--txt);padding:9px 11px;font-size:12.5px;font-family:inherit;cursor:pointer;text-align:left;transition:.16s}
+  .sm-picker-btn:hover{border-color:rgba(0,212,255,0.55);background:rgba(0,212,255,0.06)}
+  .sm-picker-btn span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sm-picker-btn svg{width:14px;height:14px;flex:0 0 auto;opacity:.65}
+  .sm-picker-menu{display:none;position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:40;max-height:220px;overflow:auto;background:#0a1018;border:1px solid var(--line);box-shadow:0 12px 28px rgba(0,0,0,.55)}
+  .sm-picker.open .sm-picker-menu{display:block}
+  .sm-picker-item{display:flex;align-items:center;gap:8px;padding:9px 11px;font-size:12px;color:var(--txt-soft);cursor:pointer;border-bottom:1px solid rgba(255,255,255,0.04)}
+  .sm-picker-item:hover{background:rgba(0,212,255,0.10);color:#fff}
+  .sm-picker-item.active{background:rgba(0,212,255,0.16);color:#fff}
+  .sm-picker-item .v{margin-left:auto;font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--txt-mute)}
+  .sm-picker-empty{padding:11px;font-size:11.5px;line-height:1.7;color:var(--txt-mute)}
+  .sm-prog{height:7px;background:rgba(255,255,255,0.08);border:1px solid var(--line);overflow:hidden}
+  .sm-prog i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--cyan),#7fe9ff);transition:width .3s ease}
   .author-kv{display:flex;align-items:center;gap:10px}
   .author-kv code{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:rgba(5,8,13,0.6);border:1px solid var(--line);padding:9px 11px;font-family:'Cascadia Mono','Consolas','SFMono-Regular','Microsoft YaHei UI','PingFang SC','Noto Sans CJK SC',monospace;font-size:12px;color:var(--cyan)}
   .author-kv .mini-btn{flex:0 0 auto;padding:8px 14px;font-size:10px}
@@ -649,7 +664,7 @@
   .modal-foot{display:flex;gap:10px;justify-content:flex-end;padding:14px 18px;border-top:1px solid var(--line)}
   .modal-foot .mini-btn{padding:9px 20px}
   .modal-field{margin-bottom:14px}
-  .modal-field label{font-family:'Cascadia Mono','Consolas','SFMono-Regular','Microsoft YaHei UI','PingFang SC','Noto Sans CJK SC',monospace;font-size:10px;letter-spacing:.22em;color:var(--txt-mute);display:block;margin-bottom:5px}
+  .modal-field label{font-family:'Cascadia Mono','Consolas','SFMono-Regular','Microsoft YaHei UI','PingFang SC','Noto Sans CJK SC',monospace;font-size:11px;letter-spacing:.22em;color:var(--txt-mute);display:block;margin-bottom:5px}
   .modal-field label .req{color:var(--red)}
   .modal-field input,.modal-field textarea{width:100%;background:rgba(5,8,13,0.6);border:1px solid var(--line);color:var(--txt);padding:9px 11px;font-family:'Cascadia Mono','Consolas','SFMono-Regular','Microsoft YaHei UI','PingFang SC','Noto Sans CJK SC',monospace;font-size:12px;outline:none;transition:.18s;clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px)}
   .modal-field input:focus,.modal-field textarea:focus{border-color:var(--cyan);box-shadow:0 0 10px rgba(0,212,255,0.2) inset}
@@ -871,7 +886,7 @@
   <div class="modal" style="width:640px">
     <div class="modal-head"><span class="tag">// CREATE MOD</span><span class="title">创建模组</span><button class="x" onclick="closeModal('createModModal')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
     <div class="modal-body">
-      <div class="cmd-notice" style="margin:0 0 14px;font-size:10px">骨架以已跑通的 welcome-mod 为基准生成：evejs-launcher.mod.json + loader.js + README.md + CHANGELOG.md。新模组默认禁用，不会自动加载。</div>
+      <div class="cmd-notice" style="margin:0 0 14px;font-size:12px;line-height:1.9">骨架以已跑通的 welcome-mod 为基准生成：evejs-launcher.mod.json + loader.js + README.md + CHANGELOG.md。新模组默认禁用，不会自动加载。</div>
       <div class="modal-field"><label>模板</label><select id="cmTemplate" onchange="cmPreview()"></select></div>
       <div class="modal-field"><label>模组名</label><input id="cmName" placeholder="我的第一个模组" oninput="cmOnName()" autocomplete="off"></div>
       <div class="modal-field"><label>标识 (id / 目录名)</label><input id="cmId" placeholder="my-first-mod" oninput="cmOnId()" autocomplete="off"></div>
@@ -917,17 +932,30 @@
   <div class="modal" style="width:680px">
     <div class="modal-head"><span class="tag">// SUBMIT</span><span class="title">提交模组</span><button class="x" onclick="closeModal('submitModModal')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
     <div class="modal-body">
-      <div class="cmd-notice" style="margin:0 0 14px;font-size:10px">第 ① 步完全离线（重签 → 打包 → sha256 → 生成上架清单）；第 ② 步把 ZIP 与 evejs-mod.json 发到你自己的 GitHub 仓库（不动索引仓库）；第 ③ 步只是一次性的「登记我的仓库」，此后发新版都不用再提 PR。</div>
-      <div class="modal-field"><label>选择模组</label><select id="smMod" onchange="smOnModChange()"></select></div>
+      <div class="cmd-notice" style="margin:0 0 14px;font-size:12px;line-height:1.9">
+        <div>1) 生成并打包：完全离线（重签 → 打包 → sha256 → 生成上架清单）</div>
+        <div>2) 发布到我的仓库：把 ZIP 与 evejs-mod.json 发到你自己的 GitHub 仓库（不动索引仓库）</div>
+        <div>3) 申请收录：一次性登记你的仓库，此后发新版都不用再提 PR</div>
+      </div>
+      <div class="modal-field"><label>选择模组（只列出你自己的模组）</label>
+        <div class="sm-picker" id="smPicker">
+          <button type="button" class="sm-picker-btn" id="smPickerBtn" onclick="smTogglePicker(event)">
+            <span id="smPickerLabel">—</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="sm-picker-menu" id="smPickerMenu"></div>
+        </div>
+        <input type="hidden" id="smMod" value="">
+      </div>
       <div class="modal-field"><label>更新说明（会写进索引与 PR）</label><textarea id="smChangelog" rows="2" placeholder="这一版改了什么"></textarea></div>
       <div style="display:flex;gap:12px">
         <div class="modal-field" style="flex:1"><label>分类</label><select id="smCategory"><option value="玩法">玩法</option><option value="经济">经济</option><option value="AI">AI</option><option value="画面">画面</option><option value="工具">工具</option></select></div>
         <div class="modal-field" style="flex:1"><label>标签（逗号分隔）</label><input id="smTags" placeholder="聊天, 新手" autocomplete="off"></div>
       </div>
       <div class="modal-field"><label>源码 / 项目地址（选填）</label><input id="smRepo" placeholder="https://github.com/you/your-mod" autocomplete="off"></div>
-      <div class="modal-field"><label>GitHub Releases 直链（ZIP，留空则由 ② 自动生成）</label><input id="smUrlGithub" placeholder="https://github.com/…/releases/download/v1.0.0/mod-1.0.0.zip" autocomplete="off"></div>
+      <div class="modal-field"><label>GitHub Releases 直链（ZIP，留空则由 2) 自动生成）</label><input id="smUrlGithub" placeholder="https://github.com/…/releases/download/v1.0.0/mod-1.0.0.zip" autocomplete="off"></div>
       <div style="display:flex;gap:10px;margin-bottom:14px">
-        <button class="mini-btn start" id="smPrepare" onclick="smPrepare()" style="flex:1">① 生成并打包</button>
+        <button class="mini-btn start" id="smPrepare" onclick="smPrepare()" style="flex:1">1) 生成并打包</button>
         <button class="mini-btn" id="smReveal" onclick="smRevealZip()" style="flex:0 0 auto;padding:8px 14px" disabled>打开 ZIP 目录</button>
       </div>
       <div id="smResult" style="display:none">
@@ -935,17 +963,21 @@
         <div class="modal-field"><label>索引分片（可直接贴进索引仓库 mods/&lt;id&gt;.json）</label><textarea id="smShard" rows="6" readonly spellcheck="false"></textarea><button class="mini-btn" onclick="smCopyShard()" style="margin-top:8px;padding:6px 14px;flex:0 0 auto">复制分片 JSON</button></div>
       </div>
       <div style="border-top:1px solid var(--line);margin:16px 0 14px"></div>
-      <div class="modal-field"><label>GitHub 令牌（只用于提交，需 fine-grained：Contents + Pull requests 读写）</label>
+      <div class="modal-field"><label>GitHub 令牌（fine-grained，只用于提交）</label>
         <div style="display:flex;gap:8px"><input id="smToken" type="password" placeholder="github_pat_…" autocomplete="off" style="flex:1"><button class="mini-btn" onclick="smSaveToken()" style="flex:0 0 auto;padding:8px 14px">保存</button><button class="mini-btn" onclick="smCheckToken()" style="flex:0 0 auto;padding:8px 14px">校验</button><button class="mini-btn stop" onclick="smClearToken()" style="flex:0 0 auto;padding:8px 14px">清除</button></div>
         <div id="smTokenState" style="font-size:10.5px;color:var(--txt-mute);margin-top:6px">—</div>
       </div>
+
       <div class="modal-field"><label>我的仓库（owner/repo，留空则自动建 <code>evejs-mod-&lt;id&gt;</code>）</label><input id="smRepoName" placeholder="my-evejs-mod" autocomplete="off"></div>
       <div style="display:flex;gap:10px">
-        <button class="mini-btn start" id="smSubmit" onclick="smSubmit()" style="flex:1" disabled>② 发布到我的仓库（建仓库 → 写 evejs-mod.json → 发 Release）</button>
+        <button class="mini-btn start" id="smSubmit" onclick="smSubmit()" style="flex:1" disabled>2) 发布到我的仓库（建仓库 → 写 evejs-mod.json → 发 Release）</button>
+      </div>
+      <div id="smProgress" style="display:none;margin-top:10px">
+        <div class="sm-prog"><i id="smProgressBar"></i></div>
+        <div id="smProgressText" style="font-size:10.5px;color:var(--txt-mute);margin-top:5px">—</div>
       </div>
       <div style="display:flex;gap:10px;margin-top:10px">
-        <button class="mini-btn" id="smRegister" onclick="smRegisterSource()" style="flex:1">③ 申请收录（一次性 PR 到索引仓库）</button>
-        <button class="mini-btn" id="smCompare" onclick="smOpenCompare()" style="flex:0 0 auto;padding:8px 14px">打开 PR 页面</button>
+        <button class="mini-btn" id="smRegister" onclick="smRegisterSource()" style="flex:1">3) 申请收录（提交给维护者审核）</button>
       </div>
       <div id="smSubmitResult" style="display:none;margin-top:10px;font-size:11px;line-height:1.7;color:var(--txt-soft)"></div>
     </div>
@@ -2170,6 +2202,60 @@ Object.assign(TRANSLATE, {
   "拒绝收录原因": {'en':"Reason not accepted",'ja':"不採用の理由",'ko':"등록 거절 사유",'fr':"Motif du refus",'de':"Grund der Ablehnung",'nl':"Reden van afwijzing",'ru':"Причина отказа"},
   "下架原因": {'en':"Reason delisted",'ja':"掲載終了の理由",'ko':"등록 해제 사유",'fr':"Motif du retrait",'de':"Grund der Entfernung",'nl':"Reden van verwijdering",'ru':"Причина снятия"},
   "维护者": {'en':"Maintainer",'ja':"管理者",'ko':"관리자",'fr':"Mainteneur",'de':"Betreuer",'nl':"Beheerder",'ru':"Модератор"}
+});
+
+// GitHub 令牌提示：fine-grained 权限到底在哪勾（Contents / Pull requests / Administration / Metadata）
+Object.assign(TRANSLATE, {
+  "GitHub 令牌（fine-grained，只用于提交）": {'en':"GitHub token (fine-grained, submit only)",'ja':"GitHub トークン（fine-grained・投稿専用）",'ko':"GitHub 토큰 (fine-grained, 제출 전용)",'fr':"Jeton GitHub (fine-grained, soumission uniquement)",'de':"GitHub-Token (fine-grained, nur zum Einreichen)",'nl':"GitHub-token (fine-grained, alleen voor inzenden)",'ru':"Токен GitHub (fine-grained, только для отправки)"},
+  "生成位置：GitHub → 头像 → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token": {'en':"Where to create it: GitHub → your avatar → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token",'ja':"作成場所：GitHub → アバター → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token",'ko':"생성 위치: GitHub → 아바타 → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token",'fr':"Où le créer : GitHub → votre avatar → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token",'de':"Wo erstellen: GitHub → Avatar → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token",'nl':"Waar aanmaken: GitHub → je avatar → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token",'ru':"Где создать: GitHub → аватар → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token"},
+  "选好 Resource owner（你的账号）与 Repository access 后，展开 Permissions → Repository permissions（不是 Account permissions），勾选：": {'en':"After choosing Resource owner (your account) and Repository access, expand Permissions → Repository permissions (not Account permissions) and tick:",'ja':"Resource owner（自分のアカウント）と Repository access を選んだら、Permissions → Repository permissions（Account permissions ではない）を開いて以下をチェック：",'ko':"Resource owner(본인 계정)와 Repository access를 고른 뒤 Permissions → Repository permissions(Account permissions 아님)를 펼쳐 선택하세요:",'fr':"Après avoir choisi Resource owner (votre compte) et Repository access, ouvrez Permissions → Repository permissions (pas Account permissions) et cochez :",'de':"Nachdem du Resource owner (dein Konto) und Repository access gewählt hast, öffne Permissions → Repository permissions (nicht Account permissions) und setze:",'nl':"Nadat je Resource owner (je account) en Repository access hebt gekozen, open je Permissions → Repository permissions (niet Account permissions) en vink je aan:",'ru':"Выбрав Resource owner (свой аккаунт) и Repository access, откройте Permissions → Repository permissions (не Account permissions) и отметьте:"},
+  "Contents = Read and write　← 读写仓库内容 / 分支 / Release 与资产": {'en':"Contents = Read and write　← repo contents / branches / releases and assets",'ja':"Contents = Read and write　← リポジトリ内容 / ブランチ / Release とアセットの読み書き",'ko':"Contents = Read and write　← 저장소 내용 / 브랜치 / Release 및 에셋 읽기·쓰기",'fr':"Contents = Read and write　← contenu du dépôt / branches / releases et assets",'de':"Contents = Read and write　← Repo-Inhalte / Branches / Releases und Assets",'nl':"Contents = Read and write　← repo-inhoud / branches / releases en assets",'ru':"Contents = Read and write　← содержимое репозитория / ветки / Release и ассеты"},
+  "Pull requests = Read and write　← ③ 申请收录时开 PR": {'en':"Pull requests = Read and write　← opens the listing PR in step ③",'ja':"Pull requests = Read and write　← ③ 掲載申請で PR を作成",'ko':"Pull requests = Read and write　← ③ 등록 신청 시 PR 생성",'fr':"Pull requests = Read and write　← crée la PR de référencement à l'étape ③",'de':"Pull requests = Read and write　← erstellt den Listing-PR in Schritt ③",'nl':"Pull requests = Read and write　← maakt de listing-PR in stap ③",'ru':"Pull requests = Read and write　← создаёт PR при подаче заявки (шаг ③)"},
+  "Administration = Read and write　← ② 自动建仓库用（手动建好仓库可不勾）": {'en':"Administration = Read and write　← lets step ② create the repo (skip it if you create the repo yourself)",'ja':"Administration = Read and write　← ② の自動作成に必要（自分でリポジトリを作る場合は不要）",'ko':"Administration = Read and write　← ② 자동 저장소 생성용 (직접 만들면 불필요)",'fr':"Administration = Read and write　← permet à l'étape ② de créer le dépôt (inutile si vous le créez vous-même)",'de':"Administration = Read and write　← damit Schritt ② das Repo anlegen kann (nicht nötig, wenn du es selbst anlegst)",'nl':"Administration = Read and write　← nodig zodat stap ② de repo kan aanmaken (niet nodig als je die zelf aanmaakt)",'ru':"Administration = Read and write　← нужен, чтобы шаг ② создал репозиторий (не нужен, если создадите его сами)"},
+  "Metadata = Read-only　← GitHub 会自动勾上": {'en':"Metadata = Read-only　← GitHub selects this automatically",'ja':"Metadata = Read-only　← GitHub が自動で選択します",'ko':"Metadata = Read-only　← GitHub가 자동으로 선택합니다",'fr':"Metadata = Read-only　← sélectionné automatiquement par GitHub",'de':"Metadata = Read-only　← wird von GitHub automatisch gesetzt",'nl':"Metadata = Read-only　← wordt automatisch geselecteerd",'ru':"Metadata = Read-only　← GitHub выбирает автоматически"},
+  "别用「Tokens (classic)」那一页：那里只有 repo / workflow 这类 scope，没有 Contents / Pull requests 这两项。": {'en':"Do not use the \"Tokens (classic)\" page: it only offers scopes such as repo / workflow, with no Contents / Pull requests entries.",'ja':"「Tokens (classic)」の画面は使わないでください。repo / workflow などの scope しかなく、Contents / Pull requests はありません。",'ko':"「Tokens (classic)」화면은 사용하지 마세요. repo / workflow 같은 scope만 있고 Contents / Pull requests 항목이 없습니다.",'fr':"N'utilisez pas la page « Tokens (classic) » : elle n'offre que des scopes comme repo / workflow, sans Contents ni Pull requests.",'de':"Nutze nicht die Seite „Tokens (classic)“ – dort gibt es nur Scopes wie repo / workflow, aber kein Contents / Pull requests.",'nl':"Gebruik niet de pagina \"Tokens (classic)\": daar staan alleen scopes zoals repo / workflow, zonder Contents / Pull requests.",'ru':"Не используйте страницу «Tokens (classic)»: там только scopes вроде repo / workflow, без Contents / Pull requests."}
+});
+
+// 提交模组：自定义下拉 / 重新提交审核 / 发布进度条
+Object.assign(TRANSLATE, {
+  "选择要提交的模组": {'en':"Select a mod to submit",'ja':"提出する MOD を選択",'ko':"제출할 모드 선택",'fr':"Choisir le mod à soumettre",'de':"Mod zum Einreichen wählen",'nl':"Kies een mod om in te dienen",'ru':"Выберите мод для отправки"},
+  "没有可提交的模组": {'en':"No mods to submit",'ja':"提出できる MOD がありません",'ko':"제출할 모드가 없습니다",'fr':"Aucun mod à soumettre",'de':"Keine Mods zum Einreichen",'nl':"Geen mods om in te dienen",'ru':"Нет модов для отправки"},
+  "这里只列出你自己的模组。先用「创建模组」建一个，或把带你自己作者标识的模组放进 mods/ 目录。": {'en':"Only your own mods are listed here. Create one with Create mod, or put a mod carrying your author id into the mods/ folder.",'ja':"ここには自分の MOD だけが表示されます。「MOD を作成」で作るか、自分の作者 ID を持つ MOD を mods/ フォルダに入れてください。",'ko':"여기에는 본인의 모드만 표시됩니다. 「모드 만들기」로 만들거나 자신의 작성자 ID가 있는 모드를 mods/ 폴더에 넣으세요.",'fr':"Seuls vos propres mods sont listés ici. Créez-en un avec « Créer un mod » ou placez un mod portant votre identifiant d'auteur dans le dossier mods/.",'de':"Hier werden nur deine eigenen Mods gelistet. Erstelle einen mit „Mod erstellen“ oder lege einen Mod mit deiner Autoren-ID in den mods/-Ordner.",'nl':"Hier staan alleen je eigen mods. Maak er een met 'Mod maken' of zet een mod met jouw auteurs-id in de map mods/.",'ru':"Здесь перечислены только ваши моды. Создайте мод через «Создать мод» или поместите мод с вашим author id в папку mods/."},
+  "重新提交审核": {'en':"Resubmit for review",'ja':"再審査に提出",'ko':"재심사 제출",'fr':"Resoumettre pour validation",'de':"Erneut zur Prüfung einreichen",'nl':"Opnieuw ter beoordeling indienen",'ru':"Отправить на повторную проверку"},
+  "发布进度": {'en':"Publish progress",'ja':"公開の進捗",'ko':"게시 진행",'fr':"Progression de la publication",'de':"Veröffentlichungsfortschritt",'nl':"Voortgang publiceren",'ru':"Ход публикации"},
+  "发布失败": {'en':"Publish failed",'ja':"公開に失敗",'ko':"게시 실패",'fr':"Échec de la publication",'de':"Veröffentlichung fehlgeschlagen",'nl':"Publiceren mislukt",'ru':"Публикация не удалась"},
+  "发布完成": {'en':"Publish complete",'ja':"公開完了",'ko':"게시 완료",'fr':"Publication terminée",'de':"Veröffentlichung abgeschlossen",'nl':"Publiceren voltooid",'ru':"Публикация завершена"},
+  "正在发布到你的仓库，请稍候…": {'en':"Publishing to your repository, please wait…",'ja':"あなたのリポジトリに公開中です…",'ko':"저장소에 게시하는 중입니다…",'fr':"Publication vers votre dépôt, veuillez patienter…",'de':"Wird in dein Repository veröffentlicht, bitte warten…",'nl':"Bezig met publiceren naar je repository, even geduld…",'ru':"Публикация в ваш репозиторий, подождите…"},
+  "校验 GitHub 令牌": {'en':"Verifying GitHub token",'ja':"GitHub トークンを確認中",'ko':"GitHub 토큰 확인 중",'fr':"Vérification du jeton GitHub",'de':"GitHub-Token wird geprüft",'nl':"GitHub-token controleren",'ru':"Проверка токена GitHub"},
+  "准备仓库": {'en':"Preparing repository",'ja':"リポジトリを準備中",'ko':"저장소 준비 중",'fr':"Préparation du dépôt",'de':"Repository wird vorbereitet",'nl':"Repository voorbereiden",'ru':"Подготовка репозитория"},
+  "写入 evejs-mod.json": {'en':"Writing evejs-mod.json",'ja':"evejs-mod.json を書き込み中",'ko':"evejs-mod.json 작성 중",'fr':"Écriture de evejs-mod.json",'de':"evejs-mod.json wird geschrieben",'nl':"evejs-mod.json schrijven",'ru':"Запись evejs-mod.json"},
+  "创建 Release": {'en':"Creating Release",'ja':"Release を作成中",'ko':"Release 생성 중",'fr':"Création de la Release",'de':"Release wird erstellt",'nl':"Release aanmaken",'ru':"Создание Release"},
+  "上传 ZIP（最慢的一步，请稍候）": {'en':"Uploading ZIP (slowest step, please wait)",'ja':"ZIP をアップロード中（最も時間がかかります）",'ko':"ZIP 업로드 중(가장 오래 걸립니다)",'fr':"Téléversement du ZIP (étape la plus longue)",'de':"ZIP wird hochgeladen (langsamster Schritt)",'nl':"ZIP uploaden (traagste stap)",'ru':"Загрузка ZIP (самый долгий шаг)"},
+  "完成": {'en':"Done",'ja':"完了",'ko':"완료",'fr':"Terminé",'de':"Fertig",'nl':"Klaar",'ru':"Готово"}
+});
+
+Object.assign(TRANSLATE, {
+  "选择模组（只列出你自己的模组）": {'en':"Select a mod (only your own mods are listed)",'ja':"MOD を選択（自分の MOD のみ表示）",'ko':"모드 선택(본인 모드만 표시)",'fr':"Choisir un mod (seuls les vôtres sont listés)",'de':"Mod wählen (nur eigene werden gelistet)",'nl':"Kies een mod (alleen je eigen mods)",'ru':"Выберите мод (только ваши моды)"}
+});
+
+// 提交模组：1) 2) 3) 步骤文案（替代 ①②③）
+Object.assign(TRANSLATE, {
+  "1) 生成并打包：完全离线（重签 → 打包 → sha256 → 生成上架清单）": {'en':"1) Generate and pack: fully offline (re-sign -> pack -> sha256 -> build the listing)",'ja':"1) 生成して固める：完全オフライン（再署名 → パッケージ → sha256 → 掲載リスト作成）",'ko':"1) 생성 및 패키징: 완전 오프라인(재서명 → 패키징 → sha256 → 등록 목록 생성)",'fr':"1) Générer et empaqueter : entièrement hors ligne (re-signature -> empaquetage -> sha256 -> liste de publication)",'de':"1) Erzeugen und packen: komplett offline (neu signieren -> packen -> sha256 -> Listing erzeugen)",'nl':"1) Genereren en inpakken: volledig offline (opnieuw ondertekenen -> inpakken -> sha256 -> listing maken)",'ru':"1) Собрать пакет: полностью офлайн (переподпись -> упаковка -> sha256 -> создание листинга)"},
+  "2) 发布到我的仓库：把 ZIP 与 evejs-mod.json 发到你自己的 GitHub 仓库（不动索引仓库）": {'en':"2) Publish to my repo: push the ZIP and evejs-mod.json to your own GitHub repository (the index repo is untouched)",'ja':"2) 自分のリポジトリへ公開：ZIP と evejs-mod.json を自分の GitHub リポジトリへ（索引リポジトリは触りません）",'ko':"2) 내 저장소에 게시: ZIP과 evejs-mod.json을 자신의 GitHub 저장소로(색인 저장소는 건드리지 않음)",'fr':"2) Publier dans mon dépôt : envoyer le ZIP et evejs-mod.json dans votre propre dépôt GitHub (le dépôt d'index n'est pas touché)",'de':"2) In mein Repo veröffentlichen: ZIP und evejs-mod.json in dein eigenes GitHub-Repository (das Index-Repo bleibt unberührt)",'nl':"2) Publiceren naar mijn repo: ZIP en evejs-mod.json naar je eigen GitHub-repository (de index-repo blijft ongemoeid)",'ru':"2) Опубликовать в моём репозитории: отправить ZIP и evejs-mod.json в ваш собственный репозиторий GitHub (индексный репозиторий не затрагивается)"},
+  "3) 申请收录：一次性登记你的仓库，此后发新版都不用再提 PR": {'en':"3) Request listing: register your repository once — future releases need no further PR",'ja':"3) 収録申請：自分のリポジトリを一度だけ登録。以降の新版に PR は不要",'ko':"3) 등록 요청: 저장소를 한 번만 등록하면 이후 새 버전에는 PR이 필요 없습니다",'fr':"3) Demander l'inscription : enregistrez votre dépôt une seule fois, les versions suivantes n'ont plus besoin de PR",'de':"3) Aufnahme beantragen: dein Repository einmal registrieren — spätere Versionen brauchen keinen PR",'nl':"3) Registratie aanvragen: registreer je repository één keer — latere versies hebben geen PR meer nodig",'ru':"3) Запросить включение: зарегистрируйте репозиторий один раз — для новых версий PR больше не нужен"},
+  "GitHub Releases 直链（ZIP，留空则由 2) 自动生成）": {'en':"GitHub Releases direct link (ZIP — leave empty and step 2 fills it in)",'ja':"GitHub Releases 直リンク（ZIP。空欄なら 2) が自動生成）",'ko':"GitHub Releases 직접 링크(ZIP, 비워두면 2)가 자동 생성)",'fr':"Lien direct GitHub Releases (ZIP — laissez vide, l'étape 2 le remplit)",'de':"GitHub Releases Direktlink (ZIP — leer lassen, Schritt 2 füllt ihn)",'nl':"GitHub Releases directe link (ZIP — leeg laten, stap 2 vult hem in)",'ru':"Прямая ссылка GitHub Releases (ZIP — оставьте пустым, шаг 2 подставит её)"},
+  "1) 生成并打包": {'en':"1) Generate and pack",'ja':"1) 生成して固める",'ko':"1) 생성 및 패키징",'fr':"1) Générer et empaqueter",'de':"1) Erzeugen und packen",'nl':"1) Genereren en inpakken",'ru':"1) Собрать пакет"},
+  "2) 发布到我的仓库（建仓库 → 写 evejs-mod.json → 发 Release）": {'en':"2) Publish to my repo (create repo -> write evejs-mod.json -> create Release)",'ja':"2) 自分のリポジトリへ公開（リポジトリ作成 → evejs-mod.json → Release 作成）",'ko':"2) 내 저장소에 게시(저장소 생성 → evejs-mod.json → Release 생성)",'fr':"2) Publier dans mon dépôt (créer le dépôt -> écrire evejs-mod.json -> créer la Release)",'de':"2) In mein Repo veröffentlichen (Repo anlegen -> evejs-mod.json schreiben -> Release erstellen)",'nl':"2) Publiceren naar mijn repo (repo aanmaken -> evejs-mod.json schrijven -> Release aanmaken)",'ru':"2) Опубликовать в моём репозитории (создать репозиторий -> записать evejs-mod.json -> создать Release)"},
+  "3) 申请收录（提交给维护者审核）": {'en':"3) Request listing (submitted to the maintainer for review)",'ja':"3) 収録申請（管理者の審査に提出）",'ko':"3) 등록 요청(관리자 심사 제출)",'fr':"3) Demander l'inscription (soumise au mainteneur pour validation)",'de':"3) Aufnahme beantragen (wird dem Betreuer zur Prüfung vorgelegt)",'nl':"3) Registratie aanvragen (naar de beheerder voor beoordeling)",'ru':"3) Запросить включение (отправляется модератору на проверку)"},
+  "请先执行 1) 生成并打包": {'en':"Run step 1 (generate and pack) first",'ja':"先に 1) 生成して固める を実行してください",'ko':"먼저 1) 생성 및 패키징을 실행하세요",'fr':"Lancez d'abord l'étape 1 (générer et empaqueter)",'de':"Bitte zuerst Schritt 1 ausführen (erzeugen und packen)",'nl':"Voer eerst stap 1 uit (genereren en inpakken)",'ru':"Сначала выполните шаг 1 (собрать пакет)"},
+  "下一步：点 3) 申请收录（一次性）": {'en':"Next: click step 3 to request listing (one-time)",'ja':"次へ：3) で収録申請（一度だけ）",'ko':"다음: 3)에서 등록 요청(1회)",'fr':"Ensuite : cliquez l'étape 3 pour demander l'inscription (unique)",'de':"Weiter: Schritt 3 für die Aufnahme (einmalig)",'nl':"Volgende: klik stap 3 om registratie aan te vragen (eenmalig)",'ru':"Далее: нажмите шаг 3, чтобы запросить включение (однократно)"},
+  "还没有提交记录，请先点 2) 或直接到索引仓库手动开 PR": {'en':"No submission yet — click step 2 first, or open a PR manually in the index repo",'ja':"まだ投稿記録がありません。先に 2) を実行するか、索引リポジトリで手動 PR を作成してください",'ko':"제출 기록이 없습니다. 먼저 2)를 실행하거나 색인 저장소에서 수동으로 PR을 만드세요",'fr':"Pas encore de soumission — cliquez d'abord l'étape 2, ou ouvrez une PR manuellement dans le dépôt d'index",'de':"Noch keine Einreichung — erst Schritt 2 klicken oder im Index-Repo manuell einen PR öffnen",'nl':"Nog geen inzending — klik eerst stap 2, of open handmatig een PR in de index-repo",'ru':"Заявок пока нет — сначала нажмите шаг 2 или откройте PR вручную в индексном репозитории"}
+});
+
+// 「我创建的」：本地已删除的记录提示（作者把文件夹删掉后不该再挂着旧条目）
+Object.assign(TRANSLATE, {
+  "已隐藏": {"en":"hidden","ja":"非表示","ko":"숨김","fr":"masqués","de":"ausgeblendet","nl":"verborgen","ru":"скрыто"},
+  "条本地已删除的记录": {"en":"records whose local files were deleted","ja":"ローカルファイルが削除された記録","ko":"로컬 파일이 삭제된 기록","fr":"enregistrements dont les fichiers locaux ont été supprimés","de":"Einträge, deren lokale Dateien gelöscht wurden","nl":"records waarvan de lokale bestanden zijn verwijderd","ru":"записей, чьи локальные файлы удалены"}
 });
 
 // 字典 key 两端不能有空格：translateDOM 用 trim 后的文本查表，带首尾空格的 key 永远命中不了
@@ -3448,6 +3534,7 @@ function modAttr(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/"
 /* ============ 模组三页签：已安装 / 我创建的 / 模组市场 ============ */
 let MOD_TAB = "installed";
 let MY_MODS = [];
+let MY_MODS_HIDDEN = 0;   // 本地文件已删除、索引里也不可安装的记录数（只提示，不显示）
 let MARKET = [];
 let MOD_UPDATES = [];
 let MARKET_DELISTED = [];   // 被维护者下架的条目（作者在「我创建的」看原因）
@@ -3583,6 +3670,12 @@ function updateModBanner() {
 function renderMyMods() {
   const grid = document.getElementById("modsGrid");
   if (!grid) return;
+  const summary = document.getElementById("modSummary");
+  if (summary) {
+    summary.textContent =
+      MY_MODS.length + " " + t("个模组") +
+      (MY_MODS_HIDDEN ? " · " + t("已隐藏") + " " + MY_MODS_HIDDEN + " " + t("条本地已删除的记录") : "");
+  }
   if (!MY_MODS.length) {
     grid.innerHTML = '<div class="mk-card" style="grid-column:1/-1;text-align:center;padding:28px">' + '<div class="mk-name">' + t("还没有属于你的模组") + "</div>" + '<div class="mk-desc" style="min-height:0">' + t("用「创建模组」建一个，或用「提交模组」把已有模组发布到你自己的仓库。带你的作者标识或签名的模组会自动出现在这里。") + "</div>" + '<div class="mk-foot" style="justify-content:center">' + '<button class="mk-btn" id="mineEmptyCreate" style="flex:0 0 auto;padding:8px 18px">' + t("创建模组") + "</button></div></div>";
     const mc = document.getElementById("mineEmptyCreate");
@@ -3603,7 +3696,9 @@ function renderMyMods() {
     const listed = m.listedVersion && m.listedVersion !== m.version ? " · " + t("已上架") + " v" + m.listedVersion : "";
     const src = m.sourceRepo ? '<span class="mk-tag">' + esc(m.sourceRepo) + "</span>" : "";
     const openBtn = m.folder ? '<button class="mk-btn" onclick="revealModFolder(\'' + esc(m.folder) + '\')">' + t("打开目录") + "</button>" : "";
-    const prBtn = m.prUrl ? '<button class="mk-btn" onclick="openExternalUrl(\'' + esc(m.prUrl) + '\')">' + t("打开 PR") + "</button>" : "";
+    // 被拒绝收录的模组：按钮改成「重新提交审核」（走同一条 提交 → 申请收录 流程）
+    const rejected = m.status === "rejected";
+    const submitLabel = rejected ? t("重新提交审核") : t("提新版 / 提交");
     return '<div class="mk-card">'
       + '<div class="mk-head"><div class="mk-name">' + esc(m.displayName || m.id) + "</div>"
       + '<span class="mk-badge ' + badgeCls + '">' + esc(statusLabel) + "</span></div>"
@@ -3612,8 +3707,8 @@ function renderMyMods() {
       + '<div class="mk-tags">' + src + "</div>"
       + reasonBlock
       + '<div class="mk-foot">' + openBtn
-      + '<button class="mk-btn" onclick="openSubmitModDialog()">' + t("提新版 / 提交") + "</button>"
-      + prBtn + "</div></div>";
+      + '<button class="mk-btn" onclick="openSubmitModDialog(\'' + modAttr(m.folder || "") + '\')">' + submitLabel + "</button>"
+      + "</div></div>";
   }).join("");
   if (typeof autoTranslateAfterRender === "function") autoTranslateAfterRender();
 }

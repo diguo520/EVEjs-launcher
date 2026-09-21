@@ -1385,6 +1385,7 @@
     try {
       const res = await api.modsMyMods();
       MY_MODS = (res && res.items) || [];
+      MY_MODS_HIDDEN = (res && typeof res.hidden === "number") ? res.hidden : 0;
     } catch (error) {
       console.error("myMods failed", error);
       MY_MODS = [];
@@ -1457,6 +1458,8 @@
   /* ============ 提交模组（签名 → 打包 → 索引分片 → GitHub PR，见 docs/…plan.md §5.4） ============ */
   let SM_ITEM = null;
   let SM_COMPARE = "";
+  /** 从「我创建的」卡片点进来时，预先选中的模组目录名 */
+  let SM_PRESELECT = "";
 
   function smVal(id) { const el = document.getElementById(id); return el ? String(el.value || "") : ""; }
   function smSet(id, v) { const el = document.getElementById(id); if (el) el.value = v; }
@@ -1467,17 +1470,59 @@
     return false;
   }
 
+  /** 当前选中的模组目录名（隐藏 input，保持 smVal/smSet 兼容） */
+  function smSelectedFolder() { return smVal("smMod"); }
+
+  /** 设定选中的模组：更新隐藏 input、按钮文字、列表高亮 */
+  function smSetMod(folder) {
+    smSet("smMod", folder);
+    const mod = MODS.find((m) => m.folder === folder);
+    const label = document.getElementById("smPickerLabel");
+    if (label) {
+      label.textContent = mod ? (mod.displayName || mod.id) + "  v" + (mod.version || "?") : t("选择要提交的模组");
+    }
+    const menu = document.getElementById("smPickerMenu");
+    if (menu) {
+      menu.querySelectorAll(".sm-picker-item").forEach((el) => {
+        el.classList.toggle("active", el.dataset.folder === folder);
+      });
+    }
+    const picker = document.getElementById("smPicker");
+    if (picker) picker.classList.remove("open");
+  }
+
+  smTogglePicker = function (ev) {
+    if (ev && ev.stopPropagation) ev.stopPropagation();
+    const picker = document.getElementById("smPicker");
+    if (picker) picker.classList.toggle("open");
+  };
+
+  /* 只列作者自己的模组：别人的模组不给提交（避免误传/替别人提交） */
   function smFillMods() {
-    const sel = document.getElementById("smMod");
-    if (!sel) return;
+    const menu = document.getElementById("smPickerMenu");
+    if (!menu) return;
     const mine = MODS.filter((m) => smIsMine(m));
-    const others = MODS.filter((m) => !smIsMine(m));
-    const opt = (m) => '<option value="' + esc(m.folder) + '">' + esc((m.displayName || m.id) + "  v" + (m.version || "?")) + (smIsMine(m) ? t("（我的）") : "") + "</option>";
-    const parts = [];
-    if (mine.length) parts.push('<optgroup label="' + esc(t("我创建的")) + '">' + mine.map(opt).join("") + "</optgroup>");
-    if (others.length) parts.push('<optgroup label="' + esc(t("其它模组")) + '">' + others.map(opt).join("") + "</optgroup>");
-    sel.innerHTML = parts.join("") || "<option value=\"\">" + esc(t("mods 目录里还没有模组")) + "</option>";
-    if (mine.length) sel.value = mine[0].folder;
+    if (!mine.length) {
+      menu.innerHTML = '<div class="sm-picker-empty">' + esc(t("这里只列出你自己的模组。先用「创建模组」建一个，或把带你自己作者标识的模组放进 mods/ 目录。")) + "</div>";
+      smSetMod("");
+      const label = document.getElementById("smPickerLabel");
+      if (label) label.textContent = t("没有可提交的模组");
+      return;
+    }
+    menu.innerHTML = mine
+      .map((m) =>
+        '<div class="sm-picker-item" data-folder="' + esc(m.folder) + '">' +
+        "<span>" + esc(m.displayName || m.id) + "</span>" +
+        '<span class="v">v' + esc(m.version || "?") + "</span></div>"
+      )
+      .join("");
+    menu.querySelectorAll(".sm-picker-item").forEach((el) => {
+      el.addEventListener("click", () => {
+        smSetMod(el.dataset.folder);
+        smOnModChange();
+      });
+    });
+    smSetMod(SM_PRESELECT && mine.some((m) => m.folder === SM_PRESELECT) ? SM_PRESELECT : mine[0].folder);
   }
 
   smOnModChange = function () {
@@ -1487,6 +1532,35 @@
     if (!smVal("smCategory")) smSet("smCategory", mod.category || "玩法");
     if (!smVal("smTags") && mod.tags && mod.tags.length) smSet("smTags", mod.tags.join(", "));
   };
+
+  /** 更新 2) 的进度条；failed=true 时标红 */
+  function smSetProgress(percent, text, failed) {
+    const box = document.getElementById("smProgress");
+    const bar = document.getElementById("smProgressBar");
+    const txt = document.getElementById("smProgressText");
+    if (box) box.style.display = "";
+    if (bar) {
+      bar.style.width = Math.max(0, Math.min(100, Number(percent) || 0)) + "%";
+      bar.style.background = failed ? "var(--red)" : "";
+    }
+    if (txt) {
+      txt.textContent = text || "";
+      txt.style.color = failed ? "var(--red)" : "var(--txt-mute)";
+    }
+  }
+
+  if (typeof api.onModPublishProgress === "function") {
+    api.onModPublishProgress((p) => {
+      if (!p) return;
+      smSetProgress(p.percent, t("发布进度") + "：" + t(String(p.stage || "")), false);
+    });
+  }
+
+  // 点页面空白处收起自定义下拉
+  document.addEventListener("click", (ev) => {
+    const picker = document.getElementById("smPicker");
+    if (picker && !picker.contains(ev.target)) picker.classList.remove("open");
+  });
 
   async function smRefreshTokenState() {
     const el = document.getElementById("smTokenState");
@@ -1509,12 +1583,15 @@
     }
   }
 
-  openSubmitModDialog = async function () {
+  openSubmitModDialog = async function (preselectFolder) {
     const modal = document.getElementById("submitModModal");
     if (!modal) return;
+    SM_PRESELECT = typeof preselectFolder === "string" ? preselectFolder : "";
     await loadAuthorProfile();
     await refreshModsStatus();
     smFillMods();
+    const progBox = document.getElementById("smProgress");
+    if (progBox) progBox.style.display = "none";
     SM_ITEM = null;
     SM_COMPARE = "";
     const res = document.getElementById("smResult");
@@ -1635,7 +1712,7 @@
   };
 
   smRegisterSource = async function () {
-    if (!SM_ITEM) { toast(t("请先执行①生成并打包"), "warn"); return; }
+    if (!SM_ITEM) { toast(t("请先执行 1) 生成并打包"), "warn"); return; }
     const box = document.getElementById("smSubmitResult");
     try {
       const res = await api.modsRegisterSource(SM_ITEM.id, SM_ITEM.version);
@@ -1654,11 +1731,12 @@
   };
 
   smSubmit = async function () {
-    if (!SM_ITEM) { toast(t("请先执行①生成并打包"), "warn"); return; }
+    if (!SM_ITEM) { toast(t("请先执行 1) 生成并打包"), "warn"); return; }
     const btn = document.getElementById("smSubmit");
     const box = document.getElementById("smSubmitResult");
     if (btn) btn.disabled = true;
-    if (box) { box.style.display = ""; box.textContent = t("正在提交（fork → 分支 → PR），请稍候…"); }
+    if (box) { box.style.display = ""; box.textContent = t("正在发布到你的仓库，请稍候…"); }
+    smSetProgress(2, t("发布进度") + "：" + t("校验 GitHub 令牌"), false);
     try {
       const repoInput = smVal("smRepoName").trim();
       const res = await api.modsPublishOwnRepo(SM_ITEM.id, SM_ITEM.version, repoInput, "");   // 只走 GitHub，不再要 Gitee
@@ -1669,19 +1747,22 @@
           res.assetUrl ? "ZIP: " + res.assetUrl : "",
           res.repoCreated ? t("（仓库是本次新建的）") : "",
           "",
-          t("下一步：点 ③ 申请收录（一次性）")
+          t("下一步：点 3) 申请收录（一次性）")
         ].filter(Boolean);
         if (box) { box.style.display = ""; box.textContent = lines.join("\n"); }
+        smSetProgress(100, t("发布完成") + " · " + (res.repo || ""), false);
         toast(t("已发布到我的仓库") + " · " + (res.repo || ""), "ok");
         logTo("sys", "OK", "模组 <span class=\"hi\">" + esc(SM_ITEM.id) + "</span> 已发布到 <span class=\"hi\">" + esc(res.repoUrl || "") + "</span>");
       } else {
         const reason = (res && res.reason) || t("提交失败");
         const hint = res && res.repoUrl ? "\n" + t("仓库已就绪，可手动上传 ZIP 到 Release") + ": " + res.repoUrl : "";
         if (box) { box.style.display = ""; box.textContent = reason + hint; }
+        smSetProgress(100, t("发布失败") + ": " + reason, true);
         toast(t("提交失败") + ": " + reason, "err");
       }
     } catch (error) {
       if (box) box.textContent = String(error);
+      smSetProgress(100, t("发布失败") + ": " + String(error), true);
       toast(t("提交失败") + ": " + String(error), "err");
     } finally {
       if (btn) btn.disabled = false;
@@ -1691,7 +1772,7 @@
 
   smOpenCompare = async function () {
     if (!SM_COMPARE) {
-      const r = t("还没有提交记录，请先点②或直接到索引仓库手动开 PR");
+      const r = t("还没有提交记录，请先点 2) 或直接到索引仓库手动开 PR");
       toast(r, "warn");
       return;
     }
