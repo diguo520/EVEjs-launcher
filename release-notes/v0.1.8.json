@@ -1,0 +1,25 @@
+{
+  "version": "0.1.8",
+  "changelog": {
+    "zh": [
+      {
+        "type": "new",
+        "text": "更新检查默认指向 GitHub Latest Release 的更新清单"
+      },
+      {
+        "type": "opt",
+        "text": "准备 v0.1.8 的更新测试发布"
+      }
+    ],
+    "en": [
+      {
+        "type": "new",
+        "text": "Update checks now default to the update manifest on the GitHub Latest Release"
+      },
+      {
+        "type": "opt",
+        "text": "Prepared the v0.1.8 update test release"
+      }
+    ]
+  }
+}

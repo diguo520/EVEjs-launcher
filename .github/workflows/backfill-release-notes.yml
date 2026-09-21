@@ -10,6 +10,7 @@ on:
   push:
     paths:
       - '.github/workflows/backfill-release-notes.yml'
+      - 'release-notes/**'
   workflow_dispatch:
     inputs:
       releases:

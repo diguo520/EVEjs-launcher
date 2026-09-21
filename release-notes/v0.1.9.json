@@ -1,0 +1,17 @@
+{
+  "version": "0.1.9",
+  "changelog": {
+    "zh": [
+      {
+        "type": "new",
+        "text": "启动器运行中也检查更新：不重启就能收到新版本提示"
+      }
+    ],
+    "en": [
+      {
+        "type": "new",
+        "text": "The launcher now checks for updates while it is running, so new versions are announced without a restart"
+      }
+    ]
+  }
+}

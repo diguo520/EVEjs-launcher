@@ -1,0 +1,17 @@
+{
+  "version": "0.1.7",
+  "changelog": {
+    "zh": [
+      {
+        "type": "fix",
+        "text": "启动器更新改用 Electron net.fetch（走系统代理，避免 Node 侧 TLS 问题）"
+      }
+    ],
+    "en": [
+      {
+        "type": "fix",
+        "text": "Launcher updates now use Electron net.fetch (honours the system proxy and avoids Node-side TLS failures)"
+      }
+    ]
+  }
+}

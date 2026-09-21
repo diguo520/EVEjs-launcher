@@ -1,0 +1,25 @@
+{
+  "version": "0.1.6",
+  "changelog": {
+    "zh": [
+      {
+        "type": "new",
+        "text": "首个 Electron 启动器版本：内置自动更新（便携版 exe 自我替换）"
+      },
+      {
+        "type": "new",
+        "text": "加入 GitHub Release 构建工作流：打 tag 自动出便携包 + 更新清单"
+      }
+    ],
+    "en": [
+      {
+        "type": "new",
+        "text": "First Electron launcher build with built-in auto-update (portable exe self-replacement)"
+      },
+      {
+        "type": "new",
+        "text": "Added the GitHub Release workflow: pushing a tag builds the portable exe and the update manifest"
+      }
+    ]
+  }
+}
