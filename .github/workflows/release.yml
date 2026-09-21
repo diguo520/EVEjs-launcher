@@ -15,6 +15,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -132,6 +134,18 @@ jobs:
           Write-Host "asset=$assetPath"
           Write-Host "sha256=$hash"
 
+      - name: Build release body (English)
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $version = $tag.TrimStart("v")
+          $previousTag = ""
+          try { $previousTag = (git describe --tags --abbrev=0 "$tag^" 2>$null | Select-Object -First 1).Trim() } catch { }
+          $nodeArgs = @($version, "--repo", "${{ github.repository }}", "--out", "release/release-body.md")
+          if ($previousTag) { $nodeArgs += @("--compare-from", $previousTag) }
+          node scripts/release-notes-body.mjs @nodeArgs
+          Get-Content -LiteralPath "release/release-body.md" -TotalCount 6
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -139,4 +153,4 @@ jobs:
           files: |
             release/EvEJS-Launcher-Portable-*.exe
             release/update-manifest.json
-          generate_release_notes: true
+          body_path: release/release-body.md

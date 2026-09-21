@@ -1,0 +1,108 @@
+name: Backfill release notes
+
+# 给「已经发布过、但正文是空的」历史版本补写英文 Release 说明。
+# 正文来源与发版时同源：release-notes/v<version>.json（英文段）。
+# 用法：Actions → Backfill release notes → Run workflow（leave inputs empty = 所有已发布版本）
+
+on:
+  # 这个文件本身被推送时自动跑一次（顺手把历史版本补齐），平时不会触发；
+  # 以后想再补就手动 Run workflow。
+  push:
+    paths:
+      - '.github/workflows/backfill-release-notes.yml'
+  workflow_dispatch:
+    inputs:
+      releases:
+        description: '要补写的 tag，逗号分隔（如 v0.1.19,v0.1.18）。留空 = 所有已发布的版本'
+        required: false
+        default: ''
+      overwrite:
+        description: '覆盖已经写过的正文（关掉则只补空正文的版本）'
+        type: boolean
+        required: false
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Patch release bodies (English)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          WANT: ${{ inputs.releases }}
+          OVERWRITE: ${{ inputs.overwrite }}
+        run: |
+          set -euo pipefail
+
+          tags=""
+          if [ -n "${WANT:-}" ]; then
+            tags="$(printf '%s' "$WANT" | tr ',' '\n' | sed 's/^ *//;s/ *$//' | grep -v '^$' || true)"
+          else
+            tags="$(gh release list --repo "$REPO" --limit 200 --json tagName --jq '.[].tagName' | sort -V)"
+          fi
+
+          if [ -z "$tags" ]; then
+            echo "没有找到任何 release。"
+            exit 0
+          fi
+
+          patched=0
+          skipped=0
+          for raw_tag in $tags; do
+            tag="$raw_tag"
+            case "$tag" in v*) ;; *) tag="v$tag" ;; esac
+            ver="${tag#v}"
+            file="release-notes/v${ver}.json"
+
+            if [ ! -f "$file" ]; then
+              echo "skip $tag — 没有 $file"
+              skipped=$((skipped + 1))
+              continue
+            fi
+
+            if ! gh release view "$tag" --repo "$REPO" >/dev/null 2>&1; then
+              echo "skip $tag — 这个 tag 还没有 Release"
+              skipped=$((skipped + 1))
+              continue
+            fi
+
+            # 只有显式关掉 overwrite（overwrite=false）时才跳过已有正文；
+            # push 触发时 inputs 为空，按「覆盖」处理。
+            if [ "${OVERWRITE}" = "false" ]; then
+              current="$(gh release view "$tag" --repo "$REPO" --json body --jq '.body' | tr -d '[:space:]')"
+              if [ -n "$current" ]; then
+                echo "skip $tag — 已经有正文"
+                skipped=$((skipped + 1))
+                continue
+              fi
+            fi
+
+            prev="$(git describe --tags --abbrev=0 "${tag}^" 2>/dev/null || true)"
+            args=( "$ver" --repo "$REPO" --out "/tmp/release-body-${ver}.md" )
+            if [ -n "$prev" ]; then
+              args+=( --compare-from "$prev" )
+            fi
+
+            node scripts/release-notes-body.mjs "${args[@]}"
+            gh release edit "$tag" --repo "$REPO" --notes-file "/tmp/release-body-${ver}.md"
+            echo "patched $tag — $(grep -c '^- \*\*' "/tmp/release-body-${ver}.md" || true) entries"
+            patched=$((patched + 1))
+          done
+
+          echo "完成：补写 $patched 个，跳过 $skipped 个。"
