@@ -6,7 +6,7 @@ import { initLogger, log } from "./logger";
 import { resolveRepoRoot } from "./envDetector";
 import { readSettings, writeSettings } from "./configStore";
 import { ensureLauncherRuntimePaths } from "./runtimePaths";
-import { ensureModAuthoringDoc } from "./modManager";
+import { ensureModAuthoringDoc, ensureAllModAuthoringDocs } from "./modManager";
 import * as pty from "./ptyManager";
 import { getServices, onServicesChanged, onProgress, onOutput, cleanupAll } from "./processManager";
 
@@ -643,6 +643,8 @@ function createWindow(): void {
               if (typeof openCreateModDialog === "function") { await openCreateModDialog(); await wait(400); scanModal("createModModal", "创建模组"); closeModal("createModModal"); }
               if (typeof openSubmitModDialog === "function") { await openSubmitModDialog(); await wait(400); scanModal("submitModModal", "提交模组"); closeModal("submitModModal"); }
               if (typeof openAuthorDialog === "function") { await openAuthorDialog(); await wait(400); scanModal("authorModal", "作者身份"); closeModal("authorModal"); }
+              if (typeof openAuthorDialog === "function") { await openAuthorDialog(); await wait(400); scanModal("authorModal", "作者身份"); closeModal("authorModal"); }
+              scanModal("modsMissingPanel", "mods缺失提示");
             } catch (e) {
               out.error = String(e && e.message ? e.message : e);
             }
@@ -718,6 +720,58 @@ function createWindow(): void {
         } catch (e) {
           console.log("[SMOKE] moderation screenshot ERROR:", e);
         }
+        // 模组制作规范：内嵌 Markdown 阅读器（标题导航树 / 表格 / 代码块）
+        try {
+          const docState = await mainWindow?.webContents.executeJavaScript(`(async () => {
+            const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+            const out = {};
+            if (typeof openModAuthoringDoc !== "function") return JSON.stringify({ error: "no openModAuthoringDoc" });
+            await openModAuthoringDoc();
+            await wait(700);
+            const modal = document.getElementById("docModal");
+            const body = document.getElementById("docBody");
+            const toc = document.getElementById("docToc");
+            out.opened = !!(modal && modal.classList.contains("open"));
+            out.headings = body ? body.querySelectorAll("h1,h2,h3").length : 0;
+            out.h1 = body && body.querySelector("h1") ? body.querySelector("h1").textContent.slice(0, 40) : "";
+            out.tables = body ? body.querySelectorAll("table").length : 0;
+            out.preBlocks = body ? body.querySelectorAll("pre").length : 0;
+            out.tocItems = toc ? toc.querySelectorAll(".doc-toc-item").length : 0;
+            out.tocFirst = toc && toc.querySelector(".doc-toc-item") ? toc.querySelector(".doc-toc-item").textContent.slice(0, 30) : "";
+            out.tocActive = toc ? toc.querySelectorAll(".doc-toc-item.active").length : 0;
+            out.hasColorLegend = body ? body.textContent.includes("颜色 / 标记图例") : false;
+            const dmodal = document.querySelector("#docModal .doc-modal");
+            out.docFont = dmodal ? getComputedStyle(dmodal).getPropertyValue("--doc-fs").trim() : "";
+            out.docSize = dmodal ? Math.round(dmodal.offsetWidth) + "x" + Math.round(dmodal.offsetHeight) : "";
+            out.resizable = dmodal ? getComputedStyle(dmodal).resize : "";
+            out.tools = document.querySelectorAll("#docModal .doc-tools button").length;
+            out.tools = document.querySelectorAll("#docModal .doc-tools button").length;
+            const langBtn = document.getElementById("docLangBtn");
+            out.langBtn = langBtn ? langBtn.textContent : "";
+            if (typeof docToggleLang === "function") {
+              await docToggleLang();
+              await wait(600);
+              const h1b = document.querySelector("#docBody h1");
+              out.afterToggleH1 = h1b ? h1b.textContent.slice(0, 46) : "";
+              out.tocAfterToggle = document.querySelectorAll("#docToc .doc-toc-item").length;
+              await docToggleLang();
+              await wait(400);
+            }
+            return JSON.stringify(out);
+          })()`);
+          console.log("[SMOKE] authoring-doc:", docState);
+          const docImage = await mainWindow?.webContents.capturePage();
+          if (docImage) {
+            const dir = path.resolve(__dirname, "../../../docs");
+            fs.mkdirSync(dir, { recursive: true });
+            const shot = path.join(dir, "ui-authoring-doc.png");
+            fs.writeFileSync(shot, docImage.toPNG());
+            console.log("[SMOKE] authoring-doc screenshot saved:", shot);
+          }
+          await mainWindow?.webContents.executeJavaScript(`(() => { if (typeof closeModal === "function") closeModal("docModal"); return "ok"; })()`);
+        } catch (e) {
+          console.log("[SMOKE] authoring-doc ERROR:", e);
+        }
         console.log("[SMOKE] mods-state:", modsState);
         } catch (e) {
           console.log("[SMOKE] mods-state ERROR:", e);
@@ -753,6 +807,7 @@ if (!gotLock) {
     } catch { /* spellcheck disabled */ }
     registerIpc();
     // 每次启动把内置的模组制作规范释放到 _launcher/mods/，方便模组作者查阅
+    ensureAllModAuthoringDocs();
     const authoringDoc = ensureModAuthoringDoc();
     if (authoringDoc.ok) {
       log("launcher", (authoringDoc.written ? "已释放" : "已是最新") + "模组制作规范: " + authoringDoc.path);

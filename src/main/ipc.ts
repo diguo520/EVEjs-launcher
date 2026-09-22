@@ -25,7 +25,7 @@ import {
 import { listAccounts, createAccount, deleteAccount, checkServerRunning, verifyAccount, changeAccountPassword, launchClientWithLogin, launchStoredAccount } from "./accountManager";
 import * as pty from "./ptyManager";
 import { repairClientDisplay } from "./processManager";
-import { scanMods, setModEnabled, createModsFolder, planLoaders, modsRoot, ensureModAuthoringDoc, importModZip, setModOrder, signModFolder, readModReadme } from "./modManager";
+import { scanMods, setModEnabled, createModsFolder, planLoaders, modsRoot, ensureModAuthoringDoc, readModAuthoringDocText, importModZip, setModOrder, signModFolder, readModReadme } from "./modManager";
 import { getAuthor, setAuthorName, exportAuthorKey, importAuthorKey, authorDataDir } from "./authorStore";
 import { createMod, SCAFFOLD_TEMPLATES, type CreateModDraft } from "./modScaffold";
 import { fetchModIndex, installEntry, findUpdates, satisfiesEvejs, indexUrls as indexUrlsForUi, type MarketEntry } from "./modRegistry";
@@ -483,7 +483,15 @@ export function registerIpc(): void {
   ipcMain.handle("config:repairClientDisplay", () => repairClientDisplay());
 
   /* ---------- 模组（manifest schema 3，M1：loader 启停 + NODE_OPTIONS 注入） ---------- */
-  ipcMain.handle("mods:list", () => scanMods(resolveRepoRoot()));
+  ipcMain.handle("mods:list", () => {
+    const repoRoot = resolveRepoRoot();
+    return {
+      ...scanMods(repoRoot),
+      repoRoot,
+      // 服务端根目录是否真的像 EveJS 根目录（用于提示用户去配置中心设置）
+      repoRootLooksValid: fs.existsSync(path.join(repoRoot, "server", "autostart.js"))
+    };
+  });
   ipcMain.handle("mods:plan", () => planLoaders(resolveRepoRoot()));
   ipcMain.handle("mods:setEnabled", (_e, folder: string, enabled: boolean) => {
     try {
@@ -619,6 +627,7 @@ export function registerIpc(): void {
     }
   });
   ipcMain.handle("mods:authoringDoc", () => ensureModAuthoringDoc());
+  ipcMain.handle("mods:authoringDocText", (_e, lang?: string) => readModAuthoringDocText(typeof lang === "string" ? lang : "zh"));
   ipcMain.handle("mods:openAuthoringDoc", async () => {
     const doc = ensureModAuthoringDoc();
     if (!doc.ok) return { ok: false, reason: doc.reason, path: doc.path };

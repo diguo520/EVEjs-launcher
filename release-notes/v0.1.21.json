@@ -1,0 +1,57 @@
+{
+  "version": "0.1.21",
+  "changelog": {
+    "zh": [
+      {
+        "type": "opt",
+        "text": "重写《模组制作教程》（作者视角）：10 个步骤（环境 → 作者身份 → GitHub fine-grained 令牌创建（含四项权限对照与 403/404 排错）→ 创建模组 → 写 loader → 本地测试 → 1) 生成并打包 → 2) 发布到我的仓库 → 3) 申请收录 → 发新版），新增颜色标记图例（🟥危险/🟨注意/🟦提示/🟩推荐/✅必做/⭕选填）贯穿全文、重点注意事项表、审核/下架/恢复说明，并保留清单字段表、loader 骨架、冲突与加载顺序、ZIP 结构、NODE_OPTIONS 注入原理等附录"
+      },
+      {
+        "type": "new",
+        "text": "「模组制作规范」按钮改为在启动器内嵌阅读：弹出窗口用 Makdown 渲染（标题/表格/代码块/引用/列表/任务清单/颜色标记），右侧带可滚动的标题导航树（自动高亮当前章节、点击跳转），不再丢给记事本；窗口内保留「用系统程序打开」备用按钮"
+      },
+      {
+        "type": "fix",
+        "text": "文档阅读窗口在大屏（4K）上太小：修正被基础样式 max-width:560px 压住的宽度（现在按屏幕自适应，最大 1800×1500），字号改为随屏宽缩放（clamp 13.5→19px）；新增 A− / A+ 字号调节、⛶ 最大化切换，并记住用户调过的字号与窗口尺寸；窗口右下角可直接拖拽缩放"
+      },
+      {
+        "type": "fix",
+        "text": "补齐「未找到 mods 文件夹」提示的多语言翻译，并说清路径规则：模组目录是 <EveJS 服务端根目录>/mods，界面上分别显示「服务端根目录」与「将要创建」的实际路径；当启动器没找到 EveJS 根目录（缺少 server/autostart.js）时提示去「配置中心」设置服务端根目录"
+      },
+      {
+        "type": "new",
+        "text": "模组制作规范支持中/英双语：新增英文版教程 MOD_AUTHORING.en.md（与中文版同结构，37 个标题），启动时两份一起释放到 _launcher/mods/；阅读器默认跟随界面语言，标题栏可一键切换中/英（EN / 中文）"
+      },
+      {
+        "type": "new",
+        "text": "首次启动默认跟随系统语言（原来固定英文）：根据系统区域（zh/ja/ko/fr/de/nl/ru）自动选中界面语言，用户之后的选择仍会被记住"
+      }
+    ],
+    "en": [
+      {
+        "type": "opt",
+        "text": "Rewrote the mod authoring guide from the creator's point of view: 10 steps (environment -> author identity -> creating the GitHub fine-grained token with the four permissions and 403/404 troubleshooting -> create mod -> write loader -> local test -> 1) generate and pack -> 2) publish to my repo -> 3) request listing -> publish updates), plus a colour legend (🟥danger/🟨caution/🟦tip/🟩recommended/✅required/⭕optional) used throughout, a key-cautions table, review/delist/restore guidance, and appendices for the manifest fields, a runnable loader skeleton, conflicts and load order, ZIP layout and the NODE_OPTIONS injection rule"
+      },
+      {
+        "type": "new",
+        "text": "The mod authoring guide now opens in an in-launcher Markdown reader: a dialog renders headings/tables/code blocks/quotes/lists/task lists and the colour markers, with a scrollable heading tree on the right (auto-highlights the current section, click to jump) instead of handing the file to Notepad; an Open with system app button remains as a fallback"
+      },
+      {
+        "type": "fix",
+        "text": "The doc reader was tiny on large (4K) screens: fixed the width being clamped by the base modal max-width:560px (it now scales with the screen, up to 1800x1500), made the text size scale with viewport width (clamp 13.5->19px), added A- / A+ text-size controls and a maximise toggle, and remembered the user's font size and window size; the window is also drag-resizable from its corner"
+      },
+      {
+        "type": "fix",
+        "text": "Localised the Folder mods not found notice and clarified the path rule: the mods folder lives under <EveJS server root>/mods, and the UI now shows the resolved Server root and the exact path that will be created; if the EveJS root was not found (no server/autostart.js) it tells the user to set Server root in the Configuration centre"
+      },
+      {
+        "type": "new",
+        "text": "The authoring guide is now bilingual: added MOD_AUTHORING.en.md (same 37-heading structure as the Chinese guide) and both files are released into _launcher/mods/ at startup; the reader follows the UI language by default and has a one-click EN / 中文 switch in its header"
+      },
+      {
+        "type": "new",
+        "text": "First launch now follows the OS language instead of always defaulting to English: the UI picks zh/ja/ko/fr/de/nl/ru from the system locale, and the user's later choice is still remembered"
+      }
+    ]
+  }
+}
