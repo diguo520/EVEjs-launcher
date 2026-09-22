@@ -1430,6 +1430,11 @@
       MOD_UPDATES = MOD_UPDATES.filter((u) => u.id !== id);
     } catch (error) {
       toast(t("安装失败") + ": " + String(error), "err");
+      // 下载地址 404（作者删了仓库 / Release）→ 顺手静默刷新一次索引，死条目会随新索引消失
+      if (/404/.test(String(error))) {
+        void loadMarket(true, true);
+        toast(t("已尝试刷新索引；如果这个模组还在列表里，说明索引尚未更新"), "warn");
+      }
     } finally {
       delete MARKET_PROGRESS[id];
       await refreshModsStatus();

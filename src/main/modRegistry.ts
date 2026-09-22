@@ -387,6 +387,17 @@ export async function downloadEntry(
       clearTimeout(timer);
     }
   }
+  // 全部镜像都 404 = 作者删除/改名了仓库或 Release 资源（索引里还留着旧地址）
+  const all404 = failures.length > 0 && failures.every((f) => /HTTP 404/.test(f));
+  if (all404) {
+    return {
+      ok: false,
+      reason:
+        "下载地址已失效（HTTP 404）：作者可能删除了仓库或 Release 资源。" +
+        "请点「检查更新」刷新索引后重试；如果这个模组还在列表里，说明索引尚未更新（可联系维护者下架）。" +
+        " 详细信息：" + failures.join("；")
+    };
+  }
   return { ok: false, reason: "所有镜像都失败了：" + failures.join("；") };
 }
 

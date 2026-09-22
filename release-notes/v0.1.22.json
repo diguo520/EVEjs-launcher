@@ -1,0 +1,25 @@
+{
+  "version": "0.1.22",
+  "changelog": {
+    "zh": [
+      {
+        "type": "fix",
+        "text": "「我创建的」里已提交待审的模组状态由「已提交（待合并）」改为「审核中」，徽章用青色区分；审核中期间提交/更新按钮禁用并显示「审核中」（悬停提示「已提交收录申请，维护者审核中；通过后才能发新版」），防止同一版本反复开 PR；统计卡拆分为 我的模组 / 已上架 / 审核中 / 待提交 / 仅本地"
+      },
+      {
+        "type": "fix",
+        "text": "模组市场安装/更新时下载地址 404（作者删除或改名了仓库/Release）不再只报「所有镜像都失败了：github → HTTP 404」：改为明确提示「下载地址已失效（HTTP 404）：作者可能删除了仓库或 Release 资源」，并提示点「检查更新」刷新索引；同时安装失败会自动静默刷新一次索引，让已下架的条目从市场消失"
+      }
+    ],
+    "en": [
+      {
+        "type": "fix",
+        "text": "Mods awaiting review in My mods now show In review instead of Submitted (pending merge), with a cyan badge; while in review the submit/update button is disabled and labelled In review (tooltip: listing request submitted and under review, you can publish an update once approved) so the same version cannot open repeated PRs; the stat cards are now My mods / Listed / In review / Draft / Local only"
+      },
+      {
+        "type": "fix",
+        "text": "A 404 while installing/updating from the market no longer just says all mirrors failed: it now explains that the download address is dead (HTTP 404 — the author may have deleted the repository or Release) and suggests refreshing the index; a failed install also triggers a silent index refresh so delisted entries disappear from the market"
+      }
+    ]
+  }
+}

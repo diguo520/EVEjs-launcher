@@ -235,6 +235,8 @@
   .mk-badge.up{color:var(--amber);border-color:rgba(255,157,4,0.4)}
   .mk-badge.new{color:var(--green);border-color:rgba(46,230,166,0.4)}
   .mk-badge.bad{color:var(--red);border-color:rgba(255,86,86,0.45)}
+  .mk-badge.review{color:var(--cyan);border-color:rgba(0,212,255,0.45);background:rgba(0,212,255,0.08)}
+  .mk-btn:disabled{opacity:.55;cursor:not-allowed;border-style:dashed}
   .mk-reason{margin-top:2px;padding:8px 10px;background:rgba(255,86,86,0.08);border-left:3px solid var(--red);font-size:11px;line-height:1.65;color:var(--txt-soft)}
   .mk-reason b{color:var(--red);font-weight:600}
   /* 提交模组：自定义下拉（只列自己的模组，样式跟主题一致） */
@@ -2354,6 +2356,19 @@ Object.assign(TRANSLATE, {
   "读取文档失败": {'en':"Failed to read the document",'ja':"ドキュメントの読み込みに失敗",'ko':"문서를 읽지 못했습니다",'fr':"Échec de la lecture du document",'de':"Dokument konnte nicht gelesen werden",'nl':"Document lezen mislukt",'ru':"Не удалось прочитать документ"}
 });
 
+// 我创建的：审核中状态 / 禁用提交按钮
+Object.assign(TRANSLATE, {
+  "审核中": {'en':"In review",'ja':"審査中",'ko':"심사 중",'fr':"En cours de validation",'de':"In Prüfung",'nl':"In beoordeling",'ru':"На проверке"},
+  "维护者审核中": {'en':"The maintainer is reviewing it",'ja':"管理者が審査中です",'ko':"관리자가 심사 중입니다",'fr':"Le mainteneur vérifie",'de':"Der Betreuer prüft",'nl':"De beheerder beoordeelt",'ru':"Модератор проверяет"},
+  "没有待审的提交": {'en':"Nothing waiting for review",'ja':"審査待ちはありません",'ko':"심사 대기 없음",'fr':"Rien en attente",'de':"Nichts wartet auf Prüfung",'nl':"Niets in behandeling",'ru':"Ничего не ожидает проверки"},
+  "还没提交收录": {'en':"Not submitted for listing yet",'ja':"まだ収録申請していません",'ko':"아직 등록 요청하지 않음",'fr':"Pas encore soumis",'de':"Noch nicht eingereicht",'nl':"Nog niet ingediend",'ru':"Ещё не отправлено"},
+  "已提交收录申请，维护者审核中；通过后才能发新版": {'en':"Listing request submitted and under review; you can publish an update once it is approved",'ja':"収録申請を提出済みで審査中です。承認後に新版を公開できます",'ko':"등록 요청을 제출해 심사 중입니다. 승인 후 새 버전을 게시할 수 있습니다",'fr':"Demande d'inscription soumise, en cours de validation ; vous pourrez publier une mise à jour après approbation",'de':"Aufnahmeantrag eingereicht und in Prüfung; nach der Freigabe kannst du eine neue Version veröffentlichen",'nl':"Registratieverzoek ingediend en in beoordeling; na goedkeuring kun je een nieuwe versie publiceren",'ru':"Заявка отправлена и проверяется; после одобрения можно публиковать новую версию"}
+});
+
+Object.assign(TRANSLATE, {
+  "已尝试刷新索引；如果这个模组还在列表里，说明索引尚未更新": {'en':"The index was refreshed; if the mod is still listed, the index has not been updated yet",'ja':"索引を再取得しました。まだ一覧にある場合は索引が未更新です",'ko':"색인을 새로 고쳤습니다. 그래도 목록에 있으면 색인이 아직 갱신되지 않은 것입니다",'fr':"L'index a été actualisé ; si le mod est toujours listé, l'index n'a pas encore été mis à jour",'de':"Der Index wurde aktualisiert; ist der Mod noch gelistet, ist der Index noch nicht aktualisiert",'nl':"De index is vernieuwd; staat de mod er nog, dan is de index nog niet bijgewerkt",'ru':"Индекс обновлён; если мод всё ещё в списке, индекс ещё не обновлён"}
+});
+
 // 字典 key 两端不能有空格：translateDOM 用 trim 后的文本查表，带首尾空格的 key 永远命中不了
 Object.keys(TRANSLATE).forEach(function (k) {
   const trimmed = k.trim();
@@ -3642,7 +3657,7 @@ let MARKET_ONLY_NEW = false;  // 只看未安装
 const MOD_STATUS_LABEL = {
   local: "仅本地",
   draft: "待提交",
-  submitted: "已提交（待合并）",
+  submitted: "审核中",
   listed: "已上架",
   delisted: "已下架",
   rejected: "已拒绝收录",
@@ -3698,12 +3713,14 @@ function renderModStats() {
   } else if (MOD_TAB === "mine") {
     const mine = Array.isArray(MY_MODS) ? MY_MODS : [];
     const listed = mine.filter((m) => m.status === "listed" || m.status === "update-pending").length;
-    const reviewing = mine.filter((m) => m.status === "submitted" || m.status === "draft").length;
+    const reviewing = mine.filter((m) => m.status === "submitted").length;
+    const draft = mine.filter((m) => m.status === "draft").length;
     const local = mine.filter((m) => m.status === "local").length;
     items = [
       { n: nf(mine.length), l: t("我的模组"), s: t("署名") + " " + (document.getElementById("authorBtnLabel")?.textContent || "—"), cls: "" },
       { n: nf(listed), l: t("已上架"), s: t("已出现在模组市场"), cls: "ok" },
-      { n: nf(reviewing), l: t("待提交"), s: t("等待收录审核"), cls: reviewing ? "warn" : "" },
+      { n: nf(reviewing), l: t("审核中"), s: reviewing ? t("维护者审核中") : t("没有待审的提交"), cls: reviewing ? "warn" : "" },
+      { n: nf(draft), l: t("待提交"), s: t("还没提交收录"), cls: draft ? "warn" : "" },
       { n: nf(local), l: t("仅本地"), s: t("还没发布到自己仓库"), cls: "" }
     ];
   } else {
@@ -3780,7 +3797,11 @@ function renderMyMods() {
     return;
   }
   grid.innerHTML = MY_MODS.map((m) => {
-    const badgeCls = m.status === "listed" ? "new" : m.status === "update-pending" ? "up" : (m.status === "delisted" || m.status === "rejected") ? "bad" : "";
+    const badgeCls =
+      m.status === "listed" ? "new" :
+      m.status === "update-pending" ? "up" :
+      m.status === "submitted" ? "review" :
+      (m.status === "delisted" || m.status === "rejected") ? "bad" : "";
     const statusLabel = t(MOD_STATUS_LABEL[m.status] || m.status);
     // 维护者审核结果：把原因直接摊在卡片上，作者一眼能看到为什么
     const reasonText = modReasonText(m.moderationReason);
@@ -3794,7 +3815,9 @@ function renderMyMods() {
     const openBtn = m.folder ? '<button class="mk-btn" onclick="revealModFolder(\'' + esc(m.folder) + '\')">' + t("打开目录") + "</button>" : "";
     // 被拒绝收录的模组：按钮改成「重新提交审核」（走同一条 提交 → 申请收录 流程）
     const rejected = m.status === "rejected";
-    const submitLabel = rejected ? t("重新提交审核") : t("提新版 / 提交");
+    // 审核中：不接受重复提交，按钮禁用并给出提示（防止同一版本反复开 PR）
+    const pendingReview = m.status === "submitted";
+    const submitLabel = pendingReview ? t("审核中") : rejected ? t("重新提交审核") : t("提新版 / 提交");
     return '<div class="mk-card">'
       + '<div class="mk-head"><div class="mk-name">' + esc(m.displayName || m.id) + "</div>"
       + '<span class="mk-badge ' + badgeCls + '">' + esc(statusLabel) + "</span></div>"
@@ -3803,7 +3826,9 @@ function renderMyMods() {
       + '<div class="mk-tags">' + src + "</div>"
       + reasonBlock
       + '<div class="mk-foot">' + openBtn
-      + '<button class="mk-btn" onclick="openSubmitModDialog(\'' + modAttr(m.folder || "") + '\')">' + submitLabel + "</button>"
+      + (pendingReview
+        ? '<button class="mk-btn" disabled title="' + modAttr(t("已提交收录申请，维护者审核中；通过后才能发新版")) + '">' + submitLabel + "</button>"
+        : '<button class="mk-btn" onclick="openSubmitModDialog(\'' + modAttr(m.folder || "") + '\')">' + submitLabel + "</button>")
       + "</div></div>";
   }).join("");
   if (typeof autoTranslateAfterRender === "function") autoTranslateAfterRender();

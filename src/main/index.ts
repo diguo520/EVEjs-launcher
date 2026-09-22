@@ -505,6 +505,23 @@ function createWindow(): void {
               if (typeof renderMyMods === "function") renderMyMods();   // 直接渲染，避免被 loadMyMods 覆盖
               await new Promise((r) => setTimeout(r, 200));
               out.synthetic = snap();
+              // 审核中状态：徽章变蓝 + 提交按钮禁用（防止重复提交）
+              MY_MODS = [{ id: "review-mod", displayName: "审核中假模组", version: "1.0.0", category: "玩法", status: "submitted", folder: "review-mod", localVersion: "1.0.0", listedVersion: "", signed: true, sourceRepo: "me/review-mod", prUrl: "", sizeBytes: 1, updatedAt: 0 }];
+              MOD_TAB = "mine";
+              if (typeof renderMyMods === "function") renderMyMods();
+              await new Promise((r) => setTimeout(r, 200));
+              const reviewHtml = document.getElementById("modsGrid")?.innerHTML ?? "";
+              out.reviewCard = {
+                badgeReview: reviewHtml.includes("mk-badge review"),
+                btnDisabled: /<button class="mk-btn" disabled/.test(reviewHtml),
+                text: (document.getElementById("modsGrid")?.textContent ?? "").split(String.fromCharCode(10)).join(" ").trim().slice(0, 80)
+              };
+              // 收尾停在「审核中」卡片，方便截图核对
+              MY_MODS = [{ id: "review-mod", displayName: "审核中假模组", version: "1.0.0", category: "玩法", status: "submitted", folder: "review-mod", localVersion: "1.0.0", listedVersion: "", signed: true, sourceRepo: "me/review-mod", prUrl: "", sizeBytes: 1, updatedAt: 0 }];
+              MOD_TAB = "mine";
+              if (typeof updateModTabs === "function") updateModTabs();
+              if (typeof renderMyMods === "function") renderMyMods();
+              await new Promise((r) => setTimeout(r, 250));
               out.syntheticHtml = (document.getElementById("modsGrid")?.innerHTML ?? "").slice(0, 200);
               // 市场网格同样要能用真实形状的数据渲染（renderMarket 也用了 esc）
               MARKET = [
