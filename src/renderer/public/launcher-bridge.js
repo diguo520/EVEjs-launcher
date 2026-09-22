@@ -1959,6 +1959,10 @@
       const status = await api.modsList();
       const pathEl = document.getElementById("modsMissingPath");
       if (pathEl && status?.root) pathEl.textContent = status.root;
+      const rootEl = document.getElementById("modsRootPath");
+      if (rootEl) rootEl.textContent = status?.repoRoot || "—";
+      const hintEl = document.getElementById("modsRootHint");
+      if (hintEl) hintEl.style.display = status?.repoRootLooksValid === false ? "" : "none";
       panel.style.display = status?.exists ? "none" : "";
       MODS.length = 0;
       (status?.mods || []).forEach((mod) => MODS.push(mod));
@@ -2026,13 +2030,26 @@
     }
   };
 
+  /** 模组制作规范：在启动器里内嵌阅读（Markdown 渲染 + 右侧标题导航树），不再丢给记事本 */
   openModAuthoringDoc = async function () {
+    try {
+      const lang = (typeof curLang === "string" && curLang === "zh") ? "zh" : "en";
+      const res = await api.modsAuthoringDocText(lang);
+      if (!res || !res.ok) throw new Error((res && res.reason) || "读取失败");
+      openDocViewer(res.text || "", res.path || "", lang);
+      logTo("sys", "OK", "模组制作规范（内嵌阅读）: " + esc(res.path || ""));
+    } catch (error) {
+      toast(t("打开模组制作规范失败") + ": " + String(error), "err");
+    }
+  };
+
+  /** 备用：用系统默认程序打开（弹窗右下角按钮） */
+  openModAuthoringDocExternal = async function () {
     try {
       const result = await api.modsOpenAuthoringDoc();
       if (!result?.ok) throw new Error(result?.reason || "打开失败");
       if (result.revealed) toast(t("未找到 .md 关联程序，已在资源管理器中选中该文档"), "warn");
       else toast(t("已用系统默认程序打开模组制作规范"), "ok");
-      logTo("sys", "OK", "模组制作规范: <span class=\"hi\">" + esc(result.path || "") + "</span>");
     } catch (error) {
       toast(t("打开模组制作规范失败") + ": " + String(error), "err");
     }

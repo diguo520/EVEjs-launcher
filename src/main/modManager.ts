@@ -929,23 +929,58 @@ export function createModsFolder(repoRoot: string): { ok: boolean; root: string;
 /* ------------------------------------------------------------------ */
 
 /** 释放目标：<启动器目录>/_launcher/mods/MOD_AUTHORING.md（文件名保持 ASCII） */
-export function modAuthoringDocPath(): string {
-  return path.join(launcherRuntimeRoot(), "mods", "MOD_AUTHORING.md");
+/** 支持中/英两份：zh → MOD_AUTHORING.md，其它语言 → MOD_AUTHORING.en.md（读不到时回退中文） */
+const DOC_LANGS = ["zh", "en"] as const;
+type DocLang = (typeof DOC_LANGS)[number];
+function normalizeDocLang(lang?: string): DocLang {
+  return String(lang || "").toLowerCase() === "zh" ? "zh" : "en";
+}
+function docFileName(lang?: string): string {
+  return normalizeDocLang(lang) === "zh" ? "MOD_AUTHORING.md" : "MOD_AUTHORING.en.md";
 }
 
-/** 打包后的源文件：dist/main/main → dist/renderer/MOD_AUTHORING.md */
-function packedAuthoringDocPath(): string {
-  return path.join(__dirname, "..", "..", "renderer", "MOD_AUTHORING.md");
+export function modAuthoringDocPath(lang?: string): string {
+  return path.join(launcherRuntimeRoot(), "mods", docFileName(lang));
+}
+
+/** 打包后的源文件：dist/main/main → dist/renderer/MOD_AUTHORING*.md */
+function packedAuthoringDocPath(lang?: string): string {
+  return path.join(__dirname, "..", "..", "renderer", docFileName(lang));
 }
 
 /**
  * 把内置规范写到 _launcher/mods/ 供模组作者查阅。
  * 内容一致时不写盘，避免每次启动都产生磁盘写入。
  */
-export function ensureModAuthoringDoc(): { ok: boolean; path: string; written: boolean; reason?: string } {
-  const target = modAuthoringDocPath();
+/** 读取文档正文（给启动器内嵌 Markdown 阅读器用） */
+export function readModAuthoringDocText(lang?: string): { ok: boolean; text?: string; path?: string; reason?: string } {
+  let doc = ensureModAuthoringDoc(lang);
+  // 英文文档缺失时回退中文，至少让用户看到内容
+  if (!doc.ok && normalizeDocLang(lang) === "en") doc = ensureModAuthoringDoc("zh");
+  if (!doc.ok) return { ok: false, reason: doc.reason, path: doc.path };
   try {
-    const source = fs.readFileSync(packedAuthoringDocPath(), "utf8");
+    return { ok: true, text: fs.readFileSync(doc.path, "utf8"), path: doc.path };
+  } catch (e) {
+    return { ok: false, reason: e instanceof Error ? e.message : String(e), path: doc.path };
+  }
+}
+
+/** 启动时把中/英两份都释放到 _launcher/mods/ */
+export function ensureAllModAuthoringDocs(): void {
+  for (const lang of DOC_LANGS) {
+    try {
+      ensureModAuthoringDoc(lang);
+    } catch {
+      /* 单份失败不影响启动 */
+    }
+  }
+}
+
+export function ensureModAuthoringDoc(lang?: string): { ok: boolean; path: string; written: boolean; reason?: string } {
+  const target = modAuthoringDocPath(lang);
+  const packed = packedAuthoringDocPath(lang);
+  try {
+    const source = fs.readFileSync(packed, "utf8");
     fs.mkdirSync(path.dirname(target), { recursive: true });
     let current = "";
     try {

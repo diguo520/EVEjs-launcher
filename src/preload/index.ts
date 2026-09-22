@@ -71,6 +71,7 @@ const api = {
   modsOpenFolder: () => ipcRenderer.invoke("mods:openFolder"),
   modsAuthoringDoc: () => ipcRenderer.invoke("mods:authoringDoc"),
   modsOpenAuthoringDoc: () => ipcRenderer.invoke("mods:openAuthoringDoc"),
+  modsAuthoringDocText: (lang?: string) => ipcRenderer.invoke("mods:authoringDocText", lang),
   modsImportZip: () => ipcRenderer.invoke("mods:importZip"),
   modsSetOrder: (folders: string[]) => ipcRenderer.invoke("mods:setOrder", folders),
   modsSign: (folder: string) => ipcRenderer.invoke("mods:sign", folder),
