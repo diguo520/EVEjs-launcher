@@ -25,7 +25,7 @@ import {
 import { listAccounts, createAccount, deleteAccount, checkServerRunning, verifyAccount, changeAccountPassword, launchClientWithLogin, launchStoredAccount } from "./accountManager";
 import * as pty from "./ptyManager";
 import { repairClientDisplay } from "./processManager";
-import { scanMods, setModEnabled, createModsFolder, planLoaders, modsRoot, ensureModAuthoringDoc, readModAuthoringDocText, importModZip, setModOrder, signModFolder, readModReadme } from "./modManager";
+import { scanMods, setModEnabled, createModsFolder, planLoaders, modsRoot, ensureModAuthoringDoc, readModAuthoringDocText, importModZip, setModOrder, signModFolder, readModReadme, uninstallMod } from "./modManager";
 import { getAuthor, setAuthorName, exportAuthorKey, importAuthorKey, authorDataDir } from "./authorStore";
 import { createMod, SCAFFOLD_TEMPLATES, type CreateModDraft } from "./modScaffold";
 import { fetchModIndex, installEntry, findUpdates, satisfiesEvejs, indexUrls as indexUrlsForUi, type MarketEntry } from "./modRegistry";
@@ -501,6 +501,7 @@ export function registerIpc(): void {
     }
   });
   ipcMain.handle("mods:createFolder", () => createModsFolder(resolveRepoRoot()));
+  ipcMain.handle("mods:uninstall", (_e, folder: string) => uninstallMod(resolveRepoRoot(), String(folder ?? "")));
   ipcMain.handle("mods:importZip", async () => {
     const filters = [{ name: "Mod ZIP", extensions: ["zip"] }];
     const win = BrowserWindow.getAllWindows()[0];

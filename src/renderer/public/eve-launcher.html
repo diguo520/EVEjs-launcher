@@ -162,22 +162,23 @@
   .mini-btn.start{color:var(--green);border-color:rgba(46,230,166,0.3);background:rgba(46,230,166,0.06)}
   /* ===== AUTHOR IDENTITY ===== */
   /* ===== MOD DETAIL DIALOG ===== */
-  .md-sub{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--txt-mute);margin-bottom:10px}
+  .md-sub{font-family:'Share Tech Mono','Microsoft YaHei UI','PingFang SC','Noto Sans CJK SC',monospace;font-size:11.5px;color:var(--txt-mute);margin-bottom:10px}
   .md-chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
-  .md-chip{font-family:'Share Tech Mono',monospace;font-size:9px;padding:2px 7px;border:1px solid var(--line);color:var(--txt-soft)}
+  .md-chip{font-family:'Share Tech Mono','Microsoft YaHei UI','PingFang SC','Noto Sans CJK SC',monospace;font-size:10.5px;padding:2px 8px;border:1px solid var(--line);color:var(--txt-soft)}
   .md-chip.on{color:var(--green);border-color:rgba(46,230,166,0.4);background:rgba(46,230,166,0.06)}
   .md-chip.warn{color:var(--amber);border-color:rgba(255,157,4,0.4)}
   .md-chip.bad{color:var(--red);border-color:rgba(255,86,86,0.4)}
   .md-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
   .md-cell{border:1px solid var(--line);padding:8px 10px;background:rgba(5,8,13,0.4);min-width:0}
-  .md-cell .k{font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:.14em;color:var(--txt-mute)}
+  .md-cell .k{font-family:'Share Tech Mono','Microsoft YaHei UI','PingFang SC','Noto Sans CJK SC',monospace;font-size:10.5px;letter-spacing:.14em;color:var(--txt-mute)}
   .md-cell .v{margin-top:3px;font-size:12px;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .md-sec{margin-top:16px}
-  .md-sec h4{margin:0 0 8px;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:.16em;color:var(--txt-mute)}
+  .md-sec h4{margin:0 0 8px;font-family:'Share Tech Mono','Microsoft YaHei UI','PingFang SC','Noto Sans CJK SC',monospace;font-size:11.5px;letter-spacing:.16em;color:var(--txt-mute)}
   .md-list{margin:0;padding:0;list-style:none;font-size:11.5px;line-height:1.95;color:var(--txt-soft)}
   .md-list li:before{content:"✓ ";color:var(--green)}
   .md-body{font-size:11.5px;line-height:1.9;color:var(--txt-soft);white-space:pre-wrap;word-break:break-word}
   .md-note{font-size:10.5px;color:var(--txt-mute);line-height:1.8}
+  .md-link{color:var(--cyan);cursor:pointer;text-decoration:underline;word-break:break-all}
   /* ===== 构建选项（复选框行）===== */
   .cm-opts{display:flex;flex-wrap:wrap;gap:10px 24px;margin:0 0 14px;font-family:'Cascadia Mono','Consolas','Microsoft YaHei UI','PingFang SC','Noto Sans CJK SC',monospace}
   .cm-opts label{display:flex;align-items:center;gap:7px;flex:0 0 auto;margin:0;cursor:pointer;font-size:12px;letter-spacing:0;color:var(--txt-soft);white-space:nowrap}
@@ -185,56 +186,63 @@
   .cm-opts input[type="checkbox"]{width:auto;height:auto;flex:0 0 auto;margin:0;accent-color:#00d4ff;cursor:pointer}
 
   /* ===== MOD CARD: CATEGORY BADGE / TAGS LINE ===== */
-  .mod-cat{flex:0 0 auto;align-self:flex-start;font-family:'Cascadia Mono','Consolas',monospace;font-size:10px;letter-spacing:.06em;padding:2px 8px;border:1px solid rgba(0,212,255,0.4);color:var(--cyan);background:rgba(0,212,255,0.08)}
-  .mod-tags-inline{font-family:'Cascadia Mono','Consolas',monospace;font-size:10px;color:var(--txt-mute);letter-spacing:.04em;margin-top:2px}
+  .mod-cat{flex:0 0 auto;align-self:flex-start;display:inline-flex;align-items:center;height:22px;padding:0 10px;border-radius:999px;font-family:'Cascadia Mono','Consolas','Microsoft YaHei UI','PingFang SC','Noto Sans CJK SC',monospace;font-size:11.5px;font-weight:500;line-height:1;letter-spacing:.02em;white-space:nowrap;border:1px solid rgba(0,212,255,0.4);color:var(--cyan);background:rgba(0,212,255,0.08)}
+  .mod-tags-inline{font-family:'Cascadia Mono','Consolas','Microsoft YaHei UI','PingFang SC','Noto Sans CJK SC',monospace;font-size:11.5px;color:var(--txt-mute);letter-spacing:.02em;margin-top:3px}
 
   /* ===== MOD SIGNATURE BADGE ===== */
-  .mod-sig{flex:0 0 auto;font-family:'Cascadia Mono','Consolas',monospace;font-size:9px;letter-spacing:.12em;padding:2px 6px;border:1px solid var(--line);align-self:flex-start}
+  .mod-sig{flex:0 0 auto;align-self:flex-start;display:inline-flex;align-items:center;height:20px;padding:0 9px;border-radius:999px;font-family:'Cascadia Mono','Consolas','Microsoft YaHei UI','PingFang SC','Noto Sans CJK SC',monospace;font-size:10.5px;font-weight:500;line-height:1;letter-spacing:.04em;white-space:nowrap;border:1px solid var(--line)}
   .mod-sig.signed{color:var(--green);border-color:rgba(46,230,166,0.35);background:rgba(46,230,166,0.07)}
   .mod-sig.invalid{color:var(--red);border-color:rgba(255,86,86,0.4);background:rgba(255,86,86,0.08)}
   .mod-sig.unknown{color:var(--amber);border-color:rgba(255,157,4,0.4);background:rgba(255,157,4,0.07)}
   .mod-sig.unsigned{color:var(--txt-mute);border-color:var(--line);background:rgba(255,255,255,0.02)}
-  .mod-act-btn{background:transparent;border:1px solid var(--line);color:var(--cyan);font-family:'Cascadia Mono','Consolas',monospace;font-size:10px;padding:5px 12px;cursor:pointer;transition:.18s}
+  .mod-act-btn{background:transparent;border:1px solid var(--line);color:var(--cyan);font-family:'Cascadia Mono','Consolas','Microsoft YaHei UI','PingFang SC','Noto Sans CJK SC',monospace;font-size:11.5px;padding:5px 13px;cursor:pointer;transition:.18s}
   .mod-act-btn:hover{background:rgba(0,212,255,0.14);border-color:var(--cyan)}
+  .mod-act-btn.danger{color:var(--red);border-color:rgba(255,59,84,0.45)}
+  .mod-act-btn.danger:hover{background:rgba(255,59,84,0.14);border-color:var(--red)}
   /* ===== MOD SUB-TABS / BANNER / ORDER PANEL / MARKET ===== */
   .mod-tabs{display:flex;gap:6px;margin-bottom:12px}
-  .mod-tab{padding:7px 14px;border:1px solid var(--line);color:var(--txt-mute);font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:.08em;cursor:pointer;transition:.18s;clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px)}
+  .mod-tab{padding:7px 14px;border:1px solid var(--line);color:var(--txt-mute);font-family:'Share Tech Mono','Microsoft YaHei UI','PingFang SC','Noto Sans CJK SC',monospace;font-size:12px;letter-spacing:.08em;cursor:pointer;transition:.18s;clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px)}
   .mod-tab:hover{color:var(--cyan);border-color:rgba(0,212,255,0.35)}
   .mod-tab.active{color:var(--cyan);background:rgba(0,212,255,0.1);border-color:var(--cyan)}
-  .mod-tab .n{color:var(--txt-soft);font-size:10px}
-  .mod-tab .up{margin-left:6px;padding:1px 6px;font-size:10px;color:var(--amber);background:rgba(255,157,4,0.16);border:1px solid rgba(255,157,4,0.35)}
+  .mod-tab .n{color:var(--txt-soft);font-size:10.5px}
+  .mod-tab .up{margin-left:6px;padding:1px 6px;font-size:10.5px;color:var(--amber);background:rgba(255,157,4,0.16);border:1px solid rgba(255,157,4,0.35)}
   .mod-banner{margin-bottom:12px;padding:10px 12px;background:rgba(255,157,4,0.07);border-left:3px solid var(--amber);font-size:11px;line-height:1.7;color:var(--txt-soft)}
   .mod-banner.err{background:rgba(255,86,86,0.08);border-left-color:var(--red)}
   .mod-order{margin-top:14px;padding:12px;border:1px solid var(--line);background:rgba(5,8,13,0.4)}
-  .mod-order h4{margin:0 0 8px;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:.16em;color:var(--txt-mute)}
+  .mod-order h4{margin:0 0 8px;font-family:'Share Tech Mono','Microsoft YaHei UI','PingFang SC','Noto Sans CJK SC',monospace;font-size:11.5px;letter-spacing:.16em;color:var(--txt-mute)}
   .mod-order ol{margin:0;padding-left:20px;font-size:11px;color:var(--txt-soft);line-height:1.9}
   .mk-stats{grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:4px}
   .mk-stat{background:rgba(18,26,40,0.6);border:1px solid var(--line);padding:12px 14px;clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,12px 100%,0 calc(100% - 12px))}
-  .mk-stat .k{font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:.14em;color:var(--txt-mute);display:flex;align-items:center;gap:6px}
+  .mk-stat .k{font-family:'Share Tech Mono','Microsoft YaHei UI','PingFang SC','Noto Sans CJK SC',monospace;font-size:11px;letter-spacing:.14em;color:var(--txt-mute);display:flex;align-items:center;gap:6px}
   .mk-stat .v{font-family:'Orbitron','Segoe UI Semibold','Segoe UI',sans-serif;font-weight:700;font-size:22px;color:#fff;margin:4px 0 2px}
-  .mk-stat .s{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--txt-soft)}
+  .mk-stat .s{font-family:'Share Tech Mono','Microsoft YaHei UI','PingFang SC','Noto Sans CJK SC',monospace;font-size:11px;color:var(--txt-soft)}
   .mk-stat.hot .v{color:var(--amber)}
-  .mk-dl{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--cyan)}
-  .mk-meta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--txt-mute)}
+  .mk-dl{font-family:'Share Tech Mono','Microsoft YaHei UI','PingFang SC','Noto Sans CJK SC',monospace;font-size:11px;color:var(--cyan)}
+  .mk-meta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;font-family:'Share Tech Mono','Microsoft YaHei UI','PingFang SC','Noto Sans CJK SC',monospace;font-size:11px;color:var(--txt-mute)}
   .mk-meta .mk-dl{color:var(--cyan)}
-  .mk-bar{display:flex;align-items:center;gap:8px;font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--txt-mute);padding:0 2px 4px}
+  .meta-i{display:inline-flex;align-items:center;gap:4px}
+  .meta-i svg{width:11px;height:11px;flex:0 0 11px;opacity:.7}
+  .meta-i .v{white-space:nowrap}
+  .mk-bar{display:flex;align-items:center;gap:8px;font-family:'Share Tech Mono','Microsoft YaHei UI','PingFang SC','Noto Sans CJK SC',monospace;font-size:11.5px;color:var(--txt-mute);padding:0 2px 4px}
   .mk-card{border:1px solid var(--line);background:rgba(5,8,13,0.4);padding:12px;display:flex;flex-direction:column;gap:8px}
   .mk-head{display:flex;align-items:flex-start;gap:8px}
   .mk-name{flex:1;font-size:13px;color:var(--txt)}
-  .mk-sub{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--txt-mute)}
+  .mk-sub{font-family:'Share Tech Mono','Microsoft YaHei UI','PingFang SC','Noto Sans CJK SC',monospace;font-size:11px;color:var(--txt-mute)}
   .mk-desc{font-size:11px;line-height:1.7;color:var(--txt-soft);min-height:32px}
-  .mk-tags{display:flex;flex-wrap:wrap;gap:6px}
-  .mk-tag{font-family:'Share Tech Mono',monospace;font-size:9px;padding:2px 6px;border:1px solid var(--line);color:var(--txt-mute)}
+  /* 市场卡片：描述固定两行，保证下面标签/元信息行横向对齐 */
+  .mk-desc.clamp2{height:37px;min-height:37px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .mk-tags{display:flex;flex-wrap:wrap;gap:6px;min-height:22px;align-content:flex-start}
+  .mk-tag{display:inline-flex;align-items:center;height:22px;padding:0 10px;border-radius:999px;font-family:'Share Tech Mono','Microsoft YaHei UI','PingFang SC','Noto Sans CJK SC',monospace;font-size:11.5px;font-weight:500;line-height:1;letter-spacing:.02em;white-space:nowrap;border:1px solid rgba(0,212,255,0.32);background:rgba(0,212,255,0.09);color:var(--cyan)}
   .mk-foot{display:flex;align-items:center;gap:8px;margin-top:auto}
-  .mk-btn{flex:1;padding:7px;border:1px solid var(--line);background:rgba(0,212,255,0.08);color:var(--cyan);font-family:'Share Tech Mono',monospace;font-size:10px;cursor:pointer;transition:.18s}
+  .mk-btn{flex:1;padding:7px;border:1px solid var(--line);background:rgba(0,212,255,0.08);color:var(--cyan);font-family:'Share Tech Mono','Microsoft YaHei UI','PingFang SC','Noto Sans CJK SC',monospace;font-size:11.5px;cursor:pointer;transition:.18s}
   .mk-btn:hover{background:rgba(0,212,255,0.16)}
   .mk-btn:disabled{opacity:.5;cursor:default}
   .mk-prog{height:4px;background:rgba(255,255,255,0.08);overflow:hidden}
   .mk-prog i{display:block;height:100%;background:var(--cyan)}
-  .mk-badge{font-family:'Share Tech Mono',monospace;font-size:9px;padding:2px 6px;border:1px solid var(--line)}
-  .mk-badge.up{color:var(--amber);border-color:rgba(255,157,4,0.4)}
-  .mk-badge.new{color:var(--green);border-color:rgba(46,230,166,0.4)}
-  .mk-badge.bad{color:var(--red);border-color:rgba(255,86,86,0.45)}
+  .mk-badge{display:inline-flex;align-items:center;height:20px;padding:0 9px;border-radius:999px;font-family:'Share Tech Mono','Microsoft YaHei UI','PingFang SC','Noto Sans CJK SC',monospace;font-size:11px;font-weight:500;line-height:1;letter-spacing:.02em;white-space:nowrap;border:1px solid var(--line)}
+  .mk-badge.up{color:var(--amber);border-color:rgba(255,157,4,0.4);background:rgba(255,157,4,0.10)}
+  .mk-badge.new{color:var(--green);border-color:rgba(46,230,166,0.4);background:rgba(46,230,166,0.10)}
+  .mk-badge.bad{color:var(--red);border-color:rgba(255,86,86,0.45);background:rgba(255,86,86,0.10)}
   .mk-badge.review{color:var(--cyan);border-color:rgba(0,212,255,0.45);background:rgba(0,212,255,0.08)}
   .mk-btn:disabled{opacity:.55;cursor:not-allowed;border-style:dashed}
   .mk-reason{margin-top:2px;padding:8px 10px;background:rgba(255,86,86,0.08);border-left:3px solid var(--red);font-size:11px;line-height:1.65;color:var(--txt-soft)}
@@ -250,7 +258,7 @@
   .sm-picker-item{display:flex;align-items:center;gap:8px;padding:9px 11px;font-size:12px;color:var(--txt-soft);cursor:pointer;border-bottom:1px solid rgba(255,255,255,0.04)}
   .sm-picker-item:hover{background:rgba(0,212,255,0.10);color:#fff}
   .sm-picker-item.active{background:rgba(0,212,255,0.16);color:#fff}
-  .sm-picker-item .v{margin-left:auto;font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--txt-mute)}
+  .sm-picker-item .v{margin-left:auto;font-family:'Share Tech Mono','Microsoft YaHei UI','PingFang SC','Noto Sans CJK SC',monospace;font-size:11px;color:var(--txt-mute)}
   .sm-picker-empty{padding:11px;font-size:11.5px;line-height:1.7;color:var(--txt-mute)}
   .sm-prog{height:7px;background:rgba(255,255,255,0.08);border:1px solid var(--line);overflow:hidden}
   .sm-prog i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--cyan),#7fe9ff);transition:width .3s ease}
@@ -263,7 +271,7 @@
   .doc-wrap{display:flex;flex:1;min-height:0}
   .doc-body{flex:1;min-width:0;overflow:auto;padding:22px 26px 60px}
   .doc-toc-wrap{width:clamp(230px, 15vw, 380px);flex:0 0 clamp(230px, 15vw, 380px);border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0;background:rgba(5,8,13,0.35)}
-  .doc-toc-head{flex:0 0 auto;padding:12px 14px;border-bottom:1px solid var(--line);font-family:'Cascadia Mono','Consolas',monospace;font-size:10px;letter-spacing:.2em;color:var(--cyan)}
+  .doc-toc-head{flex:0 0 auto;padding:12px 14px;border-bottom:1px solid var(--line);font-family:'Cascadia Mono','Consolas','Microsoft YaHei UI','PingFang SC','Noto Sans CJK SC',monospace;font-size:11px;letter-spacing:.2em;color:var(--cyan)}
   .doc-toc{flex:1;overflow:auto;padding:8px 6px 20px}
   .doc-toc-item{display:block;width:100%;text-align:left;background:transparent;border:0;border-left:2px solid transparent;color:var(--txt-dim);font-family:inherit;font-size:calc(var(--doc-fs) - 1.5px);line-height:1.5;padding:5px 10px;cursor:pointer}
   .doc-toc-item:hover{color:#fff;background:rgba(0,212,255,0.07)}
@@ -291,7 +299,7 @@
   .author-kv{display:flex;align-items:center;gap:10px}
   .author-kv code{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:rgba(5,8,13,0.6);border:1px solid var(--line);padding:9px 11px;font-family:'Cascadia Mono','Consolas','SFMono-Regular','Microsoft YaHei UI','PingFang SC','Noto Sans CJK SC',monospace;font-size:12px;color:var(--cyan)}
   .author-kv .mini-btn{flex:0 0 auto;padding:8px 14px;font-size:10px}
-  .author-state{flex:0 0 auto;font-family:'Cascadia Mono','Consolas',monospace;font-size:10px;letter-spacing:.14em;padding:4px 8px;border:1px solid var(--line)}
+  .author-state{flex:0 0 auto;font-family:'Cascadia Mono','Consolas','Microsoft YaHei UI','PingFang SC','Noto Sans CJK SC',monospace;font-size:11px;letter-spacing:.14em;padding:4px 8px;border:1px solid var(--line)}
   .author-state.ok{color:var(--green);border-color:rgba(46,230,166,0.35);background:rgba(46,230,166,0.06)}
   .author-state.bad{color:var(--red);border-color:rgba(255,86,86,0.35);background:rgba(255,86,86,0.06)}
   .author-warn{margin-top:4px;padding:10px 12px;background:rgba(255,86,86,0.07);border-left:3px solid var(--red);font-family:'Cascadia Mono','Consolas','Microsoft YaHei UI',monospace;font-size:10.5px;line-height:1.6;color:var(--txt-soft)}
@@ -650,7 +658,7 @@
   .mod:hover{border-color:var(--line-strong)}
   .mod.removed{opacity:.45;border-style:dashed}
   .mod-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:10px}
-.mod-stat .s{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--txt-soft);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mod-stat .s{font-family:'Share Tech Mono','Microsoft YaHei UI','PingFang SC','Noto Sans CJK SC',monospace;font-size:11px;color:var(--txt-soft);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .mod-stat{background:rgba(0,212,255,0.04);border:1px solid var(--line);padding:10px 13px;clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px)}
 .mod-stat .n{font-family:'Orbitron','Segoe UI Semibold','Segoe UI',sans-serif;font-size:19px;color:#fff;letter-spacing:.02em}
 .mod-stat .l{font-size:11px;color:var(--txt-dim);margin-top:3px;letter-spacing:.06em}
@@ -1087,7 +1095,7 @@
       </div>
       <div class="logo-text">
         <div class="t1">EVEJS COMMAND</div>
-        <div class="t2">SERVER LAUNCHER · v0.1.18</div>
+        <div class="t2">SERVER LAUNCHER · v—</div>
       </div>
     </div>
     <div class="topbar-divider"></div>
@@ -1273,7 +1281,7 @@
           <button class="mini-btn start" onclick="openAddCmdModal()" style="padding:8px 16px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>添加指令</button>
           <button class="mini-btn" onclick="importCmdJSON()" style="padding:8px 14px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>导入 JSON</button>
           <button class="mini-btn" onclick="exportCmdJSON()" style="padding:8px 14px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>导出 JSON</button>
-          <span class="meta" id="cmdCustomMeta" style="margin-left:auto;color:var(--txt-mute);font-family:'Cascadia Mono','Consolas','SFMono-Regular','DejaVu Sans Mono',monospace;font-size:11px"></span>
+          <span class="meta" id="cmdCustomMeta" style="margin-left:auto;color:var(--txt-mute);font-family:'Cascadia Mono','Consolas','SFMono-Regular','Microsoft YaHei UI','PingFang SC','Noto Sans CJK SC',monospace;font-size:11px"></span>
           <input type="file" id="cmdImportFile" accept=".json" style="display:none" onchange="handleCmdImportFile(event)">
         </div>
         <div class="cmd-stats" id="cmdStats"></div>
@@ -1395,9 +1403,9 @@
         <div class="section-title"><span class="bar"></span><h2>模组 / 插件</h2><span class="sub">// MOD PACKAGES · MANIFEST SCHEMA 3</span></div>
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
           <div class="mod-tabs" id="modTabs" style="margin-bottom:0">
-            <div class="mod-tab active" data-mtab="installed" onclick="switchModTab('installed')">已安装 · <span class="n" id="mtInstalled">0</span></div>
-            <div class="mod-tab" data-mtab="mine" onclick="switchModTab('mine')">我创建的 · <span class="n" id="mtMine">0</span></div>
-            <div class="mod-tab" data-mtab="market" onclick="switchModTab('market')">模组市场 · <span class="n" id="mtMarket">0</span><span class="up" id="mtMarketUp" style="display:none">0</span></div>
+            <div class="mod-tab active" data-mtab="installed" onclick="switchModTab('installed')"><span class="lbl">已安装</span> · <span class="n" id="mtInstalled">0</span></div>
+            <div class="mod-tab" data-mtab="mine" onclick="switchModTab('mine')"><span class="lbl">我创建的</span> · <span class="n" id="mtMine">0</span></div>
+            <div class="mod-tab" data-mtab="market" onclick="switchModTab('market')"><span class="lbl">模组市场</span> · <span class="n" id="mtMarket">0</span><span class="up" id="mtMarketUp" style="display:none">0</span></div>
           </div>
           <div style="flex:1"></div>
           <div id="modTabActions" style="display:flex;gap:8px;flex-wrap:wrap">
@@ -2368,6 +2376,77 @@ Object.assign(TRANSLATE, {
 Object.assign(TRANSLATE, {
   "已尝试刷新索引；如果这个模组还在列表里，说明索引尚未更新": {'en':"The index was refreshed; if the mod is still listed, the index has not been updated yet",'ja':"索引を再取得しました。まだ一覧にある場合は索引が未更新です",'ko':"색인을 새로 고쳤습니다. 그래도 목록에 있으면 색인이 아직 갱신되지 않은 것입니다",'fr':"L'index a été actualisé ; si le mod est toujours listé, l'index n'a pas encore été mis à jour",'de':"Der Index wurde aktualisiert; ist der Mod noch gelistet, ist der Index noch nicht aktualisiert",'nl':"De index is vernieuwd; staat de mod er nog, dan is de index nog niet bijgewerkt",'ru':"Индекс обновлён; если мод всё ещё в списке, индекс ещё не обновлён"}
 });
+
+// 模组卸载 / 卡片来源仓库
+Object.assign(TRANSLATE, {
+  "卸载": {'en':"Uninstall",'ja':"アンインストール",'ko':"제거",'fr':"Désinstaller",'de':"Deinstallieren",'nl':"Verwijderen",'ru':"Удалить"},
+  "模组文件会移入回收站，可从回收站还原。": {'en':"The mod folder will be moved to the Recycle Bin and can be restored from there.",'ja':"MOD フォルダはゴミ箱に移動します（ゴミ箱から復元できます）。",'ko':"모드 폴더는 휴지통으로 이동하며 휴지통에서 복원할 수 있습니다.",'fr':"Le dossier du mod sera déplacé vers la Corbeille et pourra être restauré.",'de':"Der Mod-Ordner wird in den Papierkorb verschoben und kann von dort wiederhergestellt werden.",'nl':"De mod-map wordt naar de prullenbak verplaatst en kan daaruit worden hersteld.",'ru':"Папка мода будет перемещена в корзину и может быть восстановлена оттуда."},
+  "已卸载": {'en':"Uninstalled",'ja':"アンインストールしました",'ko':"제거됨",'fr':"Désinstallé",'de':"Deinstalliert",'nl':"Verwijderd",'ru':"Удалено"},
+  "卸载失败": {'en':"Uninstall failed",'ja':"アンインストールに失敗",'ko':"제거 실패",'fr':"Échec de la désinstallation",'de':"Deinstallation fehlgeschlagen",'nl':"Verwijderen mislukt",'ru':"Не удалось удалить"},
+  "未进入回收站，已直接删除": {'en':"not moved to the Recycle Bin; deleted directly",'ja':"ゴミ箱に入れず直接削除しました",'ko':"휴지통에 넣지 않고 직접 삭제했습니다",'fr':"non déplacé vers la Corbeille ; supprimé directement",'de':"nicht in den Papierkorb verschoben; direkt gelöscht",'nl':"niet naar de prullenbak verplaatst; direct verwijderd",'ru':"не в корзину — удалено напрямую"},
+  "来源仓库": {'en':"Source repository",'ja':"ソースリポジトリ",'ko':"소스 저장소",'fr':"Dépôt source",'de':"Quell-Repository",'nl':"Bronrepository",'ru':"Репозиторий-источник"}
+});
+
+// 卡片 meta 图标 tooltip
+Object.assign(TRANSLATE, {
+  "下载次数": {'en':"Downloads",'ja':"ダウンロード数",'ko':"다운로드 수",'fr':"Téléchargements",'de':"Downloads",'nl':"Downloads",'ru':"Загрузки"}
+});
+// 模组批量操作条 / 计数（已安装页）
+Object.assign(TRANSLATE, {
+  '全部启用': {'en':'Enable all','ja':'すべて有効化','ko':'모두 활성화','fr':'Tout activer','de':'Alle aktivieren','nl':'Alles inschakelen','ru':'Включить все'},
+  '全部停用': {'en':'Disable all','ja':'すべて無効化','ko':'모두 비활성화','fr':'Tout désactiver','de':'Alle deaktivieren','nl':'Alles uitschakelen','ru':'Отключить все'},
+  '显示': {'en':'Showing','ja':'表示','ko':'표시','fr':'Affichage','de':'Anzeige','nl':'Weergave','ru':'Показано'},
+  '个活跃': {'en':'active','ja':'件アクティブ','ko':'개 활성','fr':'actifs','de':'aktiv','nl':'actief','ru':'активных'},
+});
+// 模组分类 / 标签词条：分类来自「创建模组」下拉与 mod.json，标签来自 mod.json 与市场索引。
+// 卡片上的标签是一词一个文本节点，所以这里按「单个词」建词条。
+Object.assign(TRANSLATE, {
+  '经济': {'en':'Economy','ja':'経済','ko':'경제','fr':'Économie','de':'Wirtschaft','nl':'Economie','ru':'Экономика'},
+  '画面': {'en':'Graphics','ja':'グラフィック','ko':'그래픽','fr':'Graphismes','de':'Grafik','nl':'Graphics','ru':'Графика'},
+  '锁定': {'en':'Lock','ja':'ロック','ko':'록','fr':'Verrouillage','de':'Zielerfassung','nl':'Lock','ru':'Захват'},
+  '集火': {'en':'Focus fire','ja':'集中砲火','ko':'집중 사격','fr':'Tir concentré','de':'Fokussiertes Feuer','nl':'Geconcentreerd vuur','ru':'Сосредоточенный огонь'},
+  '开火': {'en':'Fire','ja':'発砲','ko':'발사','fr':'Tir','de':'Feuer','nl':'Vuren','ru':'Огонь'},
+  '自动': {'en':'Auto','ja':'自動','ko':'자동','fr':'Auto','de':'Auto','nl':'Auto','ru':'Авто'},
+  '采矿': {'en':'Mining','ja':'採掘','ko':'채굴','fr':'Minage','de':'Abbau','nl':'Mijnbouw','ru':'Добыча'},
+  '矿工': {'en':'Miner','ja':'採掘者','ko':'채굴꾼','fr':'Mineur','de':'Bergmann','nl':'Mijnwerker','ru':'Шахтёр'},
+  '探索': {'en':'Exploration','ja':'探索','ko':'탐험','fr':'Exploration','de':'Erkundung','nl':'Verkenning','ru':'Исследование'},
+  '高安外': {'en':'Outside high-sec','ja':'ハイセク外','ko':'하이섹 외','fr':'Hors high-sec','de':'Außerhalb High-Sec','nl':'Buiten high-sec','ru':'Вне хай-сека'},
+  '工业': {'en':'Industry','ja':'産業','ko':'산업','fr':'Industrie','de':'Industrie','nl':'Industrie','ru':'Промышленность'},
+  '制造': {'en':'Manufacturing','ja':'製造','ko':'제조','fr':'Fabrication','de':'Fertigung','nl':'Productie','ru':'Производство'},
+  '市场': {'en':'Market','ja':'マーケット','ko':'시장','fr':'Marché','de':'Markt','nl':'Markt','ru':'Рынок'},
+  '交易': {'en':'Trading','ja':'取引','ko':'거래','fr':'Échanges','de':'Handel','nl':'Handel','ru':'Торговля'},
+  '副本': {'en':'Dungeon','ja':'ダンジョン','ko':'던전','fr':'Donjon','de':'Dungeon','nl':'Dungeon','ru':'Подземелье'},
+  '难度': {'en':'Difficulty','ja':'難易度','ko':'난이도','fr':'Difficulté','de':'Schwierigkeit','nl':'Moeilijkheid','ru':'Сложность'},
+  '高难': {'en':'High difficulty','ja':'高難度','ko':'고난도','fr':'Haute difficulté','de':'Hohe Schwierigkeit','nl':'Hoge moeilijkheid','ru':'Высокая сложность'},
+  '硬核': {'en':'Hardcore','ja':'ハードコア','ko':'하드코어','fr':'Hardcore','de':'Hardcore','nl':'Hardcore','ru':'Хардкор'},
+  '风险': {'en':'Risk','ja':'リスク','ko':'리스크','fr':'Risque','de':'Risiko','nl':'Risico','ru':'Риск'},
+  '掉落': {'en':'Loot','ja':'ドロップ','ko':'드롭','fr':'Butin','de':'Beute','nl':'Buit','ru':'Лут'},
+  '平衡': {'en':'Balance','ja':'バランス','ko':'밸런스','fr':'Équilibrage','de':'Balance','nl':'Balans','ru':'Баланс'},
+  '联盟': {'en':'Alliance','ja':'アライアンス','ko':'얼라이언스','fr':'Alliance','de':'Allianz','nl':'Alliantie','ru':'Альянс'},
+  '舰队': {'en':'Fleet','ja':'艦隊','ko':'함대','fr':'Flotte','de':'Flotte','nl':'Vloot','ru':'Флот'},
+  '协作': {'en':'Co-op','ja':'協力','ko':'협동','fr':'Coopération','de':'Kooperation','nl':'Samenwerking','ru':'Кооперация'},
+  '聊天': {'en':'Chat','ja':'チャット','ko':'채팅','fr':'Chat','de':'Chat','nl':'Chat','ru':'Чат'},
+  '语音': {'en':'Voice','ja':'ボイス','ko':'음성','fr':'Vocal','de':'Sprache','nl':'Spraak','ru':'Голос'},
+  '新手': {'en':'Beginner','ja':'初心者','ko':'초보자','fr':'Débutant','de':'Anfänger','nl':'Beginner','ru':'Новичок'},
+  '保护': {'en':'Protection','ja':'保護','ko':'보호','fr':'Protection','de':'Schutz','nl':'Bescherming','ru':'Защита'},
+  '引导': {'en':'Tutorial','ja':'チュートリアル','ko':'가이드','fr':'Tutoriel','de':'Anleitung','nl':'Gids','ru':'Обучение'},
+  '客户端': {'en':'Client','ja':'クライアント','ko':'클라이언트','fr':'Client','de':'Client','nl':'Client','ru':'Клиент'},
+  '贴图': {'en':'Textures','ja':'テクスチャ','ko':'텍스처','fr':'Textures','de':'Texturen','nl':'Texturen','ru':'Текстуры'},
+  '天空盒': {'en':'Skybox','ja':'スカイボックス','ko':'스카이박스','fr':'Skybox','de':'Skybox','nl':'Skybox','ru':'Скайбокс'},
+  '日志': {'en':'Logs','ja':'ログ','ko':'로그','fr':'Journaux','de':'Protokolle','nl':'Logboeken','ru':'Логи'},
+  '统计': {'en':'Stats','ja':'統計','ko':'통계','fr':'Statistiques','de':'Statistiken','nl':'Statistieken','ru':'Статистика'},
+  '监控': {'en':'Monitoring','ja':'監視','ko':'모니터링','fr':'Surveillance','de':'Überwachung','nl':'Monitoring','ru':'Мониторинг'},
+  '面板': {'en':'Panel','ja':'パネル','ko':'패널','fr':'Panneau','de':'Panel','nl':'Paneel','ru':'Панель'},
+  '管理': {'en':'Admin','ja':'管理','ko':'관리','fr':'Administration','de':'Verwaltung','nl':'Beheer','ru':'Администрирование'},
+  '风控': {'en':'Risk control','ja':'リスク管理','ko':'리스크 관리','fr':'Contrôle des risques','de':'Risikokontrolle','nl':'Risicobeheer','ru':'Контроль рисков'},
+  '轻量': {'en':'Lightweight','ja':'軽量','ko':'경량','fr':'Léger','de':'Leichtgewichtig','nl':'Lichtgewicht','ru':'Облегчённый'},
+  '低配': {'en':'Low-end PC','ja':'低スペック','ko':'저사양','fr':'PC modeste','de':'Schwache Hardware','nl':'Zwakke pc','ru':'Слабый ПК'},
+  '体验': {'en':'Experience','ja':'体験','ko':'체험','fr':'Expérience','de':'Erlebnis','nl':'Ervaring','ru':'Опыт'},
+  '移动': {'en':'Movement','ja':'移動','ko':'이동','fr':'Déplacement','de':'Bewegung','nl':'Beweging','ru':'Движение'},
+  '行星': {'en':'Planetary','ja':'惑星','ko':'행성','fr':'Planétaire','de':'Planetarisch','nl':'Planetaire','ru':'Планетарный'},
+  '标签': {'en':'Tag','ja':'タグ','ko':'태그','fr':'Étiquette','de':'Tag','nl':'Tag','ru':'Тег'},
+});
+
 
 // 字典 key 两端不能有空格：translateDOM 用 trim 后的文本查表，带首尾空格的 key 永远命中不了
 Object.keys(TRANSLATE).forEach(function (k) {
@@ -3608,6 +3687,12 @@ let MOD_STATS={total:0,enabled:0,disabled:0,conflicts:0,bytes:0};
 let MOD_CONFLICTS=[];
 const KIND_LABEL={loader:'LOADER','source-integrated':'SOURCE','client-package':'CLIENT',settings:'SETTINGS'};
 const MOD_ICON={loader:'shield','source-integrated':'chart','client-package':'globe',settings:'factory'};
+/** 按「创建模组」的分类给卡片图标（玩法 / 经济 / AI / 画面 / 工具），未分类时退回按 kind */
+const MOD_CAT_ICON={'玩法':'skull','经济':'chart','AI':'radio','画面':'eye','工具':'factory'};
+function modCardIcon(m){
+  const byCat=m && m.category ? MOD_CAT_ICON[m.category] : null;
+  return I[byCat] || I[MOD_ICON[m && m.kind]] || I.shield;
+}
 /* 创建模组 / 提交模组 / 卡片共用的分类取值（下拉菜单） */
 const MOD_CATEGORIES = ["玩法", "经济", "AI", "画面", "工具"];
 function modCategoryLabel(m) {
@@ -3615,8 +3700,17 @@ function modCategoryLabel(m) {
   return m.category || "";   // 只认「创建模组」里的分类；没有就返回空，由调用方显示「未分类」
 }
 /** 毫秒时间戳 → 本地时间「2026-09-22 01:05」（取不到就显示 —） */
+/** 毫秒时间戳 → 「2026-09-22」（列表里只显示到日） */
+function toMs(v) { const n = Number(v); if (Number.isFinite(n) && n > 0) return n; const p = Date.parse(String(v || "")); return Number.isFinite(p) ? p : 0; }
+function fmtDate(ms) {
+  const t0 = toMs(ms);
+  if (t0 <= 0) return "—";
+  const d = new Date(t0);
+  const p = (n) => String(n).padStart(2, "0");
+  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+}
 function fmtTime(ms) {
-  const t = Number(ms) || 0;
+  const t = toMs(ms);
   if (t <= 0) return "—";
   const d = new Date(t);
   const p = (n) => String(n).padStart(2, "0");
@@ -3630,6 +3724,20 @@ function fmtBytes(n) {
   if (v < 1024 * 1024) return (v / 1024).toFixed(1) + " KB";
   if (v < 1024 * 1024 * 1024) return (v / 1048576).toFixed(1) + " MB";
   return (v / 1073741824).toFixed(2) + " GB";
+}
+
+/* ---------- 卡片 meta：图标 + 值（标签放到 title 里，鼠标悬停可见） ---------- */
+const META_ICON = {
+  size: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 16V8l-9-5-9 5v8l9 5 9-5z"/><polyline points="3.3 7 12 12 20.7 7"/><line x1="12" y1="22" x2="12" y2="12"/></svg>',
+  version: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20.6 13.4 12 22l-9-9V4h9z"/><circle cx="7.5" cy="7.5" r="1.6"/></svg>',
+  time: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 16 14"/></svg>',
+  download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12"/><polyline points="7 10 12 15 17 10"/><path d="M4 21h16"/></svg>'
+};
+/** icon 类型 + 标签（title，会翻译）+ 值；extraCls 可加 mk-dl 之类 */
+function metaItem(kind, label, value, extraCls) {
+  const cls = "meta-i" + (extraCls ? " " + extraCls : "");
+  return '<span class="' + cls + '" title="' + modAttr(t(label)) + '">' + (META_ICON[kind] || "") +
+    '<span class="v">' + modAttr(value == null || value === "" ? "—" : value) + "</span></span>";
 }
 
 /* escape：bridge 里的 esc 在 IIFE 内部、HTML 拿不到，所以这里要有一份等价的（含单引号） */
@@ -3910,27 +4018,27 @@ function renderMarket() {
     const percent = MARKET_PROGRESS[e.id];
     const busy = typeof percent === "number";
     const label = busy ? t("下载中") + " " + percent + "%" : !localVer ? t("安装") : isUpdate ? t("更新") : t("重装");
-    const repoBtn = e.repo ? '<button class="mk-btn" onclick="openExternalUrl(\'' + esc(e.repo) + '\')">' + t("源码") + "</button>" : "";
+    // 源码按钮已移除：仓库地址改到「详情」里展示
     const mdBtn = '<button class="mk-btn" onclick="openMarketModDetail(\'' + esc(e.id) + '\')">' + t("详情") + "</button>";
     const prog = busy ? '<div class="mk-prog"><i style="width:' + percent + '%"></i></div>' : "";
     const restartTag = e.requiresRestart ? '<span class="mk-tag">' + t("需重启") + "</span>" : "";
     // 卡片专属下载次数（对齐原型：每张市场卡片都有自己的下载量）
     const dlN = marketDownloads(e);
     // 拿不到下载数时也用「— 次下载」占位，保证每张卡片的这一行版式一致
-    const dlTxt = dlN === null ? "— " + t("次下载") : dlN.toLocaleString() + " " + t("次下载");
+    const dlTxt = dlN === null ? "—" : dlN.toLocaleString();
     const updMs = marketUpdatedMs(e);
-    const metaBits = ['<span class="mk-dl">' + esc(dlTxt) + "</span>"];
-    if (Number(e.sizeBytes) > 0) metaBits.push("<span>" + esc(fmtBytes(e.sizeBytes)) + "</span>");
-    if (updMs > 0) metaBits.push("<span>" + t("更新于") + " " + esc(fmtTime(updMs)) + "</span>");
-    if (localVer) metaBits.push("<span>" + t("本地") + " " + esc(String(localVer).replace(/^v/i, "")) + "</span>");
+    const metaBits = [metaItem('download', '下载次数', dlTxt, 'mk-dl')];
+    if (Number(e.sizeBytes) > 0) metaBits.push(metaItem('size', 'MOD大小', fmtBytes(e.sizeBytes)));
+    if (updMs > 0) metaBits.push(metaItem('time', '更新于', fmtDate(updMs)));
+    if (localVer) metaBits.push(metaItem('version', '本地', "v" + String(localVer).replace(/^v/i, "")));
     return '<div class="mk-card">'
       + '<div class="mk-head"><div class="mk-name">' + esc(e.displayName || e.id) + "</div>" + badge + "</div>"
       + '<div class="mk-sub">' + esc(e.id) + " · v" + esc(e.version || "?") + " · " + (e.author && e.author.name ? esc(e.author.name) : t("未知作者")) + "</div>"
-      + '<div class="mk-desc">' + esc(e.description || "") + "</div>"
+      + '<div class="mk-desc clamp2">' + esc(e.description || "") + "</div>"
       + '<div class="mk-tags">' + tags.map((x) => '<span class="mk-tag">' + esc(x) + "</span>").join("") + restartTag + "</div>"
       + '<div class="mk-meta">' + metaBits.join("") + "</div>"
       + prog
-      + '<div class="mk-foot"><button class="mk-btn"' + (busy ? " disabled" : "") + ' onclick="installMarketMod(\'' + esc(e.id) + '\')">' + esc(label) + "</button>" + mdBtn + repoBtn + "</div></div>";
+      + '<div class="mk-foot"><button class="mk-btn"' + (busy ? " disabled" : "") + ' onclick="installMarketMod(\'' + esc(e.id) + '\')">' + esc(label) + "</button>" + mdBtn + "</div></div>";
   }).join("");
   if (typeof autoTranslateAfterRender === "function") autoTranslateAfterRender();
 }
@@ -3978,22 +4086,23 @@ function renderInstalledMods(){
         ? '<div class="toggle '+(m.enabled?'on':'')+'" data-mod-folder="'+modAttr(m.folder)+'" title="'+t(m.enabled?'点击禁用':'点击启用')+'"><span class="knob"></span></div>'
         : '';
       const ver=m.version?('v'+String(m.version).replace(/^v/i,'')):'';
-      const tagsText=(m.tags&&m.tags.length)?m.tags.join(' · '):'';
+      const tagsText=(m.tags&&m.tags.length)?m.tags.map(function(x){return t(x);}).join(' · '):'';
       const draggable=(!q&&filt==='all');
         const dragAttrs=draggable?('" draggable="true" data-drag-folder="'+modAttr(m.folder)+'"'):'"';
       return '<div class="mod '+(m.enabled?'':'disabled')+dragAttrs+'>'
-        +'<div class="mod-head"><div class="mod-icon">'+(I[MOD_ICON[m.kind]]||I.shield)+'</div><div style="flex:1">'
+        +'<div class="mod-head"><div class="mod-icon">'+modCardIcon(m)+'</div><div style="flex:1">'
         +'<div class="mod-name">'+modAttr(m.displayName||m.id)+'</div>'
         +'<div class="mod-tags-inline">'+(tagsText ? modAttr(tagsText) : '<span style="color:var(--txt-mute)">'+t('无标签')+'</span>')+'</div>'
         +'</div>' + categoryBadge(m) + '</div>'
         +'<div class="mod-desc">'+(modAttr(m.description)||'<span style="color:var(--txt-mute)">'+t('无描述')+'</span>')+'</div>'
         +'<div class="mod-meta">'
-        +'<span>'+t('MOD大小')+': <span class="v">'+modAttr(fmtBytes(m.sizeBytes))+'</span></span>'
-        +'<span>'+t('本地版本')+': <span class="v">'+modAttr(ver||'—')+'</span></span>'
-        +'<span>'+t('更新时间')+': <span class="v">'+modAttr(fmtTime(m.updatedAt))+'</span></span>'
+        + metaItem('size', 'MOD大小', fmtBytes(m.sizeBytes))
+        + metaItem('version', '本地版本', ver || '—')
+        + metaItem('time', '更新时间', fmtDate(m.updatedAt))
         +'</div>'
         +(notes.length?'<div style="font-size:11px;color:var(--amber);line-height:1.6;margin-bottom:8px">'+notes.map(n=>modAttr(n)).join('<br>')+'</div>':'')
         +'<div class="mod-foot">'
+        + '<button class="mod-act-btn danger" data-uninstall-folder="'+modAttr(m.folder)+'">'+t('卸载')+'</button>'
         + detailButton(m)
         + toggle
         +'</div>'
@@ -4014,6 +4123,9 @@ function renderInstalledMods(){
   }
   grid.querySelectorAll('.mod-act-btn[data-detail-folder]').forEach(el=>{
     el.addEventListener('click',(ev)=>{ ev.stopPropagation(); if(typeof openInstalledModDetail==='function') openInstalledModDetail(el.dataset.detailFolder); });
+  });
+  grid.querySelectorAll('.mod-act-btn[data-uninstall-folder]').forEach(el=>{
+    el.addEventListener('click',(ev)=>{ ev.stopPropagation(); void uninstallMod(el.dataset.uninstallFolder); });
   });
   grid.querySelectorAll('.mod-act-btn[data-sign-folder]').forEach(el=>{
     el.addEventListener('click',(ev)=>{ ev.stopPropagation(); void signMod(el.dataset.signFolder); });
@@ -4247,7 +4359,8 @@ document.addEventListener('click',e=>{ if(e.target.classList&&e.target.classList
 
 
 /* ============ UPDATE SYSTEM ============ */
-const CURRENT_VER='v0.1.15';
+// 启动时由 launcher-bridge 用 app.getVersion() 覆盖（以前的写死值会导致版本号不更新）
+let CURRENT_VER='v—';
 const LATEST_VER='v0.2.0';
 const UPDATE_INFO={
   version: LATEST_VER,

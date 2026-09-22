@@ -1,0 +1,81 @@
+{
+  "version": "0.1.23",
+  "changelog": {
+    "zh": [
+      {
+        "type": "new",
+        "text": "模组管理：已安装卡片新增「卸载」按钮（在「详情」左侧），二次确认后把 mods/<目录> 移入系统回收站（可从回收站还原；回收站不可用时才直接删除），卸载前会先禁用该模组；模组市场卡片移除「源码」按钮，仓库地址改到「详情」里以可点击链接展示；市场卡片描述固定为两行（超出省略），空标签行也会保持高度，使并排卡片的标签区与元信息行横向对齐"
+      },
+      {
+        "type": "fix",
+        "text": "修复「卸载」按钮的确认框反复弹出：卸载监听器被误写在「详情」按钮的循环里，导致每个详情按钮都给它注册一次（有 N 张卡就弹 N 次）；现在只注册一次，卸载成功/失败各只提示一条"
+      },
+      {
+        "type": "fix",
+        "text": "启动器左上角版本号改为读取真实运行版本（app.getVersion()），此前顶部品牌行与「当前版本」是写死的旧版本号（一直显示 v0.1.18），现在会随版本更新"
+      },
+      {
+        "type": "new",
+        "text": "模组卡片图标按「创建模组」的分类区分：玩法 / 经济 / AI / 画面 / 工具 各有不同图标（此前全部显示盾牌），未分类时退回按类型显示"
+      },
+      {
+        "type": "new",
+        "text": "模组卡片的元信息改为图标版：「MOD大小」「本地版本」「更新时间」都带专属小图标，其中更新时间仅保留年月日（YYYY-MM-DD）；市场卡片同步使用图标：「下载次数」「更新于」「本地」均带图标，文字标签放到悬停提示里"
+      },
+      {
+        "type": "opt",
+        "text": "模组标签改为 GitHub 标签样式的圆角胶囊（分类徽章、标签、需重启、已安装 / 可更新 / 可安装等），字号由 9–10px 放大到 11–11.5px；同时给 19 处只写了等宽字体的样式补上中文回退字体（微软雅黑 / PingFang / Noto Sans CJK），此前中文在这些位置会掉到系统默认字体、明显偏小"
+      },
+      {
+        "type": "fix",
+        "text": "已安装页的「全部启用」「全部停用」和「显示 N / M」补上多语言：此前词典里根本没有这几个词条，切到英文仍然是中文"
+      },
+      {
+        "type": "fix",
+        "text": "模组分类与标签补齐 7 种语言词条（经济 / 画面 / 锁定 / 集火 / 开火 / 自动 / 采矿 / 探索 / 工业 / 制造 / 市场 / 交易 … 共 44 条），卡片标签改为逐个词翻译；此前只有「玩法」「需重启」等少数词条有翻译，英文模式下会中英混排"
+      },
+      {
+        "type": "fix",
+        "text": "模组页签「已安装 / 我创建的 / 模组市场」补上多语言：此前标签文字和计数拼在同一个文本节点里，词典永远匹配不到，切到英文也不变；现已把标签拆成独立节点"
+      }
+    ],
+    "en": [
+      {
+        "type": "new",
+        "text": "Mod management: installed cards gained an Uninstall button (left of Details) that asks for confirmation and moves mods/<folder> to the system Recycle Bin (restorable; falls back to a hard delete only when the bin is unavailable) after disabling the mod; market cards no longer carry a Source button — the repository URL now appears as a clickable link inside Details; the market card description is clamped to two lines and empty tag rows keep their height, so the tag and meta rows of cards side by side line up horizontally"
+      },
+      {
+        "type": "fix",
+        "text": "Fixed the uninstall confirmation dialog popping up repeatedly: the uninstall listener was mistakenly registered inside the Details-button loop, so every Details button added another listener (N cards = N dialogs); it is now registered once and uninstall reports exactly one success or failure toast"
+      },
+      {
+        "type": "fix",
+        "text": "The version shown in the launcher header now comes from the running build (app.getVersion()); the brand line and the update dialog's Current version were hard-coded to a stale value (v0.1.18) and now follow the actual release"
+      },
+      {
+        "type": "new",
+        "text": "Mod card icons now differentiate the Create-mod categories (Gameplay / Economy / AI / Visuals / Tools) instead of all showing a shield; uncategorised mods fall back to their kind icon"
+      },
+      {
+        "type": "new",
+        "text": "Mod cards now show their meta info with icons: Mod size, Local version and Updated each carry a dedicated small icon, and the Updated timestamp keeps the date only (YYYY-MM-DD); market cards match this treatment with icons for Downloads, Updated and Local, leaving the text label in the hover tooltip"
+      },
+      {
+        "type": "opt",
+        "text": "Mod tags are now GitHub-style rounded pills (category badge, tags, restart-required, Installed / Update / Available) with the type size raised from 9–10px to 11–11.5px; 19 styles that only listed monospace fonts also gained CJK fallbacks (Microsoft YaHei / PingFang / Noto Sans CJK), so Chinese no longer drops to the system default font at a visibly smaller size"
+      },
+      {
+        "type": "fix",
+        "text": "The installed page's Enable all / Disable all buttons and the Showing N / M counter are now localised: these entries were missing from the dictionary entirely, so they stayed Chinese in English mode"
+      },
+      {
+        "type": "fix",
+        "text": "Mod categories and tags gained dictionary entries in all 7 languages (Economy / Graphics / Lock / Focus fire / Fire / Auto / Mining / Exploration / Industry / Manufacturing / Market / Trading … 44 entries) and card tags are now translated one by one; previously only a handful such as Gameplay and Restart required were translated, so English mode showed a mix of English and Chinese"
+      },
+      {
+        "type": "fix",
+        "text": "The mod tabs Installed / Created by me / Mod market are now localised: the label and the counter shared a single text node, so the dictionary lookup could never match and switching to English left them unchanged; the label is now its own node"
+      }
+    ]
+  }
+}

@@ -516,14 +516,16 @@ function createWindow(): void {
                 btnDisabled: /<button class="mk-btn" disabled/.test(reviewHtml),
                 text: (document.getElementById("modsGrid")?.textContent ?? "").split(String.fromCharCode(10)).join(" ").trim().slice(0, 80)
               };
-              // 收尾停在「审核中」卡片，方便截图核对
-              MY_MODS = [{ id: "review-mod", displayName: "审核中假模组", version: "1.0.0", category: "玩法", status: "submitted", folder: "review-mod", localVersion: "1.0.0", listedVersion: "", signed: true, sourceRepo: "me/review-mod", prUrl: "", sizeBytes: 1, updatedAt: 0 }];
-              MOD_TAB = "mine";
+              // 收尾停在市场页（含两张假模组卡片），方便截图核对描述/标签/元信息行是否对齐
+              MOD_TAB = "market";
               if (typeof updateModTabs === "function") updateModTabs();
-              if (typeof renderMyMods === "function") renderMyMods();
+              if (typeof renderMarket === "function") renderMarket();
+              await new Promise((r) => setTimeout(r, 250));
+              document.querySelector("#modsGrid .mk-meta")?.scrollIntoView({ block: "center" });
               await new Promise((r) => setTimeout(r, 250));
               out.syntheticHtml = (document.getElementById("modsGrid")?.innerHTML ?? "").slice(0, 200);
               // 市场网格同样要能用真实形状的数据渲染（renderMarket 也用了 esc）
+              const realMarketSnapshot = Array.isArray(MARKET) ? MARKET.slice() : [];
               MARKET = [
                 { id: "fake-market", displayName: "市场假模组", version: "2.0.0", author: { id: "au-x", name: "某人" }, description: "描述", category: "经济", tags: ["标签"], requiresRestart: true, sizeBytes: 7340032, downloads: 12345, updatedAt: "2026-09-01T00:00:00.000Z", downloadUrls: [{ mirror: "github", url: "https://example.com/a.zip", priority: 1 }] },
                 { id: "fake-nodl", displayName: "没统计到下载", version: "1.0.0", author: { name: "某人" }, description: "描述", category: "工具", tags: ["标签"], downloadUrls: [{ mirror: "github", url: "https://example.com/b.zip", priority: 1 }] }
@@ -532,6 +534,20 @@ function createWindow(): void {
               if (typeof renderMarket === "function") renderMarket();
               await new Promise((r) => setTimeout(r, 200));
               out.syntheticMarket = snap();
+              out.metaIcons = {
+                svgSpans: document.querySelectorAll("#modsGrid .mk-meta .meta-i svg").length,
+                icons: [...document.querySelectorAll("#modsGrid .mk-meta .meta-i")].map((el) => ({
+                  kindTitle: el.getAttribute("title"),
+                  hasSvg: !!el.querySelector("svg"),
+                  text: (el.querySelector(".v")?.textContent ?? "").trim()
+                })),
+                dateOnly: [...document.querySelectorAll("#modsGrid .mk-meta .meta-i")].map((el) => (el.querySelector(".v")?.textContent ?? "").trim()).filter((t) => /^\\d{4}-\\d{2}-\\d{2}$/.test(t)),
+                noIsoTime: !/\\d{2}:\\d{2}:\\d{2}/.test(document.querySelector("#modsGrid .mk-meta")?.textContent ?? "")
+              };
+              if (realMarketSnapshot && realMarketSnapshot.length) { MARKET = realMarketSnapshot.slice(); }
+              if (typeof renderMarket === "function") renderMarket();
+              if (typeof goView === "function") goView("modules");
+              await new Promise((r) => setTimeout(r, 300));
               out.syntheticMarketHtml = (document.getElementById("modsGrid")?.innerHTML ?? "").slice(0, 160);
               // 每张市场卡片都要有自己的下载次数行；没有 downloads 字段时显示「待统计」
               const marketCards = Array.from(document.querySelectorAll("#modsGrid .mk-card"));
@@ -540,6 +556,7 @@ function createWindow(): void {
                 cards: marketCards.length,
                 dlSpans: document.querySelectorAll("#modsGrid .mk-dl").length,
                 dlTexts: dlTexts,
+                noSourceBtn: !document.querySelector("#modsGrid")?.innerHTML.includes("源码"),
                 statsRegions: document.querySelectorAll("#view-modules .mod-stats").length
               };
               // 已安装卡片：字段应为 分类 / 标签 / MOD大小 / 本地版本，并有「详情」按钮
@@ -550,12 +567,21 @@ function createWindow(): void {
               const cardHtml = document.getElementById("modsGrid")?.innerHTML ?? "";
               out.card = {
                 hasDetailBtn: cardHtml.includes("data-detail-folder"),
+                hasUninstallBtn: cardHtml.includes("data-uninstall-folder"),
                 showsCategory: cardHtml.includes("经济"),
                 hasLoaderWord: cardHtml.includes("LOADER"),
                 hasSize: cardHtml.includes("MOD"),
                 noRestartField: !cardHtml.includes("restart:")
               };
               out.cardText = (document.getElementById("modsGrid")?.textContent ?? "").split(String.fromCharCode(10)).join(" ").trim().slice(0, 120);
+              // 分类图标：再来一张「玩法」卡片，两张卡的图标应该不同
+              MODS.push({ folder: "fake-gameplay", id: "fake-gameplay", displayName: "玩法假模组", version: "1.0.0", description: "简介", category: "玩法", tags: ["玩法"], kind: "loader", restart: "game_server", enabled: false, supported: true, valid: true, sizeBytes: 1024, signatureState: "valid", signatureTrusted: true, conflicts: [] });
+              if (typeof renderInstalledMods === "function") renderInstalledMods();
+              await new Promise((r) => setTimeout(r, 200));
+              const iconHtml = [...document.querySelectorAll("#modsGrid .mod-icon")].map((el) => el.innerHTML);
+              out.categoryIconHeads = iconHtml.map((h) => (h.match(/d="([^"]{0,18})/) || [])[1] || h.slice(0, 24));
+              out.categoryIcons = { cards: iconHtml.length, uniqueIcons: new Set(iconHtml).size };
+              out.appVersion = { brand: document.querySelector(".logo-text .t2")?.textContent ?? "", currentVer: typeof CURRENT_VER !== "undefined" ? CURRENT_VER : "" };
               // 市场页签的「N 可更新」徽章（模拟 4 个可更新）
               MOD_UPDATES = [{ id: "a" }, { id: "b" }, { id: "c" }, { id: "d" }];
               if (typeof updateModTabs === "function") updateModTabs();
@@ -703,6 +729,28 @@ function createWindow(): void {
           console.log("[SMOKE] i18n-leftovers ERROR:", e);
         }
         try {
+        // 市场截图前再确认一次强制切回模组视图，避免其他异步渲染把视图换掉
+        let modsShotReady = false;
+        try {
+          const shotPrep = await mainWindow?.webContents.executeJavaScript(`(async () => {
+            MOD_TAB = "market";
+            if (typeof updateModTabs === "function") updateModTabs();
+            if (typeof renderMarket === "function") renderMarket();
+            if (typeof goView === "function") goView("modules");
+            await new Promise((r) => setTimeout(r, 400));
+            document.querySelector("#modsGrid .mk-meta")?.scrollIntoView({ block: "center" });
+            await new Promise((r) => setTimeout(r, 400));
+            return JSON.stringify({
+              active: document.querySelector("#view-modules")?.classList.contains("active"),
+              cards: document.querySelectorAll("#modsGrid .mk-card").length,
+              metaSvg: document.querySelectorAll("#modsGrid .mk-meta .meta-i svg").length
+            });
+          })()`);
+          console.log("[SMOKE] mods-screenshot-prep:", shotPrep);
+          modsShotReady = true;
+        } catch (e) {
+          console.log("[SMOKE] mods-screenshot-prep ERROR:", e);
+        }
           const modsImage = await mainWindow?.webContents.capturePage();
           if (modsImage) {
             const modsShotDir = path.resolve(__dirname, "../../../docs");

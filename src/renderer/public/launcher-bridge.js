@@ -663,6 +663,15 @@
       setInput("cfgGatewayPort", config?.server?.ports?.gateway);
       setInput("cfgServerSource", config?.server?.sourceFile);
       setInput("cfgServerRoot", appInfo?.repoRoot);
+
+    // 顶部品牌行与更新弹窗的「当前版本」用真实运行版本（以前写死，导致版本号一直不更新）
+    const appVer = String(appInfo?.version || "").trim();
+    if (appVer) {
+      CURRENT_VER = "v" + appVer.replace(/^v/i, "");
+      document.querySelectorAll(".logo-text .t2").forEach((el) => {
+        el.textContent = "SERVER LAUNCHER · " + CURRENT_VER;
+      });
+    }
       setInput("cfgClientPath", config?.client?.clientPath);
       setInput("cfgClientExe", config?.client?.clientExe);
       setInput("cfgCaPem", config?.client?.caPem);
@@ -1303,6 +1312,10 @@
     ];
     if (isMarket && m.rating) grid.splice(4, 0, mdCell("评分", m.rating + (m.ratingCount ? " (" + m.ratingCount + ")" : "")));
     if (isMarket && m.sha256) grid.push(mdCell("SHA256", String(m.sha256).slice(0, 16) + "…"));
+    // 市场条目：把仓库地址放进详情（卡片上的「源码」按钮已移除）
+    const repoBlock = (isMarket && m.repo)
+      ? '<div class="md-sec"><h4>// ' + t("来源仓库") + '</h4><div class="md-note"><span class="md-link" onclick="openExternalUrl(\'' + esc(m.repo) + '\')">' + esc(m.repo) + "</span></div></div>"
+      : "";
 
     const highlightList = (d.highlights && d.highlights.length)
       ? '<div class="md-sec"><h4>// ' + t("功能要点") + '</h4><ul class="md-list">' + d.highlights.map((h) => "<li>" + esc(h) + "</li>").join("") + "</ul></div>"
@@ -1317,7 +1330,7 @@
     body.innerHTML = '<div class="md-sub">' + esc(sub || "—") + "</div>"
       + '<div class="md-chips">' + chips.map(([cls, text]) => '<span class="md-chip ' + cls + '">' + esc(text) + "</span>").join("") + "</div>"
       + '<div class="md-grid">' + grid.join("") + "</div>"
-      + highlightList + readmeBlock + changelog
+      + highlightList + readmeBlock + changelog + repoBlock
       + '<div class="md-sec"><h4>// ' + t("玩家评价") + '</h4><div class="md-note">' + t("评分与评价需要服务器汇总，当前版本先在索引里展示聚合评分。") + "</div></div>";
 
     const folderBtn = document.getElementById("mdOpenFolder");
@@ -2057,6 +2070,22 @@
       else toast(t("已用系统默认程序打开模组制作规范"), "ok");
     } catch (error) {
       toast(t("打开模组制作规范失败") + ": " + String(error), "err");
+    }
+  };
+
+  /** 卸载模组：先二次确认，再把 mods/<folder> 移入回收站（可还原） */
+  uninstallMod = async function (folder) {
+    const mod = MODS.find((m) => m.folder === folder);
+    const name = mod ? (mod.displayName || mod.id) : String(folder);
+    if (!window.confirm(t("卸载") + "「" + name + "」？" + String.fromCharCode(10) + t("模组文件会移入回收站，可从回收站还原。"))) return;
+    try {
+      const res = await api.modsUninstall(folder);
+      if (!res || !res.ok) throw new Error((res && res.reason) || t("卸载失败"));
+      toast(t("已卸载") + " · " + name + (res.trashed ? "" : "（" + t("未进入回收站，已直接删除") + "）"), "ok");
+      logTo("sys", "WARN", "已卸载模组 <span class=\"hi\">" + esc(String(folder)) + "</span>");
+      await refreshModsStatus();
+    } catch (error) {
+      toast(t("卸载失败") + ": " + String(error), "err");
     }
   };
 

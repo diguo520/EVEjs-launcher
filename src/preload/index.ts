@@ -68,6 +68,7 @@ const api = {
   modsPlan: () => ipcRenderer.invoke("mods:plan"),
   modsSetEnabled: (folder: string, enabled: boolean) => ipcRenderer.invoke("mods:setEnabled", folder, enabled),
   modsCreateFolder: () => ipcRenderer.invoke("mods:createFolder"),
+  modsUninstall: (folder: string) => ipcRenderer.invoke("mods:uninstall", folder),
   modsOpenFolder: () => ipcRenderer.invoke("mods:openFolder"),
   modsAuthoringDoc: () => ipcRenderer.invoke("mods:authoringDoc"),
   modsOpenAuthoringDoc: () => ipcRenderer.invoke("mods:openAuthoringDoc"),

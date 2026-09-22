@@ -1,5 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
+import { shell } from "electron";
 import { launcherRuntimeRoot } from "./runtimePaths";
 import { execFile } from "child_process";
 import { promisify } from "util";
@@ -924,6 +925,40 @@ export function createModsFolder(repoRoot: string): { ok: boolean; root: string;
     return { ok: false, root, reason: e instanceof Error ? e.message : String(e) };
   }
 }
+/**
+ * 卸载模组：优先移入系统回收站（用户能自己还原），回收站不可用时才直接删除。
+ * 只接受简单目录名，防止越权删除 mods/ 之外的目录。
+ */
+export async function uninstallMod(
+  repoRoot: string,
+  folder: string
+): Promise<{ ok: boolean; folder?: string; dir?: string; trashed?: boolean; reason?: string }> {
+  const safe = String(folder || "").trim();
+  if (!safe || /[\\/]/.test(safe) || safe === "." || safe === "..") return { ok: false, reason: "目录名非法" };
+  const dir = path.join(modsRoot(repoRoot), safe);
+  if (!fs.existsSync(dir)) return { ok: false, reason: "目录不存在：" + dir };
+
+  // 先禁用，避免服务端仍按启用状态引用它
+  try {
+    const enabled = path.join(dir, LOADER_ENABLED);
+    if (fs.existsSync(enabled)) fs.renameSync(enabled, path.join(dir, LOADER_DISABLED));
+  } catch {
+    /* 禁用失败不影响卸载 */
+  }
+
+  try {
+    await shell.trashItem(dir);
+    return { ok: true, folder: safe, dir, trashed: true };
+  } catch {
+    try {
+      fs.rmSync(dir, { recursive: true, force: true });
+      return { ok: true, folder: safe, dir, trashed: false };
+    } catch (e) {
+      return { ok: false, reason: e instanceof Error ? e.message : String(e), dir };
+    }
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /* 内置模组制作规范文档：每次启动释放到 _launcher/mods/MOD_AUTHORING.md   */
 /* ------------------------------------------------------------------ */
