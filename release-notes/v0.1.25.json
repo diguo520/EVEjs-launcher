@@ -1,0 +1,17 @@
+{
+  "version": "0.1.25",
+  "changelog": {
+    "zh": [
+      {
+        "type": "fix",
+        "text": "修复「我创建的」列表与审核结论的关系：之前作者删掉本地 mods/<id> 后，被拒绝收录或已下架的条目会连同原因一起被隐藏（只剩一行「已隐藏 N 条本地已删除的记录」），作者看不到为什么被拒绝/下架；现在市场侧的拒绝与下架都不会再移除这条记录，卡片常驻显示“已拒绝收录”/“已下架”与对应原因，直到作者自己删掉本地文件夹或维护者恢复上架；同时宽松了审核记录的归属判定（authorId / 本地文件夹 / 投稿台账 / 同名仓库），避免索引里 authorId 缺失时作者看不到自己的审核结论"
+      }
+    ],
+    "en": [
+      {
+        "type": "fix",
+        "text": "Fixed how the Created-by-me list reacts to moderation verdicts: once an author deleted mods/<id>, a rejected or delisted entry was hidden together with its reason (only a \"hidden N locally-deleted records\" counter remained); market-side rejection or delisting no longer removes the entry - the card stays pinned with a Rejected / Delisted badge and the maintainer's reason until the author deletes the local folder or the maintainer relists it; the ownership check for a moderation record is also more tolerant (authorId / local folder / submission ledger / same repo name) so a missing authorId in the index no longer hides the verdict"
+      }
+    ]
+  }
+}

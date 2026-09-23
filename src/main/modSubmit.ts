@@ -536,9 +536,29 @@ export async function listMyMods(
     for (const key of Object.keys(moderation)) {
       const rec = moderation[key];
       if (!rec || (rec.action !== "reject" && rec.action !== "delist")) continue;
-      const mine = (rec.authorId && rec.authorId === authorId) || (rec.id && items.has(rec.id)) ||
-        (rec.source && Array.from(items.values()).some((it) => it.sourceRepo && it.sourceRepo.toLowerCase() === String(rec.source).toLowerCase()));
-      if (!mine) continue;
+      // "这条拒绝记录是不是我的" 的判定（按可靠度从高到低）：
+      //   1) 索引里的 authorId 就是本机作者；
+      //   2) 该 id 已经在本地列表里（本地文件夹或投稿台账）；
+      //   3) 同一个仓库名在本地台账里（作者删了 mods/<id> 后仍能认领）；
+      //   4) 降级：拒绝记录没带 authorId（老版索引/模组清单没声明作者）时，清单里的 source 仓库名与本地台账一致就认领
+      const myLedger = readSubmissionFile().items;
+      const forkName = (repo?: string) => String(repo || "").split("/")[1] || "";
+      const moderationIsMine = (rec: { id?: string; source?: string; authorId?: string }) => {
+        const recSource = String(rec.source || "").toLowerCase();
+        const recId = String(rec.id || "");
+        if (rec.authorId && rec.authorId === authorId) return true;
+        if (recId && items.has(recId)) return true;
+        if (recSource && Array.from(items.values()).some((it) => it.sourceRepo && it.sourceRepo.toLowerCase() === recSource)) return true;
+        const led = myLedger.some((s: { id?: string; sourceRepo?: string }) => {
+          const sid = String(s.id || "");
+          const ssrc = String(s.sourceRepo || "").toLowerCase();
+          if (recId && sid && sid === recId) return true;
+          if (recSource && ssrc && ssrc === recSource) return true;
+          return !!forkName(recSource) && !!forkName(ssrc) && forkName(recSource) === forkName(ssrc);
+        });
+        return led;
+      };
+      if (!moderationIsMine(rec)) continue;
       const prev = (rec.id && items.get(rec.id)) || (rec.source && Array.from(items.values()).find((it) => it.sourceRepo && it.sourceRepo.toLowerCase() === String(rec.source).toLowerCase())) || null;
       const id = (prev && prev.id) || rec.id || String(rec.source || key);
       if (rec.action === "delist" && prev && prev.status === "delisted") continue;   // 上面已经标过
@@ -613,7 +633,15 @@ export async function listMyMods(
       return new Set<string>();
     }
   })();
-  const list = all.filter((it) => (it.folder && localFolders.has(it.folder)) || listedIds.has(it.id));
+  // 维护者给的审核结论（拒绝收录 / 已下架）必须一直对作者可见：
+  // 市场侧的下架或拒绝都不等于「从我的列表移除」——只有作者自己删掉本地 mods/<id>，记录才会真正消失。
+  // 维护者「恢复上架」时 moderate.mjs 会删掉这条记录，条目随之回到正常状态。
+  const keepModerated = (it: MyModItem) =>
+    it.status === "rejected" || it.status === "delisted" || !!it.moderationAction;
+  // 其余只挂审核记录/提交台账、既没有本地文件夹也不在索引里的记录才会被隐藏
+  const list = all.filter(
+    (it: MyModItem) => (it.folder && localFolders.has(it.folder)) || listedIds.has(it.id) || keepModerated(it),
+  );
   return { ok: true, items: list, hidden: all.length - list.length };
 }
 

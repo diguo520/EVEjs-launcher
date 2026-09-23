@@ -7,6 +7,9 @@ import { resolveRepoRoot } from "./envDetector";
 import { readSettings, writeSettings } from "./configStore";
 import { ensureLauncherRuntimePaths } from "./runtimePaths";
 import { ensureModAuthoringDoc, ensureAllModAuthoringDocs } from "./modManager";
+import { listMyMods } from "./modSubmit";
+import { getAuthor, readAuthorPrivateKey } from "./authorStore";
+import { signManifest } from "./modSigner";
 import * as pty from "./ptyManager";
 import { getServices, onServicesChanged, onProgress, onOutput, cleanupAll } from "./processManager";
 
@@ -840,7 +843,50 @@ function createWindow(): void {
         console.log("[SMOKE] mods-state:", modsState);
         } catch (e) {
           console.log("[SMOKE] mods-state ERROR:", e);
-        }        console.log("[SMOKE] quit");
+        }
+        // 探针：审核结论（拒绝收录 / 已下架）在作者删掉本地 mods/<id> 后必须仍然可见且带原因
+        try {
+          const author = getAuthor();
+          const pem = readAuthorPrivateKey();
+          const builtIndexPath = path.join(__dirname, "..", "..", "..", "..", "..", "evejs-mods-index", "docs", "mod-index.json");
+          const builtIndex = JSON.parse(fs.readFileSync(builtIndexPath, "utf8"));
+          const authorId = author.author.id;
+          const mods = (builtIndex.mods || []) as Array<{ id?: string; source?: string; delisted?: boolean; delistReason?: unknown }>;
+          const rejectTarget = mods.find((m) => m.id === "evejs-cntext-fix") || mods[0];
+          const delistTarget = mods.find((m) => m.id === "evejs-autolockfire") || mods[1] || mods[0];
+          const rejectReason = { zh: "[SMOKE] 拒绝原因测试", en: "[SMOKE] reject reason" };
+          const delistReason = { zh: "[SMOKE] 下架原因测试", en: "[SMOKE] delist reason" };
+          builtIndex.moderation = {};
+          if (rejectTarget && rejectTarget.id) builtIndex.moderation[rejectTarget.id] = { id: rejectTarget.id, source: rejectTarget.source || "", authorId, action: "reject", reason: rejectReason, at: new Date().toISOString(), by: "smoke" };
+          if (delistTarget) {
+            delistTarget.delisted = true;
+            delistTarget.delistReason = delistReason;
+            builtIndex.moderation[delistTarget.id as string] = { id: delistTarget.id, source: delistTarget.source || "", authorId, action: "delist", reason: delistReason, at: new Date().toISOString(), by: "smoke" };
+          }
+          if (pem) {
+            const sig = signManifest(builtIndex, pem);
+            builtIndex.signature = { alg: "ed25519", keyId: author.author.keyId, sig, signedAt: new Date().toISOString() };
+          }
+          const cacheDir = ensureLauncherRuntimePaths().cache;
+          fs.mkdirSync(cacheDir, { recursive: true });
+          fs.writeFileSync(path.join(cacheDir, "mod-index.json"), JSON.stringify({ index: builtIndex, fetchedAt: Date.now() }), "utf8");
+          const mine = await listMyMods(resolveRepoRoot());
+          const find = (s: string) => mine.items.find((m) => m.status === s);
+          console.log("[SMOKE] mods-visibility:", JSON.stringify({
+            usedKey: !!pem,
+            hidden: mine.hidden,
+            statuses: mine.items.map((m) => m.id + "=" + m.status),
+            rejectedVisible: !!find("rejected"),
+            rejectedFolderEmpty: !find("rejected") || !find("rejected")!.folder,
+            rejectedReasonZh: find("rejected")?.moderationReason?.zh || "",
+            delistedVisible: !!find("delisted"),
+            delistedFolderEmpty: !find("delisted") || !find("delisted")!.folder,
+            delistedReasonZh: find("delisted")?.moderationReason?.zh || "",
+          }));
+        } catch (e) {
+          console.log("[SMOKE] mods-visibility ERROR:", e);
+        }
+        console.log("[SMOKE] quit");
         app.exit(0);
       }, 2800);
     });
