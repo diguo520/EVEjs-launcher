@@ -1867,14 +1867,21 @@
     const idEl = document.getElementById("cmId");
     const id = cmSlug(idEl && idEl.value ? idEl.value : "") || "<id>";
     const tpl = cmTemplate();
-    const files = (tpl && tpl.files) || ["evejs-launcher.mod.json", "loader.js", "README.md", "CHANGELOG.md"];
-    const lines = ["mods/" + id + "/"];
-    files.forEach((f, i) => lines.push("  " + (i === files.length - 1 ? "└─ " : "├─ ") + f));
+    // 预览必须和 createMod 真正落地的文件一致：默认生成的是 loader.js.disabled（勾了「立即启用」才改名）
+    const enabledEl = document.getElementById("cmEnabled");
+    const loaderName = enabledEl && enabledEl.checked ? "loader.js" : "loader.js.disabled";
+    const files = (tpl && tpl.files
+      ? tpl.files.map((f) => (f === "loader.js" ? loaderName : f))
+      : ["evejs-launcher.mod.json", loaderName, "README.md", "CHANGELOG.md"]);
+    const branch = (i) => (i === files.length - 1 ? "└─ " : "├─ ");
+    const rows = files.map((f) =>
+      "<div class=\"cm-file\">" + branch(files.indexOf(f)) + esc(f) + "</div>"
+    );
+    let html = "<div class=\"cm-root\">" + esc("mods/" + id + "/") + "</div>" + rows.join("");
     if (tpl) {
-      lines.push("");
-      lines.push(t("模板") + ": " + t(tpl.name) + " —— " + t(tpl.desc));
+      html += "<div class=\"cm-tpl\">" + esc(t("模板") + ": " + t(tpl.name) + " —— " + t(tpl.desc)) + "</div>";
     }
-    pre.textContent = lines.join("\n");
+    pre.innerHTML = html;
   };
 
   openCreateModDialog = async function () {
@@ -1900,6 +1907,11 @@
     if (restart) restart.checked = true;
     const enabled = document.getElementById("cmEnabled");
     if (enabled) enabled.checked = false;
+    // 「立即启用」会改变真正落地的文件名（loader.js.disabled ↔ loader.js），预览要同步刷新
+    if (enabled && !enabled.dataset.previewBound) {
+      enabled.dataset.previewBound = "1";
+      enabled.addEventListener("change", () => cmPreview());
+    }
     const signEl = document.getElementById("cmSign");
     if (signEl) signEl.checked = true;
     cmPreview();

@@ -886,6 +886,42 @@ function createWindow(): void {
         } catch (e) {
           console.log("[SMOKE] mods-visibility ERROR:", e);
         }
+
+        // 探针：创建模组的「将生成」预览必须与真实落地文件一致（默认 loader.js.disabled），并且三级配色各不相同
+        try {
+          const preview = await mainWindow?.webContents.executeJavaScript(`(async () => {
+            if (typeof openCreateModDialog === "function") await openCreateModDialog();
+            await new Promise((r) => setTimeout(r, 500));
+            const pre = document.getElementById("cmPreview");
+            const enabled = document.getElementById("cmEnabled");
+            if (enabled) { enabled.checked = false; if (typeof cmPreview === "function") cmPreview(); }
+            await new Promise((r) => setTimeout(r, 150));
+            const offText = pre ? pre.textContent : "";
+            const colors = {
+              root: pre && pre.querySelector(".cm-root") ? getComputedStyle(pre.querySelector(".cm-root")).color : "",
+              file: pre && pre.querySelector(".cm-file") ? getComputedStyle(pre.querySelector(".cm-file")).color : "",
+              tpl: pre && pre.querySelector(".cm-tpl") ? getComputedStyle(pre.querySelector(".cm-tpl")).color : "",
+            };
+            const fileRows = pre ? Array.from(pre.querySelectorAll(".cm-file")).map((el) => Math.round(el.getBoundingClientRect().top)) : [];
+            const rowsOnSeparateLines = new Set(fileRows).size === fileRows.length && fileRows.length > 1;
+            if (enabled) { enabled.checked = true; if (typeof cmPreview === "function") cmPreview(); }
+            await new Promise((r) => setTimeout(r, 150));
+            const onText = pre ? pre.textContent : "";
+            if (typeof closeModal === "function") closeModal("createModModal");
+            return JSON.stringify({
+              rowsOnSeparateLines,
+              disabledListed: offText.includes("loader.js.disabled"),
+              plainLoaderAbsentWhenDisabled: !/\bloader\.js\b(?!\.disabled)/.test(offText),
+              loaderListedWhenEnabled: onText.includes("loader.js"),
+              colors,
+              threeDistinct: colors.root !== colors.file && colors.file !== colors.tpl && colors.root !== colors.tpl,
+              sample: offText.split(String.fromCharCode(10)).filter(Boolean).slice(0, 6),
+            });
+          })()`);
+          console.log("[SMOKE] create-preview:", preview);
+        } catch (e) {
+          console.log("[SMOKE] create-preview ERROR:", e);
+        }
         console.log("[SMOKE] quit");
         app.exit(0);
       }, 2800);

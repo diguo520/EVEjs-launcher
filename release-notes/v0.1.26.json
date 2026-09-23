@@ -1,0 +1,17 @@
+{
+  "version": "0.1.26",
+  "changelog": {
+    "zh": [
+      {
+        "type": "fix",
+        "text": "创建模组的「将生成」预览修正：预览之前固定显示 loader.js，而实际默认落地的是 loader.js.disabled（勾选「立即启用」才改名），作者会以为预设模板漏写了 loader.js；现在预览与真实落地文件一致、随「立即启用」实时切换，改成三级配色（一级目录最亮 / 文件名中灰 / 模板说明最暗），并修复改用 HTML 渲染后文件名挤成一行的问题"
+      }
+    ],
+    "en": [
+      {
+        "type": "fix",
+        "text": "The Create-mod 'Will generate' preview corrected: it always listed loader.js while the file actually created by default is loader.js.disabled (renamed only when Enable immediately is checked), which made the built-in templates look like they were missing loader.js; the preview now matches the real files, follows the Enable immediately checkbox, uses three distinct colours (top-level folder brightest / file names mid-grey / template description dimmest), and no longer collapses the file list onto a single line"
+      }
+    ]
+  }
+}

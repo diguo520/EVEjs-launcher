@@ -223,6 +223,11 @@
   .meta-i{display:inline-flex;align-items:center;gap:4px}
   .meta-i svg{width:11px;height:11px;flex:0 0 11px;opacity:.7}
   .meta-i .v{white-space:nowrap}
+  /* 创建模组「将生成」预览：三级配色 —— 一级目录(亮) / 文件名(灰) / 模板说明(暗) */
+  .cm-root{color:var(--txt)}
+  .cm-file{color:var(--txt-dim);display:block}
+  .cm-tpl{color:var(--txt-mute);margin-top:9px}
+
   .mk-bar{display:flex;align-items:center;gap:8px;font-family:'Share Tech Mono','Microsoft YaHei UI','PingFang SC','Noto Sans CJK SC',monospace;font-size:11.5px;color:var(--txt-mute);padding:0 2px 4px}
   .mk-card{border:1px solid var(--line);background:rgba(5,8,13,0.4);padding:12px;display:flex;flex-direction:column;gap:8px}
   .mk-head{display:flex;align-items:flex-start;gap:8px}
@@ -2447,6 +2452,11 @@ Object.assign(TRANSLATE, {
   '行星': {'en':'Planetary','ja':'惑星','ko':'행성','fr':'Planétaire','de':'Planetarisch','nl':'Planetaire','ru':'Планетарный'},
   '标签': {'en':'Tag','ja':'タグ','ko':'태그','fr':'Étiquette','de':'Tag','nl':'Tag','ru':'Тег'},
 });
+
+  Object.assign(TRANSLATE, {
+    "即将生成 loader.js.disabled（未启用状态），在模组列表里启用后会自动改名为 loader.js": {'en':"Will create loader.js.disabled (disabled by default); it is renamed to loader.js when you enable the mod in the mod list",'ja':"loader.js.disabled（未有効）を作成します。MOD リストで有効化すると loader.js に名前が変わります",'ko':"loader.js.disabled(미활성)를 생성합니다. 모드 목록에서 활성화하면 loader.js로 이름이 변경됩니다",'fr':"Crée loader.js.disabled (désactivé par défaut) ; il est renommé en loader.js quand vous activez le mod",'de':"Erzeugt loader.js.disabled (standardmäßig deaktiviert); beim Aktivieren im Mod-Liste wird sie in loader.js umbenannt",'nl':"Maakt loader.js.disabled (standaard uit); bij activeren in de modlijst wordt de naam loader.js",'ru':"Создаётся loader.js.disabled (по умолчанию отключён); при включении в списке модов файл переименовывается в loader.js"},
+    "勾选「立即启用」将直接生成 loader.js": {'en':"With Enable immediately checked, loader.js is generated directly",'ja':"「すぐに有効化」にチェックすると loader.js を直接作成します",'ko':"'즉시 활성'을 체크하면 loader.js가 바로 생성됩니다",'fr':"Avec Activer immédiatement coché, loader.js est généré directement",'de':"Mit „Sofort aktivieren“ wird loader.js direkt erzeugt",'nl':"Met Direct activeren aangevinkt wordt loader.js direct aangemaakt",'ru':"При отметке «Включить сразу» создаётся loader.js"},
+  });
 
 
 // 字典 key 两端不能有空格：translateDOM 用 trim 后的文本查表，带首尾空格的 key 永远命中不了
