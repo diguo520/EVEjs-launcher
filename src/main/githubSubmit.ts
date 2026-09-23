@@ -148,6 +148,8 @@ export interface SubmitFileResult {
   branch?: string;
   login?: string;
   forkRepo?: string;
+  /** 开 PR 失败时给出的「手动开 PR」比较页链接 */
+  compareUrl?: string;
   reason?: string;
 }
 
@@ -221,12 +223,15 @@ export async function submitFileViaPullRequest(input: SubmitFileInput): Promise<
     if (url) return { ok: true, prUrl: url, branch: input.branch, login, forkRepo };
   }
   if (!pr.ok) {
-    // 分支已经推上去了 —— 即使开 PR 失败也要把分支名与 fork 告诉用户
+    // 分支已推到 fork，但开 PR 失败（多半是令牌缺 Pull requests 写权限）：附带手动开 PR 的比较页链接
+    const compareUrl =
+      "https://github.com/" + input.upstream + "/compare/" + base + "..." + encodeURIComponent(login + ":" + input.branch) + "?expand=1";
     return {
       ok: false,
       login,
       forkRepo,
       branch: input.branch,
+      compareUrl,
       reason: pr.reason || "开 PR 失败（分支已推送，可手动开 PR）"
     };
   }

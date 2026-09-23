@@ -83,7 +83,7 @@ async function call<T>(token: string, method: string, apiPath: string, body?: un
  */
 function permissionHint(status: number): string {
   if (status === 403) {
-    return "（令牌权限不足：fine-grained 令牌要在 Repository permissions 里给 Contents = Read and write；自动建仓库还要 Administration = Read and write；并且 Repository access 必须覆盖这个仓库）";
+    return "（令牌权限不足，fine-grained 令牌需要同时满足以下三项）1) Repository access 必须勾选目标仓库（申请收录必须勾上索引仓库 EVEjs-mods，不只是你自己的仓库）；2) Repository permissions 里 Contents = Read and write（写文件 / 建分支 / 建 Release / 传资产）；3) Repository permissions 里 Pull requests = Read and write（开 PR，最常漏的就是这一项）；只有让启动器自动建仓库时才额外需要 Administration = Read and write";
   }
   if (status === 404) {
     return "（仓库或文件不存在，或者令牌的 Repository access 没有覆盖这个仓库）";

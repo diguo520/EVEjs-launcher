@@ -1740,7 +1740,16 @@
         toast(t("收录申请已提交") + " · " + (res.branch || ""), "ok");
       } else {
         const reason = (res && res.reason) || t("提交失败");
-        if (box) { box.style.display = ""; box.textContent = reason; }
+        const manual = res && res.compareUrl ? res.compareUrl : "";
+        if (box) {
+          box.style.display = "";
+          box.innerHTML =
+            esc(reason) +
+            (manual
+              ? '<div style="margin-top:8px;color:var(--amber)">' + esc(t("PR 自动创建失败（分支已推送，可点下面按钮手动开 PR）")) + '</div>' +
+                '<div style="margin-top:6px"><span class="hi" style="cursor:pointer" onclick="openExternalUrl(this.dataset.u)" data-u="' + esc(manual) + '">' + esc(manual) + '</span></div>'
+              : "");
+        }
         toast(t("提交失败") + ": " + reason, "err");
       }
     } catch (error) {

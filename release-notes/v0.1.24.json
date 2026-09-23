@@ -1,0 +1,17 @@
+{
+  "version": "0.1.24",
+  "changelog": {
+    "zh": [
+      {
+        "type": "fix",
+        "text": "修复模组提交第三步「申请收录」报 GitHub 403（Resource not accessible by personal access token）时提示不准确的问题：403 提示现在明确要求 fine-grained 令牌必须同时具备 Contents 与 Pull requests 读写，并且 Repository access 要勾上索引仓库 EVEjs-mods；开 PR 失败但分支已推送时，弹窗会直接给出可点击的「手动开 PR」比较页链接，不再只报一串错误代码"
+      }
+    ],
+    "en": [
+      {
+        "type": "fix",
+        "text": "Fixed the misleading GitHub 403 (Resource not accessible by personal access token) shown in step 3 of mod submission: the hint now spells out that a fine-grained token needs both Contents and Pull requests read/write and that Repository access must include the EVEjs-mods index repo; when PR creation fails but the branch was already pushed, the dialog now offers a clickable manual PR compare link instead of only dumping an error code"
+      }
+    ]
+  }
+}
