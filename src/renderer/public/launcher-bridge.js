@@ -92,7 +92,7 @@
     updateSvcStatus();
     (start ? api.serviceStart(def.id) : api.serviceStop(def.id))
       .then((result) => {
-        if (!result?.ok) toast(`${item.name}: ${result?.reason || "操作失败"}`, "err");
+        if (!result?.ok) toast(`${item.name}: ${result?.reason || t("操作失败")}`, "err");
       })
       .catch((error) => toast(`${item.name}: ${String(error)}`, "err"))
       .finally(refreshServices);
@@ -107,13 +107,13 @@
       const critical = new Set(["node", "serverDeps", "localDb"]);
       const failed = (report.checks || []).filter((item) => !item.ok && critical.has(item.key));
       if (failed.length) {
-        toast("关键环境未通过，已中止启动", "err");
+        toast(t("关键环境未通过，已中止启动"), "err");
         return;
       }
       const result = await api.engageStart();
-      toast(result.ok ? "一键启动序列完成" : `启动失败: ${result.reason}`, result.ok ? "ok" : "err");
+      toast(result.ok ? t("一键启动序列完成") : `${t("启动失败")}: ${result.reason}`, result.ok ? "ok" : "err");
     } catch (error) {
-      toast("一键启动失败: " + String(error), "err");
+      toast(t("一键启动失败") + ": " + String(error), "err");
     } finally {
       launching = false;
       await refreshServices();
@@ -126,9 +126,9 @@
     setLaunchBtn("stopping");
     try {
       const result = await api.engageStop();
-      toast(result.ok ? "全部服务已停止" : `停止失败: ${result.reason}`, result.ok ? "warn" : "err");
+      toast(result.ok ? t("全部服务已停止") : `${t("停止失败")}: ${result.reason}`, result.ok ? "warn" : "err");
     } catch (error) {
-      toast("停止失败: " + String(error), "err");
+      toast(t("停止失败") + ": " + String(error), "err");
     } finally {
       launching = false;
       await refreshServices();
@@ -350,9 +350,9 @@
     if (list) list.innerHTML = '<div style="padding:30px;text-align:center;color:var(--txt-mute);font-family:Share Tech Mono">扫描中…</div>';
     try {
       applyEnvReport(await api.envCheck());
-      toast("环境自检完成", "ok");
+      toast(t("环境自检完成"), "ok");
     } catch (error) {
-      toast("环境自检失败: " + String(error), "err");
+      toast(t("环境自检失败") + ": " + String(error), "err");
       renderEnvCheck();
     }
   };
@@ -360,7 +360,7 @@
   initEnvItem = async function (index) {
     const item = ENV[index];
     if (!item || !item._initKey) {
-      toast("该项暂不支持启动器内初始化", "warn");
+      toast(t("该项暂不支持启动器内初始化"), "warn");
       return;
     }
     item.status = "init";
@@ -378,7 +378,7 @@
   initAllEnv = async function () {
     const pending = ENV.map((item, index) => ({ item, index })).filter(({ item }) => item.status === "pending" && item._initKey);
     if (!pending.length) {
-      toast("当前没有可初始化项目", "ok");
+      toast(t("当前没有可初始化项目"), "ok");
       return;
     }
     for (const { index } of pending) {
@@ -432,7 +432,7 @@
     try {
       const result = await api.accountsList();
       if (!result?.ok) {
-        toast(result?.reason || "账号读取失败", "err");
+        toast(result?.reason || t("账号读取失败"), "err");
         return;
       }
       ACC.length = 0;
@@ -440,7 +440,7 @@
       accExpanded = {};
       renderAccounts();
     } catch (error) {
-      toast("账号读取失败: " + String(error), "err");
+      toast(t("账号读取失败") + ": " + String(error), "err");
     }
   }
 
@@ -450,7 +450,7 @@
     try {
       const running = await api.accountsCheckRunning();
       if (running?.running) {
-        toast("服务运行中，请先停止全部服务", "warn");
+        toast(t("服务运行中，请先停止全部服务"), "warn");
         return;
       }
       const preview = await api.accountsDelete(account.id, false);
@@ -458,13 +458,13 @@
       if (!window.confirm(text)) return;
       const result = await api.accountsDelete(account.id, true);
       if (!result?.ok) {
-        toast(result?.reason || "删除失败", "err");
+        toast(result?.reason || t("删除失败"), "err");
         return;
       }
-      toast("账号已删除，备份已生成", "warn");
+      toast(t("账号已删除，备份已生成"), "warn");
       await loadAccountsFromBackend();
     } catch (error) {
-      toast("删除失败: " + String(error), "err");
+      toast(t("删除失败") + ": " + String(error), "err");
     }
   };
 
@@ -487,16 +487,16 @@
     const password = document.getElementById("newAccountPass")?.value || "";
     const password2 = document.getElementById("newAccountPass2")?.value || "";
     const isGM = !!document.getElementById("newAccountGm")?.classList.contains("on");
-    if (!user) { toast("请输入账号名", "err"); return; }
-    if (password.length < 4) { toast("密码至少 4 位", "err"); return; }
-    if (password !== password2) { toast("两次密码不一致", "err"); return; }
+    if (!user) { toast(t("请输入账号名"), "err"); return; }
+    if (password.length < 4) { toast(t("密码至少 4 位"), "err"); return; }
+    if (password !== password2) { toast(t("两次密码不一致"), "err"); return; }
     const button = document.getElementById("createAccountBtn");
     if (button) button.disabled = true;
     try {
       const result = await api.accountsCreate(user, password, isGM);
       if (!result?.ok) throw new Error(result?.reason || "创建账号失败");
       closeModal("addAccountModal");
-      toast(`账号 ${user} 已创建${isGM ? " · GM 权限" : ""}`, "ok");
+      toast(t("账号") + " " + user + " " + t("已创建") + (isGM ? " · " + t("GM 权限") : ""), "ok");
       logTo("sys", "OK", `账号 <span class="hi">${esc(user)}</span> 已创建${isGM ? " · GM" : ""}`);
       await loadAccountsFromBackend();
     } catch (error) {
@@ -515,7 +515,7 @@
         if (!result?.ok) throw new Error(result?.reason || "客户端启动失败");
         logTo("sys", "OK", `账号 <span class="hi">${esc(account.name)}</span> · 已进入角色选择，点击空槽位即可创建角色`);
       } catch (error) {
-        toast(`进入角色创建失败: ${String(error)}`, "err");
+        toast(`${t("进入角色创建失败")}: ${String(error)}`, "err");
       }
       return;
     }
@@ -533,7 +533,7 @@
     const accountName = document.getElementById("createAccountName")?.value || "";
     const password = document.getElementById("createAccountPassword")?.value || "";
     if (!password) {
-      toast("请输入账号密码", "err");
+      toast(t("请输入账号密码"), "err");
       return;
     }
     const button = document.getElementById("createCharacterBtn");
@@ -551,7 +551,7 @@
     }
   };
   delChar = function () {
-    toast("请通过账号删除流程处理角色数据", "warn");
+    toast(t("请通过账号删除流程处理角色数据"), "warn");
   };
   launchChar = async function (accountName, characterName, characterId) {
     const accountRecord = ACC.find((item) => item.name === accountName);
@@ -560,12 +560,12 @@
     pendingLaunchCharacterId = targetCharacterId;
     if (accountRecord?.hasCredential) {
       try {
-        toast(`${characterName} · 直达角色启动中`, "ok");
+        toast(`${characterName} · ${t("直达角色启动中")}`, "ok");
         const result = await api.accountsLaunch(accountName, targetCharacterId);
         if (!result?.ok) throw new Error(result?.reason || "自动登录失败");
         logTo("sys", "OK", `启动角色 <span class="hi">${esc(characterName)}</span> · 账号 ${esc(accountName)} · 已保存凭据直达角色`);
       } catch (error) {
-        toast(`自动登录失败: ${String(error)}`, "err");
+        toast(`${t("自动登录失败")}: ${String(error)}`, "err");
       }
       return;
     }
@@ -586,7 +586,7 @@
     const characterName = document.getElementById("launchCharacterName")?.value || "";
     const password = document.getElementById("launchAccountPassword")?.value || "";
     if (!password) {
-      toast("请输入账号密码", "err");
+      toast(t("请输入账号密码"), "err");
       return;
     }
     const button = document.getElementById("launchCharacterBtn");
@@ -595,7 +595,7 @@
       const result = await api.loginStart(accountName, password, true, pendingLaunchCharacterId);
       if (!result?.ok) throw new Error(result?.reason || "客户端启动失败");
       closeModal("launchCharacterModal");
-      toast(`${characterName} · 客户端直达角色中`, "ok");
+      toast(`${characterName} · ${t("客户端直达角色中")}`, "ok");
       logTo("sys", "OK", `启动角色 <span class="hi">${esc(characterName)}</span> · 账号 ${esc(accountName)} · 直达角色`);
     } catch (error) {
       toast(String(error), "err");
@@ -609,7 +609,7 @@
     const password = document.getElementById("loginPass")?.value || "";
     const meta = document.getElementById("loginMeta");
     if (!user || !password) {
-      toast("请输入账号和密码", "err");
+      toast(t("请输入账号和密码"), "err");
       return;
     }
     if (meta) meta.textContent = "● VERIFYING";
@@ -619,7 +619,7 @@
       const result = await api.loginStart(user, password);
       if (!result?.ok) throw new Error(result?.reason || "客户端启动失败");
       if (meta) meta.textContent = `● LOGGED IN · ${user}`;
-      toast("登录成功 · 客户端启动中", "ok");
+      toast(t("登录成功") + " · " + t("客户端启动中"), "ok");
       logTo("sys", "OK", `登录成功 · <span class="hi">${esc(user)}</span> · 直达角色选择`);
     } catch (error) {
       if (meta) meta.textContent = "● LOGIN FAILED";
@@ -633,19 +633,19 @@
     const newPassword = document.getElementById("pwdNew")?.value || "";
     const confirmPassword = document.getElementById("pwdNew2")?.value || "";
     if (!user || !oldPassword || !newPassword) {
-      toast("请填写完整", "err");
+      toast(t("请填写完整"), "err");
       return;
     }
     if (newPassword !== confirmPassword) {
-      toast("两次新密码不一致", "err");
+      toast(t("两次新密码不一致"), "err");
       return;
     }
     const result = await api.accountsSetPassword(user, oldPassword, newPassword);
     if (!result?.ok) {
-      toast(result?.reason || "修改失败", "err");
+      toast(result?.reason || t("修改失败"), "err");
       return;
     }
-    toast("密码已修改，立即生效", "ok");
+    toast(t("密码已修改，立即生效"), "ok");
     logTo("sys", "OK", "密码已修改 · 需重新登录");
     setTimeout(flipLogin, 600);
   };
@@ -693,7 +693,7 @@
       setCheckbox("cfgAutoLogin", settings?.autoLogin === true);
       setCheckbox("cfgSafeWindowed", String(config?.client?.safeWindowed || "off").trim().toLowerCase() === "on");
     } catch (error) {
-      toast("配置读取失败: " + String(error), "err");
+      toast(t("配置读取失败") + ": " + String(error), "err");
     }
   }
 
@@ -758,7 +758,7 @@
     try {
       const result = await api.databaseOverview();
       if (!result?.ok) {
-        toast(result?.reason || "数据库读取失败", "err");
+        toast(result?.reason || t("数据库读取失败"), "err");
         return;
       }
       databaseState.tables = Array.isArray(result.tables) ? result.tables : [];
@@ -771,7 +771,7 @@
       renderDatabaseTableList();
       if (!databaseState.table && databaseState.tables.length) await selectDatabaseTable(databaseState.tables[0].name);
     } catch (error) {
-      toast("数据库读取失败: " + String(error), "err");
+      toast(t("数据库读取失败") + ": " + String(error), "err");
     }
   };
 
@@ -789,7 +789,7 @@
     try {
       const result = await api.databaseTable(databaseState.table, databaseState.pageSize, databaseState.page * databaseState.pageSize);
       if (!result?.ok) {
-        toast(result?.reason || "数据表读取失败", "err");
+        toast(result?.reason || t("数据表读取失败"), "err");
         return;
       }
       databaseState.rows = Array.isArray(result.rows) ? result.rows : [];
@@ -815,7 +815,7 @@
       if (backup) backup.disabled = false;
       updateDatabasePager();
     } catch (error) {
-      toast("数据表读取失败: " + String(error), "err");
+      toast(t("数据表读取失败") + ": " + String(error), "err");
     }
   };
 
@@ -942,7 +942,7 @@
         ? await api.databaseInsertRow(databaseState.table, values)
         : await api.databaseSaveRow(databaseState.table, values);
       if (!result?.ok) throw new Error(result?.reason || "保存失败");
-      toast(`已保存 ${databaseState.table}`, "ok");
+      toast(`${t("已保存")} ${databaseState.table}`, "ok");
       logTo("sys", "OK", `数据库表 <span class="hi">${esc(databaseState.table)}</span> 已保存`);
       await loadDatabaseTable();
       await loadDatabaseOverview();
@@ -957,8 +957,8 @@
     if (!row || !window.confirm(`确认删除 ${databaseState.table} 中的这一行？`)) return;
     try {
       const result = await api.databaseDeleteRow(databaseState.table, row);
-      if (!result?.ok) throw new Error(result?.reason || "删除失败");
-      toast(`已删除 ${databaseState.table} 中的一行`, "warn");
+      if (!result?.ok) throw new Error(result?.reason || t("删除失败"));
+      toast(`${t("已删除")} ${databaseState.table} ${t("中的一行")}`, "warn");
       await loadDatabaseTable();
       await loadDatabaseOverview();
     } catch (error) {
@@ -972,7 +972,7 @@
     try {
       const result = await api.databaseBackup();
       if (!result?.ok) throw new Error(result?.reason || "备份失败");
-      toast(`数据库备份完成：${result.name}`, "ok");
+      toast(`${t("数据库备份完成")}：${result.name}`, "ok");
       logTo("sys", "OK", `数据库已备份 · <span class="hi">${esc(result.name)}</span>`);
       if (document.getElementById("dbRestoreModal")?.classList.contains("open")) await openDatabaseRestore();
     } catch (error) {
@@ -1028,7 +1028,7 @@
       const result = await api.databaseRestore(selectedDatabaseBackup);
       if (!result?.ok) throw new Error(result?.reason || "恢复失败");
       closeModal("dbRestoreModal");
-      toast(`数据库已恢复到 ${result.restored}；安全备份：${result.safetyBackup}`, "ok");
+      toast(`${t("数据库已恢复到")} ${result.restored}；${t("安全备份")}：${result.safetyBackup}`, "ok");
       logTo("sys", "OK", `数据库已恢复 · <span class="hi">${esc(result.restored)}</span> · 安全备份 ${esc(result.safetyBackup || "")}`);
       await loadDatabaseOverview();
       if (databaseState.table) await loadDatabaseTable();
@@ -1049,8 +1049,13 @@
     const repoRoot = (document.getElementById("cfgServerRoot")?.value || "").trim();
     if (repoRoot) {
       const rootResult = await api.configSetRepoRoot(repoRoot);
+      if (rootResult?.corrected && rootResult.repoRoot) {
+        const el = document.getElementById("cfgServerRoot");
+        if (el) el.value = rootResult.repoRoot;
+        toast(t("服务端根目录已自动修正为") + " " + rootResult.repoRoot, "warn");
+      }
       if (!rootResult?.ok) {
-        toast(rootResult?.reason || "服务端根目录保存失败", "err");
+        toast(rootResult?.reason || t("服务端根目录保存失败"), "err");
         return;
       }
     }
@@ -1062,10 +1067,10 @@
       safeWindowed: checkboxOn("cfgSafeWindowed") ? "on" : "off"
     });
     if (!result?.ok) {
-      toast(result?.reason || "配置保存失败", "err");
+      toast(result?.reason || t("配置保存失败"), "err");
       return;
     }
-    toast("配置已保存到 " + (result.client?.sourceFile || "EvEJSConfig.bat"), "ok");
+    toast(t("配置已保存到") + " " + (result.client?.sourceFile || "EvEJSConfig.bat"), "ok");
     await loadConfigFromBackend();
     await tickMetrics();
   };
@@ -1265,6 +1270,13 @@
     return out;
   }
 
+  /** 索引里的 readme 可能是段落数组也可能是单段文本；两种都能正常渲染 */
+  function readmeTextOf(entry) {
+    if (!entry) return "";
+    if (Array.isArray(entry.readme)) return entry.readme.map((x) => String(x || "").trim()).filter(Boolean).join("\n\n");
+    if (typeof entry.readme === "string") return entry.readme.trim();
+    return entry.description || "";
+  }
   function mdCell(label, value) {
     return '<div class="md-cell"><div class="k">' + esc(t(label)) + '</div><div class="v">' + esc(value == null || value === "" ? "—" : value) + '</div></div>';
   }
@@ -1286,8 +1298,10 @@
 
     const chips = [];
     if (!isMarket) {
+      // 三态：已签名 / 签名真的不对 / 无法验证（旧包没带作者公钥）——后者不会阻止启用，不能冒充“校验失败”
       if (m.signatureState === "valid") chips.push(['on', t("已签名")]);
-      else if (m.signatureState === "invalid") chips.push(['bad', t("签名校验失败")]);
+      else if (m.signatureState === "invalid" && m.signatureTrusted) chips.push(['bad', t("签名校验失败")]);
+      else if (m.signatureState === "invalid") chips.push(['', t("未签名（旧版包未含作者公钥）")]);
       else chips.push(['', t("未签名")]);
       chips.push([m.enabled ? "on" : "", m.enabled ? t("已启用") : t("已停用")]);
     } else {
@@ -1308,13 +1322,18 @@
       mdCell("互斥模组", (Array.isArray(m.conflicts) && m.conflicts.length) ? m.conflicts.join(", ") : t("无")),
       mdCell("兼容版本", (Array.isArray(m.evejsVersions) && m.evejsVersions.length) ? m.evejsVersions.join(", ") : t("未声明")),
       mdCell("更新时间", fmtTime(isMarket ? Date.parse(String(m.updatedAt || m.publishedAt || "")) : m.updatedAt)),
-      mdCell("来源", isMarket ? t("模组市场") : t("本机"))
+      mdCell("来源", isMarket ? t("模组市场") : (m.source === "market" ? t("模组市场") : t("本机")))
     ];
     if (isMarket && m.rating) grid.splice(4, 0, mdCell("评分", m.rating + (m.ratingCount ? " (" + m.ratingCount + ")" : "")));
     if (isMarket && m.sha256) grid.push(mdCell("SHA256", String(m.sha256).slice(0, 16) + "…"));
     // 市场条目：把仓库地址放进详情（卡片上的「源码」按钮已移除）
     const repoBlock = (isMarket && m.repo)
       ? '<div class="md-sec"><h4>// ' + t("来源仓库") + '</h4><div class="md-note"><span class="md-link" onclick="openExternalUrl(\'' + esc(m.repo) + '\')">' + esc(m.repo) + "</span></div></div>"
+      : "";
+
+    // 旧版包签了名但没带 publicKey：本机无法验证，但不影响使用，给一句说明避免误以为“被篡改”
+    const sigNote = (!isMarket && m.signatureState === "invalid" && !m.signatureTrusted)
+      ? '<div class="md-note" style="margin-bottom:8px">' + esc(t("这可能是旧版模组包：签名里没有附带作者公钥，本机无法验证，但不影响启用。作者用新版启动器重新发布后即可正常校验。")) + '</div>'
       : "";
 
     const highlightList = (d.highlights && d.highlights.length)
@@ -1327,7 +1346,7 @@
       ? '<div class="md-sec"><h4>// ' + t("本次更新") + '</h4><div class="md-body">' + esc(m.changelog) + "</div></div>"
       : "";
 
-    body.innerHTML = '<div class="md-sub">' + esc(sub || "—") + "</div>"
+    body.innerHTML = sigNote + '<div class="md-sub">' + esc(sub || "—") + "</div>"
       + '<div class="md-chips">' + chips.map(([cls, text]) => '<span class="md-chip ' + cls + '">' + esc(text) + "</span>").join("") + "</div>"
       + '<div class="md-grid">' + grid.join("") + "</div>"
       + highlightList + readmeBlock + changelog + repoBlock
@@ -1369,7 +1388,7 @@
     MOD_DETAIL = {
       kind: "market",
       entry,
-      readme: Array.isArray(entry.readme) ? entry.readme.join("\n\n") : (entry.description || ""),
+      readme: readmeTextOf(entry),
       highlights: Array.isArray(entry.highlights) ? entry.highlights : []
     };
     renderModDetail();
@@ -2425,7 +2444,7 @@
       const latest = v(result.latestVersion || "");
       if (latest && latest !== notifiedUpdateVersion) {
         notifiedUpdateVersion = latest;
-        toast(`发现新版本 ${latest}，点击右上角更新按钮`, "ok");
+        toast(`${t("发现新版本")} ${latest}${t("，点击右上角更新按钮")}`, "ok");
       }
     } else if (result?.ok && !result.available) {
       setUpdateDot(false);

@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { ensureLauncherRuntimePaths, launcherTempDir } from "./runtimePaths";
-import { modsRoot, readModDir, signModFolder } from "./modManager";
+import { modsRoot, readModDir, signModFolder, readModReadme } from "./modManager";
 import { packModZip } from "./modPack";
 import { getAuthor } from "./authorStore";
 import { scanMods } from "./modManager";
@@ -199,6 +199,8 @@ export async function prepareSubmission(repoRoot: string, input: PrepareInput): 
   const history = previousHistory(record.id);
   if (history.length) history.push({ version, changelog: input.changelog || "", at: now });
 
+  // 从本地 README.md 提取上架用的详细介绍（否则市场详情里「模组说明」会是空的）
+  const listed = readmeForListing(repoRoot, folder);
   const indexDraft: Record<string, unknown> = {
     id: record.id,
     displayName: record.displayName,
@@ -207,8 +209,8 @@ export async function prepareSubmission(repoRoot: string, input: PrepareInput): 
     description: input.description || record.description,
     category: input.category || "玩法",
     tags: input.tags || [],
-    readme: input.readme || [],
-    highlights: input.highlights || [],
+    readme: listed.readme.length ? listed.readme : input.readme || [],
+    highlights: listed.highlights.length ? listed.highlights : input.highlights || [],
     conflicts: input.conflicts || record.conflicts || [],
     requiresRestart: input.requiresRestart !== false,
     evejsVersions,
@@ -268,6 +270,50 @@ export interface PublishOwnResult {
   reason?: string;
 }
 
+/** 目录名安全化（与 modManager 保持一致，防止 ../ 穿越） */
+function safeFolder(folder: string): string {
+  return String(folder || "")
+    .trim()
+    .replace(/[\\/:*?"<>|]+/g, "-")
+    .replace(/[\u0000-\u001f]/g, "")
+    .replace(/^[. ]+|[. ]+$/g, "")
+    .slice(0, 80);
+}
+
+/**
+ * 从 mods/<id>/README.md 里抽出上架用的正文：
+ * 创建模组时生成的 README 有「## 功能要点」与「## 详细介绍」两段，
+ * 前者去重后进 highlights，后者按空行拆成段落进 readme；没有标题的手写 README 则整篇当正文。
+ */
+function readmeForListing(repoRoot: string, folder: string): { readme: string[]; highlights: string[] } {
+  const empty = { readme: [] as string[], highlights: [] as string[] };
+  const safe = safeFolder(folder) || String(folder || "");
+  if (!safe) return empty;
+  const res = readModReadme(repoRoot, safe);
+  if (!res.ok || !res.text.trim()) return empty;
+  const lines = res.text.split(/\r?\n/);
+  const highlights: string[] = [];
+  let section = "";
+  const detail: string[] = [];
+  const free: string[] = [];
+  for (const line of lines) {
+    const h2 = /^##\s*(.+?)\s*$/.exec(line);
+    if (h2) { section = h2[1].trim(); continue; }
+    if (/^#\s/.test(line)) continue;
+    const bullet = /^[-*]\s+(.+)$/.exec(line);
+    if (bullet && (/\u529f\u80fd\u8981\u70b9|Highlights/i.test(section) || !section)) { highlights.push(bullet[1].trim()); continue; }
+    if (/\u8be6\u7ec6\u4ecb\u7ecd|\u8bf4\u660e|Details|Description/i.test(section)) detail.push(line);
+    else if (!section) free.push(line);
+  }
+  const source = detail.length ? detail : free;
+  const readme = source
+    .join("\n")
+    .split(/\n{2,}/)
+    .map((x) => x.trim())
+    .filter(Boolean)
+    .slice(0, 60);
+  return { readme, highlights: Array.from(new Set(highlights)).slice(0, 12) };
+}
 /** 由索引分片 + 资产地址组装 `evejs-mod.json`（索引仓库 CI 抓取的就是它） */
 function buildListingJson(draft: Record<string, unknown>, downloadUrls: DownloadUrl[]): string {
   return JSON.stringify({ ...draft, downloadUrls }, null, 2) + "\n";

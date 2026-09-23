@@ -4,7 +4,7 @@ import * as path from "path";
 import { net } from "electron";
 import { ensureLauncherRuntimePaths, launcherTempDir } from "./runtimePaths";
 import { readSettings } from "./configStore";
-import { importModZip, scanMods, updateMod, type ModRecord } from "./modManager";
+import { importModZip, scanMods, updateMod, modsRoot, type ModRecord } from "./modManager";
 import { verifyIndexSignature, trustPublicKey } from "./modSigner";
 
 /**
@@ -58,7 +58,8 @@ export interface MarketEntry {
   description?: string;
   category?: string;
   tags?: string[];
-  readme?: string[];
+  /** 上架用的模组说明：新索引是段落数组，老索引可能是单段文本 */
+  readme?: string[] | string;
   highlights?: string[];
   conflicts?: string[];
   requiresRestart?: boolean;
@@ -411,6 +412,25 @@ export interface InstallOutcome {
   reason?: string;
 }
 
+/**
+ * 记下「这个目录是从模组市场下载安装的」，供已安装详情里的「来源」字段使用。
+ * 写在模组目录里的隐藏文件，不影响清单校验与签名。
+ */
+function recordMarketSource(repoRoot: string, folder: string, entry: MarketEntry): void {
+  if (!folder) return;
+  try {
+    const dir = path.join(modsRoot(repoRoot), folder);
+    if (!fs.existsSync(dir)) return;
+    fs.writeFileSync(
+      path.join(dir, ".evejs-source.json"),
+      JSON.stringify({ source: "market", repo: String(entry.repo || ""), version: String(entry.version || ""), id: String(entry.id || ""), at: new Date().toISOString() }, null, 2) + "\n",
+      "utf8"
+    );
+  } catch {
+    /* 标记写不进去不影响安装 */
+  }
+}
+
 /** 下载并安装/更新：已装则走 updateMod（保留启用状态与用户数据），否则走 importModZip */
 export async function installEntry(
   repoRoot: string,
@@ -423,6 +443,7 @@ export async function installEntry(
   const local = scanMods(repoRoot).mods.find((m) => m.id === entry.id);
   if (local) {
     const updated = await updateMod(repoRoot, downloaded.zipPath);
+    if (updated.ok) recordMarketSource(repoRoot, updated.folder || entry.id, entry);
     return {
       ok: updated.ok,
       mode: "update",
@@ -435,6 +456,7 @@ export async function installEntry(
   }
 
   const imported = await importModZip(repoRoot, downloaded.zipPath);
+  if (imported.ok) recordMarketSource(repoRoot, imported.folder || entry.id, entry);
   return {
     ok: imported.ok,
     mode: "install",

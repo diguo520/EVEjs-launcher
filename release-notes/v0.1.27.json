@@ -1,0 +1,49 @@
+{
+  "version": "0.1.27",
+  "changelog": {
+    "zh": [
+      {
+        "type": "fix",
+        "text": "修复模组市场详情里「模组说明」总是空的问题：创建模组时填写的「详细介绍」只写进了本地 README.md，上架清单里的 readme / highlights 一直是空数组，所以市场详情总提示「这个模组没有写说明」；现在在打包上架时会从 mods/<id>/README.md 里抽取「功能要点」与「详细介绍」写入清单，市场详情就能看到完整说明；禁用了该处叠加说明的回退（字符串与数组两种格式都能渲染）"
+      },
+      {
+        "type": "fix",
+        "text": "修复配置中心点「保存」报「目录中未找到 server/autostart.js」导致整份配置都存不了的问题：新版 EveJS 服务端入口已改为 server/index.js（npm start），旧标记 autostart.js 已不存在，但保存时仍然只认旧标记；现在同时接受 server/index.js 与旧版 autostart.js，并且会按“StartServer.bat + server/index.js”等信号给候选目录打分，用户选上层目录或 server/ 子目录时会自动校正到正确的项目根并提示；不像项目根的目录仍会拒绝，但报错信息改成明确需要 server/index.js"
+      },
+      {
+        "type": "fix",
+        "text": "修复市场下载的模组在「已安装」详情里误报「签名校验失败」：信任链断在作者上架清单没有携带公钥——市场索引本来会用清单里的 publicKey 把作者注入信任表，但上架清单里 author 只写了 id/name/keyId，导致下载方永远得到「密钥不在信任列表」并被当成签名失败甚至阻止启用；现在创建/签名时会把作者 publicKey 一并写进清单，扫描时在 keyId 与签名一致的前提下注入信任表，下载方即可正常验证；旧包（签名但无公钥）不再显示吓人的红色失败，改为中性提示且不阻止启用"
+      },
+      {
+        "type": "fix",
+        "text": "修复已安装模组详情里「来源」总是显示「本机」的问题：从模组市场下载安装/更新时会在模组目录写入 .evejs-source.json 来源标记，扫描时读取并在详情里显示「模组市场」（同时保留仓库与安装版本）；只有用户自己创建/导入的模组才显示「本机」"
+      },
+      {
+        "type": "fix",
+        "text": "启动器界面的提示消息全量接入多语言：之前 launcher-bridge.js 里约 33 处 toast() 提示是汉语硬编码（toast 本身不做翻译），切到英文后仍显示中文；现在全部改为 t() 并补齐 7 种语言词条，包括启动/停止服务、账号与密码校验、数据库操作、配置保存、自动更新全流程、模组安装/卸载/签名等"
+      }
+    ],
+    "en": [
+      {
+        "type": "fix",
+        "text": "Fixed the mod-market details always showing an empty About-this-mod section: the Details text entered when creating a mod was only written to the local README.md, while the listing manifest's readme / highlights stayed as empty arrays, so the market detail said the mod had no description; publishing now extracts the Highlights and Details sections from mods/<id>/README.md into the listing, so the market detail shows the full description (the renderer also tolerates both string and array forms)"
+      },
+      {
+        "type": "fix",
+        "text": "Fixed the configuration centre failing to save with 'server/autostart.js not found': newer EveJS servers start via server/index.js (npm start) and no longer ship autostart.js, but the save path still required the old marker, so the whole config save was rejected; the launcher now accepts both server/index.js and the legacy autostart.js, scores candidate folders (StartServer.bat + server/index.js ranks highest) and auto-corrects when the user picked a parent folder or the server/ subfolder, reporting the corrected path; folders that really are not a project root are still rejected with a message that names server/index.js"
+      },
+      {
+        "type": "fix",
+        "text": "Fixed market-downloaded mods wrongly showing a 'signature check failed' badge in the installed details: the trust chain broke because the published manifest did not carry the author's public key - the market index is designed to trust the author by the publicKey found in the manifest, but the author block only had id/name/keyId, so the downloader always got 'signing key is not in the trusted list', which was presented as a signature failure and could even block enabling; creating/signing now writes the author publicKey into the manifest and the scanner trusts it when keyId matches the signature, so downloads verify correctly; old packages (signed without a public key) no longer show the alarming red failure but a neutral note and are not blocked"
+      },
+      {
+        "type": "fix",
+        "text": "Fixed installed-mod details always reporting the source as local: installing or updating from the mod market now writes a .evejs-source.json provenance marker into the mod folder, which the scanner reads so the details show Mod market (keeping the repo and installed version); only mods the user created or imported locally show as local"
+      },
+      {
+        "type": "fix",
+        "text": "All launcher toast messages are now localised: about 33 toast() calls in launcher-bridge.js were raw Chinese (toast does not translate by itself), so they stayed Chinese after switching to English; every one now goes through t() with entries for all 7 languages, covering service start/stop, account and password validation, database actions, configuration saving, the whole auto-update flow and mod install/uninstall/sign paths"
+      }
+    ]
+  }
+}

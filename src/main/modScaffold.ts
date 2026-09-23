@@ -341,7 +341,8 @@ function manifestFrom(draft: CreateModDraft, template: ScaffoldTemplate, evejsVe
   let author: Record<string, string> = {};
   try {
     const a = getAuthor().author;
-    author = { id: a.id, name: a.name, keyId: a.keyId };
+    // publicKey 必须一起发布：市场索引里带上它，下载方才能验证作者签名（否则只能报「签名密钥不在信任列表」）
+    author = { id: a.id, name: a.name, keyId: a.keyId, publicKey: a.publicKey };
   } catch {
     /* 读不到作者身份就先不写 author 块 */
   }

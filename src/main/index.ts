@@ -7,7 +7,8 @@ import { resolveRepoRoot } from "./envDetector";
 import { readSettings, writeSettings } from "./configStore";
 import { ensureLauncherRuntimePaths } from "./runtimePaths";
 import { ensureModAuthoringDoc, ensureAllModAuthoringDocs } from "./modManager";
-import { listMyMods } from "./modSubmit";
+import { listMyMods, prepareSubmission } from "./modSubmit";
+import { createMod } from "./modScaffold";
 import { getAuthor, readAuthorPrivateKey } from "./authorStore";
 import { signManifest } from "./modSigner";
 import * as pty from "./ptyManager";
@@ -922,7 +923,178 @@ function createWindow(): void {
         } catch (e) {
           console.log("[SMOKE] create-preview ERROR:", e);
         }
-        console.log("[SMOKE] quit");
+        // 探针：创建模组时填的「详细介绍」必须跟着 README.md 进入上架清单（否则市场详情里模组说明是空的）
+        try {
+          console.log("[SMOKE] listing-readme probe start");
+          const probeRoot = path.join(ensureLauncherRuntimePaths().userData, "readme-probe-root");
+          fs.mkdirSync(path.join(probeRoot, "server", "src", "services", "chat"), { recursive: true });
+          fs.writeFileSync(path.join(probeRoot, "server", "src", "services", "chat", "chatHub.js"), "", "utf8");
+          fs.writeFileSync(path.join(probeRoot, "server", "src", "services", "chat", "sessionRegistry.js"), "", "utf8");
+          const created = createMod(probeRoot, {
+            id: "smoke-readme-mod",
+            displayName: "Smoke README Mod",
+            version: "1.0.0",
+            description: "one-line summary",
+            templateId: "blank",
+            category: "工具",
+            tags: [],
+            readme: "段落一：这是详细介绍的第一段。\n\n段落二：这是第二段，用来验证段落分割。",
+            highlights: ["亮点一", "亮点二"],
+            conflicts: [],
+            requiresRestart: true,
+            enabled: false,
+            sign: false,
+          }, "0.12.8");
+          const prep = created.ok
+            ? await prepareSubmission(probeRoot, { folder: "smoke-readme-mod", changelog: "smoke", category: "工具", tags: [], repo: "", downloadUrls: [] })
+            : { ok: false, reason: "createMod failed: " + created.reason };
+          const draft = prep && prep.ok && prep.item ? (prep.item.indexDraft as { readme?: unknown; highlights?: unknown }) : {};
+          console.log("[SMOKE] listing-readme:", JSON.stringify({
+            created: created.ok,
+            prepOk: !!prep.ok,
+            readmeIsArray: Array.isArray(draft.readme),
+            readmeParagraphs: Array.isArray(draft.readme) ? draft.readme.length : 0,
+            readmeFirst: Array.isArray(draft.readme) ? String(draft.readme[0] || "").slice(0, 40) : "",
+            readmeHasOnlyBody: Array.isArray(draft.readme) ? draft.readme.every((x) => !String(x).startsWith("##")) : false,
+            highlights: Array.isArray(draft.highlights) ? draft.highlights : [],
+            prepReason: prep.ok ? "" : String(prep.reason || created.reason || "").slice(0, 120),
+          }));
+        } catch (e) {
+          console.log("[SMOKE] listing-readme ERROR:", e);
+        }
+
+        // 探针：服务端根目录识别必须支持现版 server/index.js（不再只认 server/autostart.js）
+        try {
+          const fake = path.join(ensureLauncherRuntimePaths().userData, "root-probe");
+          const real = path.join(fake, "EveJS-real");
+          fs.mkdirSync(path.join(real, "server"), { recursive: true });
+          fs.writeFileSync(path.join(real, "StartServer.bat"), "@echo off", "utf8");
+          fs.writeFileSync(path.join(real, "server", "index.js"), "", "utf8");
+          fs.writeFileSync(path.join(real, "server", "package.json"), "{}\n", "utf8");
+          const legacy = path.join(fake, "EveJS-legacy");
+          fs.mkdirSync(path.join(legacy, "server"), { recursive: true });
+          fs.writeFileSync(path.join(legacy, "StartServer.bat"), "@echo off", "utf8");
+          fs.writeFileSync(path.join(legacy, "server", "autostart.js"), "", "utf8");
+          const rootProbe = await mainWindow?.webContents.executeJavaScript(`(async () => {
+            const real = ${JSON.stringify(real)};
+            const parent = ${JSON.stringify(fake)};
+            const sub = ${JSON.stringify(path.join(real, "server"))};
+            const legacyRoot = ${JSON.stringify(path.join(fake, "EveJS-legacy"))};
+            const legacyRes = await window.api.configSetRepoRoot(legacyRoot);
+            const bad = ${JSON.stringify(path.join(fake, "not-a-server"))};
+            const exact = await window.api.configSetRepoRoot(real);
+            const parentRes = await window.api.configSetRepoRoot(parent);
+            const subRes = await window.api.configSetRepoRoot(sub);
+            const badRes = await window.api.configSetRepoRoot(bad);
+            return JSON.stringify({
+              exactOk: !!exact.ok,
+              parentCorrected: !!parentRes.ok && parentRes.corrected === true,
+              parentRoot: (parentRes && parentRes.repoRoot) || "",
+              subdirCorrected: !!subRes.ok && subRes.corrected === true,
+              badRejected: !badRes.ok,
+              legacyOk: !!legacyRes.ok,
+              badReason: badRes.ok ? "" : String(badRes.reason || "").slice(0, 80),
+              configWritten: !!exact.path,
+            });
+          })()`);
+          console.log("[SMOKE] repo-root-probe:", rootProbe);
+        } catch (e) {
+          console.log("[SMOKE] repo-root-probe ERROR:", e);
+        }
+
+        // 探针：防御“本机自己签名的模组，下载方也能验证通过”（市场兼容性）
+        try {
+          const { scanMods, readModDir, signModFolder } = require("./modManager");
+          const root = path.join(ensureLauncherRuntimePaths().userData, "signed-probe");
+          fs.mkdirSync(path.join(root, "server", "src", "services", "chat"), { recursive: true });
+          fs.writeFileSync(path.join(root, "StartServer.bat"), "@echo off", "utf8");
+          fs.writeFileSync(path.join(root, "server", "index.js"), "", "utf8");
+          fs.writeFileSync(path.join(root, "server", "package.json"), "{}\n", "utf8");
+          const made = createMod(root, {
+            id: "signed-probe-mod",
+            displayName: "Signed Probe",
+            version: "1.0.0",
+            description: "probe",
+            templateId: "blank",
+            category: "工具",
+            tags: [],
+            readme: "probe readme",
+            highlights: [],
+            conflicts: [],
+            requiresRestart: true,
+            enabled: false,
+            sign: true
+          }, "0.12.8");
+          const dir = path.join(root, "mods", "signed-probe-mod");
+          const manifest = JSON.parse(fs.readFileSync(path.join(dir, "evejs-launcher.mod.json"), "utf8"));
+          const scanned = scanMods(root).mods.find((m: { id?: string }) => m.id === "signed-probe-mod");
+          console.log("[SMOKE] signed-installed-probe:", JSON.stringify({
+            created: made.ok,
+            hasSignature: !!manifest.signature,
+            authorHasPublicKey: !!(manifest.author && manifest.author.publicKey),
+            signatureStateOnRescan: scanned ? scanned.signatureState : "?",
+            signatureTrustedOnRescan: scanned ? scanned.signatureTrusted : "?",
+          }));
+        } catch (e) {
+          console.log("[SMOKE] signed-installed-probe ERROR:", e);
+        }
+
+        // 探针：已安装模组的「来源」必须区分市场下载与本机创建
+        try {
+          const { scanMods } = require("./modManager");
+          const root = path.join(ensureLauncherRuntimePaths().userData, "source-probe");
+          fs.mkdirSync(path.join(root, "server"), { recursive: true });
+          fs.writeFileSync(path.join(root, "StartServer.bat"), "@echo off", "utf8");
+          fs.writeFileSync(path.join(root, "server", "index.js"), "", "utf8");
+          const localMade = createMod(root, { id: "local-mod", displayName: "Local Mod", version: "1.0.0", description: "d", templateId: "blank", category: "工具", tags: [], readme: "", highlights: [], conflicts: [], requiresRestart: true, enabled: false, sign: false }, "0.12.8");
+          const marketDir = path.join(root, "mods", "market-mod");
+          fs.mkdirSync(marketDir, { recursive: true });
+          fs.writeFileSync(path.join(marketDir, "evejs-launcher.mod.json"), JSON.stringify({ schemaVersion: 3, id: "market-mod", displayName: "Market Mod", version: "2.0.0", description: "d", kind: "loader", restart: "game_server", activation: { strategy: "loader_rename" } }, null, 2), "utf8");
+          fs.writeFileSync(path.join(marketDir, "loader.js.disabled"), "\"use strict\";\n", "utf8");
+          fs.writeFileSync(path.join(marketDir, ".evejs-source.json"), JSON.stringify({ source: "market", repo: "someone/evejs-mod-market-mod", version: "2.0.0", id: "market-mod" }, null, 2), "utf8");
+          const mods = scanMods(root).mods;
+          const byId = (id: string) => mods.find((m: { id?: string }) => m.id === id);
+          console.log("[SMOKE] mod-source-probe:", JSON.stringify({
+            localCreated: !!localMade.ok,
+            localSource: byId("local-mod") ? byId("local-mod").source : "?",
+            marketSource: byId("market-mod") ? byId("market-mod").source : "?",
+            marketRepo: byId("market-mod") ? byId("market-mod").sourceRepo : "",
+          }));
+        } catch (e) {
+          console.log("[SMOKE] mod-source-probe ERROR:", e);
+        }
+
+        // 探针：新增的两条签名提示必须在切英文后也是英文（不能漏翻）
+        try {
+          const sigI18n = await mainWindow?.webContents.executeJavaScript(`(async () => {
+            if (typeof setLang === "function") setLang("en");
+            await new Promise((r) => setTimeout(r, 500));
+            const chip = typeof t === "function" ? t("未签名（旧版包未含作者公钥）") : "";
+            const note = typeof t === "function" ? t("这可能是旧版模组包：签名里没有附带作者公钥，本机无法验证，但不影响启用。作者用新版启动器重新发布后即可正常校验。") : "";
+            const cjk = /[\u4e00-\u9fff]/;
+            if (typeof setLang === "function") setLang("zh");
+            return JSON.stringify({ keyInDict: !!(typeof TRANSLATE !== "undefined" && TRANSLATE["未签名（旧版包未含作者公钥）"]), chip, chipHasCjk: cjk.test(chip), note: note.slice(0, 70), noteHasCjk: cjk.test(note) });
+          })()`);
+          console.log("[SMOKE] sig-i18n-probe:", sigI18n);
+        } catch (e) {
+          console.log("[SMOKE] sig-i18n-probe ERROR:", e);
+        }
+
+        // 探针：根目录自动修正的提示也要跟随语言
+        try {
+          const rootToast = await mainWindow?.webContents.executeJavaScript(`(async () => {
+            if (typeof setLang === "function") setLang("en");
+            await new Promise((r) => setTimeout(r, 400));
+            const en = typeof t === "function" ? t("服务端根目录已自动修正为") : "";
+            if (typeof setLang === "function") setLang("zh");
+            await new Promise((r) => setTimeout(r, 200));
+            const zh = typeof t === "function" ? t("服务端根目录已自动修正为") : "";
+            return JSON.stringify({ en, zh, enHasCjk: /[\u4e00-\u9fff]/.test(en), zhIsCn: zh.indexOf("服务端") === 0 });
+          })()`);
+          console.log("[SMOKE] root-toast-i18n-probe:", rootToast);
+        } catch (e) {
+          console.log("[SMOKE] root-toast-i18n-probe ERROR:", e);
+        }
         app.exit(0);
       }, 2800);
     });

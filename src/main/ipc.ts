@@ -44,6 +44,75 @@ import {
   type PrepareInput
 } from "./modSubmit";
 import { log } from "./logger";
+
+/**
+ * 判断一个目录是不是 EveJS 项目根目录。
+ * 历史版本用 server/autostart.js，现在改成 server/index.js（npm start），
+ * 两种都认，避免新版服务端因为旧标记而保存不了配置。
+ */
+/**
+ * 给一个目录打分：越像 EveJS 项目根分越高，0 = 不像。
+ * 新版用 server/index.js（npm start），旧版用 server/autostart.js，两种都认。
+ * 分级是为了在多个候选目录里选最像的一个，避免选到一个同名旧目录。
+ */
+function repoRootScore(dir: string): number {
+  if (!dir) return 0;
+  try {
+    const serverDir = path.join(dir, "server");
+    const hasStartScript = fs.existsSync(path.join(dir, "StartServer.bat"));
+    const hasServerIndex = fs.existsSync(path.join(serverDir, "index.js"));
+    const hasLegacy = fs.existsSync(path.join(serverDir, "autostart.js"));
+    const hasServerPkg = fs.existsSync(path.join(serverDir, "package.json"));
+    if (hasStartScript && hasServerIndex) return 4;   // 最强：根目录启动脚本 + 服务端入口
+    if (hasStartScript && hasLegacy) return 3;        // 旧版完整布局
+    if (hasServerIndex && hasServerPkg) return 2;     // 无便携版脚本的服务端部署
+    if (hasLegacy) return 1;                          // 只剩旧标记
+    return 0;
+  } catch {
+    return 0;
+  }
+}
+
+function looksLikeRepoRoot(dir: string): boolean {
+  return repoRootScore(dir) > 0;
+}
+function resolveExistingRepoRoot(input: string): string {
+  const raw = String(input || "").trim();
+  if (!raw) return "";
+  let start: string;
+  try {
+    start = path.resolve(raw);
+  } catch {
+    return "";
+  }
+  if (looksLikeRepoRoot(start)) return start;
+  let up = start;
+  for (let i = 0; i < 3; i++) {
+    const parent = path.dirname(up);
+    if (!parent || parent === up) break;
+    if (looksLikeRepoRoot(parent)) return parent;
+    up = parent;
+  }
+  // 子目录可能有多个候选，取分数最高的那个
+  try {
+    let best = "";
+    let bestScore = 0;
+    const children = fs.readdirSync(start, { withFileTypes: true });
+    for (const child of children) {
+      if (!child.isDirectory()) continue;
+      const dir = path.join(start, child.name);
+      const score = repoRootScore(dir);
+      if (score > bestScore) {
+        best = dir;
+        bestScore = score;
+      }
+    }
+    if (best) return best;
+  } catch {
+    /* 读不了就算了 */
+  }
+  return "";
+}
 import { applyUpdate, cancelUpdateDownload, checkForUpdates, currentUpdateState, downloadUpdate } from "./updater";
 import { databaseOverview, databaseTable, databaseSaveRow, databaseInsertRow, databaseDeleteRow, databaseCreateBackup, databaseBackups, databaseRestoreBackup } from "./databaseManager";
 
@@ -454,10 +523,16 @@ export function registerIpc(): void {
     return { server: readServerConfig(root), client: readClientConfig(root) };
   });
   ipcMain.handle("config:setRepoRoot", (_e, repoRoot: string) => {
-    const nextRoot = path.resolve(String(repoRoot || ""));
+    const requested = String(repoRoot || "").trim();
+    // 用户可能选了上层目录或 server/ 子目录，先尝试自动校正到真正的项目根
+    const nextRoot = resolveExistingRepoRoot(requested);
     try {
-      if (!fs.existsSync(path.join(nextRoot, "server", "autostart.js"))) {
-        return { ok: false, reason: "目录中未找到 server/autostart.js" };
+      if (!nextRoot) {
+        return {
+          ok: false,
+          reason:
+            "这个目录不像 EveJS 项目根目录（里面应该有 server/index.js）：" + (requested || "空路径")
+        };
       }
       const base = process.env.PORTABLE_EXECUTABLE_DIR || (app.isPackaged ? path.dirname(app.getPath("exe")) : process.cwd());
       const configPath = path.join(base, "launcher.config.json");
@@ -467,7 +542,14 @@ export function registerIpc(): void {
       } catch { /* new file */ }
       const next = { ...current, repoRoot: nextRoot };
       fs.writeFileSync(configPath, JSON.stringify(next, null, 2), "utf8");
-      return { ok: true, path: configPath, repoRoot: nextRoot };
+      // 告诉前端实际写入的路径；与用户填的不一致时可以提示已自动修正
+      let corrected = false;
+      try {
+        corrected = nextRoot !== path.resolve(requested || ".");
+      } catch {
+        corrected = true;
+      }
+      return { ok: true, path: configPath, repoRoot: nextRoot, corrected };
     } catch (err) {
       return { ok: false, reason: err instanceof Error ? err.message : String(err) };
     }
@@ -489,7 +571,7 @@ export function registerIpc(): void {
       ...scanMods(repoRoot),
       repoRoot,
       // 服务端根目录是否真的像 EveJS 根目录（用于提示用户去配置中心设置）
-      repoRootLooksValid: fs.existsSync(path.join(repoRoot, "server", "autostart.js"))
+      repoRootLooksValid: looksLikeRepoRoot(repoRoot)
     };
   });
   ipcMain.handle("mods:plan", () => planLoaders(resolveRepoRoot()));

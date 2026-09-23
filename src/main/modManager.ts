@@ -4,7 +4,7 @@ import { shell } from "electron";
 import { launcherRuntimeRoot } from "./runtimePaths";
 import { execFile } from "child_process";
 import { promisify } from "util";
-import { verifyManifestSignature, signManifestWithAuthorKey, type SignatureState } from "./modSigner";
+import { verifyManifestSignature, signManifestWithAuthorKey, trustPublicKey, type SignatureState } from "./modSigner";
 import { getAuthor, readAuthorPrivateKey } from "./authorStore";
 
 /**
@@ -66,6 +66,11 @@ export interface ModRecord {
   category: string;
   /** 清单 tags */
   tags: string[];
+  /** 来源："market" = 从模组市场下载安装；"local" = 本机创建/导入 */
+  source: "market" | "local";
+  /** 来源详情（source==="market" 时有值） */
+  sourceRepo: string;
+  sourceVersion: string;
 }
 
 /** 冲突种类：declared=清单声明；duplicate-id=重复 id；shared-module=引用同一服务端模块；missing-require=依赖缺失 */
@@ -111,6 +116,8 @@ export interface LoaderPlan {
 }
 
 const MANIFEST_NAME = "evejs-launcher.mod.json";
+/** 来源标记：从市场安装时写入，用来区分「本机创建」与「模组市场」 */
+const MOD_SOURCE_FILE = ".evejs-source.json";
 const MAX_MANIFEST_BYTES = 1024 * 1024;
 const KINDS: ModKind[] = ["loader", "source-integrated", "client-package", "settings"];
 const RESTART_VALUES = ["none", "game_server", "client", "launcher"];
@@ -347,6 +354,9 @@ function emptyRecord(folder: string, dir: string, manifestPath: string, error: s
     signatureError: "",
     signatureKeyId: "",
     signatureTrusted: false,
+    source: "local",
+    sourceRepo: "",
+    sourceVersion: "",
     authorId: "",
     authorName: "",
     category: "",
@@ -374,6 +384,24 @@ function readManifest(dir: string, manifestPath: string): { manifest: Record<str
 }
 
 /** 读取单个模组目录（校验 manifest schema 3） */
+/** 读取市场安装标记（不存在就是本机创建/导入） */
+function readModSource(dir: string): { source: "market" | "local"; sourceRepo: string; sourceVersion: string } {
+  const fallback = { source: "local" as const, sourceRepo: "", sourceVersion: "" };
+  try {
+    const file = path.join(dir, MOD_SOURCE_FILE);
+    if (!fs.existsSync(file)) return fallback;
+    const parsed = JSON.parse(fs.readFileSync(file, "utf8").replace(/^\uFEFF/, "")) as Record<string, unknown>;
+    if (!parsed || parsed.source !== "market") return fallback;
+    return {
+      source: "market",
+      sourceRepo: typeof parsed.repo === "string" ? parsed.repo : "",
+      sourceVersion: typeof parsed.version === "string" ? parsed.version : ""
+    };
+  } catch {
+    return fallback;
+  }
+}
+
 export function readModDir(folder: string, dir: string): ModRecord {
   const manifestPath = path.join(dir, MANIFEST_NAME);
   const { manifest, error } = readManifest(dir, manifestPath);
@@ -459,6 +487,20 @@ export function readModDir(folder: string, dir: string): ModRecord {
   record.tags = Array.isArray(manifest.tags) ? (manifest.tags.filter((t) => typeof t === "string") as string[]) : [];
 
   // 签名校验（Ed25519）：none 不拦截，invalid 且密钥可信才由 planLoaders 拦下
+  // 作者自签名的清单会带上自己的 publicKey（keyId 必须与签名一致）。
+  // 先把它注入信任表，下载方才能验证作者签名；没带 publicKey 的旧包仍按原逻辑处理。
+  try {
+    const sigBlock = manifest.signature && typeof manifest.signature === "object" ? (manifest.signature as Record<string, unknown>) : null;
+    const sigKeyId = sigBlock && typeof sigBlock.keyId === "string" ? sigBlock.keyId.trim() : "";
+    const authorBlockForTrust = manifest.author && typeof manifest.author === "object" ? (manifest.author as Record<string, unknown>) : null;
+    const authorKeyId = authorBlockForTrust && typeof authorBlockForTrust.keyId === "string" ? authorBlockForTrust.keyId.trim() : "";
+    const authorPublicKey = authorBlockForTrust && typeof authorBlockForTrust.publicKey === "string" ? authorBlockForTrust.publicKey.trim() : "";
+    if (sigKeyId && authorPublicKey && (!authorKeyId || authorKeyId === sigKeyId)) {
+      trustPublicKey(sigKeyId, authorPublicKey);
+    }
+  } catch {
+    /* 信任注入失败就按原逻辑校验 */
+  }
   const verdict = verifyManifestSignature(manifest);
   record.signatureState = verdict.state;
   record.signatureError = verdict.reason;
@@ -472,6 +514,11 @@ export function readModDir(folder: string, dir: string): ModRecord {
   record.sizeBytes = dirInfo.bytes;
   record.updatedAt = dirInfo.newest;
   record.modules = record.kind === "loader" ? scanLoaderModules(dir) : [];
+  // 来源：市场下载安装 → market；本机创建/导入 → local
+  const origin = readModSource(dir);
+  record.source = origin.source;
+  record.sourceRepo = origin.sourceRepo;
+  record.sourceVersion = origin.sourceVersion;
   return record;
 }
 
@@ -869,7 +916,7 @@ export function signModFolder(repoRoot: string, folder: string): ModSignResult {
   if (!existingAuthor || typeof existingAuthor !== "object" || Array.isArray(existingAuthor)) {
     try {
       const author = getAuthor().author;
-      draft.author = { id: author.id, name: author.name, keyId: author.keyId };
+      draft.author = { id: author.id, name: author.name, keyId: author.keyId, publicKey: author.publicKey };
     } catch {
       /* 补作者块失败不阻断签名 */
     }
