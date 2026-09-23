@@ -1098,6 +1098,19 @@
     return (AUTHOR && AUTHOR.author && AUTHOR.author.name) || "";
   }
 
+  /**
+   * 这个模组的签名是不是「本机作者身份」签的？
+   * 下载别人的模组时，本机无法也不需要替他校验签名，
+   * 所以只有「本机作者 id 命中」才在详情里展示签名状态。
+   */
+  function signedByLocalAuthor(m) {
+    if (!m) return false;
+    const me = (AUTHOR && AUTHOR.author && AUTHOR.author.id) || "";
+    if (me && m.authorId && m.authorId === me) return true;
+    // 没读到本机作者身份时，只有签名真实有效且密钥可信才显示
+    return !me && m.signatureState === "valid";
+  }
+
   function updateAuthorBadge() {
     const label = document.getElementById("authorBtnLabel");
     // 直接用 t() 渲染，避免先写中文再被 translateDOM 翻译造成的瞬间闪烁
@@ -1298,11 +1311,17 @@
 
     const chips = [];
     if (!isMarket) {
-      // 三态：已签名 / 签名真的不对 / 无法验证（旧包没带作者公钥）——后者不会阻止启用，不能冒充“校验失败”
-      if (m.signatureState === "valid") chips.push(['on', t("已签名")]);
-      else if (m.signatureState === "invalid" && m.signatureTrusted) chips.push(['bad', t("签名校验失败")]);
-      else if (m.signatureState === "invalid") chips.push(['', t("未签名（旧版包未含作者公钥）")]);
-      else chips.push(['', t("未签名")]);
+      // 签名状态只对「本机作者自己的模组」有意义：
+      // 下载别人的模组时不展示签名（本机无需也无法替他校验），改由「来源」与仓库信息说明出处。
+      if (m.source === "market") {
+        chips.push(['', t("模组市场")]);
+      } else if (signedByLocalAuthor(m)) {
+        if (m.signatureState === "valid") chips.push(['on', t("已签名")]);
+        else if (m.signatureState === "invalid" && m.signatureTrusted) chips.push(['bad', t("签名校验失败")]);
+        else chips.push(['', t("未签名")]);
+      } else {
+        chips.push(['', t("本机导入")]);
+      }
       chips.push([m.enabled ? "on" : "", m.enabled ? t("已启用") : t("已停用")]);
     } else {
       const local = marketLocalVersion(m.id);
@@ -1332,7 +1351,7 @@
       : "";
 
     // 旧版包签了名但没带 publicKey：本机无法验证，但不影响使用，给一句说明避免误以为“被篡改”
-    const sigNote = (!isMarket && m.signatureState === "invalid" && !m.signatureTrusted)
+    const sigNote = (!isMarket && signedByLocalAuthor(m) && m.signatureState === "invalid" && !m.signatureTrusted)
       ? '<div class="md-note" style="margin-bottom:8px">' + esc(t("这可能是旧版模组包：签名里没有附带作者公钥，本机无法验证，但不影响启用。作者用新版启动器重新发布后即可正常校验。")) + '</div>'
       : "";
 

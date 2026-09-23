@@ -1,0 +1,17 @@
+{
+  "version": "0.1.28",
+  "changelog": {
+    "zh": [
+      {
+        "type": "fix",
+        "text": "修正已安装模组详情里的签名提示逻辑：之前不管模组是谁做的都会在详情里显示签名状态，下载别人的模组时会出现「未签名（旧版包未含作者公钥）」这种与下载者无关的提示；现在只有模组的 authorId 命中本机作者身份时才展示签名状态（已签名 / 未签名 / 签名校验失败），市场下载的显示「模组市场」，其他本机导入的显示「本机导入」，新增词条已补齐 7 种语言"
+      }
+    ],
+    "en": [
+      {
+        "type": "fix",
+        "text": "Fixed the signature hint in installed-mod details: previously every mod showed its signing state, so downloading someone else's mod displayed 'Unsigned (this older package did not include the author's public key)', which has nothing to do with the downloader; the signature state (Signed / Unsigned / Signature check failed) is now only shown when the mod's authorId matches this machine's author identity, market-downloaded mods show Mod market and other locally imported mods show Imported locally, with the new label translated into all 7 languages"
+      }
+    ]
+  }
+}

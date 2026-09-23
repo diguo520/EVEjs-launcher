@@ -1,7 +1,7 @@
 {
   "name": "evejs-launcher",
   "productName": "EvEJS 启动器",
-  "version": "0.1.27",
+  "version": "0.1.28",
   "description": "EveJS 一键启动器（EVE 风格 UI + 内嵌终端）— 当前为 Phase 1-2 界面壳",
   "private": true,
   "main": "dist/main/main/index.js",
