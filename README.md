@@ -6,7 +6,7 @@ EVE Online Neocom 风格的一站式启动器：管服务、看日志、管账�
 **English** ｜ [中文](#中文)
 
 - Download: [Latest Release](https://github.com/diguo520/EVEjs-launcher/releases/latest)
-- Mod index repo: [diguo520/EVEjs-mods](https://github.com/diguo520/EVEjs-mods)
+- MOD Making Tutorial：(https://github.com/diguo520/EVEjs-launcher/wiki).
 
 ---
 
