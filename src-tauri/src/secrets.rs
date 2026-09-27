@@ -232,6 +232,11 @@ pub fn stored_flags(settings_file: &Path) -> BTreeMap<String, bool> {
 }
 
 #[cfg(test)]
+fn fs_remove(path: &std::path::Path) {
+    let _ = std::fs::remove_file(path);
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
@@ -341,11 +346,6 @@ mod tests {
         assert_eq!(&blob[..3], b"v10", "账号凭据也要用 OSCrypt 格式");
         assert!(!raw.contains("hunter2"), "设置文件里不能出现明文密码");
         assert_eq!(stored(&file, "pilot").as_deref(), Some("hunter2"));
-        let _ = fs_remove(&file);
+        fs_remove(&file);
     }
-}
-
-#[cfg(test)]
-fn fs_remove(path: &std::path::Path) {
-    let _ = std::fs::remove_file(path);
 }
