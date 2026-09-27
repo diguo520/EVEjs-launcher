@@ -1,14 +1,18 @@
-# S4 门禁流水线：lint → unit → parity → build → size-gate → smoke
+# S4 门禁流水线：前端 → lint → unit → parity → build → size-gate → smoke
 #
 # 顺序刻意与 scripts/build.ps1 的分步一致，失败时能直接看出是哪一道门禁。
-# 注意：本工作流是在本机写的，尚未在真实 runner 上跑过（见 docs/S4-打包-实施记录.md §5）。
-# 首次 push 后需要校准的点：① windows-latest 上 WebView2 自检能否拿到桌面会话；
-# ② rust-toolchain.toml 固定版本的下载；③ artifact 体积是否超 GitHub 配额（几十 MB 级别，无风险）。
+#
+# ⚠️ 第 0 步必须先构建 ui/dist：`tauri::generate_context!()` 在**编译期**读
+#    tauri.conf.json 的 frontendDist（../ui/dist），路径不存在就直接
+#    `proc macro panicked: The frontendDist configuration is set to "../ui/dist" but this path doesn't
+#    exist`。也就是说任何 cargo 步骤都必须排在它后面。本地因为 ui/dist 早就存在，这个坑不会暴露。
+#
+# 待校准：① windows-latest 能否跑通真机 WebView2 冒烟（桌面会话）；② artifact 体积是否超配额。
 name: CI
 
 on:
   push:
-    branches: ["main", "tauri2"]
+    branches: ["main"]
   pull_request:
   workflow_dispatch:
 
@@ -22,26 +26,41 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: "22"
 
-      # rust-toolchain.toml 里固定了 1.98.1；这一步保证 CI 用的是同一个通道
-      - uses: dtolnay/rust-toolchain@stable
+      # 工具链固定到 rust-toolchain.toml 里的 1.98.1：本地与 CI 共用同一套 rustfmt/clippy，
+      # 避免「本地绿、CI 红」的 lint 漂移（@stable 会随上游换版本）。
+      - uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: "1.98.1"
           components: rustfmt, clippy
 
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
 
+      # 0) 前端产物 —— 必须早于所有 cargo 步骤（见文件头注释）
+      - name: 0) 构建前端（ui/dist + ui/dist/react）
+        run: |
+          npm run ui:app:install
+          if ($LASTEXITCODE -ne 0) { throw "ui 依赖安装失败" }
+          node ui/scripts/build-ui.mjs
+          if ($LASTEXITCODE -ne 0) { throw "同步 ui/dist 失败" }
+          npm run check:app
+          if ($LASTEXITCODE -ne 0) { throw "S6 应用门禁失败" }
+
       - name: 1) lint（rustfmt + clippy -D warnings）
         working-directory: src-tauri
         run: |
+          rustc --version
           cargo fmt --check
+          if ($LASTEXITCODE -ne 0) { throw "rustfmt 校验失败：跑 cargo fmt 后再提交" }
           cargo clippy --all-targets -- -D warnings
+          if ($LASTEXITCODE -ne 0) { throw "clippy 校验失败（-D warnings）" }
 
       - name: 2) unit（Rust 单测）
         working-directory: src-tauri
@@ -52,22 +71,14 @@ jobs:
       - name: 3) parity 与 JS 门禁
         run: npm run check
 
-      # S6 应用（ui/ 下的 Vite + React）：需要 ui/node_modules，所以单独一步；
-      # 根 package.json 的 `npm run check` 刻意保持零依赖，不并入。
-      # ⚠️ 必须排在 build 之前：release 的 frontendDist 资产是**编译期**嵌入的，
-      #    ui/dist/react 不存在的话，打出来的 exe 用 --ui=react 会白屏。
-      - name: 3b) S6 应用（类型检查 + 打包 + 发布到 ui/dist/react）
-        run: |
-          npm run ui:app:install
-          npm run check:app
-
+      # -SkipApp：前端在第 0 步已经构建过，这里只做 Rust 构建与门禁
       # -SkipHeavy：L4/L5/L6/L8 是**发布前**的重档门禁（真起 ConPTY 喷 10 万行、真跑更新器替换 exe、
-      # 3 次 cargo debug 重编），runner 上没有交互桌面会话、也不保证有 Go 工具链，放在 CI 只会把红灯
-      # 归因搞乱。它们由维护者在发布机上跑（发布检查单见 docs/S7-发布与回滚-实施记录.md §5.2）。
+      # 3 次 cargo debug 重编），runner 上不保证有交互桌面会话，放在 CI 只会把红灯归因搞乱。
+      # 它们由维护者在发布机上跑（发布检查单见 docs/S7-发布与回滚-实施记录.md §5.2）。
       - name: 4) build + 体积门禁（G4 前置）
         run: pwsh -File scripts/build.ps1 -SkipApp -SkipHeavy
 
-      - name: 5) 真机自检（真实 WebView2，26 通道 + A4 断言）
+      - name: 5) 真机自检（真实 WebView2 通道自检 + A4 断言）
         run: pwsh -File scripts/smoke-ipc.ps1
 
       - name: 6) 缺 WebView2 引导冒烟（诊断开关）
@@ -75,7 +86,7 @@ jobs:
 
       - name: 上传 exe（体积门禁的实物凭据）
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: EvEJSLauncher-exe
           path: src-tauri/target/release/EvEJSLauncher.exe
