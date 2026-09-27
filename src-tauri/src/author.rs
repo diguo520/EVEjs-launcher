@@ -20,8 +20,8 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::AppHandle;
 
-const AUTHOR_FILE: &str = "author.json";
-const KEY_DIR: &str = "mod-keys";
+pub(crate) const AUTHOR_FILE: &str = "author.json";
+pub(crate) const KEY_DIR: &str = "mod-keys";
 const DEFAULT_NAME: &str = "指挥官";
 const ID_PREFIX: &str = "au-";
 const ID_MIN_TAIL: usize = 6;

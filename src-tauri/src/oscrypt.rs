@@ -150,14 +150,17 @@ fn wide(text: &str) -> Vec<u16> {
 fn open_gcm_key(key: &[u8; KEY_LEN]) -> Option<*mut c_void> {
     let mut algorithm: *mut c_void = std::ptr::null_mut();
     let aes = wide("AES");
+    // SAFETY: algorithm 指向本函数栈上的句柄出参；aes 是带 NUL 结尾的 UTF-16，随本次调用有效。
     if unsafe { BCryptOpenAlgorithmProvider(&mut algorithm, aes.as_ptr(), std::ptr::null(), 0) } < 0
     {
         return None;
     }
     let property = wide("ChainingMode");
     let value = wide("ChainingModeGCM");
+    // SAFETY: value 是 Vec<u16>，len()*2 正是它的字节数，指针在本函数内一直有效。
     let value_bytes =
         unsafe { std::slice::from_raw_parts(value.as_ptr() as *const u8, value.len() * 2) };
+    // SAFETY: algorithm 来自上面的 Open（尚未关闭）；property 与 value_bytes 都是带 NUL 的 UTF-16，长度按字节给。
     let set = unsafe {
         BCryptSetProperty(
             algorithm,
@@ -168,10 +171,12 @@ fn open_gcm_key(key: &[u8; KEY_LEN]) -> Option<*mut c_void> {
         )
     };
     if set < 0 {
+        // SAFETY: algorithm 由 BCryptOpenAlgorithmProvider 返回且尚未关闭，这里只关一次。
         unsafe { BCryptCloseAlgorithmProvider(algorithm, 0) };
         return None;
     }
     let mut handle: *mut c_void = std::ptr::null_mut();
+    // SAFETY: algorithm 已打开；key 是 [u8; KEY_LEN] 定长切片，handle 是本函数栈上的句柄出参。
     let generated = unsafe {
         BCryptGenerateSymmetricKey(
             algorithm,
@@ -183,6 +188,7 @@ fn open_gcm_key(key: &[u8; KEY_LEN]) -> Option<*mut c_void> {
             0,
         )
     };
+    // SAFETY: 句柄用完立刻关闭；algorithm 自 Open 之后只在这里关一次。
     unsafe { BCryptCloseAlgorithmProvider(algorithm, 0) };
     if generated < 0 || handle.is_null() {
         return None;
@@ -197,6 +203,7 @@ fn gcm_encrypt(key: &[u8; KEY_LEN], nonce: &[u8], plain: &[u8]) -> Option<(Vec<u
     let mut info = AuthCipherModeInfo::new(&mut nonce, &mut tag);
     let mut out = vec![0u8; plain.len()];
     let mut done: u32 = 0;
+    // SAFETY: handle 来自 open_gcm_key；plain / out 都是本函数里的有效缓冲，长度按字节传入，info 是栈上的 GCM 参数块。
     let status = unsafe {
         BCryptEncrypt(
             handle,
@@ -211,6 +218,7 @@ fn gcm_encrypt(key: &[u8; KEY_LEN], nonce: &[u8], plain: &[u8]) -> Option<(Vec<u
             0,
         )
     };
+    // SAFETY: handle 由 BCryptGenerateSymmetricKey 返回，用完销毁一次。
     unsafe { BCryptDestroyKey(handle) };
     if status < 0 {
         return None;
@@ -226,6 +234,7 @@ fn gcm_decrypt(key: &[u8; KEY_LEN], nonce: &[u8], cipher: &[u8], tag: &[u8]) -> 
     let mut info = AuthCipherModeInfo::new(&mut nonce, &mut tag);
     let mut out = vec![0u8; cipher.len()];
     let mut done: u32 = 0;
+    // SAFETY: handle 来自 open_gcm_key；cipher / out 都是本函数里的有效缓冲，长度按字节传入，info 是栈上的 GCM 参数块。
     let status = unsafe {
         BCryptDecrypt(
             handle,
@@ -240,6 +249,7 @@ fn gcm_decrypt(key: &[u8; KEY_LEN], nonce: &[u8], cipher: &[u8], tag: &[u8]) -> 
             0,
         )
     };
+    // SAFETY: handle 由 BCryptGenerateSymmetricKey 返回，用完销毁一次。
     unsafe { BCryptDestroyKey(handle) };
     if status < 0 {
         return None;

@@ -65,11 +65,19 @@ try {
         }
     }
 
-    if (-not $SkipContract) {
-        Invoke-Step 1 "契约生成" { node scripts/extract-contract.mjs; node scripts/gen-contract.mjs }
+    # PowerShell 的 $LASTEXITCODE 只反映**最后一条**原生命令：把多条 node 塞进一个 scriptblock，
+    # 前面失败的那条会被后面的成功掩盖（audit-dedup 就这么被静默放行过）。所以逐条判退出码。
+    function Invoke-Node {
+        param([string]$Script, [string[]]$ScriptArgs = @())
+        node $Script @ScriptArgs
+        if ($LASTEXITCODE -ne 0) { throw "node $Script 失败（退出码 $LASTEXITCODE）" }
     }
-    Invoke-Step 2 "静态契约校验 + 版本一致性（G1）" { node scripts/verify-contract.mjs; node scripts/sync-version.mjs --check }
-    Invoke-Step 3 "静态安全审计 + 查重门禁 + parity 固定向量" { node scripts/audit-security.mjs; node scripts/audit-dedup.mjs; node tests/parity/run.mjs }
+
+    if (-not $SkipContract) {
+        Invoke-Step 1 "契约生成" { Invoke-Node scripts/extract-contract.mjs; Invoke-Node scripts/gen-contract.mjs }
+    }
+    Invoke-Step 2 "静态契约校验 + 版本一致性（G1）" { Invoke-Node scripts/verify-contract.mjs; Invoke-Node scripts/sync-version.mjs --check }
+    Invoke-Step 3 "静态安全审计 + 查重门禁 + parity 固定向量" { Invoke-Node scripts/audit-security.mjs; Invoke-Node scripts/audit-dedup.mjs; Invoke-Node tests/parity/run.mjs }
     Invoke-Step 4 "渲染层语法预检" { node scripts/check-renderer.mjs }
     Invoke-Step 5 "同步 ui/dist" { node ui/scripts/build-ui.mjs }
 
