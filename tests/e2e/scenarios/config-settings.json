@@ -1,0 +1,24 @@
+{
+  "name": "config-settings",
+  "note": "宇宙参数（config:*）与启动器设置（settings:*）两条写通道：改 EvEJSConfig.bat 里的客户端路径与安全窗口开关 → 读回 → 把 repoRoot 指回沙箱仓库 → 写一条设置 → 读回。参数里的 ${REPO} / ${USERDATA} 由编排侧换成沙箱真实绝对路径（见 run.mjs 的 resolvePlaceholders）。",
+  "steps": [
+    { "id": "config-get", "channel": "config:get", "args": [], "expect": { "path": "server.ports.game", "equals": 26000 } },
+    {
+      "id": "set-client",
+      "channel": "config:setClient",
+      "args": [{ "clientPath": "${REPO}\\client-e2e", "safeWindowed": "on" }],
+      "expect": { "path": "client.safeWindowed", "equals": "on" }
+    },
+    { "id": "config-get-again", "channel": "config:get", "args": [], "expect": { "path": "client.safeWindowed", "equals": "on" } },
+    { "id": "set-repo-root", "channel": "config:setRepoRoot", "args": ["${REPO}"], "expect": { "ok": true } },
+    { "id": "set-repo-root-bogus", "channel": "config:setRepoRoot", "args": ["${CWD}\\not-a-repo"], "expect": { "ok": false } },
+    { "id": "settings-set", "channel": "settings:set", "args": [{ "e2eProbe": { "round": 1, "tag": "config-settings" } }], "expect": { "path": "e2eProbe.round", "equals": 1 } },
+    { "id": "settings-get", "channel": "settings:get", "args": [], "expect": { "path": "e2eProbe.tag", "equals": "config-settings" } }
+  ],
+  "fsAfter": [
+    { "path": "repo/tools/ClientSETUP/scripts/EvEJSConfig.bat", "exists": true, "contains": "client-e2e" },
+    { "path": "repo/tools/ClientSETUP/scripts/EvEJSConfig.bat", "contains": "EVEJS_CLIENT_SAFE_WINDOWED=on" },
+    { "path": "cwd/launcher.config.json", "exists": true, "contains": "repoRoot" },
+    { "path": "userdata/launcher-settings.json", "exists": true, "contains": "config-settings" }
+  ]
+}

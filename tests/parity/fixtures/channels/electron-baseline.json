@@ -1,0 +1,319 @@
+{
+  "channels": {
+    "accounts:checkRunning": {
+      "listening": [],
+      "ports": [
+        30000,
+        11,
+        2,
+        127,
+        26000,
+        26002,
+        26400
+      ],
+      "running": false
+    },
+    "accounts:list": {
+      "ok": false,
+      "reason": "[account-cli] 未找到 server/node_modules/better-sqlite3（服务端依赖不完整）"
+    },
+    "accounts:verify": {
+      "ok": false,
+      "reason": "验证失败"
+    },
+    "app:info": {
+      "evejsVersion": "0.12.8",
+      "name": "EvEJS 启动器",
+      "phase": "3-4",
+      "platform": "win32",
+      "repoRoot": "<abs-path>",
+      "version": "0.0.0"
+    },
+    "config:get": {
+      "client": {
+        "caPem": "<abs-path>",
+        "clientExe": "",
+        "clientPath": "<abs-path>",
+        "proxyUrl": "http://127.0.0.1:26002/",
+        "safeGraphics": "off",
+        "safeWindowed": "off",
+        "sourceFile": "<abs-path>"
+      },
+      "server": {
+        "ports": {
+          "game": 26000,
+          "gateway": 26002,
+          "images": 26001
+        },
+        "sourceFile": "<abs-path>"
+      }
+    },
+    "database:backups": {
+      "backups": [],
+      "directory": "<abs-path>",
+      "ok": true
+    },
+    "database:overview": {
+      "ok": false,
+      "reason": "[database-cli] 数据库不存在: <abs-path>"
+    },
+    "database:table": {
+      "ok": false,
+      "reason": "[database-cli] 未找到 server/node_modules/better-sqlite3"
+    },
+    "env:check": {
+      "checks": [
+        {
+          "key": "node",
+          "label": "Node.js 运行时",
+          "message": "Node v26.5.0（满足 ≥24）",
+          "ok": true
+        },
+        {
+          "key": "rust",
+          "label": "Rust / Cargo 工具链",
+          "message": "rustc 1.98.1 (48a229cea 2026-09-01) · cargo 1.98.1 (797e8a9bc 2026-08-05)",
+          "ok": true,
+          "warn": false
+        },
+        {
+          "key": "vsBuildTools",
+          "label": "VS C++ 构建工具",
+          "message": "已安装：<abs-path>",
+          "ok": true
+        },
+        {
+          "hint": "在 server 目录执行 npm ci 安装依赖",
+          "key": "serverDeps",
+          "label": "主服务器依赖",
+          "message": "缺少 server/node_modules（express 未安装）",
+          "ok": false
+        },
+        {
+          "hint": "运行 tools\\DatabaseCreator\\CreateDatabase.bat 初始化数据库",
+          "key": "localDb",
+          "label": "本地数据库",
+          "message": "本地数据库缺失（manifest/sqlite 不存在）",
+          "ok": false
+        },
+        {
+          "hint": "按 StartMarketServer.bat 使用 VS Build Tools 构建一次（cargo build --release）",
+          "key": "market",
+          "label": "市场服务二进制",
+          "message": "未找到 target/release/market-server.exe",
+          "ok": false
+        },
+        {
+          "key": "clientPath",
+          "label": "客户端路径",
+          "message": "客户端: <abs-path>",
+          "ok": true,
+          "warn": false
+        },
+        {
+          "key": "caCert",
+          "label": "客户端证书 CA",
+          "message": "CA 证书就绪",
+          "ok": true,
+          "warn": false
+        }
+      ],
+      "node": {
+        "ok": true,
+        "version": "26.5.0"
+      },
+      "passCount": 5,
+      "repoRoot": "<abs-path>",
+      "sys": {
+        "cpuThreads": 12,
+        "level": "ok",
+        "memGB": 31,
+        "memRaw": 31.9,
+        "message": "内存 31.9 GB · CPU 12 线程（阈值 8 GB / 8 线程）"
+      },
+      "totalCount": 8
+    },
+    "health:check": {
+      "game": false,
+      "gateway": false,
+      "images": false,
+      "market": false
+    },
+    "health:ping": {
+      "ok": false,
+      "port": 26000
+    },
+    "init:state": {
+      "busy": false,
+      "key": null,
+      "label": "",
+      "progress": null
+    },
+    "log:read": {
+      "exists": false,
+      "lines": [],
+      "mtime": 0,
+      "ok": true,
+      "path": "<abs-path>",
+      "size": 0
+    },
+    "metrics:get": {
+      "cpuPercent": 26.975230948253337,
+      "diskRoot": "E:",
+      "diskTotalGB": 976.5624961853027,
+      "diskUsedGB": 864.4106483459473,
+      "gpuDedicatedTotalGB": null,
+      "gpuDedicatedUsedGB": null,
+      "gpuMemoryTotalGB": null,
+      "gpuMemoryUsedGB": null,
+      "gpuPercent": null,
+      "gpuSharedUsedGB": null,
+      "memTotalGB": 31.855934143066406,
+      "memUsedGB": 15.199237823486328,
+      "netBytesPerSec": 0,
+      "onlinePlayers": 0,
+      "virtualMemTotalGB": null,
+      "virtualMemUsedGB": null,
+      "volumes": [
+        {
+          "freeGB": 44.98625183105469,
+          "percent": 79.77506819876523,
+          "root": "C:",
+          "totalGB": 222.42968368530273,
+          "usedGB": 177.44343185424805
+        },
+        {
+          "freeGB": 145.09650039672852,
+          "percent": 50.473727219709986,
+          "root": "D:",
+          "totalGB": 292.96874618530273,
+          "usedGB": 147.87224578857422
+        },
+        {
+          "freeGB": 112.15184783935547,
+          "percent": 88.51565073638926,
+          "root": "E:",
+          "totalGB": 976.5624961853027,
+          "usedGB": 864.4106483459473
+        },
+        {
+          "freeGB": 447.4195213317871,
+          "percent": 81.7861124914933,
+          "root": "F:",
+          "totalGB": 2456.4746055603027,
+          "usedGB": 2009.0550842285156
+        }
+      ]
+    },
+    "mods:githubTokenStatus": {
+      "encrypted": false,
+      "hasToken": false,
+      "path": "<abs-path>"
+    },
+    "mods:list": {
+      "conflicts": [],
+      "exists": false,
+      "mods": [],
+      "ok": true,
+      "order": [],
+      "repoRoot": "<abs-path>",
+      "repoRootLooksValid": true,
+      "root": "<abs-path>",
+      "stats": {
+        "bytes": 0,
+        "conflicts": 0,
+        "disabled": 0,
+        "enabled": 0,
+        "total": 0
+      }
+    },
+    "mods:myMods": {
+      "hidden": 0,
+      "items": [],
+      "ok": true
+    },
+    "mods:mySubmissions": {
+      "indexRepo": "diguo520/EVEjs-mods",
+      "items": [],
+      "ok": true
+    },
+    "mods:plan": {
+      "paths": [],
+      "skipped": []
+    },
+    "mods:templates": {
+      "ok": true,
+      "templates": [
+        {
+          "category": "玩法",
+          "desc": "加载模组后会在游戏本地聊天框看到一条「欢迎回来，飞行员」的信息。",
+          "files": [
+            "evejs-launcher.mod.json",
+            "loader.js",
+            "README.md",
+            "CHANGELOG.md"
+          ],
+          "highlights": [
+            "玩家上线后在其本地聊天频道发送欢迎消息",
+            "只改运行内存，不修改 server/ 下任何文件",
+            "骨架已内置进程身份校验与 require.cache 等待，不会提前拉起大依赖"
+          ],
+          "id": "broadcast",
+          "name": "Welcome Broadcast (Example)",
+          "requiresRestart": true,
+          "tags": [
+            "聊天",
+            "新手"
+          ]
+        },
+        {
+          "category": "玩法",
+          "desc": "同样的加载骨架，业务逻辑留空，适合从零写起",
+          "files": [
+            "evejs-launcher.mod.json",
+            "loader.js",
+            "README.md",
+            "CHANGELOG.md"
+          ],
+          "highlights": [
+            "保留全部 loader 加载要点（身份校验 / require.cache 等待 / unref）",
+            "业务钩子集中在 loader.js 的 start() 里，改这一处即可"
+          ],
+          "id": "blank",
+          "name": "Blank Skeleton",
+          "requiresRestart": true,
+          "tags": []
+        }
+      ]
+    },
+    "services:list": [
+      {
+        "id": "mainServer",
+        "name": "主服务器",
+        "state": "idle"
+      },
+      {
+        "id": "marketServer",
+        "name": "市场服务",
+        "state": "idle"
+      },
+      {
+        "id": "client",
+        "name": "游戏客户端",
+        "state": "idle"
+      }
+    ],
+    "settings:get": {},
+    "shell:openExternal": false,
+    "terminal:input": {
+      "__parity": "undefined"
+    },
+    "terminal:resize": {
+      "__parity": "undefined"
+    },
+    "update:state": {
+      "currentVersion": "0.0.0",
+      "state": "idle"
+    }
+  }
+}

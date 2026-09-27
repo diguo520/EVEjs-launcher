@@ -1,0 +1,25 @@
+{
+  "version": "0.2.0",
+  "changelog": {
+    "zh": [
+      { "type": "new", "text": "外壳从 Electron 换成 Tauri 2（Rust + 系统 WebView2），不再随包分发 Chromium 与 Node 运行时" },
+      { "type": "new", "text": "界面用 React + shadcn/ui 重做：主控台、服务器日志、账号管理、指令手册、数据库、模组市场、配置中心、设置" },
+      { "type": "new", "text": "新增 three.js 启动动画，取不到 WebGL 时静默退回 CSS 层" },
+      { "type": "new", "text": "服务卡片补齐 PID / CPU / 内存 / 运行时长读数；实时日志按服务分 tab 且切换页面不丢" },
+      { "type": "new", "text": "环境自检扩到八项：Node.js、Rust/Cargo、VS++ 构建工具、服务端依赖、本地数据库、市场服务二进制、客户端路径、客户端证书 CA" },
+      { "type": "fix", "text": "修复 0.12.9 环境拉不到模组市场清单的问题（清单改走 EVEjs-mods 的 Pages 与 jsDelivr 双源）" },
+      { "type": "new", "text": "模组发布改为「本地签名 + GitHub 令牌」流程；换到新框架时自动接管老启动器的作者身份 key 与令牌，无需重填" },
+      { "type": "opt", "text": "体积大幅下降：便携版 zip 约 5.5 MB、主程序 exe 约 7.3 MB（体积门禁 exe ≤ 12 MB / zip ≤ 20 MB）" }
+    ],
+    "en": [
+      { "type": "new", "text": "Shell rewritten from Electron to Tauri 2 (Rust + system WebView2); no bundled Chromium or Node runtime" },
+      { "type": "new", "text": "Interface rebuilt with React + shadcn/ui: dashboard, server logs, accounts, command manual, database, mod marketplace, config center, settings" },
+      { "type": "new", "text": "New three.js boot animation with a silent CSS fallback when WebGL is unavailable" },
+      { "type": "new", "text": "Service cards now report PID / CPU / memory / uptime; live logs are tabbed per service and survive page switches" },
+      { "type": "new", "text": "Environment self-check expanded to eight items: Node.js, Rust/Cargo, VS++ Build Tools, server dependencies, local database, market service binary, client path, client certificate CA" },
+      { "type": "fix", "text": "Fixed the mod marketplace manifest failing to load in the 0.12.9 environment (dual sources: EVEjs-mods Pages and jsDelivr)" },
+      { "type": "new", "text": "Mod publishing now uses local signing plus a GitHub token; the author identity key and token are imported from the old launcher automatically - nothing to re-enter" },
+      { "type": "opt", "text": "Much smaller: portable zip about 5.5 MB, main executable about 7.3 MB (gates: exe <= 12 MB, zip <= 20 MB)" }
+    ]
+  }
+}

@@ -1,0 +1,45 @@
+# --- Rust / Tauri ---
+src-tauri/target/
+src-tauri/gen/
+
+# --- Node ---
+node_modules/
+ui/dist/
+ui/app-dist/
+dist/
+
+# --- 构建产物（不进仓） ---
+release/
+artifacts/
+*.exe
+*.msi
+*.zip
+
+# --- 审核 / 契约临时产物 ---
+.audit/
+.parity-out/
+
+# --- 编辑器 / 系统 ---
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
+
+# --- 本地配置（含本机路径，禁止入库，对应评审文档 B7） ---
+launcher.config.json
+
+# --- 维护者私钥（只进 CI Secret，禁止入库，对应 A1） ---
+.keys/
+*.eve-key
+
+# --- 来自旧 Electron 仓库（仍然适用，保留兼容） ---
+_launcher/
+updater/bin/*.exe
+.gocache/
+.gotmp/
+*.backup
+*.new
+*.log
+.DS_Store
+.env
+.env.*

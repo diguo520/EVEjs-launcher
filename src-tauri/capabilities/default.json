@@ -1,0 +1,11 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "EvEJS 启动器主窗口能力（最小白名单：渲染层事件 API + 无边框窗口的拖动 / 双击最大化；自定义命令不经 ACL，由 launcher_invoke 内部白名单把关）",
+  "windows": ["main"],
+  "permissions": [
+    "core:event:default",
+    "core:window:allow-start-dragging",
+    "core:window:allow-internal-toggle-maximize"
+  ]
+}

@@ -1,0 +1,736 @@
+{
+  "generatedFrom": "E:\\Games\\EveJS-v0.12.8\\launcher\\launcher",
+  "generatedAt": "2026-09-27T21:52:08.459Z",
+  "counts": {
+    "invoke": 76,
+    "send": 6,
+    "events": 7,
+    "requests": 82,
+    "registered": 82,
+    "apiTotal": 89
+  },
+  "invoke": [
+    {
+      "api": "accountsCheckRunning",
+      "channel": "accounts:checkRunning",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "accountsCreate",
+      "channel": "accounts:create",
+      "kind": "invoke",
+      "signature": "user: string, password: string, isGM: boolean",
+      "params": [
+        "user",
+        "password",
+        "isGM"
+      ]
+    },
+    {
+      "api": "accountsDelete",
+      "channel": "accounts:delete",
+      "kind": "invoke",
+      "signature": "target: string, apply: boolean",
+      "params": [
+        "target",
+        "apply"
+      ]
+    },
+    {
+      "api": "accountsLaunch",
+      "channel": "accounts:launch",
+      "kind": "invoke",
+      "signature": "user: string, characterId?: string | number",
+      "params": [
+        "user",
+        "characterId"
+      ]
+    },
+    {
+      "api": "accountsList",
+      "channel": "accounts:list",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "accountsSetPassword",
+      "channel": "accounts:setPassword",
+      "kind": "invoke",
+      "signature": "user: string, oldPw: string, newPw: string",
+      "params": [
+        "user",
+        "oldPw",
+        "newPw"
+      ]
+    },
+    {
+      "api": "accountsVerify",
+      "channel": "accounts:verify",
+      "kind": "invoke",
+      "signature": "user: string, password: string",
+      "params": [
+        "user",
+        "password"
+      ]
+    },
+    {
+      "api": "appInfo",
+      "channel": "app:info",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "authorExportKey",
+      "channel": "author:exportKey",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "authorGet",
+      "channel": "author:get",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "authorImportKey",
+      "channel": "author:importKey",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "authorOpenKeyFolder",
+      "channel": "author:openKeyFolder",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "authorSetName",
+      "channel": "author:setName",
+      "kind": "invoke",
+      "signature": "name: string",
+      "params": [
+        "name"
+      ]
+    },
+    {
+      "api": "configRepairClientDisplay",
+      "channel": "config:repairClientDisplay",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "configSetClient",
+      "channel": "config:setClient",
+      "kind": "invoke",
+      "signature": "patch: Record<string, string>",
+      "params": [
+        "patch"
+      ]
+    },
+    {
+      "api": "configSetRepoRoot",
+      "channel": "config:setRepoRoot",
+      "kind": "invoke",
+      "signature": "repoRoot: string",
+      "params": [
+        "repoRoot"
+      ]
+    },
+    {
+      "api": "databaseBackup",
+      "channel": "database:backup",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "databaseBackups",
+      "channel": "database:backups",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "databaseDeleteRow",
+      "channel": "database:delete",
+      "kind": "invoke",
+      "signature": "table: string, values: Record<string, unknown>",
+      "params": [
+        "table",
+        "values"
+      ]
+    },
+    {
+      "api": "databaseInsertRow",
+      "channel": "database:insert",
+      "kind": "invoke",
+      "signature": "table: string, values: Record<string, unknown>",
+      "params": [
+        "table",
+        "values"
+      ]
+    },
+    {
+      "api": "databaseOverview",
+      "channel": "database:overview",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "databaseRestore",
+      "channel": "database:restore",
+      "kind": "invoke",
+      "signature": "name: string",
+      "params": [
+        "name"
+      ]
+    },
+    {
+      "api": "databaseSaveRow",
+      "channel": "database:save",
+      "kind": "invoke",
+      "signature": "table: string, values: Record<string, unknown>",
+      "params": [
+        "table",
+        "values"
+      ]
+    },
+    {
+      "api": "databaseTable",
+      "channel": "database:table",
+      "kind": "invoke",
+      "signature": "table: string, limit = 100, offset = 0",
+      "params": [
+        "table",
+        "limit",
+        "offset"
+      ]
+    },
+    {
+      "api": "engageStart",
+      "channel": "engage:start",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "engageStop",
+      "channel": "engage:stop",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "envCheck",
+      "channel": "env:check",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "getConfig",
+      "channel": "config:get",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "healthCheck",
+      "channel": "health:check",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "healthPing",
+      "channel": "health:ping",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "initRun",
+      "channel": "init:run",
+      "kind": "invoke",
+      "signature": "key: string",
+      "params": [
+        "key"
+      ]
+    },
+    {
+      "api": "initState",
+      "channel": "init:state",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "loginStart",
+      "channel": "login:start",
+      "kind": "invoke",
+      "signature": "user: string, password: string, remember = false, characterId?: string | number",
+      "params": [
+        "user",
+        "password",
+        "remember",
+        "characterId"
+      ]
+    },
+    {
+      "api": "metricsGet",
+      "channel": "metrics:get",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "modsAuthoringDoc",
+      "channel": "mods:authoringDoc",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "modsAuthoringDocText",
+      "channel": "mods:authoringDocText",
+      "kind": "invoke",
+      "signature": "lang?: string",
+      "params": [
+        "lang"
+      ]
+    },
+    {
+      "api": "modsCreate",
+      "channel": "mods:create",
+      "kind": "invoke",
+      "signature": "draft: Record<string, unknown>",
+      "params": [
+        "draft"
+      ]
+    },
+    {
+      "api": "modsCreateFolder",
+      "channel": "mods:createFolder",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "modsGithubTokenCheck",
+      "channel": "mods:githubTokenCheck",
+      "kind": "invoke",
+      "signature": "token?: string",
+      "params": [
+        "token"
+      ]
+    },
+    {
+      "api": "modsGithubTokenClear",
+      "channel": "mods:githubTokenClear",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "modsGithubTokenSave",
+      "channel": "mods:githubTokenSave",
+      "kind": "invoke",
+      "signature": "token: string",
+      "params": [
+        "token"
+      ]
+    },
+    {
+      "api": "modsGithubTokenStatus",
+      "channel": "mods:githubTokenStatus",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "modsImportZip",
+      "channel": "mods:importZip",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "modsList",
+      "channel": "mods:list",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "modsMarketInstall",
+      "channel": "mods:marketInstall",
+      "kind": "invoke",
+      "signature": "entry: Record<string, unknown>",
+      "params": [
+        "entry"
+      ]
+    },
+    {
+      "api": "modsMarketList",
+      "channel": "mods:marketList",
+      "kind": "invoke",
+      "signature": "force?: boolean",
+      "params": [
+        "force"
+      ]
+    },
+    {
+      "api": "modsMyMods",
+      "channel": "mods:myMods",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "modsMySubmissions",
+      "channel": "mods:mySubmissions",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "modsOpenAuthoringDoc",
+      "channel": "mods:openAuthoringDoc",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "modsOpenFolder",
+      "channel": "mods:openFolder",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "modsOpenModFolder",
+      "channel": "mods:openModFolder",
+      "kind": "invoke",
+      "signature": "folder: string",
+      "params": [
+        "folder"
+      ]
+    },
+    {
+      "api": "modsPlan",
+      "channel": "mods:plan",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "modsPublishOwnRepo",
+      "channel": "mods:publishOwnRepo",
+      "kind": "invoke",
+      "signature": "id: string, version: string, repo: string, giteeUrl?: string",
+      "params": [
+        "id",
+        "version",
+        "repo",
+        "giteeUrl"
+      ]
+    },
+    {
+      "api": "modsReadme",
+      "channel": "mods:readme",
+      "kind": "invoke",
+      "signature": "folder: string",
+      "params": [
+        "folder"
+      ]
+    },
+    {
+      "api": "modsRegisterSource",
+      "channel": "mods:registerSource",
+      "kind": "invoke",
+      "signature": "id: string, version: string",
+      "params": [
+        "id",
+        "version"
+      ]
+    },
+    {
+      "api": "modsRevealSubmissionZip",
+      "channel": "mods:revealSubmissionZip",
+      "kind": "invoke",
+      "signature": "zipPath: string",
+      "params": [
+        "zipPath"
+      ]
+    },
+    {
+      "api": "modsSaveText",
+      "channel": "mods:saveText",
+      "kind": "invoke",
+      "signature": "defaultName: string, content: string",
+      "params": [
+        "defaultName",
+        "content"
+      ]
+    },
+    {
+      "api": "modsSetEnabled",
+      "channel": "mods:setEnabled",
+      "kind": "invoke",
+      "signature": "folder: string, enabled: boolean",
+      "params": [
+        "folder",
+        "enabled"
+      ]
+    },
+    {
+      "api": "modsSetOrder",
+      "channel": "mods:setOrder",
+      "kind": "invoke",
+      "signature": "folders: string[]",
+      "params": [
+        "folders"
+      ]
+    },
+    {
+      "api": "modsSign",
+      "channel": "mods:sign",
+      "kind": "invoke",
+      "signature": "folder: string",
+      "params": [
+        "folder"
+      ]
+    },
+    {
+      "api": "modsSubmitGithub",
+      "channel": "mods:submitGithub",
+      "kind": "invoke",
+      "signature": "id: string, version: string",
+      "params": [
+        "id",
+        "version"
+      ]
+    },
+    {
+      "api": "modsSubmitPrepare",
+      "channel": "mods:submitPrepare",
+      "kind": "invoke",
+      "signature": "input: Record<string, unknown>",
+      "params": [
+        "input"
+      ]
+    },
+    {
+      "api": "modsTemplates",
+      "channel": "mods:templates",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "modsUninstall",
+      "channel": "mods:uninstall",
+      "kind": "invoke",
+      "signature": "folder: string",
+      "params": [
+        "folder"
+      ]
+    },
+    {
+      "api": "openExternal",
+      "channel": "shell:openExternal",
+      "kind": "invoke",
+      "signature": "url: string",
+      "params": [
+        "url"
+      ]
+    },
+    {
+      "api": "readServerLog",
+      "channel": "log:read",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "serviceRestart",
+      "channel": "service:restart",
+      "kind": "invoke",
+      "signature": "id: string",
+      "params": [
+        "id"
+      ]
+    },
+    {
+      "api": "servicesList",
+      "channel": "services:list",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "serviceStart",
+      "channel": "service:start",
+      "kind": "invoke",
+      "signature": "id: string",
+      "params": [
+        "id"
+      ]
+    },
+    {
+      "api": "serviceStop",
+      "channel": "service:stop",
+      "kind": "invoke",
+      "signature": "id: string",
+      "params": [
+        "id"
+      ]
+    },
+    {
+      "api": "settingsGet",
+      "channel": "settings:get",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "settingsSet",
+      "channel": "settings:set",
+      "kind": "invoke",
+      "signature": "patch: Record<string, unknown>",
+      "params": [
+        "patch"
+      ]
+    },
+    {
+      "api": "updateApply",
+      "channel": "update:apply",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "updateCheck",
+      "channel": "update:check",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "updateDownload",
+      "channel": "update:download",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "updateState",
+      "channel": "update:state",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    }
+  ],
+  "send": [
+    {
+      "api": "terminalInput",
+      "channel": "terminal:input",
+      "kind": "send",
+      "signature": "tabId: string, data: string",
+      "params": [
+        "tabId",
+        "data"
+      ]
+    },
+    {
+      "api": "terminalResize",
+      "channel": "terminal:resize",
+      "kind": "send",
+      "signature": "tabId: string, cols: number, rows: number",
+      "params": [
+        "tabId",
+        "cols",
+        "rows"
+      ]
+    },
+    {
+      "api": "updateCancel",
+      "channel": "update:cancel",
+      "kind": "send",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "windowClose",
+      "channel": "window:close",
+      "kind": "send",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "windowMinimize",
+      "channel": "window:minimize",
+      "kind": "send",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "windowToggleMaximize",
+      "channel": "window:toggleMaximize",
+      "kind": "send",
+      "signature": "",
+      "params": []
+    }
+  ],
+  "events": [
+    {
+      "api": "onInitChanged",
+      "channel": "init:changed"
+    },
+    {
+      "api": "onModDownloadProgress",
+      "channel": "mod:downloadProgress"
+    },
+    {
+      "api": "onModPublishProgress",
+      "channel": "mod:publishProgress"
+    },
+    {
+      "api": "onServicesChanged",
+      "channel": "services:changed"
+    },
+    {
+      "api": "onTerminalData",
+      "channel": "terminal:data"
+    },
+    {
+      "api": "onTerminalExit",
+      "channel": "terminal:exit"
+    },
+    {
+      "api": "onUpdateChanged",
+      "channel": "update:changed"
+    }
+  ],
+  "registeredNotExposed": [],
+  "exposedNotRegistered": [
+    "init:changed",
+    "mod:downloadProgress",
+    "mod:publishProgress",
+    "services:changed",
+    "terminal:data",
+    "terminal:exit",
+    "update:changed"
+  ],
+  "dynamicRegistrations": 0
+}

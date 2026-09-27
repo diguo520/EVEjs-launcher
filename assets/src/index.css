@@ -1,0 +1,217 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   Mission Control —— 深空指挥台
+   深空海军蓝画布 + 琥珀遥测 + 青色信号。功能清晰优先，圆角克制。
+   低光环境下每个读数都要一眼可辨。
+   ============================================================ */
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+@layer base {
+  :root {
+    color-scheme: dark;
+
+    /* ---- 表面 ---- */
+    --background: 223 49% 8%; /* #0B1120 深空海军蓝 */
+    --foreground: 218 92% 95%; /* #E8F0FE */
+
+    --card: 221 39% 11%; /* #111827 面板 */
+    --card-foreground: 218 92% 95%;
+    --popover: 221 39% 11%;
+    --popover-foreground: 218 92% 95%;
+
+    --secondary: 216 34% 15%; /* #1A2535 表面 hover */
+    --secondary-foreground: 218 92% 95%;
+    --muted: 216 34% 15%;
+    --muted-foreground: 216 35% 66%; /* #8BA3C7 标签 / 次要 */
+    --accent: 216 34% 15%;
+    --accent-foreground: 218 92% 95%;
+
+    --border: 214 52% 25%; /* #1E3A5F 面板分隔 */
+    --input: 221 41% 15%; /* #162035 内部分隔 */
+    --ring: 190 100% 50%;
+
+    /* ---- 招牌：青色信号（活动 / 健康 / 主操作） ---- */
+    --primary: 190 100% 50%; /* #00D4FF */
+    --primary-foreground: 223 49% 8%;
+
+    /* ---- 遥测数据：琥珀 ---- */
+    --telemetry: 43 100% 50%; /* #FFB800 */
+
+    /* ---- 状态语义 ---- */
+    --success: 150 74% 51%; /* #26DE81 正常 */
+    --warning: 29 100% 63%; /* #FF9F43 告警 */
+    --destructive: 355 100% 64%; /* #FF4757 故障 */
+    --destructive-foreground: 223 49% 8%;
+
+    /* ---- 三级文字 ---- */
+    --fg-tertiary: 216 27% 40%; /* #4A6080 时间戳 / 元数据 */
+
+    /* ---- 圆角：指挥台是功能性的，不做圆润 ---- */
+    --radius: 6px;
+    --radius-sm: 2px;
+    --radius-md: 4px;
+    --radius-lg: 6px;
+    --radius-pill: 9999px;
+
+    /* ---- 层级 ---- */
+    --elev-flat: none;
+    --elev-ring: 0 0 0 1px var(--border);
+    --elev-raised: 0 24px 72px rgba(0, 0, 0, 0.42);
+    --focus-ring: 0 0 0 3px rgba(0, 212, 255, 0.28);
+
+    /* ---- 间距（4px 基线） ---- */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+    --space-8: 32px;
+    --space-12: 48px;
+
+    /* ---- 字阶 ---- */
+    --text-xs: 11px;
+    --text-sm: 12px;
+    --text-base: 14px;
+    --text-lg: 16px;
+    --text-xl: 20px;
+    --text-2xl: 28px;
+    --text-3xl: 40px;
+    --text-4xl: 56px;
+    --leading-body: 1.45;
+    --leading-tight: 1.06;
+
+    /* ---- 字体 ---- */
+    --font-display: Inter, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
+      "Noto Sans SC", system-ui, sans-serif;
+    --font-body: Inter, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
+      "Noto Sans SC", system-ui, sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo,
+      Consolas, "Cascadia Mono", "PingFang SC", "Microsoft YaHei", monospace;
+
+    --cjk-latin-shift: -0.15em;
+
+    /* ---- 动效 ---- */
+    --motion-fast: 100ms;
+    --motion-base: 180ms;
+    --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  }
+
+  body {
+    font-family: var(--font-body);
+  }
+
+  /* 中英混排: 把英文/数字那一截用 <span class="cjk-latin"> 包起来, 字号 + 基线对齐中文 */
+  .cjk-latin {
+    font-size-adjust: 0.56;
+    vertical-align: var(--cjk-latin-shift, -0.15em);
+  }
+
+  /* 全局滚动条: 细、暗、不抢视线 */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 9999px;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: hsl(214 52% 34%);
+  }
+}
+
+@layer utilities {
+  /* 遥测数字：等宽 + 表格数字，扫读时数字要成列对齐 */
+  .tabular {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  /* 面板小标题：大写 + 宽字距 */
+  .panel-label {
+    font-size: var(--text-xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: hsl(var(--muted-foreground));
+  }
+}
+
+/* 环境光：低光指挥室里唯一允许的装饰，让画布不至于死平 */
+.mission-glow {
+  background-image:
+    radial-gradient(
+      ellipse 70% 55% at 12% -6%,
+      rgba(0, 212, 255, 0.07),
+      transparent 62%
+    ),
+    radial-gradient(
+      ellipse 55% 45% at 92% 104%,
+      rgba(255, 184, 0, 0.05),
+      transparent 60%
+    );
+}
+
+/* 网格底纹：参考网格，帮助对齐读数（极淡，不参与信息表达） */
+.mission-grid {
+  background-image:
+    linear-gradient(rgba(30, 58, 95, 0.22) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(30, 58, 95, 0.22) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, #000 20%, transparent 78%);
+  -webkit-mask-image: radial-gradient(
+    ellipse 80% 70% at 50% 40%,
+    #000 20%,
+    transparent 78%
+  );
+}
+
+@keyframes mc-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.mc-pulse {
+  animation: mc-pulse 1.8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
