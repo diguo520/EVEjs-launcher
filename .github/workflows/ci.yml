@@ -43,6 +43,13 @@ jobs:
         with:
           workspaces: src-tauri
 
+      # vendor/updater/bin/*.exe 被 .gitignore 排除（不把二进制塞进仓库），于是 runner 上 build.ps1
+      # 第 9 步「拷贝自更新器」必须现场 go build；windows-latest 不预装 Go，这里显式装。
+      # vendor/updater 只有 go.mod + main.go（无第三方依赖），所以不需要 go.sum、也不需要联网。
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
       # 0) 前端产物 —— 必须早于所有 cargo 步骤（见文件头注释）
       - name: 0) 构建前端（ui/dist + ui/dist/react）
         run: |
@@ -75,8 +82,20 @@ jobs:
       # -SkipHeavy：L4/L5/L6/L8 是**发布前**的重档门禁（真起 ConPTY 喷 10 万行、真跑更新器替换 exe、
       # 3 次 cargo debug 重编），runner 上不保证有交互桌面会话，放在 CI 只会把红灯归因搞乱。
       # 它们由维护者在发布机上跑（发布检查单见 docs/S7-发布与回滚-实施记录.md §5.2）。
+      # 顺带把完整输出落到 build.log 并上传：仓库是 public，Actions 日志 API 对非管理员返回 403，
+      # 失败时只能靠 artifact 读回现场（这一条是前几轮「红灯但看不到原因」的直接对策）。
       - name: 4) build + 体积门禁（G4 前置）
-        run: pwsh -File scripts/build.ps1 -SkipApp -SkipHeavy
+        run: |
+          pwsh -File scripts/build.ps1 -SkipApp -SkipHeavy *>&1 | Tee-Object -FilePath "$env:GITHUB_WORKSPACE\build.log"
+          if ($LASTEXITCODE -ne 0) { throw "build.ps1 退出码 $LASTEXITCODE" }
+
+      - name: 上传构建日志
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: build-log
+          path: build.log
+          if-no-files-found: warn
 
       - name: 5) 真机自检（真实 WebView2 通道自检 + A4 断言）
         run: pwsh -File scripts/smoke-ipc.ps1

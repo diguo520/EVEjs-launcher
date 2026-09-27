@@ -73,8 +73,23 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "node $Script 失败（退出码 $LASTEXITCODE）" }
     }
 
+    # 契约的来源是**本机现役 Electron 工程**（默认 E:\Games\EveJS-v0.12.8\launcher\launcher，可用 EVEJS_REFERENCE_ROOT 覆盖）。
+    # CI runner 与「只拿到本仓库」的人没有这份源码，而 contract/ipc-channels.json 是随仓库提交的冻结件，
+    # 所以这里「源码不在就跳过重抽」——否则 build 会在第 1 步硬失败（实测 CI 步骤只活 1 秒），连 cargo build 都跑不到。
+    # 契约确实变了时：在有现役版的本机跑 npm run contract，把新契约一并提交。
+    $referenceRoot = if ($env:EVEJS_REFERENCE_ROOT) { $env:EVEJS_REFERENCE_ROOT } else { "E:\Games\EveJS-v0.12.8\launcher\launcher" }
+
     if (-not $SkipContract) {
-        Invoke-Step 1 "契约生成" { Invoke-Node scripts/extract-contract.mjs; Invoke-Node scripts/gen-contract.mjs }
+        if (Test-Path -LiteralPath (Join-Path $referenceRoot "src\preload\index.ts")) {
+            Invoke-Step 1 "契约生成" { Invoke-Node scripts/extract-contract.mjs; Invoke-Node scripts/gen-contract.mjs }
+        }
+        else {
+            Write-Host ""
+            Write-Host "=== [1] 契约生成 —— 跳过（本机没有现役实现源码）" -ForegroundColor Yellow
+            Write-Host "  参考实现：$referenceRoot"
+            Write-Host "  用仓库里冻结的 contract/ipc-channels.json；第 2 步 verify-contract 仍会校验派生文件与它一致。"
+            Write-Host "  要重新抽取：npm run contract（或用 EVEJS_REFERENCE_ROOT 指定现役源码根）"
+        }
     }
     Invoke-Step 2 "静态契约校验 + 版本一致性（G1）" { Invoke-Node scripts/verify-contract.mjs; Invoke-Node scripts/sync-version.mjs --check }
     Invoke-Step 3 "静态安全审计 + 查重门禁 + parity 固定向量" { Invoke-Node scripts/audit-security.mjs; Invoke-Node scripts/audit-dedup.mjs; Invoke-Node tests/parity/run.mjs }
@@ -157,7 +172,7 @@ try {
                 node tests/parity/driver-tauri.mjs
                 node tests/parity/diff.mjs
             }
-            $referenceExe = "E:\Games\EveJS-v0.12.8\launcher\launcher\node_modules\electron\dist\electron.exe"
+            $referenceExe = Join-Path $referenceRoot "node_modules\electron\dist\electron.exe"
             if (Test-Path -LiteralPath $referenceExe) {
                 Invoke-Step 12 "parity 跨实现（Electron 现役版 ↔ Tauri）" {
                     node tests/parity/driver-electron.mjs

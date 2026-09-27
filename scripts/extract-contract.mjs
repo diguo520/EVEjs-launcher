@@ -3,7 +3,7 @@
  * 从现役 Electron 工程抽取 IPC 契约，产出 contract/ipc-channels.json（唯一事实来源）。
  *
  * 用法：node scripts/extract-contract.mjs [源工程根目录]
- * 默认：E:\Games\EveJS-v0.12.8\launcher\launcher
+ * 默认：E:\Games\EveJS-v0.12.8\launcher\launcher（可用环境变量 EVEJS_REFERENCE_ROOT 覆盖，CI 上用不到就跳过重抽）
  *
  * 说明：
  *   - 渲染层只通过 window.api 访问主进程，所以 src/preload/index.ts 是契约主来源；
@@ -17,7 +17,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const DEFAULT_SRC = "E:\\Games\\EveJS-v0.12.8\\launcher\\launcher";
+const DEFAULT_SRC = process.env.EVEJS_REFERENCE_ROOT || "E:\\Games\\EveJS-v0.12.8\\launcher\\launcher";
 const SRC_ROOT = path.resolve(process.argv[2] || DEFAULT_SRC);
 const OUT_FILE = path.resolve("contract", "ipc-channels.json");
 
