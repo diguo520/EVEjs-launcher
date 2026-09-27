@@ -213,7 +213,10 @@ impl MetricsCollector {
         let mut children: HashMap<u32, Vec<u32>> = HashMap::new();
         for (pid, process) in self.system.processes() {
             if let Some(parent) = process.parent() {
-                children.entry(parent.as_u32()).or_default().push(pid.as_u32());
+                children
+                    .entry(parent.as_u32())
+                    .or_default()
+                    .push(pid.as_u32());
             }
         }
 

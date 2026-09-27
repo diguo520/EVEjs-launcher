@@ -194,7 +194,9 @@ fn adopt_from(runtime: &RuntimePaths, own: &Path, cands: Vec<PathBuf>) -> Adopti
                     // 私钥路径来自 author.json（相对 data 目录），原样搬
                     if let Some(rel) = profile.get("privateKeyPath").and_then(Value::as_str) {
                         let rel_path = PathBuf::from(rel);
-                        if !rel_path.is_absolute() && copy_file(&cand.join(&rel_path), &own.join(&rel_path)) {
+                        if !rel_path.is_absolute()
+                            && copy_file(&cand.join(&rel_path), &own.join(&rel_path))
+                        {
                             items.push(rel_path.to_string_lossy().to_string());
                         }
                     }
@@ -300,7 +302,11 @@ mod tests {
 
     /// 造一个「老启动器的数据目录」
     fn legacy_dir(root: &Path, key_id: &str) -> PathBuf {
-        let dir = root.join("launcher").join("launcher").join(LAUNCHER_DIR).join(DATA_DIR);
+        let dir = root
+            .join("launcher")
+            .join("launcher")
+            .join(LAUNCHER_DIR)
+            .join(DATA_DIR);
         fs::create_dir_all(dir.join(KEY_DIR)).unwrap();
         fs::write(
             dir.join(AUTHOR_FILE),
@@ -315,11 +321,16 @@ mod tests {
             .unwrap(),
         )
         .unwrap();
-        fs::write(dir.join(KEY_DIR).join(format!("{key_id}.key")), "-----BEGIN PRIVATE KEY-----\\nAAA\\n-----END PRIVATE KEY-----\\n").unwrap();
+        fs::write(
+            dir.join(KEY_DIR).join(format!("{key_id}.key")),
+            "-----BEGIN PRIVATE KEY-----\\nAAA\\n-----END PRIVATE KEY-----\\n",
+        )
+        .unwrap();
         fs::write(dir.join(TOKEN_FILE), [1u8, 2, 3, 4]).unwrap();
         fs::write(
             dir.join(SETTINGS_FILE),
-            json!({ "windowBounds": { "x": 1 }, "accountCredentials": { "pilot": "AAAA" } }).to_string(),
+            json!({ "windowBounds": { "x": 1 }, "accountCredentials": { "pilot": "AAAA" } })
+                .to_string(),
         )
         .unwrap();
         dir
@@ -334,7 +345,10 @@ mod tests {
         let paths = RuntimePaths::from_root(own.clone(), true);
 
         let adoption = adopt_from(&paths, &own, vec![legacy.clone()]);
-        assert_eq!(adoption.source.as_deref().map(PathBuf::from), Some(legacy.clone()));
+        assert_eq!(
+            adoption.source.as_deref().map(PathBuf::from),
+            Some(legacy.clone())
+        );
         assert!(adoption.items.iter().any(|item| item == AUTHOR_FILE));
         assert!(adoption.items.iter().any(|item| item.ends_with(".key")));
         assert!(adoption.items.iter().any(|item| item == TOKEN_FILE));
@@ -354,7 +368,10 @@ mod tests {
         let settings: Value =
             serde_json::from_str(&fs::read_to_string(own.join(SETTINGS_FILE)).unwrap()).unwrap();
         assert_eq!(settings[CREDENTIALS_KEY]["pilot"], json!("AAAA"));
-        assert!(settings.get("windowBounds").is_none(), "不该把老窗口几何也搬过来");
+        assert!(
+            settings.get("windowBounds").is_none(),
+            "不该把老窗口几何也搬过来"
+        );
 
         let _ = fs::remove_dir_all(&root);
     }
@@ -370,7 +387,11 @@ mod tests {
         let first = adopt_from(&paths, &own, vec![legacy.clone()]);
         assert!(!first.is_empty());
         // 本机身份已被用户改过名字：第二次接管绝不能把它覆盖回去
-        fs::write(own.join(AUTHOR_FILE), json!({ "id": "au-mine000001" }).to_string()).unwrap();
+        fs::write(
+            own.join(AUTHOR_FILE),
+            json!({ "id": "au-mine000001" }).to_string(),
+        )
+        .unwrap();
 
         let second = adopt_from(&paths, &own, vec![legacy]);
         assert!(second.is_empty(), "已有本机数据时不该再接管");
@@ -423,4 +444,3 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
     }
 }
-

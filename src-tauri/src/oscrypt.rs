@@ -150,7 +150,8 @@ fn wide(text: &str) -> Vec<u16> {
 fn open_gcm_key(key: &[u8; KEY_LEN]) -> Option<*mut c_void> {
     let mut algorithm: *mut c_void = std::ptr::null_mut();
     let aes = wide("AES");
-    if unsafe { BCryptOpenAlgorithmProvider(&mut algorithm, aes.as_ptr(), std::ptr::null(), 0) } < 0 {
+    if unsafe { BCryptOpenAlgorithmProvider(&mut algorithm, aes.as_ptr(), std::ptr::null(), 0) } < 0
+    {
         return None;
     }
     let property = wide("ChainingMode");
@@ -460,7 +461,10 @@ mod tests {
         assert!(!store_key(&runtime, &key), "已存在就不再覆盖");
         assert_eq!(key_from_store(&key_store_path(&runtime)), Some(key));
         let raw = fs::read(key_store_path(&runtime)).unwrap();
-        assert!(secrets::unprotect(&raw).is_some(), "落盘的密钥必须是 DPAPI 密文");
+        assert!(
+            secrets::unprotect(&raw).is_some(),
+            "落盘的密钥必须是 DPAPI 密文"
+        );
         let _ = fs::remove_dir_all(&runtime.root);
     }
 
@@ -519,9 +523,12 @@ mod tests {
         ) else {
             return;
         };
-        let key = key_from_local_state(Path::new(&local_state)).expect("老启动器的 Local State 应能解出 AES 密钥");
+        let key = key_from_local_state(Path::new(&local_state))
+            .expect("老启动器的 Local State 应能解出 AES 密钥");
         let cipher = fs::read(&token_path).expect("令牌文件应可读");
-        let body = cipher.strip_prefix(PREFIX.as_slice()).expect("应带 v10 前缀");
+        let body = cipher
+            .strip_prefix(PREFIX.as_slice())
+            .expect("应带 v10 前缀");
         let nonce = &body[..NONCE_LEN];
         let tag = &body[body.len() - TAG_LEN..];
         let data = &body[NONCE_LEN..body.len() - TAG_LEN];

@@ -104,7 +104,10 @@ fn template_size_bytes(template: &ScaffoldTemplate) -> u64 {
         key_id: "0123456789ab".to_string(),
         public_key: "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY0123".to_string(),
     };
-    let manifest_text = format!("{}\n", manifest_from(&draft, template, "0.12.8", Some(&sample)));
+    let manifest_text = format!(
+        "{}\n",
+        manifest_from(&draft, template, "0.12.8", Some(&sample))
+    );
     let mut total = manifest_text.len() as u64;
     total += loader_from(&draft, template).len() as u64;
     total += readme_from(&draft, template).len() as u64;
