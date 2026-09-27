@@ -1,0 +1,23 @@
+{
+  "name": "repo-mods",
+  "note": "模组全链（真写盘）：建脚手架 → 列出 → 启用（loader.js.disabled 改名成 loader.js）→ 自定义排序 → 注入计划 → 卸载（走回收站）→ 再列出。结束时故意留下 e2e-keep 作为残留样本，由还原负责清掉：这样快照 diff 一定非空，才能证明写通道真的落了盘。",
+  "steps": [
+    { "id": "create-folder", "channel": "mods:createFolder", "args": [], "expect": { "ok": true } },
+    { "id": "create-keep", "channel": "mods:create", "args": [{ "templateId": "blank", "id": "e2e-keep", "displayName": "E2E Keep", "version": "1.0.0" }], "expect": { "ok": true } },
+    { "id": "create-gone", "channel": "mods:create", "args": [{ "templateId": "blank", "id": "e2e-gone", "displayName": "E2E Gone", "version": "1.0.0" }], "expect": { "ok": true } },
+    { "id": "list-created", "channel": "mods:list", "args": [], "expect": { "path": "mods.length", "equals": 2 } },
+    { "id": "enable-keep", "channel": "mods:setEnabled", "args": ["e2e-keep", true], "expect": { "ok": true, "path": "mod.enabled", "equals": true } },
+    { "id": "list-enabled", "channel": "mods:list", "args": [], "expect": { "path": "stats.enabled", "equals": 1 } },
+    { "id": "order", "channel": "mods:setOrder", "args": [["e2e-keep", "e2e-gone"]], "expect": { "ok": true } },
+    { "id": "plan", "channel": "mods:plan", "args": [], "expect": { "path": "paths", "minLength": 1 } },
+    { "id": "uninstall-gone", "channel": "mods:uninstall", "args": ["e2e-gone"], "expect": { "ok": true } },
+    { "id": "list-final", "channel": "mods:list", "args": [], "expect": { "path": "mods.length", "equals": 1 } }
+  ],
+  "fsAfter": [
+    { "path": "repo/mods/e2e-keep/evejs-launcher.mod.json", "exists": true },
+    { "path": "repo/mods/e2e-keep/loader.js", "exists": true },
+    { "path": "repo/mods/e2e-keep/loader.js.disabled", "exists": false },
+    { "path": "repo/mods/e2e-gone", "exists": false },
+    { "path": "userdata/mods/mod-order.json", "exists": true }
+  ]
+}

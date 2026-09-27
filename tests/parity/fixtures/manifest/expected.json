@@ -1,0 +1,10 @@
+{
+  "keyId": "evejs-parity-fixture",
+  "pubkey": "fDkGYSbWJoAYFSHj/TRjZm3NXx+7Rr4scyJLPN/5mdc=",
+  "seedSha256Of": "evejs-s3-parity-fixture",
+  "verdicts": {
+    "valid.json": true,
+    "tampered.json": false,
+    "bad-signature.json": false
+  }
+}

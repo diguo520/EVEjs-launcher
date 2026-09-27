@@ -1,0 +1,94 @@
+{
+  "name": "author-token",
+  "note": "作者身份（author:*）与 GitHub 令牌（mods:githubTokenStatus/Save）：改署名要落盘读得回来；令牌走 DPAPI 加密落盘 —— 这里同时断言「状态读得回来」与「不是明文落盘」（notContains）。清除令牌（mods:githubTokenClear）由单测 github::tests::memory_token_round_trip 覆盖，这里不重复。全程不出网（不调 mods:githubTokenCheck）。",
+  "steps": [
+    {
+      "id": "author-get",
+      "channel": "author:get",
+      "args": [],
+      "expect": {
+        "path": "ok",
+        "equals": true
+      }
+    },
+    {
+      "id": "author-key-exists",
+      "channel": "author:get",
+      "args": [],
+      "expect": {
+        "path": "privateKeyExists",
+        "equals": true
+      }
+    },
+    {
+      "id": "author-rename",
+      "channel": "author:setName",
+      "args": [
+        "e2e-rename"
+      ],
+      "expect": {
+        "path": "author.name",
+        "equals": "e2e-rename"
+      }
+    },
+    {
+      "id": "author-get-again",
+      "channel": "author:get",
+      "args": [],
+      "expect": {
+        "path": "author.name",
+        "equals": "e2e-rename"
+      }
+    },
+    {
+      "id": "token-status-empty",
+      "channel": "mods:githubTokenStatus",
+      "args": [],
+      "expect": {
+        "path": "hasToken",
+        "equals": false
+      }
+    },
+    {
+      "id": "token-save",
+      "channel": "mods:githubTokenSave",
+      "args": [
+        "ghp_e2e_probe_token_do_not_reuse"
+      ],
+      "expect": {
+        "path": "ok",
+        "equals": true
+      }
+    },
+    {
+      "id": "token-status-saved",
+      "channel": "mods:githubTokenStatus",
+      "args": [],
+      "expect": {
+        "path": "hasToken",
+        "equals": true
+      }
+    },
+    {
+      "id": "token-status-encrypted",
+      "channel": "mods:githubTokenStatus",
+      "args": [],
+      "expect": {
+        "path": "encrypted",
+        "equals": true
+      }
+    }
+  ],
+  "fsAfter": [
+    {
+      "path": "userdata/author.json",
+      "exists": true,
+      "contains": "e2e-rename"
+    },
+    {
+      "path": "userdata/github-token.bin",
+      "exists": true,
+      "notContains": "ghp_e2e_probe_token_do_not_reuse"
+    }
+  ]
+}

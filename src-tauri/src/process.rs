@@ -1,0 +1,1258 @@
+//! 服务启停状态机：对齐现役版 src/main/processManager.ts 的关键语义
+//!   - 状态取值 idle / starting / running / stopping / error（渲染层直接映射卡片颜色）
+//!   - 主服务器经 PTY 执行 `cmd.exe /c npm start`，cwd = server/
+//!   - 市场服务直接 spawn release 二进制，缺失时给出可操作提示
+//!   - 停止统一走 `taskkill /PID <pid> /T /F`（等价现役版 killOwned）
+use crate::env;
+use crate::health;
+use crate::pty::PtySpec;
+#[cfg(windows)]
+use crate::win32::{CREATE_NEW_PROCESS_GROUP, DETACHED_PROCESS};
+use crate::AppState;
+use serde::Serialize;
+use serde_json::{json, Value};
+use std::collections::{BTreeMap, HashMap};
+use std::io::{Read, Seek, SeekFrom};
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+use tauri::{AppHandle, Emitter, Manager};
+
+pub const MAIN_SERVER: &str = "mainServer";
+pub const MARKET_SERVER: &str = "marketServer";
+pub const CLIENT: &str = "client";
+
+/// PTY 会话 id（与现役版一致：市场服务用 "market"）
+fn session_id(service_id: &str) -> &'static str {
+    match service_id {
+        MAIN_SERVER => "mainServer",
+        MARKET_SERVER => "market",
+        _ => "client",
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ServiceInfo {
+    pub id: String,
+    pub name: String,
+    pub state: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pid: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+    /// 进程第一次被记录下来的时刻（毫秒时间戳）：运行时长由它算出来。
+    /// 「端口已被外部占用、pid 为空」的那种运行中拿不到起点，回 null，界面画 "—"。
+    /// 不 skip：让每张卡片的 JSON 形状恒定（省得结构比对时忽有忽无）
+    #[serde(rename = "startedAt")]
+    pub started_at: Option<u64>,
+}
+
+pub struct ServiceTable {
+    inner: Mutex<BTreeMap<String, ServiceInfo>>,
+}
+
+impl Default for ServiceTable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ServiceTable {
+    pub fn new() -> Self {
+        let mut table = BTreeMap::new();
+        for (id, name) in [
+            (MAIN_SERVER, "主服务器"),
+            (MARKET_SERVER, "市场服务"),
+            (CLIENT, "游戏客户端"),
+        ] {
+            table.insert(
+                id.to_string(),
+                ServiceInfo {
+                    id: id.to_string(),
+                    name: name.to_string(),
+                    state: "idle".to_string(),
+                    pid: None,
+                    message: None,
+                    started_at: None,
+                },
+            );
+        }
+        Self {
+            inner: Mutex::new(table),
+        }
+    }
+
+    pub fn snapshot(&self) -> Vec<ServiceInfo> {
+        match self.inner.lock() {
+            Ok(guard) => guard.values().cloned().collect(),
+            Err(_) => Vec::new(),
+        }
+    }
+
+    pub fn state_of(&self, id: &str) -> String {
+        self.inner
+            .lock()
+            .ok()
+            .and_then(|guard| guard.get(id).map(|info| info.state.clone()))
+            .unwrap_or_else(|| "idle".to_string())
+    }
+
+    /// 记录中的 PID（客户端是 DETACHED_PROCESS 直连启动，没有 PTY，只能从这里取）
+    pub fn pid_of(&self, id: &str) -> Option<u32> {
+        self.inner
+            .lock()
+            .ok()
+            .and_then(|guard| guard.get(id).and_then(|info| info.pid))
+    }
+
+    pub fn message_of(&self, id: &str) -> Option<String> {
+        self.inner
+            .lock()
+            .ok()
+            .and_then(|guard| guard.get(id).and_then(|info| info.message.clone()))
+    }
+
+    /// 进程退出后清掉 PID，但保留 state/message（update 会一并覆盖 message，不能拿来复用）
+    pub fn clear_pid(&self, id: &str) {
+        if let Ok(mut guard) = self.inner.lock() {
+            if let Some(info) = guard.get_mut(id) {
+                info.pid = None;
+            }
+        }
+    }
+
+    fn update(&self, id: &str, state: &str, pid: Option<u32>, message: Option<String>) {
+        if let Ok(mut guard) = self.inner.lock() {
+            if let Some(info) = guard.get_mut(id) {
+                info.state = state.to_string();
+                info.message = message;
+                match pid {
+                    Some(value) => {
+                        // 记下「第一次拿到 pid」的那一刻：运行时长从这里起算。
+                        // 同一个 pid 反复上报（starting → running）不能把起点往后推。
+                        if info.pid != Some(value) {
+                            info.started_at = Some(now_ms());
+                        }
+                        info.pid = Some(value);
+                    }
+                    None => {
+                        if state == "idle" || state == "error" || state == "stopping" {
+                            info.pid = None;
+                            info.started_at = None;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// 服务表 + 逐进程读数（CPU / 内存）。
+///
+/// `services:list` 与 `services:changed` 共用这一份：两个入口形状必须一致，
+/// 否则收到事件的那一帧会把卡片上的读数抖成 "—"。
+pub fn list_with_stats(state: &AppState) -> Vec<Value> {
+    let snapshot = state.services.snapshot();
+    let pids: Vec<u32> = snapshot.iter().filter_map(|info| info.pid).collect();
+    let stats = match state.metrics.lock() {
+        Ok(mut guard) => guard.process_stats(&pids),
+        Err(_) => HashMap::new(),
+    };
+
+    snapshot
+        .into_iter()
+        .map(|info| {
+            let mut value = serde_json::to_value(&info).unwrap_or(Value::Null);
+            let stat = info.pid.and_then(|pid| stats.get(&pid));
+            if let Some(object) = value.as_object_mut() {
+                object.insert(
+                    "cpuPercent".to_string(),
+                    stat.and_then(|stat| stat.cpu_percent)
+                        .map_or(Value::Null, |cpu| json!(cpu)),
+                );
+                object.insert(
+                    "memMB".to_string(),
+                    stat.map_or(Value::Null, |stat| json!(stat.mem_mb)),
+                );
+            }
+            value
+        })
+        .collect()
+}
+
+fn emit_services(app: &AppHandle) {
+    if let Some(state) = app.try_state::<AppState>() {
+        let list = list_with_stats(&state);
+        let _ = app.emit("services:changed", json!([list]));
+    }
+}
+
+fn set_state(app: &AppHandle, id: &str, state: &str, pid: Option<u32>, message: Option<String>) {
+    if let Some(app_state) = app.try_state::<AppState>() {
+        app_state.services.update(id, state, pid, message);
+    }
+    emit_services(app);
+}
+
+fn taskkill_tree(pid: u32) {
+    // 输出丢弃而不是继承：taskkill 的提示是 CP936 的（L5 顺带发现），继承到父进程控制台
+    // 会以 UTF-8 解读成乱码；而这段文字对用户没有任何价值（成功与否由状态机与 PID 探针判定）。
+    let _ = Command::new("taskkill")
+        .args(["/PID", &pid.to_string(), "/T", "/F"])
+        .creation_flags_no_window()
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
+}
+
+/// 只用于隐藏 taskkill 的控制台窗口（不改变进程创建语义）
+trait NoWindow {
+    fn creation_flags_no_window(&mut self) -> &mut Self;
+}
+
+impl NoWindow for Command {
+    fn creation_flags_no_window(&mut self) -> &mut Self {
+        #[cfg(windows)]
+        {
+            use crate::win32::CREATE_NO_WINDOW;
+            use std::os::windows::process::CommandExt;
+            self.creation_flags(CREATE_NO_WINDOW);
+        }
+        self
+    }
+}
+
+pub fn stop_tree(app: &AppHandle, service_id: &str) {
+    let Some(state) = app.try_state::<AppState>() else {
+        return;
+    };
+    let tab = session_id(service_id);
+    let mut pids: Vec<u32> = Vec::new();
+    if let Some(pid) = state.pty.pid(tab) {
+        pids.push(pid);
+    }
+    if let Some(pid) = state.services.pid_of(service_id) {
+        if !pids.contains(&pid) {
+            pids.push(pid);
+        }
+    }
+    for pid in pids {
+        taskkill_tree(pid);
+    }
+    state.pty.remove(tab);
+}
+
+/* ------------------------------ 启动 ------------------------------ */
+
+pub async fn start_service(app: &AppHandle, service_id: &str) -> Result<Value, String> {
+    match service_id {
+        MAIN_SERVER => start_main_server(app).await,
+        MARKET_SERVER => start_market_server(app).await,
+        CLIENT => start_client(app, None).await,
+        other => Err(format!("未知服务: {other}")),
+    }
+}
+
+async fn start_main_server(app: &AppHandle) -> Result<Value, String> {
+    let state = app.state::<AppState>();
+    let root = state.repo_root();
+    let server_dir = root.join("server");
+
+    if health::tcp_alive(26000).await {
+        set_state(
+            app,
+            MAIN_SERVER,
+            "running",
+            None,
+            Some("端口 26000 已监听（外部已启动）".to_string()),
+        );
+        return Ok(json!({ "ok": true, "reason": "already-running" }));
+    }
+    if !server_dir.join("autostart.js").exists() && !server_dir.join("package.json").exists() {
+        let message = format!("服务端目录不完整：{}", server_dir.to_string_lossy());
+        set_state(app, MAIN_SERVER, "error", None, Some(message.clone()));
+        return Err(message);
+    }
+
+    let db_root = root.join("_local").join("gameStore");
+    let mut env_vars = vec![
+        (
+            "EVEJS_LOCAL_DATABASE_ROOT".to_string(),
+            db_root.to_string_lossy().to_string(),
+        ),
+        (
+            "EVEJS_GAMESTORE_DATA_DIR".to_string(),
+            db_root.join("data").to_string_lossy().to_string(),
+        ),
+        ("EVEJS_PROXY_LOCAL_INTERCEPT".to_string(), "1".to_string()),
+    ];
+    // 模组 loader：通过 NODE_OPTIONS=--require 注入，服务端文件零改动。
+    // 注意 NODE_OPTIONS 的解析规则：反斜杠会被当转义符吃掉，且按空格分词，
+    // 所以路径必须转成正斜杠并加双引号（已实测验证；plan_loaders 保证斜杠方向）。
+    if let Some(options) = mods_loader_node_options(&root, &state.runtime) {
+        env_vars.push(("NODE_OPTIONS".to_string(), options));
+    }
+
+    set_state(
+        app,
+        MAIN_SERVER,
+        "starting",
+        None,
+        Some("启动 npm start（server/）…".to_string()),
+    );
+    let pid = state.pty.spawn(
+        app,
+        session_id(MAIN_SERVER),
+        PtySpec::new("cmd.exe", &server_dir)
+            .args(vec!["/c".to_string(), "npm start".to_string()])
+            .env(env_vars),
+    )?;
+    set_state(
+        app,
+        MAIN_SERVER,
+        "starting",
+        Some(pid),
+        Some(format!("已启动（PID {pid}），等待 26000 端口…")),
+    );
+
+    if health::wait_port(26000, 30_000, 500).await {
+        set_state(
+            app,
+            MAIN_SERVER,
+            "running",
+            Some(pid),
+            Some(format!("运行中（PID {pid}）")),
+        );
+        Ok(json!({ "ok": true, "reason": "ok", "pid": pid }))
+    } else {
+        stop_tree(app, MAIN_SERVER);
+        set_state(
+            app,
+            MAIN_SERVER,
+            "error",
+            None,
+            Some("启动超时：26000 未在 30s 内监听".to_string()),
+        );
+        Err("主服务器启动超时（26000 端口 30s 未监听）".to_string())
+    }
+}
+
+/// PTY 会话退出 → 崩溃 / 退出处理（对齐现役版 `pty.onExit(...)` 注册的回调）。
+///
+/// 只在「本以为它在运行」时判崩溃：手动停止会先把状态置成 `stopping`，
+/// 启动失败另有自己的错误路径，都不该被这里覆盖成「异常退出」。
+pub fn on_pty_exit(app: &AppHandle, tab_id: &str, code: i64) {
+    let (service_id, message) = match tab_id {
+        "mainServer" => (MAIN_SERVER, format!("主服务器异常退出（exit {code}）")),
+        "market" => (MARKET_SERVER, format!("市场服务异常退出（exit {code}）")),
+        "client" => (CLIENT, format!("客户端已退出（exit {code}）")),
+        _ => return,
+    };
+    let Some(state) = app.try_state::<AppState>() else {
+        return;
+    };
+    let current = state.services.state_of(service_id);
+    if current == "running" || current == "starting" {
+        // pid 传 None：update 会在 error 状态下清掉它（等价现役版 `r.ownedPid = undefined`）
+        set_state(app, service_id, "error", None, Some(message));
+    }
+}
+/// 计算要注入主服务器的 `NODE_OPTIONS`：`--require "<正斜杠路径>"` 逐个拼接。
+///
+/// 现役版还会把「注入了几个 loader / 跳过了哪个模组」写进启动器日志，
+/// Rust 侧暂时只做注入（没有启动器日志写入通道），跳过理由仍可从 `mods:plan` 读到。
+fn mods_loader_node_options(root: &Path, runtime: &crate::runtime::RuntimePaths) -> Option<String> {
+    let plan = crate::mods::plan::plan_loaders(root, runtime);
+    let paths: Vec<String> = plan
+        .get("paths")
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default();
+    if paths.is_empty() {
+        return None;
+    }
+    let require_args = paths
+        .iter()
+        .map(|path| format!("--require \"{path}\""))
+        .collect::<Vec<_>>()
+        .join(" ");
+    let inherited = std::env::var("NODE_OPTIONS").unwrap_or_default();
+    let combined = [inherited, require_args]
+        .into_iter()
+        .filter(|part| !part.trim().is_empty())
+        .collect::<Vec<_>>()
+        .join(" ");
+    Some(combined)
+}
+async fn start_market_server(app: &AppHandle) -> Result<Value, String> {
+    let state = app.state::<AppState>();
+    let root = state.repo_root();
+
+    if health::tcp_alive(40110).await {
+        set_state(
+            app,
+            MARKET_SERVER,
+            "running",
+            None,
+            Some("端口 40110 已监听（外部已启动）".to_string()),
+        );
+        return Ok(json!({ "ok": true, "reason": "already-running" }));
+    }
+
+    let exe = env::market_binary(&root);
+    if !exe.is_file() {
+        let message = "release 二进制缺失，请先构建（cargo build --release）".to_string();
+        set_state(app, MARKET_SERVER, "error", None, Some(message.clone()));
+        return Err(message);
+    }
+
+    set_state(
+        app,
+        MARKET_SERVER,
+        "starting",
+        None,
+        Some("启动 market-server.exe …".to_string()),
+    );
+    let market_dir = env::market_working_dir(&root);
+    let pid = state.pty.spawn(
+        app,
+        session_id(MARKET_SERVER),
+        PtySpec::new(&exe.to_string_lossy(), &market_dir),
+    )?;
+    set_state(
+        app,
+        MARKET_SERVER,
+        "starting",
+        Some(pid),
+        Some(format!("已启动（PID {pid}），等待 40110 端口…")),
+    );
+
+    if health::wait_port(40110, 30_000, 500).await {
+        set_state(
+            app,
+            MARKET_SERVER,
+            "running",
+            Some(pid),
+            Some(format!("运行中（PID {pid}）")),
+        );
+        Ok(json!({ "ok": true, "reason": "ok", "pid": pid }))
+    } else {
+        stop_tree(app, MARKET_SERVER);
+        set_state(
+            app,
+            MARKET_SERVER,
+            "error",
+            None,
+            Some("启动超时：40110 未在 30s 内监听".to_string()),
+        );
+        Err("市场服务启动超时（40110 端口 30s 未监听）".to_string())
+    }
+}
+
+/// 停止服务：对齐现役版 stopService —— 先向 PTY 发 Ctrl+C 优雅退出，
+/// 等 3s 仍存活则 `taskkill /T /F` 收尾；外部启动的进程不接管。
+pub async fn stop_service(app: &AppHandle, service_id: &str) -> Result<Value, String> {
+    let state = app.state::<AppState>();
+    let id = match service_id {
+        MAIN_SERVER | MARKET_SERVER | CLIENT => service_id,
+        other => return Err(format!("未知服务: {other}")),
+    };
+    let name = match id {
+        MAIN_SERVER => "主服务器",
+        MARKET_SERVER => "市场服务",
+        _ => "游戏客户端",
+    };
+
+    let current = state.services.state_of(id);
+    if current == "idle" {
+        return Ok(json!({ "ok": true, "reason": format!("{name} 未运行") }));
+    }
+    if current == "stopping" {
+        return Ok(json!({ "ok": true, "reason": format!("{name} 正在停止") }));
+    }
+
+    // 外部启动的进程（没有 PID 记录）：只改状态，不越权杀
+    let owned = state.pty.pid(session_id(id)).is_some() || state.services.pid_of(id).is_some();
+    if !owned && (current == "running" || current == "starting") {
+        set_state(
+            app,
+            id,
+            "idle",
+            None,
+            Some("外部进程，未接管停止".to_string()),
+        );
+        return Ok(json!({ "ok": true, "reason": "external, not owned" }));
+    }
+
+    set_state(app, id, "stopping", None, Some("正在停止…".to_string()));
+    if id != CLIENT {
+        let _ = state
+            .pty
+            .write(session_id(id), crate::pty::TerminalInput::new("\u{3}"));
+        tokio::time::sleep(std::time::Duration::from_millis(3_000)).await;
+    }
+    stop_tree(app, id);
+    set_state(app, id, "idle", None, Some("已停止".to_string()));
+    Ok(json!({ "ok": true, "reason": "已停止" }))
+}
+
+pub async fn restart_service(app: &AppHandle, service_id: &str) -> Result<Value, String> {
+    stop_service(app, service_id).await?;
+    start_service(app, service_id).await
+}
+
+/// 一键启动：主服务器失败即中止；市场服务受设置项 startMarket 控制（对齐现役版 engageStart）
+pub async fn engage_start(app: &AppHandle) -> Value {
+    let settings = read_setting_bool(app, "startMarket", true);
+    let main = action_of(start_service(app, MAIN_SERVER).await);
+    if main["ok"] != json!(true) {
+        return main;
+    }
+    if settings {
+        let _ = start_service(app, MARKET_SERVER).await;
+    } else {
+        set_state(
+            app,
+            MARKET_SERVER,
+            "idle",
+            None,
+            Some("已跳过（启动选项关闭）".to_string()),
+        );
+    }
+    set_state(
+        app,
+        CLIENT,
+        "idle",
+        None,
+        Some("客户端由登录入口单独启动".to_string()),
+    );
+    json!({ "ok": true, "reason": "启动序列完成" })
+}
+
+pub async fn engage_stop(app: &AppHandle) -> Value {
+    let results = tokio::join!(
+        stop_service(app, MAIN_SERVER),
+        stop_service(app, MARKET_SERVER),
+        stop_service(app, CLIENT)
+    );
+    for result in [results.0, results.1, results.2] {
+        if let Err(reason) = result {
+            return json!({ "ok": false, "reason": reason });
+        }
+    }
+    json!({ "ok": true, "reason": "已全部停止" })
+}
+
+/// 现役版失败时返回 ServiceActionResult 而不是抛异常
+fn action_of(result: Result<Value, String>) -> Value {
+    match result {
+        Ok(value) => value,
+        Err(reason) => json!({ "ok": false, "reason": reason }),
+    }
+}
+
+/// 读取启动器设置里的布尔项（settings:set 写入 launcher-settings.json）
+fn read_setting_bool(app: &AppHandle, key: &str, fallback: bool) -> bool {
+    let Some(state) = app.try_state::<AppState>() else {
+        return fallback;
+    };
+    crate::config::read_settings(&state.runtime.settings_file())
+        .get(key)
+        .and_then(|value| value.as_bool())
+        .unwrap_or(fallback)
+}
+
+/* ------------------------------ 客户端直连启动 ------------------------------ */
+
+/// 客户端自动登录参数（对齐现役版 `ClientLoginOpts`）
+#[derive(Debug, Clone, Default)]
+pub struct ClientLogin {
+    pub user: String,
+    pub password: String,
+    /// 目标角色 ID（客户端 `/autoSelectCharacter:` 参数，直达该角色）
+    pub character_id: Option<String>,
+}
+
+/// 客户端早期崩溃观察窗口（现役版同款 6000ms）
+const CLIENT_WATCH_MS: u64 = 6_000;
+/// 客户端输出日志目录名（现役版 launcherRuntimeRoot()/logs/client）
+const CLIENT_LOG_SUBDIR: &str = "client";
+fn is_switch_on(value: &str) -> bool {
+    matches!(
+        value.trim().to_ascii_lowercase().as_str(),
+        "1" | "true" | "yes" | "on"
+    )
+}
+
+/// tq 同级的 ResFiles 资源缓存目录（等价 Play.bat 的 :ResolveClientResourceCache）
+fn resolve_client_res_files(client_path: &str) -> Option<String> {
+    let parent = Path::new(client_path).parent()?;
+    let res_files = parent.join("ResFiles");
+    res_files
+        .exists()
+        .then(|| res_files.to_string_lossy().to_string())
+}
+
+/// 复刻 Play.bat 的 :ApplyClientNetworkPolicy（代理 / Darkly 屏蔽 / Sentry 关闭 / 本地 CA）
+fn apply_client_network_policy(env: &mut BTreeMap<String, String>, proxy_url: &str, ca_pem: &str) {
+    let trimmed = proxy_url.trim();
+    let proxy = if trimmed.is_empty() {
+        "http://127.0.0.1:26002/".to_string()
+    } else {
+        trimmed.to_string()
+    };
+    const DARKLY: [&str; 12] = [
+        "launchdarkly.com",
+        ".launchdarkly.com",
+        "clientstream.launchdarkly.com",
+        "events.launchdarkly.com",
+        "mobile.launchdarkly.com",
+        "app.launchdarkly.com",
+        "sdk.launchdarkly.com",
+        "stream.launchdarkly.com",
+        "launchdarkly.us",
+        ".launchdarkly.us",
+        "launchdarkly.eu",
+        ".launchdarkly.eu",
+    ];
+    const BLOCKED_PREFIX: &str =
+        "api.ipify.org,sentry.io,.sentry.io,google-analytics.com,.google-analytics.com,";
+
+    let mut blocked = String::from(BLOCKED_PREFIX);
+    blocked.push_str(&DARKLY.join(","));
+
+    env.insert("EVEJS_PROXY_URL".to_string(), proxy.clone());
+    env.insert("EVEJS_PROXY_LOCAL_INTERCEPT".to_string(), "1".to_string());
+    env.insert(
+        "EVEJS_PROXY_UNHANDLED_HOST_POLICY".to_string(),
+        "block".to_string(),
+    );
+    env.insert("EVEJS_PROXY_BLOCKED_HOSTS".to_string(), blocked);
+    for key in [
+        "http_proxy",
+        "https_proxy",
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "all_proxy",
+        "ALL_PROXY",
+    ] {
+        env.insert(key.to_string(), proxy.clone());
+    }
+    let no_proxy = "127.0.0.1,localhost,::1";
+    env.insert("EVEJS_NO_PROXY".to_string(), no_proxy.to_string());
+    env.insert("no_proxy".to_string(), no_proxy.to_string());
+    env.insert("NO_PROXY".to_string(), no_proxy.to_string());
+    env.insert("EVE_CLIENT_SENTRY_DSN".to_string(), String::new());
+    env.insert("SSL_CERT_DIR".to_string(), String::new());
+    env.insert("LD_OFFLINE".to_string(), "true".to_string());
+    env.insert("LAUNCHDARKLY_OFFLINE".to_string(), "true".to_string());
+    env.insert("LAUNCHDARKLY_SEND_EVENTS".to_string(), "false".to_string());
+    env.insert("LD_SEND_EVENTS".to_string(), "false".to_string());
+    if !ca_pem.trim().is_empty() && Path::new(ca_pem).is_file() {
+        env.insert("SSL_CERT_FILE".to_string(), ca_pem.to_string());
+        env.insert("REQUESTS_CA_BUNDLE".to_string(), ca_pem.to_string());
+        env.insert("CURL_CA_BUNDLE".to_string(), ca_pem.to_string());
+    }
+}
+
+/// 跑 ClientSETUP 的 PowerShell 脚本（隐藏窗口、120s 超时、失败只取首行）
+async fn run_client_setup_script(
+    script: &Path,
+    args: Vec<String>,
+    extra_env: Vec<(String, String)>,
+) -> Result<String, String> {
+    let mut command = tokio::process::Command::new("powershell.exe");
+    command
+        .args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-File"])
+        .arg(script)
+        .args(args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    for (key, value) in extra_env {
+        command.env(key, value);
+    }
+    #[cfg(windows)]
+    {
+        use crate::win32::CREATE_NO_WINDOW;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    match tokio::time::timeout(std::time::Duration::from_secs(120), command.output()).await {
+        Ok(Ok(output)) if output.status.success() => {
+            Ok(String::from_utf8_lossy(&output.stdout).to_string())
+        }
+        Ok(Ok(output)) => {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let text = if stderr.trim().is_empty() {
+                stdout
+            } else {
+                stderr
+            };
+            Err(crate::sidecar::first_line(&text))
+        }
+        Ok(Err(err)) => Err(crate::sidecar::first_line(&err.to_string())),
+        Err(_) => Err("脚本执行超时（120s）".to_string()),
+    }
+}
+
+/// Play.bat 每次启动都会跑 Install-EvEJSCerts.ps1；直连客户端时自己补上（失败不阻塞）
+async fn prepare_client_certificate_trust(root: &Path, client_path: &str) {
+    let script = root
+        .join("tools")
+        .join("ClientSETUP")
+        .join("scripts")
+        .join("Install-EvEJSCerts.ps1");
+    if !script.is_file() {
+        return;
+    }
+    let _ = run_client_setup_script(
+        &script,
+        vec!["-ClientPath".to_string(), client_path.to_string()],
+        Vec::new(),
+    )
+    .await;
+}
+
+/// 启动前按配置决定是否重置显示设置（开关默认 off，此时完全不启动 PowerShell）
+async fn prepare_client_display_safety(root: &Path, client: &crate::config::ClientConfig) {
+    let safe_windowed = if client.safe_windowed.is_empty() {
+        "off".to_string()
+    } else {
+        client.safe_windowed.clone()
+    };
+    let safe_graphics = if client.safe_graphics.is_empty() {
+        "off".to_string()
+    } else {
+        client.safe_graphics.clone()
+    };
+    let script = root
+        .join("tools")
+        .join("ClientSETUP")
+        .join("scripts")
+        .join("PrepareClientSettings.ps1");
+    for (mode, switch) in [("Display", &safe_windowed), ("Graphics", &safe_graphics)] {
+        if !is_switch_on(switch) {
+            continue;
+        }
+        let _ = run_client_setup_script(
+            &script,
+            vec!["-Mode".to_string(), mode.to_string()],
+            vec![
+                ("EVEJS_CLIENT_PATH".to_string(), client.client_path.clone()),
+                (
+                    "EVEJS_CLIENT_SAFE_WINDOWED".to_string(),
+                    safe_windowed.clone(),
+                ),
+                (
+                    "EVEJS_CLIENT_SAFE_GRAPHICS".to_string(),
+                    safe_graphics.clone(),
+                ),
+            ],
+        )
+        .await;
+    }
+}
+
+/// 客户端 stdout/stderr 由 `/stdout=` `/stderr=` 落盘，再增量喂给终端页签
+/// （现役版 startClientLogTail：350ms 轮询，按整行推送，单块上限 64 KB）
+fn start_client_log_tail(app: &AppHandle, file: PathBuf, tab: &str, stop: Arc<AtomicBool>) {
+    let app = app.clone();
+    let tab = tab.to_string();
+    std::thread::spawn(move || {
+        let mut offset: u64 = 0;
+        let mut pending: Vec<u8> = Vec::new();
+        loop {
+            let stopping = stop.load(Ordering::Relaxed);
+            pump_client_log(&app, &file, &tab, &mut offset, &mut pending);
+            if stopping {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(350));
+        }
+    });
+}
+
+fn pump_client_log(
+    app: &AppHandle,
+    file: &Path,
+    tab: &str,
+    offset: &mut u64,
+    pending: &mut Vec<u8>,
+) {
+    let Ok(meta) = std::fs::metadata(file) else {
+        return;
+    };
+    let size = meta.len();
+    if size <= *offset {
+        return;
+    }
+    let Ok(mut handle) = std::fs::File::open(file) else {
+        return;
+    };
+    if handle.seek(SeekFrom::Start(*offset)).is_err() {
+        return;
+    }
+    let mut chunk = Vec::new();
+    if handle.take(size - *offset).read_to_end(&mut chunk).is_err() {
+        return;
+    }
+    *offset += chunk.len() as u64;
+    pending.extend_from_slice(&chunk);
+    match pending.iter().rposition(|byte| *byte == b'\n') {
+        Some(index) => {
+            let text = String::from_utf8_lossy(&pending[..=index]).to_string();
+            pending.drain(..=index);
+            let _ = app.emit("terminal:data", json!([tab, text]));
+        }
+        None if pending.len() >= 65_536 => {
+            let text = String::from_utf8_lossy(pending).to_string();
+            pending.clear();
+            let _ = app.emit("terminal:data", json!([tab, text]));
+        }
+        None => {}
+    }
+}
+
+/// 当前时间（毫秒时间戳）：服务运行时长的起点用
+fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+/// ISO8601 UTC 时间戳（毫秒精度，对齐现役版 `new Date().toISOString()`）
+pub(crate) fn iso_timestamp() -> String {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default();
+    let secs = now.as_secs();
+    let (year, month, day) = civil_from_days((secs / 86_400) as i64);
+    let rem = secs % 86_400;
+    format!(
+        "{year:04}-{month:02}-{day:02}T{:02}:{:02}:{:02}.{:03}Z",
+        rem / 3600,
+        (rem % 3600) / 60,
+        rem % 60,
+        now.subsec_millis()
+    )
+}
+
+/// 文件名安全版 ISO 时间戳（把 `:` 和 `.` 换成 `-`）
+fn iso_log_stamp() -> String {
+    iso_timestamp().replace([':', '.'], "-")
+}
+
+/// 天数 → (年, 月, 日)（Howard Hinnant 的 civil_from_days，避免为一行时间戳引入 chrono）
+pub(crate) fn civil_from_days(days: i64) -> (i64, u32, u32) {
+    let shifted = days + 719_468;
+    let era = if shifted >= 0 {
+        shifted
+    } else {
+        shifted - 146_096
+    } / 146_097;
+    let doe = (shifted - era * 146_097) as u64;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let year = yoe as i64 + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = (doy - (153 * mp + 2) / 5 + 1) as u32;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 } as u32;
+    (if month <= 2 { year + 1 } else { year }, month, day)
+}
+
+/// 客户端直连启动（对齐现役版 startClient）：/noconsole + /login: + /autoSelectCharacter: + /port:
+pub async fn start_client(app: &AppHandle, login: Option<ClientLogin>) -> Result<Value, String> {
+    let Some((root, logs_dir)) = app
+        .try_state::<AppState>()
+        .map(|state| (state.repo_root(), state.runtime.logs.clone()))
+    else {
+        return Err("应用状态不可用".to_string());
+    };
+
+    let client = crate::config::read_client_config(&root);
+    if client.client_path.trim().is_empty() || !Path::new(&client.client_path).exists() {
+        let message = "客户端路径无效，请先在配置面板设置".to_string();
+        set_state(app, CLIENT, "error", None, Some(message));
+        return Err("客户端路径无效".to_string());
+    }
+
+    let client_dir = Path::new(&client.client_path);
+    let bin64 = client_dir.join("bin64").join("exefile.exe");
+    let bin = client_dir.join("bin").join("exefile.exe");
+    let exe = if !client.client_exe.trim().is_empty() && Path::new(&client.client_exe).is_file() {
+        PathBuf::from(client.client_exe.trim())
+    } else if bin64.is_file() {
+        bin64
+    } else {
+        bin
+    };
+    if !exe.is_file() {
+        let shown = exe.to_string_lossy().to_string();
+        set_state(
+            app,
+            CLIENT,
+            "error",
+            None,
+            Some(format!("客户端程序不存在：{shown}")),
+        );
+        return Err(format!("exefile 不存在：{shown}"));
+    }
+
+    /* ---- 自动登录参数（V1 同款三件套） ---- */
+    let login = login.unwrap_or_default();
+    let account = login.user.trim().to_string();
+    let password = login.password;
+    let character_id = login.character_id.unwrap_or_default().trim().to_string();
+    let mut args: Vec<String> = vec!["/noconsole".to_string()];
+    if password.contains(':') {
+        set_state(
+            app,
+            CLIENT,
+            "error",
+            None,
+            Some("自动登录失败：密码不能包含冒号（客户端 /login: 参数限制）".to_string()),
+        );
+        return Err("密码不能包含冒号".to_string());
+    }
+    if !account.is_empty() && !password.is_empty() {
+        args.push(format!("/login:{account}:{password}"));
+    }
+    let character_ok = !character_id.is_empty()
+        && character_id.chars().all(|ch| ch.is_ascii_digit())
+        && character_id.parse::<u64>().unwrap_or(0) > 0;
+    if character_ok {
+        args.push(format!(
+            "/autoSelectCharacter:{}",
+            character_id.parse::<u64>().unwrap_or(0)
+        ));
+    }
+
+    /* ---- 游戏端口 ---- */
+    let configured_port = crate::config::read_server_config(&root).ports.game;
+    let game_port = if configured_port > 0 {
+        configured_port
+    } else {
+        26000
+    };
+    args.push(format!("/port:{game_port}"));
+
+    /* ---- 客户端输出落盘到 _launcher/logs/client（目录与文件名全部 ASCII） ---- */
+    let client_log_dir = logs_dir.join(CLIENT_LOG_SUBDIR);
+    let _ = std::fs::create_dir_all(&client_log_dir);
+    let stamp = iso_log_stamp();
+    let pid_hint = std::process::id();
+    let stdout_log = client_log_dir.join(format!("client-{stamp}-{pid_hint}.out.log"));
+    let stderr_log = client_log_dir.join(format!("client-{stamp}-{pid_hint}.err.log"));
+    args.push(format!("/stdout={}", stdout_log.to_string_lossy()));
+    args.push(format!("/stderr={}", stderr_log.to_string_lossy()));
+
+    /* ---- 环境（等价 Play.bat 的 ApplyClientNetworkPolicy + ResFiles） ---- */
+    let mut env: BTreeMap<String, String> = BTreeMap::new();
+    apply_client_network_policy(&mut env, &client.proxy_url, &client.ca_pem);
+    if let Some(res_files) = resolve_client_res_files(&client.client_path) {
+        env.insert("EO_REMOTEFILECACHEFOLDER".to_string(), res_files);
+    }
+
+    await_client_prepare(&root, &client).await;
+
+    let mut command = tokio::process::Command::new(&exe);
+    command
+        .args(&args)
+        .current_dir(client_dir)
+        .envs(&env)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    // 客户端 creationFlags：不分配控制台 + 独立进程组。绝不能叠加 windowsHide ——
+    // Windows 会把 SW_HIDE 应用到 GUI 子系统的 exefile.exe 首次显示窗口上（B8 历史故障点）。
+    #[cfg(windows)]
+    command.creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP);
+
+    let mut child = match command.spawn() {
+        Ok(child) => child,
+        Err(err) => {
+            let reason = err.to_string();
+            set_state(
+                app,
+                CLIENT,
+                "error",
+                None,
+                Some(format!("客户端启动失败：{reason}")),
+            );
+            return Err(reason);
+        }
+    };
+    let pid = child.id().unwrap_or(0);
+    set_state(
+        app,
+        CLIENT,
+        "starting",
+        Some(pid),
+        Some(format!("客户端启动中（PID {pid}）")),
+    );
+
+    let stop_flag = Arc::new(AtomicBool::new(false));
+    start_client_log_tail(app, stdout_log, "client", stop_flag.clone());
+    start_client_log_tail(app, stderr_log, "client", stop_flag.clone());
+
+    let app_exit = app.clone();
+    let stop_exit = stop_flag.clone();
+    tauri::async_runtime::spawn(async move {
+        let code = match child.wait().await {
+            Ok(status) => status.code().map(i64::from).unwrap_or(-1),
+            Err(_) => -1,
+        };
+        stop_exit.store(true, Ordering::Relaxed);
+        let current = app_exit.state::<AppState>().services.state_of(CLIENT);
+        if current == "running" || current == "starting" {
+            set_state(
+                &app_exit,
+                CLIENT,
+                "error",
+                None,
+                Some(format!("客户端已退出（exit {code}）")),
+            );
+        } else {
+            app_exit.state::<AppState>().services.clear_pid(CLIENT);
+            emit_services(&app_exit);
+        }
+    });
+
+    /* 直连启动后短暂观察：早期崩溃（配置 / 证书 / 资源错误）立刻反馈给 UI */
+    let deadline = std::time::Instant::now() + std::time::Duration::from_millis(CLIENT_WATCH_MS);
+    while std::time::Instant::now() < deadline {
+        let services = &app.state::<AppState>().services;
+        if services.state_of(CLIENT) != "starting" {
+            stop_flag.store(true, Ordering::Relaxed);
+            let reason = services
+                .message_of(CLIENT)
+                .unwrap_or_else(|| "客户端已退出（exit ?）".to_string());
+            return Err(reason);
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(400)).await;
+    }
+
+    set_state(
+        app,
+        CLIENT,
+        "running",
+        Some(pid),
+        Some(format!("客户端已启动（PID {pid}）")),
+    );
+    Ok(json!({ "ok": true, "reason": "ok", "pid": pid }))
+}
+
+/// 启动前的证书信任 + 显示安全检查（都失败不阻塞启动）
+async fn await_client_prepare(root: &Path, client: &crate::config::ClientConfig) {
+    prepare_client_certificate_trust(root, &client.client_path).await;
+    prepare_client_display_safety(root, client).await;
+}
+
+pub fn repo_root_of(app: &AppHandle) -> std::path::PathBuf {
+    app.state::<AppState>().repo_root()
+}
+
+pub fn is_any_running(app: &AppHandle) -> bool {
+    app.state::<AppState>()
+        .services
+        .snapshot()
+        .iter()
+        .any(|info| info.state == "running" || info.state == "starting")
+}
+
+pub fn server_dir_of(root: &Path) -> std::path::PathBuf {
+    root.join("server")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// L6 进程树：停服必须把整棵树（含孙进程）一起收走，不能留孤儿。
+    ///
+    /// 为什么必须真起两级进程：现役版 killOwned 与本模块的 `taskkill /PID <pid> /T /F`
+    /// 都是「按 PID 树」收，只有真拉起 `node → node` 才证明得了 `/T` 生效
+    /// （只杀根 PID 的话孙进程会活下来，端口也就一直占着）。
+    ///
+    /// 默认 `#[ignore]`：真起两个 node 进程。跑法：
+    ///   cargo test --lib -- --ignored --nocapture l6_process_tree
+    ///   pwsh -File scripts/check-process-residue.ps1   （外加系统级残留断言与产物）
+    #[test]
+    #[ignore = "L6 进程树验收：真起 node 父子进程，需显式 --ignored 运行"]
+    fn l6_stop_kills_whole_process_tree() {
+        use crate::pty::{PtyManager, PtySpec};
+        use crate::win32;
+        use std::time::{Duration, Instant};
+
+        let dir = std::env::temp_dir().join(format!("evejs-l6-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("建临时目录失败");
+        let pid_file = dir.join("child.pid");
+        let _ = std::fs::remove_file(&pid_file);
+
+        // 父进程：拉一个孙进程（每秒空转）→ 把孙进程 PID 写盘 → 自己也不退出
+        let script = format!(
+            "const fs=require('fs');const {{spawn}}=require('child_process');\
+             const child=spawn(process.execPath,['-e','setInterval(()=>{{}},1000)'],{{stdio:'ignore'}});\
+             fs.writeFileSync({path},String(child.pid));\
+             setInterval(()=>{{}},1000);",
+            path = serde_json::to_string(&pid_file.to_string_lossy().to_string()).unwrap_or_default()
+        );
+
+        let pty = PtyManager::new();
+        let root = pty
+            .spawn_streaming(
+                "l6-tree",
+                PtySpec::new("node", &dir).args(vec!["-e".to_string(), script]),
+                |_tab, _text| {},
+                |_tab, _code| {},
+            )
+            .expect("启动 L6 父进程失败");
+
+        let deadline = Instant::now() + Duration::from_secs(20);
+        let mut child_pid = 0u32;
+        while Instant::now() < deadline && child_pid == 0 {
+            if let Ok(text) = std::fs::read_to_string(&pid_file) {
+                child_pid = text.trim().parse::<u32>().unwrap_or(0);
+            }
+            if child_pid == 0 {
+                std::thread::sleep(Duration::from_millis(100));
+            }
+        }
+        assert!(child_pid > 0, "20 s 内没等到孙进程 PID");
+        assert!(win32::alive(root), "父进程应当活着");
+        assert!(win32::alive(child_pid), "孙进程应当活着");
+        let tree = win32::descendants(root);
+        assert!(
+            tree.iter().any(|entry| entry.pid == child_pid),
+            "孙进程不在进程树里（快照口径可疑）：{tree:?}"
+        );
+
+        taskkill_tree(root);
+
+        let deadline = Instant::now() + Duration::from_secs(20);
+        let mut leftover: Vec<win32::ProcessEntry> = win32::descendants(root)
+            .into_iter()
+            .filter(|entry| win32::alive(entry.pid))
+            .collect();
+        while !leftover.is_empty() && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(200));
+            leftover = win32::descendants(root)
+                .into_iter()
+                .filter(|entry| win32::alive(entry.pid))
+                .collect();
+        }
+        println!(
+            "[L6] 根 PID {root} · 孙进程 {child_pid} · 停后残留 {} 个（{}）",
+            leftover.len(),
+            leftover
+                .iter()
+                .map(|entry| format!("{}:{}", entry.name, entry.pid))
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+        assert!(leftover.is_empty(), "停服后仍有残留：{leftover:?}");
+        assert!(!win32::alive(root), "根进程仍活着");
+        assert!(!win32::alive(child_pid), "孙进程仍活着（/T 没生效）");
+        pty.remove("l6-tree");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn civil_from_days_matches_known_dates() {
+        assert_eq!(civil_from_days(0), (1970, 1, 1));
+        assert_eq!(civil_from_days(20_000), (2024, 10, 4));
+        assert_eq!(civil_from_days(19_723), (2024, 1, 1));
+    }
+
+    #[test]
+    fn log_stamp_is_filename_safe_iso8601() {
+        let stamp = iso_log_stamp();
+        assert!(stamp.ends_with('Z'), "时间戳应以 Z 结尾: {stamp}");
+        assert!(
+            !stamp.contains(':') && !stamp.contains('.'),
+            "时间戳不能含 : 或 .（文件名非法字符）: {stamp}"
+        );
+        assert_eq!(stamp.len(), "2026-09-25T13-04-05-678Z".len(), "{stamp}");
+    }
+
+    #[test]
+    fn switch_parser_matches_bat_convention() {
+        for on in ["on", "ON", " 1 ", "true", "Yes"] {
+            assert!(is_switch_on(on), "{on} 应视为开启");
+        }
+        for off in ["", "off", "0", "no", "disabled"] {
+            assert!(!is_switch_on(off), "{off} 应视为关闭");
+        }
+    }
+
+    /// 模组 loader 注入：路径必须是正斜杠 + 双引号（NODE_OPTIONS 会把反斜杠当转义吃掉）
+    #[test]
+    fn loader_node_options_uses_forward_slashes_and_quotes() {
+        let root = std::env::temp_dir().join(format!("evejs-loader-env-{}", iso_log_stamp()));
+        let repo = root.join("repo");
+        let mods = repo.join("mods");
+        let runtime = crate::runtime::RuntimePaths::from_root(root.join("_launcher"), false);
+        std::fs::create_dir_all(&runtime.root).unwrap();
+        std::fs::create_dir_all(&runtime.temp).unwrap();
+        std::fs::create_dir_all(&runtime.cache).unwrap();
+
+        std::fs::create_dir_all(&mods).unwrap();
+        assert_eq!(
+            mods_loader_node_options(&repo, &runtime),
+            None,
+            "没有模组时不应注入"
+        );
+
+        let dir = mods.join("demo");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("loader.js"), "require('./x.js')\n").unwrap();
+        std::fs::write(
+            dir.join("evejs-launcher.mod.json"),
+            serde_json::to_string_pretty(&json!({
+                "schemaVersion": 3,
+                "id": "demo",
+                "displayName": "示例",
+                "version": "1.0.0",
+                "kind": "loader",
+                "restart": "game_server",
+                "activation": { "strategy": "loader_rename" }
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+
+        let options = mods_loader_node_options(&repo, &runtime).expect("应注入一个 loader");
+        assert!(options.contains("--require \""), "{options}");
+        assert!(options.contains("/mods/demo/loader.js\""), "{options}");
+        assert!(
+            !options.contains('\\'),
+            "NODE_OPTIONS 里不能出现反斜杠：{options}"
+        );
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+    #[test]
+    fn network_policy_blocks_darkly_and_sets_proxy() {
+        let mut env: BTreeMap<String, String> = BTreeMap::new();
+        apply_client_network_policy(&mut env, "", "");
+        assert_eq!(env["EVEJS_PROXY_URL"], "http://127.0.0.1:26002/");
+        assert_eq!(env["EVEJS_PROXY_UNHANDLED_HOST_POLICY"], "block");
+        assert!(env["EVEJS_PROXY_BLOCKED_HOSTS"].contains("launchdarkly.com"));
+        assert!(env["EVEJS_PROXY_BLOCKED_HOSTS"].contains("sentry.io"));
+        assert_eq!(env["HTTP_PROXY"], env["http_proxy"]);
+        assert_eq!(env["LD_OFFLINE"], "true");
+        // 未配置 CA 时不得设置证书变量，避免把不存在的路径塞给客户端
+        assert!(!env.contains_key("SSL_CERT_FILE"));
+        assert_eq!(env["EVEJS_NO_PROXY"], "127.0.0.1,localhost,::1");
+    }
+}

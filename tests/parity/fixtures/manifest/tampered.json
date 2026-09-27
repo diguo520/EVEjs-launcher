@@ -1,0 +1,24 @@
+{
+  "version": "9.9.9",
+  "platforms": {
+    "windows-x86_64": {
+      "url": "https://example.com/evejs-launcher.zip",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "sizeBytes": 12345
+    },
+    "windows-i686": {
+      "url": "https://example.com/evejs-launcher-x86.zip",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "sizeBytes": 23456
+    }
+  },
+  "notes": {
+    "zh-CN": "新版本"
+  },
+  "publishedAt": "2026-09-26T00:00:00.000Z",
+  "signature": {
+    "alg": "ed25519",
+    "keyId": "evejs-parity-fixture",
+    "sig": "jLNFEq40ausNR5r2mvVzgqUjrEUhkaMnjLa+uVZnJO4rS/cqYQ8c180QtoNsTkF5Y8vC2yAOfLw3bPrXgCwXDA=="
+  }
+}
