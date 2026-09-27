@@ -22,7 +22,7 @@ const PUBLISH_TIMEOUT: Duration = Duration::from_secs(30);
 const UPLOAD_TIMEOUT: Duration = Duration::from_secs(120);
 /// 默认索引仓库（对齐 `modSubmit.ts::DEFAULT_INDEX_REPO`）
 pub const DEFAULT_INDEX_REPO: &str = "diguo520/EVEjs-mods";
-const TOKEN_FILE: &str = "github-token.bin";
+pub(crate) const TOKEN_FILE: &str = "github-token.bin";
 
 /* ------------------------------ 令牌存取 ------------------------------ */
 

@@ -1,6 +1,6 @@
 /* 由 scripts/gen-contract.mjs 生成 —— 请勿手改。源: contract/ipc-channels.json */
 /* 抽取源: E:\Games\EveJS-v0.12.8\launcher\launcher */
-/* 生成时间: 2026-09-27T21:52:08.459Z */
+/* 生成时间: 2026-09-27T23:13:19.159Z */
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 

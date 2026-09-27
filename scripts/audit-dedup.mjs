@@ -186,6 +186,7 @@ const UNSAFE_ALLOWED = new Set([
   "src-tauri/src/shell.rs",
   "src-tauri/src/dialog.rs",
   "src-tauri/src/webview2.rs", // WebView2 运行时预检（RegGetValueW / MessageBoxW）
+  "src-tauri/src/oscrypt.rs", // Chromium OSCrypt：BCrypt CNG + DPAPI（加解密与密钥解包）
   "src-tauri/src/win32.rs" // 系统内存探针（GlobalMemoryStatusEx）
 ]);
 const unsafeSites = [];
@@ -198,7 +199,7 @@ for (const [file, text] of SRC) {
 }
 const unsafeOffenders = unsafeSites.filter((site) => !UNSAFE_ALLOWED.has(site.file));
 check(
-  "unsafe 只出现在 FFI 白名单文件（secrets/shell/dialog/webview2/win32）",
+  "unsafe 只出现在 FFI 白名单文件（secrets/shell/dialog/webview2/win32/oscrypt）",
   unsafeOffenders.length === 0,
   unsafeOffenders.map((site) => `${site.file}:${site.line}`).join(", ")
 );

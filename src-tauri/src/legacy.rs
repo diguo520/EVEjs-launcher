@@ -17,16 +17,15 @@
 //!     `cache/Local State` 里。所以搬令牌时必须**连密钥一起搬**，否则搬过去的是一坨解不开的字节。
 //!     密钥用 DPAPI 解出来后再用 DPAPI 包一层，存进 `data/os-crypt-key.bin`（见 `oscrypt.rs`）。
 //!   - 一处老目录里接管到东西就停手，不把两台不同安装的身份混在一起。
+use crate::author::{AUTHOR_FILE, KEY_DIR};
+use crate::github::TOKEN_FILE;
 use crate::runtime::RuntimePaths;
+use crate::secrets::CREDENTIALS_KEY;
 use serde_json::{json, Map, Value};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-const AUTHOR_FILE: &str = "author.json";
-const TOKEN_FILE: &str = "github-token.bin";
 const SETTINGS_FILE: &str = "launcher-settings.json";
-const KEY_DIR: &str = "mod-keys";
-const CREDENTIALS_KEY: &str = "accountCredentials";
 const STATE_FILE: &str = "legacy-adoption.json";
 const DATA_DIR: &str = "data";
 const LAUNCHER_DIR: &str = "_launcher";
