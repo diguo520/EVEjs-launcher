@@ -79,8 +79,13 @@ try {
     # 契约确实变了时：在有现役版的本机跑 npm run contract，把新契约一并提交。
     $referenceRoot = if ($env:EVEJS_REFERENCE_ROOT) { $env:EVEJS_REFERENCE_ROOT } else { "E:\Games\EveJS-v0.12.8\launcher\launcher" }
 
+    # 注意：这里**不能**用 Join-Path —— 它走 PowerShell 驱动器校验，参考实现默认在 E: 盘，
+    # 而 CI runner 上根本没有 E: 盘（实测报错 "Cannot find drive. A drive with the name 'E' does not exist."），
+    # 会直接抛终止错误。用 .NET 的路径拼接 + 文件存在判断，纯字符串操作，不碰驱动器。
+    $referencePreload = [System.IO.Path]::Combine($referenceRoot, "src", "preload", "index.ts")
+
     if (-not $SkipContract) {
-        if (Test-Path -LiteralPath (Join-Path $referenceRoot "src\preload\index.ts")) {
+        if ([System.IO.File]::Exists($referencePreload)) {
             Invoke-Step 1 "契约生成" { Invoke-Node scripts/extract-contract.mjs; Invoke-Node scripts/gen-contract.mjs }
         }
         else {
@@ -172,8 +177,8 @@ try {
                 node tests/parity/driver-tauri.mjs
                 node tests/parity/diff.mjs
             }
-            $referenceExe = Join-Path $referenceRoot "node_modules\electron\dist\electron.exe"
-            if (Test-Path -LiteralPath $referenceExe) {
+            $referenceExe = [System.IO.Path]::Combine($referenceRoot, "node_modules", "electron", "dist", "electron.exe")
+            if ([System.IO.File]::Exists($referenceExe)) {
                 Invoke-Step 12 "parity 跨实现（Electron 现役版 ↔ Tauri）" {
                     node tests/parity/driver-electron.mjs
                     node tests/parity/diff-cross.mjs
