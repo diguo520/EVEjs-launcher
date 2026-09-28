@@ -36,13 +36,18 @@ const CHUNK: usize = 64 * 1024;
 
 /// 内置维护者公钥（base64 raw Ed25519，32 字节）。
 ///
-/// **空串 = 尚未配置 → 一律拒绝更新**（fail closed，A1）。配置步骤见
-/// `docs/S3-查重与审核-实施记录.md`：`node scripts/gen-update-key.mjs` 生成密钥对，
-/// 私钥存 CI Secret（发布时签 `update-manifest.json`），公钥粘到这两个常量上。
+/// **空串 = 尚未配置 → 一律拒绝更新**（fail closed，A1）。当前已配置
+/// `evejs-release-2026-09-28`：私钥 `.keys/update-key.pem`（已 gitignore）由维护者离线保管，
+/// 只在发版签 `update-manifest.json` 时使用，**绝不入库、绝不进 CI 日志**。
+///
+/// 注意：验签用的是**运行中二进制里编译进去的**公钥，改这两个常量只对
+/// **重新打包后**的 exe 生效；轮换密钥等于强制所有老版本手动升级一次。
+/// 生成/推导/比对：`node scripts/gen-update-key.mjs`（配置步骤见
+/// `docs/S3-查重与审核-实施记录.md`、`docs/S7-发布与回滚-实施记录.md` §5.3）。
 ///
 /// 测试与本地演练用 `EVEJS_UPDATE_KEY_ID` / `EVEJS_UPDATE_PUBKEY` 覆盖，不必重编译。
-pub const UPDATE_KEY_ID: &str = "";
-pub const UPDATE_PUBKEY: &str = "";
+pub const UPDATE_KEY_ID: &str = "evejs-release-2026-09-28";
+pub const UPDATE_PUBKEY: &str = "yaeYfbkFF4IdHC8o/GcoEFktr1zy6wpihd2VGeGynVE=";
 
 /// 允许 `file://` / 本地路径清单的开关（只有 smoke 与本地演练该打开它）
 const ALLOW_LOCAL_ENV: &str = "EVEJS_UPDATE_ALLOW_LOCAL";

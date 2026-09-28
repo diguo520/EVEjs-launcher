@@ -11,7 +11,7 @@
   pwsh -File scripts/package.ps1                 # release 构建 + 便携版 + 清单
   pwsh -File scripts/package.ps1 -SkipBuild      # 复用已有产物（迭代打包用）
   pwsh -File scripts/package.ps1 -Nsis           # 额外出 NSIS 安装包
-  pwsh -File scripts/package.ps1 -SignKey .keys/update-key.pem -KeyId evejs-release-2026
+  pwsh -File scripts/package.ps1 -SignKey .keys/update-key.pem -KeyId evejs-release-2026-09-28
 #>
 param(
     [switch]$SkipBuild,
