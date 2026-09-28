@@ -311,8 +311,11 @@ export function ModulesPage({
       readme: input.readme,
       conflicts: input.conflicts,
       requiresRestart: input.build.restart,
-      enableAfterCreate: input.build.enableAfterCreate,
-      signAfterCreate: input.build.signAfterCreate,
+      // ⚠️ 后端（与现役版 modScaffold.createMod 一致）读的键名是 enabled / sign，
+      // 不是界面内部的 enableAfterCreate / signAfterCreate —— 传错名字的后果是
+      // 「勾了立即启用，落盘还是 loader.js.disabled」（2026-09-28 报障的根因）。
+      enabled: input.build.enableAfterCreate,
+      sign: input.build.signAfterCreate,
     })
     if (!reply.ok) {
       toast.error(`模组「${input.name}」创建失败`, {
@@ -337,10 +340,26 @@ export function ModulesPage({
       await createMod(input)
       return
     }
-    // 后端没有「改写清单」的通道：清单是模组的身份文件，直接改会绕过签名校验
-    toast("清单请直接编辑文件", {
-      description: `改 mods/${input.id}/evejs-launcher.mod.json 后回到本页刷新即可；启动器不代写清单。`,
-      action: { label: "打开模组目录", onClick: () => void source.openModFolder(keyOf(target)) },
+    // 真落盘：后端只改「非身份字段」（显示名 / 简介 / 分类 / 标签 / 冲突 / 重启语义 + README），
+    // id、version、author、signature 一律不碰，改完由后端重签（签名失败会整份回滚）。
+    const reply = await source.updateMeta(keyOf(target), {
+      displayName: input.name,
+      description: input.desc,
+      category: input.cat,
+      tags: input.tags,
+      conflicts: input.conflicts,
+      requiresRestart: input.build.restart,
+      readme: input.readme,
+      highlights: input.features,
+    })
+    if (!reply.ok) {
+      toast.error(`模组「${input.name}」保存失败`, {
+        description: reply.reason ?? "后端没说明原因",
+      })
+      return
+    }
+    toast.success(`模组「${input.name}」已保存`, {
+      description: `清单与 README 已更新并重新签名（release 内的模组需要重启主服务器后生效）。`,
     })
   }
 
@@ -371,10 +390,10 @@ export function ModulesPage({
   function openSubmit(id: string | null) {
     // 从卡片或创建成功的提示进来时目标已经确定，只有工具栏那个入口需要先看看有没有可提交的
     if (id === null) {
-      const pool = mods.filter((mod) => mod.mine && mod.review !== "reviewing")
+      const pool = mods.filter((mod) => mod.mine)
       if (pool.length === 0) {
         toast("没有可发布的模组", {
-          description: "本地创建的模组都已经发布过了。",
+          description: "本地还没有你自己创建的模组，先创建一个再发布。",
         })
         return
       }
@@ -383,10 +402,10 @@ export function ModulesPage({
     setSubmitOpen(true)
   }
 
-  const submitCandidates = useMemo(
-    () => mods.filter((mod) => mod.mine && mod.review !== "reviewing"),
-    [mods]
-  )
+  // 不在候选里过滤「审核中」：新流程下一次发布只是往自己的仓库推一版 + 发 Release，
+  // 收录源一辈子只登记一次，任何审核状态都不该挡住发新版（旧写法会把发过一次的模组永久藏起来，
+  // 用户就再也选不中它了 —— 2026-09-28 报障）。审核状态在卡片上照旧用徽标显示。
+  const submitCandidates = useMemo(() => mods.filter((mod) => mod.mine), [mods])
 
   /** 发布前置还差什么（署名、GitHub 令牌）：入口上的黄点与提交弹窗都看它 */
   const pendingBlockers = publishBlockersList()

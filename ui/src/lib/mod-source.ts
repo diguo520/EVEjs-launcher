@@ -184,7 +184,8 @@ export function buildMods(input: {
 /** 已经有源码仓库的模组 id（提交台账里 sourceRepo 非空，或索引里已上架过） */
 export function sourceRepoIds(
   mine: RawMyMods | null | undefined,
-  submissions: RawSubmissionItem[] | undefined
+  submissions: RawSubmissionItem[] | undefined,
+  localMods?: { id?: string; sourceRepo?: string }[] | null
 ): string[] {
   const ids = new Set<string>()
   for (const item of mine?.items ?? []) {
@@ -192,6 +193,12 @@ export function sourceRepoIds(
   }
   for (const item of submissions ?? []) {
     if (item.sourceRepo) ids.add(item.id)
+  }
+  // 本地模组目录里的 .evejs-source.json（scan 读出来的 mod.sourceRepo）同样是「已经有源码仓库」的凭据：
+  // 台账只记得住发布成功的那一版，换过数据目录 / 清过 cache 之后就缺了，只认台账会导致
+  // 每次发布都重新建仓 + 重提一次「收录源登记」PR（2026-09-28 报障：发布过却说没提交过审核）。
+  for (const mod of localMods ?? []) {
+    if (mod?.id && mod.sourceRepo) ids.add(mod.id)
   }
   return [...ids]
 }

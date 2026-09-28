@@ -8,6 +8,7 @@
  * 说明：
  *   - 渲染层只通过 window.api 访问主进程，所以 src/preload/index.ts 是契约主来源；
  *   - src/main/ipc.ts 用于交叉校验（「注册未暴露」「暴露未注册」）；
+ *   - 本工程新增的通道写在 contract/extensions.json，重抽时自动并回来（见下第 4 步）；
  *   - 生成物不要手改，源工程变更后重跑本脚本。
  * 输出字段：
  *   invoke[]: { api, channel, signature, params[] }
@@ -127,29 +128,72 @@ const dynamicRegistrations = (
 
 const apiChannels = new Set([...calls.map((c) => c.channel), ...events.map((e) => e.channel)]);
 
+/* ---------- 4) 本工程扩展通道（现役版没有、我们新增的） ---------- */
+// 现役版升级后重抽契约时，这些通道必须**并回来**，否则会被当成「台账里多出来的通道」
+// 让 verify-contract 直接红。所以扩展清单单独放在 contract/extensions.json，由本脚本合并。
+const EXTENSIONS_FILE = path.resolve("contract", "extensions.json");
+const extensions = fs.existsSync(EXTENSIONS_FILE)
+  ? JSON.parse(fs.readFileSync(EXTENSIONS_FILE, "utf8"))
+  : { invoke: [], send: [], events: [] };
+
+const extendedInvoke = [...calls.filter((c) => c.kind === "invoke")];
+const extendedSend = [...calls.filter((c) => c.kind === "send")];
+const extendedEvents = [...events];
+for (const item of extensions.invoke ?? []) {
+  if (apiChannels.has(item.channel)) {
+    console.error("扩展通道与现役版重名，已中止：" + item.channel);
+    process.exit(1);
+  }
+  apiChannels.add(item.channel);
+  extendedInvoke.push({ api: item.api, channel: item.channel, kind: "invoke", signature: item.signature ?? "", params: item.params ?? [] });
+}
+for (const item of extensions.send ?? []) {
+  if (apiChannels.has(item.channel)) {
+    console.error("扩展通道与现役版重名，已中止：" + item.channel);
+    process.exit(1);
+  }
+  apiChannels.add(item.channel);
+  extendedSend.push({ api: item.api, channel: item.channel, kind: "send", signature: item.signature ?? "", params: item.params ?? [] });
+}
+for (const item of extensions.events ?? []) {
+  if (apiChannels.has(item.channel)) {
+    console.error("扩展事件与现役版重名，已中止：" + item.channel);
+    process.exit(1);
+  }
+  apiChannels.add(item.channel);
+  extendedEvents.push({ api: item.api, channel: item.channel });
+}
+
 const contract = {
   generatedFrom: SRC_ROOT,
   generatedAt: new Date().toISOString(),
   counts: {
-    invoke: calls.filter((c) => c.kind === "invoke").length,
-    send: calls.filter((c) => c.kind === "send").length,
-    events: events.length,
-    requests: calls.length,
+    invoke: extendedInvoke.length,
+    send: extendedSend.length,
+    events: extendedEvents.length,
+    requests: extendedInvoke.length + extendedSend.length,
     registered: registered.size,
     apiTotal: apiChannels.size
   },
-  invoke: calls.filter((c) => c.kind === "invoke").sort((a, b) => a.api.localeCompare(b.api)),
-  send: calls.filter((c) => c.kind === "send").sort((a, b) => a.api.localeCompare(b.api)),
-  events: events.sort((a, b) => a.api.localeCompare(b.api)),
+  invoke: extendedInvoke.sort((a, b) => a.api.localeCompare(b.api)),
+  send: extendedSend.sort((a, b) => a.api.localeCompare(b.api)),
+  events: extendedEvents.sort((a, b) => a.api.localeCompare(b.api)),
   registeredNotExposed: [...registered].filter((c) => !apiChannels.has(c)).sort(),
-  exposedNotRegistered: [...apiChannels].filter((c) => !registered.has(c)).sort(),
-  dynamicRegistrations
+  exposedNotRegistered: [...apiChannels].filter((c) => !registered.has(c) && !(extensions.invoke ?? []).concat(extensions.send ?? [], extensions.events ?? []).some((item) => item.channel === c)).sort(),
+  dynamicRegistrations,
+  // 扩展通道单独留一份台账：diff 时一眼能看出「哪些不是现役版有的」
+  extensions: {
+    invoke: (extensions.invoke ?? []).map((item) => item.channel).sort(),
+    send: (extensions.send ?? []).map((item) => item.channel).sort(),
+    events: (extensions.events ?? []).map((item) => item.channel).sort()
+  }
 };
 
 fs.mkdirSync(path.dirname(OUT_FILE), { recursive: true });
 fs.writeFileSync(OUT_FILE, JSON.stringify(contract, null, 2) + "\n", "utf8");
 
 console.log("契约已写出: " + path.relative(process.cwd(), OUT_FILE));
+console.log("  扩展通道: " + (contract.extensions.invoke.concat(contract.extensions.send, contract.extensions.events).join(", ") || "无"));
 console.log(
   "  invoke=" + contract.counts.invoke +
   "  send=" + contract.counts.send +

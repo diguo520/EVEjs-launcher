@@ -310,6 +310,15 @@ async fn dispatch(
         }
         "mods:uninstall" => Ok(mods::plan::uninstall_mod(&root, &arg_str(args, 0))),
         "mods:createFolder" => Ok(mods::plan::create_mods_folder(&root)),
+        // 编辑信息（本工程扩展通道，现役版只有渲染层的编辑弹窗、主进程没有落盘入口）
+        // patch 是 { displayName?, description?, category?, tags?, conflicts?,
+        //            requiresRestart?, readme?, highlights? } 的子集
+        "mods:updateMeta" => Ok(mods::scaffold::update_mod_meta(
+            &root,
+            &state.runtime,
+            &arg_str(args, 0),
+            &args.get(1).cloned().unwrap_or(Value::Null),
+        )),
         "mods:sign" => Ok(mods::plan::sign_mod_folder(
             &root,
             &arg_str(args, 0),

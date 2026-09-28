@@ -292,7 +292,10 @@ export function ModFormDialog({
               + <code className="tabular text-primary/85">loader.js</code> +{" "}
               <code className="tabular text-primary/85">README.md</code> +{" "}
               <code className="tabular text-primary/85">CHANGELOG.md</code>。
-              <span className="mt-1 block">新模组默认禁用，不会自动加载。</span>
+              <span className="mt-1 block">
+                默认生成启用中的 loader.js（在建好之前取消勾选「建好后立即启用」，就会生成
+                loader.js.disabled，加载器不认它）。
+              </span>
             </DialogDescription>
           )}
         </DialogHeader>

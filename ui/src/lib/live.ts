@@ -81,12 +81,30 @@ export function parseServerLog(raw: RawServerLog | null): LogLine[] {
  */
 export const MARKET_PORT = 40110
 
-/** 原型的四张卡与后端真实资源的关系 */
-const CARD_BINDING: Record<string, { real: string | null; health: keyof RawHealth }> = {
-  node: { real: "mainServer", health: "game" },
-  market: { real: "marketServer", health: "market" },
-  images: { real: null, health: "images" },
-  gateway: { real: null, health: "gateway" },
+/**
+ * 原型的四张卡与后端真实资源的关系。
+ *
+ * 后端只有三个可控进程（client / mainServer / marketServer）：图片服务（26001）与
+ * 网关代理（26002）**不是独立进程**，它们是主服务器进程里起的 HTTP 子服务
+ * （现役版的配置面板就是这么写的：主服务器一栏的端口是 "26000 · 26001 · 26002"）。
+ * 所以这两张卡的 PID / CPU / 内存 / 运行时长取主服务器进程的读数 —— 不再恒为 "—"
+ * （2026-09-28 报障：图片服务 / 网关代理启动后下面的统计没反应）。
+ * 端口活没活仍由各自健康探针决定，与进程读数互不代替。
+ */
+const CARD_BINDING: Record<
+  string,
+  {
+    /** 启停动作落到哪个后端服务；null = 没有独立进程，动作只能提示 */
+    real: string | null
+    /** 读数（PID / CPU / 内存 / 运行时长）取自哪个后端进程 */
+    statsFrom: string
+    health: keyof RawHealth
+  }
+> = {
+  node: { real: "mainServer", statsFrom: "mainServer", health: "game" },
+  market: { real: "marketServer", statsFrom: "marketServer", health: "market" },
+  images: { real: null, statsFrom: "mainServer", health: "images" },
+  gateway: { real: null, statsFrom: "mainServer", health: "gateway" },
 }
 
 /** 端口绑定：主服务器/图片/网关来自 config/server.json，市场服务用后端常量 */
@@ -142,17 +160,21 @@ export function serviceCards(
   return SERVICES.map((template) => {
     const binding = CARD_BINDING[template.id]
     if (!binding) return { ...template, state: "ready", pid: null, cpu: null, memMB: null, uptime: "—", logs: 0 }
-    const process = binding.real ? byId.get(binding.real) : undefined
+    // 状态只认「属于这张卡的那个进程 / 端口」：图片与网关不是独立进程，
+    // 所以它们的状态完全由各自的健康探针决定，不能被主服务器的 running 带跑。
+    const owned = binding.real ? byId.get(binding.real) : undefined
+    // 读数取自真正在服务这些端口的进程（图片 / 网关 = 主服务器进程）
+    const stats = byId.get(binding.statsFrom)
     const alive = health ? health[binding.health] : undefined
     return {
       ...template,
       port: real[template.id as keyof typeof real] ?? template.port,
-      state: stateOf(process?.state, alive),
-      pid: process?.pid ?? null,
+      state: stateOf(owned?.state, alive),
+      pid: stats?.pid ?? null,
       // 逐进程读数由后端按 pid 采；采样没到 / 拿不到句柄时是 null → 界面显示 "—"
-      cpu: typeof process?.cpuPercent === "number" ? process.cpuPercent : null,
-      memMB: typeof process?.memMB === "number" ? process.memMB : null,
-      uptime: uptimeText(process?.startedAt, now),
+      cpu: typeof stats?.cpuPercent === "number" ? stats.cpuPercent : null,
+      memMB: typeof stats?.memMB === "number" ? stats.memMB : null,
+      uptime: uptimeText(stats?.startedAt, now),
       logs: 0,
     }
   })

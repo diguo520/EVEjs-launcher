@@ -120,6 +120,21 @@ try {
         Write-Host "=== [6] S6 应用 —— 跳过（-SkipApp）" -ForegroundColor Yellow
     }
 
+    # 自更新器必须在 cargo build **之前**就位：它在编译期被 `src-tauri/build.rs` 拷进 OUT_DIR
+    # 再由 `seed.rs` 的 include_bytes! 嵌进 exe（单文件便携版靠这一步才能自带更新器）。
+    function Get-UpdaterExe {
+        $exe = Join-Path $root "vendor\updater\bin\evejs-updater.exe"
+        if (Test-Path $exe) { return $exe }
+        $go = Get-Command go -ErrorAction SilentlyContinue
+        if (-not $go) { throw "自更新器缺失且找不到 Go 工具链：$exe" }
+        Push-Location (Join-Path $root "vendor\updater")
+        try { & $go.Source build -trimpath -ldflags "-s -w" -o bin\evejs-updater.exe . }
+        finally { Pop-Location }
+        if (-not (Test-Path $exe)) { throw "自更新器编译失败：$exe" }
+        return $exe
+    }
+    Invoke-Step "6b" "准备自更新器（编译期嵌入 exe）" { [void](Get-UpdaterExe) }
+
     Invoke-Step 7 "cargo build" {
         Push-Location src-tauri
         try {
@@ -147,15 +162,7 @@ try {
         $profileName = if ($DebugBuild) { "debug" } else { "release" }
         $updaterDir = Join-Path $root "src-tauri\target\$profileName\_launcher\updater"
         New-Item -ItemType Directory -Force -Path $updaterDir | Out-Null
-        $updaterExe = Join-Path $root "vendor\updater\bin\evejs-updater.exe"
-        if (-not (Test-Path $updaterExe)) {
-            $go = Get-Command go -ErrorAction SilentlyContinue
-            if (-not $go) { throw "自更新器缺失且找不到 Go 工具链：vendor\updater\bin\evejs-updater.exe" }
-            Push-Location (Join-Path $root "vendor\updater")
-            try { & $go.Source build -trimpath -ldflags "-s -w" -o bin\evejs-updater.exe . }
-            finally { Pop-Location }
-        }
-        if (-not (Test-Path $updaterExe)) { throw "自更新器编译失败：$updaterExe" }
+        $updaterExe = Get-UpdaterExe
         Copy-Item -LiteralPath $updaterExe -Destination $updaterDir -Force
         Write-Host "已拷贝自更新器 -> $updaterDir"
     }
@@ -173,15 +180,17 @@ try {
             Write-Host "=== [11] parity 通道 golden —— 跳过（debug 产物，基线是 release 口径）" -ForegroundColor Yellow
         }
         else {
+            # 必须逐条判退出码：driver 拿不到 dump（自检被单实例锁挡住 / exe 没起来）时它退出 1，
+            # 但下面 diff 成功会把 $LASTEXITCODE 覆盖成 0 —— 门禁就变成静默空跑（2026-09-28 实测）。
             Invoke-Step 11 "parity 通道 golden（Tauri 侧 ↔ 冻结基线）" {
-                node tests/parity/driver-tauri.mjs
-                node tests/parity/diff.mjs
+                Invoke-Node tests/parity/driver-tauri.mjs
+                Invoke-Node tests/parity/diff.mjs
             }
             $referenceExe = [System.IO.Path]::Combine($referenceRoot, "node_modules", "electron", "dist", "electron.exe")
             if ([System.IO.File]::Exists($referenceExe)) {
                 Invoke-Step 12 "parity 跨实现（Electron 现役版 ↔ Tauri）" {
-                    node tests/parity/driver-electron.mjs
-                    node tests/parity/diff-cross.mjs
+                    Invoke-Node tests/parity/driver-electron.mjs
+                    Invoke-Node tests/parity/diff-cross.mjs
                 }
             }
             else {

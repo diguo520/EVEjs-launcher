@@ -149,14 +149,31 @@ describe("serviceCards", () => {
     expect(cards.map((c) => c.port)).toEqual([27000, MARKET_PORT, 27001, 27002])
   })
 
-  it("图片与网关卡没有独立后端进程，不会凭空拿到进程读数", () => {
+  it("图片与网关卡共用主服务器进程的读数（它们不是独立进程）", () => {
     const cards = serviceCards(
       [svc("mainServer", "running", 1), svc("marketServer", "running", 2)],
       HEALTH_UP,
       null
     )
-    expect(cards.find((c) => c.id === "images")!.pid).toBeNull()
-    expect(cards.find((c) => c.id === "gateway")!.pid).toBeNull()
+    const node = cards.find((c) => c.id === "node")!
+    const images = cards.find((c) => c.id === "images")!
+    const gateway = cards.find((c) => c.id === "gateway")!
+    // 26001 / 26002 是主服务器进程起的 HTTP 子服务，读数当然来自那个进程
+    expect(images.pid).toBe(1)
+    expect(gateway.pid).toBe(1)
+    expect(images.cpu).toBe(node.cpu)
+    expect(gateway.uptime).toBe(node.uptime)
+    // 市场服务是另一个进程，不会串到这两张卡上
+    expect(images.memMB).toBe(node.memMB)
+  })
+
+  it("图片与网关的开关只认自己的端口探针，不跟着主服务器一起亮", () => {
+    const partial: RawHealth = { game: true, images: false, gateway: false, market: false }
+    const cards = serviceCards([svc("mainServer", "running", 1)], partial, null)
+    expect(cards.find((c) => c.id === "node")!.state).toBe("running")
+    // 主服务器在跑，但这两个端口还没起来 → 卡片必须是未启动，不能显示运行中
+    expect(cards.find((c) => c.id === "images")!.state).toBe("ready")
+    expect(cards.find((c) => c.id === "gateway")!.state).toBe("ready")
   })
 })
 

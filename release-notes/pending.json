@@ -1,6 +1,32 @@
 {
   "target": 8,
-  "completed": 0,
+  "completed": 5,
   "nextVersion": "0.2.1",
-  "changes": []
+  "changes": [
+    {
+      "type": "fix",
+      "zh": "修复服务卡片的读数：图片服务与网关代理没有独立进程，之前读数永远是「—」，现在跟随主服务器显示 PID / CPU / 内存 / 运行时长；两者的启停状态仍只认各自的端口探针，不会因为主服务器在跑就跟着变绿",
+      "en": "Fixed the service card readings: the image service and gateway proxy have no standalone process, so their stats used to be a permanent dash; they now follow the main server's PID / CPU / memory / uptime. Their run state still comes from their own port probes and will not turn green just because the main server is running"
+    },
+    {
+      "type": "fix",
+      "zh": "修复新建模组即使勾了「建好后立即启用」也仍然生成 loader.js.disabled：界面把选项传成了内部键名（enableAfterCreate / signAfterCreate），后端读的却是 enabled / sign，导致勾选无效；现在勾选即生成可加载的 loader.js，并且新建模组默认就是启用状态",
+      "en": "Fixed new mods still landing as loader.js.disabled even with Enable right after creation ticked: the UI sent internal key names (enableAfterCreate / signAfterCreate) while the backend reads enabled / sign, so the checkbox did nothing. Ticking it now produces a loadable loader.js, and new mods are enabled by default"
+    },
+    {
+      "type": "fix",
+      "zh": "修复发布过一次的模组在「发布模组」里再也选不中：旧逻辑把「审核中」的模组从候选里剔除，而新版发布只是往自己的仓库推一版 + 发 Release，收录源一辈子只登记一次，任何审核状态都不该挡住发新版；候选池现在只按「是我创建的」过滤，另外把本地 .evejs-source.json 也算作「已有源码仓库」的凭据，避免换过数据目录后又重复建仓",
+      "en": "Fixed mods that had been published once no longer being selectable in Submit mod: the old filter dropped anything in review, but publishing now just pushes a new version to your own repo and cuts a Release, while the source index is registered only once, so no review state should block a new version. The candidate list now filters only by ownership, and a local .evejs-source.json also counts as proof of an existing source repo so a changed data dir no longer causes a duplicate repo creation"
+    },
+    {
+      "type": "new",
+      "zh": "「编辑信息」现在真的能保存：新增 mods:updateMeta 写通道，只改显示名 / 简介 / 分类 / 标签 / 冲突 / 重启语义与 README（id、version、author、签名一律不碰），保存后自动重新签名，签名失败整份回滚；不是本人的模组会被拒绝",
+      "en": "Edit info now actually saves: a new mods:updateMeta channel rewrites only the display name / description / category / tags / conflicts / restart semantics and the README (id, version, author and signature are never touched), re-signs after writing, rolls the whole change back if signing fails, and refuses mods owned by someone else"
+    },
+    {
+      "type": "opt",
+      "zh": "新增单文件便携版：双击一个约 9.2 MB 的 EvEJSLauncher.exe 就能运行，不解压、不安装；启动器缓存（data / cache / cli / updater / mods / temp）仍然放在 exe 同级的 _launcher 目录，随包的 Node CLI 与自更新器会在首次启动时释放到位（内容一致则跳过，被改坏的文件会自动修复）",
+      "en": "New single-file portable build: double-click one EvEJSLauncher.exe of about 9.2 MB - no unzip, no installer. The launcher cache (data / cache / cli / updater / mods / temp) still lives in the _launcher folder next to the exe, and the bundled Node CLIs and self-updater are released on first launch (skipped when identical, and corrupted files are repaired automatically)"
+    }
+  ]
 }

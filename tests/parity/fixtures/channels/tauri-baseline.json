@@ -3,13 +3,7 @@
     "accounts:checkRunning": {
       "listening": [],
       "ports": [
-        30000,
-        11,
-        2,
-        127,
-        26000,
-        26002,
-        26400
+        26000
       ],
       "running": false
     },
@@ -38,7 +32,7 @@
     "config:get": {
       "client": {
         "caPem": "<abs-path>",
-        "clientExe": "",
+        "clientExe": "eve.exe",
         "clientPath": "<abs-path>",
         "proxyUrl": "http://127.0.0.1:26002/",
         "safeGraphics": "off",
@@ -110,25 +104,27 @@
           "ok": false
         },
         {
+          "hint": "在 EvEJSConfig.bat / 配置面板中填写客户端安装路径",
           "key": "clientPath",
           "label": "客户端路径",
-          "message": "客户端: <abs-path>",
-          "ok": true,
-          "warn": false
+          "message": "路径不存在: <abs-path>",
+          "ok": false,
+          "warn": true
         },
         {
+          "hint": "运行 SetupEveJS.bat 或检查 EVEJS_CA_PEM 指向",
           "key": "caCert",
           "label": "客户端证书 CA",
-          "message": "CA 证书就绪",
-          "ok": true,
-          "warn": false
+          "message": "CA 证书缺失",
+          "ok": false,
+          "warn": true
         }
       ],
       "node": {
         "ok": true,
         "version": "26.5.0"
       },
-      "passCount": 5,
+      "passCount": 3,
       "repoRoot": "<abs-path>",
       "sys": {
         "cpuThreads": 12,
@@ -143,7 +139,7 @@
       "game": false,
       "gateway": false,
       "images": false,
-      "market": true
+      "market": false
     },
     "health:ping": {
       "ok": false,
@@ -165,10 +161,10 @@
       "size": 0
     },
     "metrics:get": {
-      "cpuPercent": 19.6239013671875,
+      "cpuPercent": 16.569000244140625,
       "diskRoot": "<abs-path>",
       "diskTotalGB": 976.5624961853028,
-      "diskUsedGB": 870.9935607910156,
+      "diskUsedGB": 871.6830596923828,
       "gpuDedicatedTotalGB": null,
       "gpuDedicatedUsedGB": null,
       "gpuMemoryTotalGB": null,
@@ -176,38 +172,38 @@
       "gpuPercent": null,
       "gpuSharedUsedGB": null,
       "memTotalGB": 31.855934143066406,
-      "memUsedGB": 17.446495056152344,
+      "memUsedGB": 17.679100036621094,
       "netBytesPerSec": 0,
-      "virtualMemTotalGB": 35.355934143066406,
-      "virtualMemUsedGB": 29.718338012695312,
+      "virtualMemTotalGB": 38.77593231201172,
+      "virtualMemUsedGB": 31.141639709472656,
       "volumes": [
         {
-          "freeGB": 49.44997787475586,
-          "percent": 77.76826498358982,
+          "freeGB": 44.71067428588867,
+          "percent": 79.8989624293374,
           "root": "<abs-path>",
           "totalGB": 222.4296836853027,
-          "usedGB": 172.97970581054688
+          "usedGB": 177.71900939941406
         },
         {
-          "freeGB": 144.74662399291992,
-          "percent": 50.59315170043166,
+          "freeGB": 144.74565887451172,
+          "percent": 50.59348112751929,
           "root": "<abs-path>",
           "totalGB": 292.96874618530273,
-          "usedGB": 148.2221221923828
+          "usedGB": 148.22308731079102
         },
         {
-          "freeGB": 105.56893539428712,
-          "percent": 89.18974097339742,
+          "freeGB": 104.87943649291992,
+          "percent": 89.26034566117322,
           "root": "<abs-path>",
           "totalGB": 976.5624961853028,
-          "usedGB": 870.9935607910156
+          "usedGB": 871.6830596923828
         },
         {
-          "freeGB": 399.8606834411621,
-          "percent": 83.72217312826822,
+          "freeGB": 447.3101768493652,
+          "percent": 81.79056376822031,
           "root": "<abs-path>",
           "totalGB": 2456.4746055603027,
-          "usedGB": 2056.6139221191406
+          "usedGB": 2009.1644287109375
         }
       ]
     },

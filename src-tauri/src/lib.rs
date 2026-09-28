@@ -26,6 +26,7 @@ pub mod process;
 pub mod pty;
 pub mod runtime;
 pub mod secrets;
+pub mod seed;
 pub mod shell;
 pub mod sidecar;
 pub mod updater;
@@ -121,6 +122,13 @@ pub fn run() {
     // 与 Electron safeStorage 互通的密文（令牌 / 账号密码）：装好 AES 密钥表。
     // 必须晚于 legacy::adopt —— 接管过来的密钥要优先于「现生成一把」被用上。
     oscrypt::init(&runtime);
+    // 单文件 exe：把嵌在二进制里的侧车（Node CLI / 自更新器）释放到 exe 同级的 _launcher/。
+    // 必须早于任何「调 CLI / 调更新器」的动作；内容一致时一个字节都不写。
+    // 释放失败（只读目录、磁盘满）不拦启动：相关功能会自己报「找不到脚本 / 找不到更新器」，
+    // 那两个错误信息里已经带了预期路径，用户看得懂；启动期弹窗反而更打扰。
+    if let Some(dir) = seed::exe_dir() {
+        let _ = seed::ensure_bundled_sidecars(&dir);
+    }
     // 每次启动把内置的模组制作规范释放到 _launcher/mods/，方便模组作者查阅（对齐现役版 index.ts）
     mods::scaffold::ensure_all_mod_authoring_docs(&runtime);
 
@@ -135,17 +143,21 @@ pub fn run() {
 
     let self_test = is_self_test();
 
-    let builder = tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+    let mut builder = tauri::Builder::default();
+    // 单实例锁：自检（--self-test）**不参与**。
+    // 自检是无人值守的诊断进程，parity（L2）、L3 端到端、smoke 都靠它跑；用户开着启动器时
+    // 第二个实例会被锁挡掉（实测 0.5 秒退出、不落 dump），这些门禁就静默变成空跑。
+    if !self_test {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             // 单实例：第二次启动时聚焦既有窗口（对齐现役版 requestSingleInstanceLock 行为）
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.unminimize();
                 let _ = window.show();
                 let _ = window.set_focus();
             }
-        }))
-        .plugin(tauri_plugin_opener::init())
-        .manage(state);
+        }));
+    }
+    let builder = builder.plugin(tauri_plugin_opener::init()).manage(state);
 
     // A4：命令白名单。生产运行只注册唯一分发命令（通道名还要过 ipc::channels 二次校验）；
     // `self_test_report` 会按环境变量写文件并退出进程，只在 `--self-test` 下注册。

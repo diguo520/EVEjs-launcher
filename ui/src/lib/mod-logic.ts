@@ -671,7 +671,9 @@ export interface ModBuildOptions {
 
 export const DEFAULT_BUILD_OPTIONS: ModBuildOptions = {
   restart: true,
-  enableAfterCreate: false,
+  // 默认勾上：建完就生成 loader.js（可加载的模组），不勾才是 loader.js.disabled。
+  // 按维护者要求改过默认值：新建模组默认启用，省掉「建完还得去列表里启用一次」这一步。
+  enableAfterCreate: true,
   signAfterCreate: true,
 }
 

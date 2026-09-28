@@ -50,7 +50,8 @@ const ALLOW_LOCAL_ENV: &str = "EVEJS_UPDATE_ALLOW_LOCAL";
 use crate::win32::{CREATE_NEW_PROCESS_GROUP, DETACHED_PROCESS};
 
 /// 更新器进程句柄名（随包放在 exe 同级，见 `updater_helper_path`）
-const UPDATER_NAME: &str = "evejs-updater.exe";
+/// 自更新器文件名：单文件版 (`seed.rs`) 释放侧车时也用同一个名字，单一来源由查重门禁守住
+pub(crate) const UPDATER_NAME: &str = "evejs-updater.exe";
 
 #[derive(Clone)]
 struct UpdateStore {

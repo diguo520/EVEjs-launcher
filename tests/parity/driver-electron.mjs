@@ -14,7 +14,12 @@
  *   node tests/parity/driver-electron.mjs --repo-root "E:/Games/EveJS-v0.12.8"   # 给两边同一个仓库根目录
  */
 import { spawn } from "node:child_process";
-import { ensureRepoFixture, DEFAULT_FIXTURE } from "./make-repo-fixture.mjs";
+import {
+  ensureRepoFixture,
+  ensureUserDataFixture,
+  DEFAULT_FIXTURE,
+  DEFAULT_USER_DATA_FIXTURE,
+} from "./make-repo-fixture.mjs";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -31,7 +36,7 @@ const REPO_ROOT = value("--repo-root", "") === "" ? ensureRepoFixture({ out: DEF
 const TIMEOUT_MS = Number(value("--timeout", "120")) * 1000;
 const SETTLE_MS = value("--settle-ms", "2500");
 const HARNESS = path.join(ROOT, ".parity-out", "electron-harness");
-const USER_DATA_DIR = path.join(ROOT, ".parity-out", "parity-userdata");
+const USER_DATA_DIR = DEFAULT_USER_DATA_FIXTURE;
 const BASELINE_SET = path.join(ROOT, "tests", "parity", "fixtures", "channels", "tauri-baseline.json");
 const CONTRACT = path.join(ROOT, "contract", "ipc-channels.json");
 
@@ -68,7 +73,7 @@ function latestMtime(dir) {
   return newest;
 }
 fs.mkdirSync(HARNESS, { recursive: true });
-fs.mkdirSync(USER_DATA_DIR, { recursive: true });
+ensureUserDataFixture({ out: USER_DATA_DIR });
 const harnessDist = path.join(HARNESS, "dist");
 const srcDist = path.join(SRC, "dist");
 const needCopy = !fs.existsSync(harnessDist) || latestMtime(harnessDist) < latestMtime(srcDist);
