@@ -11,7 +11,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
-import { LAUNCHER_META } from "@/lib/mock"
 
 /**
  * 侧栏底部的启动器自更新入口。
@@ -19,7 +18,8 @@ import { LAUNCHER_META } from "@/lib/mock"
  * 窄窗侧栏只有一条图标的位置，给 compact：同一个弹窗、同一份状态，只换个入口长相。
  */
 export function LauncherUpdate({ compact = false }: { compact?: boolean }) {
-  const { version, latestVersion, outdated, updating, progress } = useLauncherVersion()
+  const { version, latestVersion, outdated, updating, progress, sizeText } =
+    useLauncherVersion()
   const [open, setOpen] = useState(false)
 
   if (compact) {
@@ -97,7 +97,7 @@ export function LauncherUpdate({ compact = false }: { compact?: boolean }) {
                 查看更新
               </Button>
               <span className="tabular shrink-0 text-[10px] text-tertiary">
-                {LAUNCHER_META.size}
+                {sizeText}
               </span>
             </div>
           )}

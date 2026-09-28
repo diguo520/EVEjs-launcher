@@ -210,6 +210,24 @@ export interface RawUpdateState {
   speed?: number
   message?: string
 }
+/** update:check：更新检查的真结果（含这一版的更新说明 changelog） */
+export interface RawUpdateCheck {
+  ok: boolean
+  available: boolean
+  currentVersion: string
+  latestVersion?: string
+  /** 更新包字节数（清单里 platforms[key].size） */
+  size?: number
+  /** 清单的 publishedAt */
+  date?: string
+  channel?: string
+  /** 逐条更新说明：{ zh: [{ type, text }], en: [...] }，或单语言数组 */
+  changelog?: unknown
+  manifestUrl?: string
+  /** ok=false 时的原因（没配更新源 / 验签不过 / 网络失败…） */
+  reason?: string
+}
+
 /* ------------------------------------------------------------------
    S9b：账号 / 数据库 / 模组 / 设置（回包形状取自真机探针，见 docs/S9 记录）
    ------------------------------------------------------------------ */

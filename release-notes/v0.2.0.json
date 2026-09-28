@@ -2,24 +2,144 @@
   "version": "0.2.0",
   "changelog": {
     "zh": [
-      { "type": "new", "text": "外壳从 Electron 换成 Tauri 2（Rust + 系统 WebView2），不再随包分发 Chromium 与 Node 运行时" },
-      { "type": "new", "text": "界面用 React + shadcn/ui 重做：主控台、服务器日志、账号管理、指令手册、数据库、模组市场、配置中心、设置" },
-      { "type": "new", "text": "新增 three.js 启动动画，取不到 WebGL 时静默退回 CSS 层" },
-      { "type": "new", "text": "服务卡片补齐 PID / CPU / 内存 / 运行时长读数；实时日志按服务分 tab 且切换页面不丢" },
-      { "type": "new", "text": "环境自检扩到八项：Node.js、Rust/Cargo、VS++ 构建工具、服务端依赖、本地数据库、市场服务二进制、客户端路径、客户端证书 CA" },
-      { "type": "fix", "text": "修复 0.12.9 环境拉不到模组市场清单的问题（清单改走 EVEjs-mods 的 Pages 与 jsDelivr 双源）" },
-      { "type": "new", "text": "模组发布改为「本地签名 + GitHub 令牌」流程；换到新框架时自动接管老启动器的作者身份 key 与令牌，无需重填" },
-      { "type": "opt", "text": "体积大幅下降：便携版 zip 约 5.5 MB、主程序 exe 约 7.3 MB（体积门禁 exe ≤ 12 MB / zip ≤ 20 MB）" }
+      {
+        "type": "new",
+        "text": "外壳从 Electron 换成 Tauri 2（Rust + 系统 WebView2），不再随包分发 Chromium 与 Node 运行时"
+      },
+      {
+        "type": "new",
+        "text": "界面用 React + shadcn/ui 重做：主控台、服务器日志、账号管理、指令手册、数据库、模组市场、配置中心、设置"
+      },
+      {
+        "type": "new",
+        "text": "新增 three.js 启动动画，取不到 WebGL 时静默退回 CSS 层"
+      },
+      {
+        "type": "new",
+        "text": "服务卡片补齐 PID / CPU / 内存 / 运行时长读数；实时日志按服务分 tab 且切换页面不丢"
+      },
+      {
+        "type": "new",
+        "text": "环境自检扩到八项：Node.js、Rust/Cargo、VS++ 构建工具、服务端依赖、本地数据库、市场服务二进制、客户端路径、客户端证书 CA"
+      },
+      {
+        "type": "fix",
+        "text": "修复 0.12.9 环境拉不到模组市场清单的问题（清单改走 EVEjs-mods 的 Pages 与 jsDelivr 双源）"
+      },
+      {
+        "type": "new",
+        "text": "模组发布改为「本地签名 + GitHub 令牌」流程；换到新框架时自动接管老启动器的作者身份 key 与令牌，无需重填"
+      },
+      {
+        "type": "opt",
+        "text": "体积大幅下降：便携版主程序 exe 约 9.2 MB（现役 Electron 便携版约 73 MB；体积门禁 exe ≤ 12 MB）"
+      },
+      {
+        "type": "fix",
+        "text": "修复服务卡片的读数：图片服务与网关代理没有独立进程，之前读数永远是「—」，现在跟随主服务器显示 PID / CPU / 内存 / 运行时长；两者的启停状态仍只认各自的端口探针，不会因为主服务器在跑就跟着变绿"
+      },
+      {
+        "type": "fix",
+        "text": "修复新建模组即使勾了「建好后立即启用」也仍然生成 loader.js.disabled：界面把选项传成了内部键名（enableAfterCreate / signAfterCreate），后端读的却是 enabled / sign，导致勾选无效；现在勾选即生成可加载的 loader.js，并且新建模组默认就是启用状态"
+      },
+      {
+        "type": "fix",
+        "text": "修复发布过一次的模组在「发布模组」里再也选不中：旧逻辑把「审核中」的模组从候选里剔除，而新版发布只是往自己的仓库推一版 + 发 Release，收录源一辈子只登记一次，任何审核状态都不该挡住发新版；候选池现在只按「是我创建的」过滤，另外把本地 .evejs-source.json 也算作「已有源码仓库」的凭据，避免换过数据目录后又重复建仓"
+      },
+      {
+        "type": "new",
+        "text": "「编辑信息」现在真的能保存：新增 mods:updateMeta 写通道，只改显示名 / 简介 / 分类 / 标签 / 冲突 / 重启语义与 README（id、version、author、签名一律不碰），保存后自动重新签名，签名失败整份回滚；不是本人的模组会被拒绝"
+      },
+      {
+        "type": "opt",
+        "text": "新增单文件便携版：双击一个约 9.2 MB 的 EvEJSLauncher.exe 就能运行，不解压、不安装；启动器缓存（data / cache / cli / updater / mods / temp）仍然放在 exe 同级的 _launcher 目录，随包的 Node CLI 与自更新器会在首次启动时释放到位（内容一致则跳过，被改坏的文件会自动修复）"
+      },
+      {
+        "type": "fix",
+        "text": "修复模组市场的「导入 ZIP」是假提示：按下去只弹一句「已选择模组包…」，既不弹系统文件选择框也不落盘；现在真的走系统「打开文件」选 ZIP，导入后重扫模组列表并提示落地目录（取消不报错，来源未收录会单独提醒）。旁边的「打开 mods 目录」也从假提示接成真动作，目录不存在会先建出来"
+      },
+      {
+        "type": "fix",
+        "text": "修复「服务端已经部署好、模组页却一直报服务端根目录不对」：渲染层以前还拿配置文件里的路径跟一个写死的旧目录（E:\\Games\\EveJS-v0.12.8）比对，换到 0.12.9 就必然误报；现在只信后端扫描器给出的结论，并把那条提示改成它真正想说的话——目录下缺 mods/ 文件夹，且直接给一个「自动创建 mods/」按钮，不再让用户自己去翻目录"
+      },
+      {
+        "type": "fix",
+        "text": "自更新弹窗的更新说明改为读真清单（update-manifest.json 的 changelog），不再显示原型里的示例条目；分组与配色沿用原型排版，中英两版说明都能渲染"
+      },
+      {
+        "type": "fix",
+        "text": "修复「发布模组 → 提交审核」的完成提示说反了：首次发布明明往索引仓库提交了收录源 PR，却因为写完台账再取状态而提示「没有 PR」；现在会把真实结果与那条 PR 的地址一并显示出来"
+      }
     ],
     "en": [
-      { "type": "new", "text": "Shell rewritten from Electron to Tauri 2 (Rust + system WebView2); no bundled Chromium or Node runtime" },
-      { "type": "new", "text": "Interface rebuilt with React + shadcn/ui: dashboard, server logs, accounts, command manual, database, mod marketplace, config center, settings" },
-      { "type": "new", "text": "New three.js boot animation with a silent CSS fallback when WebGL is unavailable" },
-      { "type": "new", "text": "Service cards now report PID / CPU / memory / uptime; live logs are tabbed per service and survive page switches" },
-      { "type": "new", "text": "Environment self-check expanded to eight items: Node.js, Rust/Cargo, VS++ Build Tools, server dependencies, local database, market service binary, client path, client certificate CA" },
-      { "type": "fix", "text": "Fixed the mod marketplace manifest failing to load in the 0.12.9 environment (dual sources: EVEjs-mods Pages and jsDelivr)" },
-      { "type": "new", "text": "Mod publishing now uses local signing plus a GitHub token; the author identity key and token are imported from the old launcher automatically - nothing to re-enter" },
-      { "type": "opt", "text": "Much smaller: portable zip about 5.5 MB, main executable about 7.3 MB (gates: exe <= 12 MB, zip <= 20 MB)" }
+      {
+        "type": "new",
+        "text": "Shell rewritten from Electron to Tauri 2 (Rust + system WebView2); no bundled Chromium or Node runtime"
+      },
+      {
+        "type": "new",
+        "text": "Interface rebuilt with React + shadcn/ui: dashboard, server logs, accounts, command manual, database, mod marketplace, config center, settings"
+      },
+      {
+        "type": "new",
+        "text": "New three.js boot animation with a silent CSS fallback when WebGL is unavailable"
+      },
+      {
+        "type": "new",
+        "text": "Service cards now report PID / CPU / memory / uptime; live logs are tabbed per service and survive page switches"
+      },
+      {
+        "type": "new",
+        "text": "Environment self-check expanded to eight items: Node.js, Rust/Cargo, VS++ Build Tools, server dependencies, local database, market service binary, client path, client certificate CA"
+      },
+      {
+        "type": "fix",
+        "text": "Fixed the mod marketplace manifest failing to load in the 0.12.9 environment (dual sources: EVEjs-mods Pages and jsDelivr)"
+      },
+      {
+        "type": "new",
+        "text": "Mod publishing now uses local signing plus a GitHub token; the author identity key and token are imported from the old launcher automatically - nothing to re-enter"
+      },
+      {
+        "type": "opt",
+        "text": "Much smaller: the portable executable is about 9.2 MB versus about 73 MB for the current Electron portable build (gate: exe <= 12 MB)"
+      },
+      {
+        "type": "fix",
+        "text": "Fixed the service card readings: the image service and gateway proxy have no standalone process, so their stats used to be a permanent dash; they now follow the main server's PID / CPU / memory / uptime. Their run state still comes from their own port probes and will not turn green just because the main server is running"
+      },
+      {
+        "type": "fix",
+        "text": "Fixed new mods still landing as loader.js.disabled even with Enable right after creation ticked: the UI sent internal key names (enableAfterCreate / signAfterCreate) while the backend reads enabled / sign, so the checkbox did nothing. Ticking it now produces a loadable loader.js, and new mods are enabled by default"
+      },
+      {
+        "type": "fix",
+        "text": "Fixed mods that had been published once no longer being selectable in Submit mod: the old filter dropped anything in review, but publishing now just pushes a new version to your own repo and cuts a Release, while the source index is registered only once, so no review state should block a new version. The candidate list now filters only by ownership, and a local .evejs-source.json also counts as proof of an existing source repo so a changed data dir no longer causes a duplicate repo creation"
+      },
+      {
+        "type": "new",
+        "text": "Edit info now actually saves: a new mods:updateMeta channel rewrites only the display name / description / category / tags / conflicts / restart semantics and the README (id, version, author and signature are never touched), re-signs after writing, rolls the whole change back if signing fails, and refuses mods owned by someone else"
+      },
+      {
+        "type": "opt",
+        "text": "New single-file portable build: double-click one EvEJSLauncher.exe of about 9.2 MB - no unzip, no installer. The launcher cache (data / cache / cli / updater / mods / temp) still lives in the _launcher folder next to the exe, and the bundled Node CLIs and self-updater are released on first launch (skipped when identical, and corrupted files are repaired automatically)"
+      },
+      {
+        "type": "fix",
+        "text": "Fixed the fake Import ZIP button in the mod market: it only popped a canned 'mod package selected...' toast without opening a file dialog or writing anything. It now really opens the system ZIP picker, rescans the mod list afterwards and reports where the package landed (cancelling stays silent, and a package missing from the market index gets its own warning). The neighbouring Open mods folder button now performs the real action too, creating the folder first when missing"
+      },
+      {
+        "type": "fix",
+        "text": "Fixed the mods page claiming the server root was wrong on a fully deployed server: the renderer additionally compared the configured path against a hard-coded old directory (E:\\Games\\EveJS-v0.12.8), so anything else - such as 0.12.9 - was always reported as invalid. It now trusts only the backend scanner verdict, and the banner says what it actually means: the folder has no mods/ directory, with a one-click Create mods/ button instead of sending users off to find the directory themselves"
+      },
+      {
+        "type": "fix",
+        "text": "The self-update dialog now reads the real release notes from the update manifest (its changelog field) instead of showing the prototype's sample entries; grouping and styling follow the prototype, and both Chinese and English notes render"
+      },
+      {
+        "type": "fix",
+        "text": "Fixed the submit-for-review completion message being wrong: a first-time publish really does open a source-registration PR, but it reported 'no PR' because the ledger was reloaded before the check; the real outcome and the PR link are now shown"
+      }
     ]
   }
 }

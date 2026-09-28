@@ -3,8 +3,8 @@
 
 产物（全部落在 artifacts/，已 gitignore）：
   1) EvEJSLauncher-Tauri-<version>/            便携版目录（exe + _launcher/cli + _launcher/updater + 说明）
-  2) EvEJSLauncher-Tauri-<version>-portable.zip  绿色版压缩包（真正的分发物）
-  3) update-manifest.json                        自更新清单（可 -SignKey 签名）
+  2) EvEJSLauncher-Tauri-<version>-portable.zip  绿色版压缩包（给想要「目录版」的人）
+  3) update-manifest.json                        自更新清单（指向单文件 exe，可 -SignKey 签名）
   4) EvEJSLauncher-Tauri-<version>-setup.exe     NSIS 安装包（-Nsis 时；由 tauri CLI 产出后改名）
 
 用法：
@@ -110,7 +110,7 @@ EvEJS 启动器（Tauri 2 便携版）v$version
 
 体积与安全
 ----------
-- 主程序约 6 MB（现役 Electron 便携版约 73 MB）。
+- 主程序约 9.2 MB（现役 Electron 便携版约 73 MB）。
 - 自更新只接受用内置维护者公钥签名过的清单（Ed25519）；未配置公钥时更新功能整体关闭。
 "@
     Set-Content -LiteralPath (Join-Path $stage "README-便携版.txt") -Value $readme -Encoding UTF8
@@ -120,7 +120,10 @@ EvEJS 启动器（Tauri 2 便携版）v$version
     Compress-Archive -Path (Join-Path $stage "*") -DestinationPath $zip -CompressionLevel Optimal
     Write-Host ("便携版：{0}（{1:N2} MB）" -f $zip, ((Get-Item $zip).Length / 1MB)) -ForegroundColor Green
 
-    $manifestArgs = @("scripts/make-manifest.mjs", "--zip", $zip, "--version", $version)
+    # 自更新资产必须是**单文件 exe**：清单的 url / sha256 / size 要指向发布时上传的那一个文件。
+    # 指向 zip 的话，自更新器会把 zip 当 exe 去替换（现役 Electron 0.1.28 只核 sha256、不认 zip，
+    # 这里的口径跟它保持一致才安全）。
+    $manifestArgs = @("scripts/make-manifest.mjs", "--asset", (Join-Path $stage "EvEJSLauncher.exe"), "--version", $version)
     if ($UrlBase) { $manifestArgs += @("--url-base", $UrlBase) }
     if ($NotesZh) { $manifestArgs += @("--notes-zh", $NotesZh) }
     if ($NotesEn) { $manifestArgs += @("--notes-en", $NotesEn) }

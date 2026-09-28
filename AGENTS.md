@@ -48,6 +48,9 @@ release-notes/vX.Y.Z.json
 
 - `type` 只能是 `new`、`fix`、`opt`。
 - Git 提交记录只能作为缺少正式说明时的兜底，不能替代 `release-notes`。
+- 打包时 `scripts/make-manifest.mjs` 会把这份 `changelog` 原样写进 `update-manifest.json`；
+  启动器自更新弹窗读的就是它（按 `type` 分组渲染成 新增 / 优化 / 修复）。少了这个键，
+  用户只看到「有新版本」却不知道改了什么。
 
 ## 发布红线（务必先读）
 

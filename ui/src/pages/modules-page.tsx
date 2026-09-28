@@ -286,13 +286,26 @@ export function ModulesPage({
   /** 发布完成后的收尾：真流程在弹窗里跑，这里只解释结果 */
   function submitMod(mod: ModEntry, payload: { version: string; note: string }, outcome: PublishOutcome) {
     setTab("mine")
-    const firstTime = !sourceRepos.includes(mod.id)
+    // 「是不是首次」只能看发布流程回传的结果：这里再读 sourceRepos 已经晚了一步
+    // （publish() 收尾时 reload 过台账，首次发布也会显示成「已有源码仓库」）。
+    const registered = outcome.registered === true
+    const reviewUrl = outcome.reviewUrl
     toast.success("发布完成", {
       description: outcome.repoSlug
         ? `「${mod.name}」${payload.version} 已发布到 ${outcome.repoSlug}${
-            firstTime ? "，收录源已登记进索引仓库（唯一一次 PR）" : "，本次只推了新版本，没有 PR"
+            registered
+              ? "，收录源已登记进索引仓库（唯一一次 PR，等维护者合并后即可在市场检索到）"
+              : "，本次只推了新版本，没有 PR"
           }。`
         : `「${mod.name}」${payload.version} 已发布到你自己名下的仓库。`,
+      ...(reviewUrl
+        ? {
+            action: {
+              label: "查看收录源 PR",
+              onClick: () => void source.openExternal(reviewUrl),
+            },
+          }
+        : {}),
     })
   }
 

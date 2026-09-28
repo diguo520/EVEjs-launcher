@@ -55,7 +55,8 @@ src/
 | 服务器日志的滚动与级别 | `src/hooks/use-launcher.ts`、`src/lib/log-logic.ts` |
 | 环境自检的检查项与「服务端根目录」 | `src/lib/mock.ts` 的 `CHECK_ITEMS` / `SERVER_CONFIG`、`src/hooks/use-env-check.ts` |
 | 账号与角色（校验、状态迁移、登录规则） | `src/lib/launcher-logic.ts`、`src/hooks/use-launcher-accounts.ts` |
-| 启动器版本、更新通道、更新说明 | `src/lib/mock.ts` 的 `LAUNCHER_META` / `LAUNCHER_RELEASE`、`src/components/shell/launcher-version.tsx` |
+| 启动器版本、更新通道 | `update:state` / `update:check`（`src/components/shell/launcher-version.tsx`）；浏览器里跑原型时退回 `src/lib/mock.ts` 的 `LAUNCHER_META` |
+| 更新说明（这一版改了什么） | 清单 `update-manifest.json` 的 `changelog` → `update:check` 回包 → `src/lib/release-notes.ts` 分组；原型里的 `LAUNCHER_RELEASE.notes` 只在没有桥时兜底 |
 | 模组市场：上架、评分、安装任务 | `src/lib/mod-logic.ts`、`src/hooks/use-mod-downloads.ts` |
 | 指令手册 / 物品 / NPC 数据 | `src/data/*.json`（由 `scripts/build-manual-data.mjs` 从手册 HTML 生成） |
 | 数据库备份列表 | `src/lib/mock.ts`、`src/components/database/` |
@@ -70,7 +71,8 @@ src/
 2. **服务启停**：`src/hooks/use-launcher.ts` 现在用定时器假装拉起服务；换成主进程 `child_process.spawn` / Tauri `Command`，把 stdout 转发给服务器日志页。
 3. **环境自检**：`src/hooks/use-env-check.ts` 里的「检测」「修复」换成真实文件检查（`node_modules`、`market-service.exe`、CA 证书）与真实修复动作。自检项的文案与修复指引都在 `src/lib/mock.ts`。
 4. **账号与角色**：把 `use-launcher-accounts.ts` 的 localStorage 换成主进程 / 本地 HTTP 服务；`src/lib/launcher-logic.ts` 的规则（每账号 3 个角色槽、同账号同时仅一个角色在线、角色只在游戏内创建）保持不动即可。
-5. **自更新**：`launcher-version.tsx` + `launcher-update-dialog.tsx` 现在是一段假进度条；换成真实更新源（下载、校验、替换、重启），更新说明数据结构见 `LAUNCHER_RELEASE`。
+5. **自更新**：版本、下载进度、更新说明都走真通道（`update:state` / `update:check` / `update:download`）；
+   更新通道的内置公钥没配之前检查一律 fail closed，弹窗会照实显示原因，不摆原型示例条目。
 6. **外网数据**：这份界面没有联网取数，所以不需要代理配置。
 
 ## 设计系统
