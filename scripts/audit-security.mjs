@@ -46,6 +46,13 @@ for (const part of csp.split(";")) {
   const tokens = part.trim().split(/\s+/).filter(Boolean);
   if (tokens.length) directives.set(tokens[0].toLowerCase(), tokens.slice(1));
 }
+/*
+ * img-src 例外：军团 / 联盟徽标由本地图片服务（默认 127.0.0.1:26001，端口在配置中心可改）
+ * 直接以 <img> 加载，和游戏客户端取图走的是同一套路由。端口可配所以只能给端口通配；
+ * 角色头像不走这条路（外壳读文件后内联成 data: URL）。
+ * 这里刻意不把 img-src 纳入断言：它允许的是本机服务，不是远程源；
+ * 但**动 script-src 之前先看这一条**——script-src 只允许 'self'（下面有断言钉住）。
+ */
 const remoteSource = (sources) => sources.some((s) => /^(https?:|\*|data:)/i.test(s));
 const scriptSrc = directives.get("script-src") ?? directives.get("default-src") ?? [];
 check("A4 CSP 有 script-src", directives.has("script-src"));
