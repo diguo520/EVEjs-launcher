@@ -379,7 +379,7 @@ export function startupBannerLines(input: {
     line("INFO", `[启动器] 仓库: ${app?.repoRoot ?? "—"}`),
     token?.hasToken
       ? line("INFO", `[启动器] GitHub 令牌: 已配置${token.encrypted ? "（DPAPI 加密）" : ""}`)
-      : line("WARN", "[启动器] GitHub 令牌: 未配置 · 提交与私有索引会失败，可在模组市场里设置"),
+      : line("WARN", "[启动器] GitHub 令牌: 未配置 · MOD制作者需要配置令牌，可在模组市场里设置"),
     market?.ok
       ? line(
           "INFO",
