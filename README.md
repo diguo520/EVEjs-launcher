@@ -2,16 +2,71 @@
 
 ![license](https://img.shields.io/badge/license-GPL--3.0-blue)
 ![platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20x64-0078D6)
-![version](https://img.shields.io/badge/version-0.2.0-22d3ee)
+![version](https://img.shields.io/badge/version-0.2.1-22d3ee)
 
 EvEJS 服务端启动器 —— **Tauri 2 重写版**。
 
 ![启动动画](docs/screenshots/01-boot.png)
 
-> 本仓库 `main` 是 **0.2.0 全新框架版**：外壳从 Electron 换成 **Tauri 2（Rust + 系统 WebView2）**，
+> 本仓库 `main` 是 **0.2.1 全新框架版**：外壳从 Electron 换成 **Tauri 2（Rust + 系统 WebView2）**，
 > 界面用 **React + shadcn/ui** 重做。
 > 旧的 Electron 版源码已从 `main` 移除，但仍可通过 tag `v0.1.6` … `v0.1.28` 与
 > [Releases](https://github.com/diguo520/EVEjs-launcher/releases) 取得。
+
+---
+
+## English
+
+**EvEJS Launcher (EVEJS COMMAND)** is the all-in-one desktop launcher for an EvEJS game server.
+
+### Highlights of the 0.2.0 rewrite
+
+- **Tauri 2 shell (Rust + system WebView2)** instead of Electron — no bundled Chromium, no bundled Node runtime.
+  Portable zip ≈ 5.5 MB, installer ≈ 4.3 MB, main executable ≈ 7.3 MB.
+- **React + shadcn/ui** interface with a full dark console look, localised into eight languages (Chinese, English, Japanese, Korean, French, German, Dutch, Russian) and defaulting to the system language.
+- **three.js boot animation** with a silent CSS fallback when WebGL is unavailable.
+- **Feature parity** with the 0.1.28 Electron build: service control, live logs, accounts and characters,
+  command manual, database browser, mod marketplace / authoring / signing / publishing, config center,
+  environment self-check, and self-update with Ed25519-signed manifests.
+
+![Dashboard](docs/screenshots/02-dashboard.png)
+![Mod marketplace](docs/screenshots/03-mod-market.png)
+
+### Download
+
+Grab the latest from [Releases](https://github.com/diguo520/EVEjs-launcher/releases):
+`...-portable.zip` (green/portable, recommended) or `...-setup.exe` (NSIS installer).
+
+Requirements: Windows 10 1809+ / Windows 11, x64, and the Microsoft Edge WebView2 Runtime
+(bundled with Windows 11).
+
+### Migrating from the Electron build
+
+Your author identity and GitHub token carry over automatically — nothing to re-enter.
+The new shell imports `author.json`, `mod-keys/<keyId>.key`, `github-token.bin` and `launcher-settings.json`
+from the legacy `_launcher/data` directory (see `src-tauri/src/legacy.rs`).
+
+### Build from source
+
+Requires Node.js ≥ 20, Rust 1.98 (`rust-toolchain.toml` pins the channel), VS C++ Build Tools,
+and a Go toolchain for the updater helper (optional if `vendor/updater/bin/evejs-updater.exe` is present).
+
+```powershell
+npm --prefix ui install
+pwsh -File scripts/build.ps1
+pwsh -File scripts/package.ps1 -Nsis
+```
+
+### ⚠️ Release guardrail
+
+The legacy Electron 0.1.28 updater reads `releases/latest/download/update-manifest.json` and verifies
+**sha256 only — it does not understand zip packages**. Publishing a Tauri portable zip manifest to
+`releases/latest` would replace existing users' executables with zip bytes.
+Split the update channels before publishing.
+
+### License
+
+[GNU General Public License v3.0](LICENSE). Third-party dependencies keep their own licenses.
 
 ---
 
@@ -35,7 +90,7 @@ EVEJS COMMAND 是 EvEJS 服务端的一体化桌面启动器：启停四个服�
 | 配置中心 | server / market / images / gateway 配置项分组编辑，带影响提示 |
 | 环境自检 | Node.js、Rust/Cargo、VS++ 构建工具、服务端依赖、数据库、市场服务二进制、客户端路径、客户端证书 CA 等逐项检测 + 修复指引 |
 | 自更新 | 读取 GitHub Releases 的 `update-manifest.json`，Ed25519 签名校验后替换主程序 |
-| 界面 | 深色控制台风格，three.js 启动动画（拿不到 WebGL 时静默退回 CSS 层）；语言切换入口已就位，当前提供中文界面 |
+| 界面 | 深色控制台风格，three.js 启动动画（拿不到 WebGL 时静默退回 CSS 层）；界面语言支持中文 / 英语 / 日语 / 韩语 / 法语 / 德语 / 荷兰语 / 俄语，默认跟随系统语言 |
 
 ### 下载
 
@@ -118,61 +173,6 @@ pwsh -File scripts/smoke-ipc.ps1        # 真实 WebView2 上的通道自检
 ### 许可证
 
 [GNU General Public License v3.0](LICENSE)（GPL-3.0）。第三方依赖各自遵循其原许可证。
-
----
-
-## English
-
-**EvEJS Launcher (EVEJS COMMAND)** is the all-in-one desktop launcher for an EvEJS game server.
-
-### Highlights of the 0.2.0 rewrite
-
-- **Tauri 2 shell (Rust + system WebView2)** instead of Electron — no bundled Chromium, no bundled Node runtime.
-  Portable zip ≈ 5.5 MB, installer ≈ 4.3 MB, main executable ≈ 7.3 MB.
-- **React + shadcn/ui** interface with a full dark console look (Chinese UI today; the language switch is already wired).
-- **three.js boot animation** with a silent CSS fallback when WebGL is unavailable.
-- **Feature parity** with the 0.1.28 Electron build: service control, live logs, accounts and characters,
-  command manual, database browser, mod marketplace / authoring / signing / publishing, config center,
-  environment self-check, and self-update with Ed25519-signed manifests.
-
-![Dashboard](docs/screenshots/02-dashboard.png)
-![Mod marketplace](docs/screenshots/03-mod-market.png)
-
-### Download
-
-Grab the latest from [Releases](https://github.com/diguo520/EVEjs-launcher/releases):
-`...-portable.zip` (green/portable, recommended) or `...-setup.exe` (NSIS installer).
-
-Requirements: Windows 10 1809+ / Windows 11, x64, and the Microsoft Edge WebView2 Runtime
-(bundled with Windows 11).
-
-### Migrating from the Electron build
-
-Your author identity and GitHub token carry over automatically — nothing to re-enter.
-The new shell imports `author.json`, `mod-keys/<keyId>.key`, `github-token.bin` and `launcher-settings.json`
-from the legacy `_launcher/data` directory (see `src-tauri/src/legacy.rs`).
-
-### Build from source
-
-Requires Node.js ≥ 20, Rust 1.98 (`rust-toolchain.toml` pins the channel), VS C++ Build Tools,
-and a Go toolchain for the updater helper (optional if `vendor/updater/bin/evejs-updater.exe` is present).
-
-```powershell
-npm --prefix ui install
-pwsh -File scripts/build.ps1
-pwsh -File scripts/package.ps1 -Nsis
-```
-
-### ⚠️ Release guardrail
-
-The legacy Electron 0.1.28 updater reads `releases/latest/download/update-manifest.json` and verifies
-**sha256 only — it does not understand zip packages**. Publishing a Tauri portable zip manifest to
-`releases/latest` would replace existing users' executables with zip bytes.
-Split the update channels before publishing.
-
-### License
-
-[GNU General Public License v3.0](LICENSE). Third-party dependencies keep their own licenses.
 
 ---
 

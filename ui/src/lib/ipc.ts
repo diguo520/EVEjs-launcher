@@ -247,6 +247,16 @@ export interface RawRole {
     solarSystemName?: string
     stationName?: string
   }
+  /** 静态数据主键：1 加达里 / 2 米玛塔尔 / 4 艾玛 / 8 盖伦特；没记录为 null */
+  raceID?: number | null
+  /** static characterCreationBloodlines 主键；没记录为 null */
+  bloodlineID?: number | null
+  /** 服务端只写 0 / 1 / 2；没记录为 null */
+  gender?: number | null
+  corporationID?: number | null
+  corporationName?: string | null
+  allianceID?: number | null
+  allianceName?: string | null
 }
 
 export interface RawAccount {

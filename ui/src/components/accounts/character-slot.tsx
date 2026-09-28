@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { Gamepad2, Globe, Loader2, Play, Square, Trash2 } from "lucide-react"
 
 import { CharacterAvatar } from "@/components/accounts/character-avatar"
@@ -33,6 +34,37 @@ import {
 } from "@/lib/launcher-logic"
 
 /**
+ * 军团 / 联盟徽标。
+ *
+ * 本地图片服务的路由与 images.evetech.net 一致（`/corporations/<id>/logo`、
+ * `/alliances/<id>/logo`），端口取自 config:get。图片服务没起、或这个 id 没有
+ * 专属徽标时会让 <img> 报错，这里直接把徽标摘掉——不留破图占位。
+ */
+function LogoBadge({
+  base,
+  kind,
+  id,
+  label,
+}: {
+  base: string
+  kind: "corporations" | "alliances"
+  id: number
+  label: string
+}) {
+  const [failed, setFailed] = useState(false)
+  if (failed) return null
+  return (
+    <img
+      src={`${base}/${kind}/${id}/logo?size=64`}
+      alt={label}
+      title={label}
+      onError={() => setFailed(true)}
+      className="size-5 shrink-0 rounded-[3px] border border-input bg-background/40 object-cover"
+    />
+  )
+}
+
+/**
  * 一个角色槽：有角色就展示名片与登录操作；
  * 空槽只负责把人送进游戏——角色是在游戏里建的，启动器不提供捏人界面。
  */
@@ -42,6 +74,7 @@ export function CharacterSlot({
   index,
   creatingStep,
   now,
+  imagesBaseUrl,
   onEnter,
   onExit,
   onDelete,
@@ -52,6 +85,8 @@ export function CharacterSlot({
   index: number
   /** 建号走到哪一步了；null 表示这个槽位没在等待 */
   creatingStep: InGameStep | null
+  /** 本地图片服务地址；没有就不画军团 / 联盟徽标 */
+  imagesBaseUrl: string | null
   /** 页面统一往下发的当前时间，在线时长按它算，避免每个槽位各起一个定时器 */
   now: number
   onEnter: (accountId: string, character: Character) => void
@@ -115,8 +150,15 @@ export function CharacterSlot({
     )
   }
 
-  // 种族资料只有老启动器的本地数据才有；真后端不返回，拿不到就不画
+  // 种族 / 血统 / 性别来自服务端角色表，缺哪项就少画哪项，全缺才画「未记录」
   const race = character.race ? raceOf(character.race) : null
+  const traits = [
+    race?.name,
+    character.bloodline,
+    character.gender ? GENDER_LABEL[character.gender] : undefined,
+  ].filter((part): part is string => Boolean(part))
+  /** 角色所在星系：服务端给的是「星系 · 停靠点」，这里只要星系 */
+  const system = character.system ?? character.location
   const guard = canLogin(account, character)
   /** 在线的角色给出「在线多久了」，会随时间自己往上走 */
   const onlineFor = onlineDuration(character, now)
@@ -144,11 +186,7 @@ export function CharacterSlot({
             ) : null}
           </div>
           <div className="mt-0.5 truncate text-[11px] text-muted-foreground">
-            {race
-              ? `${race.name} · ${character.bloodline ?? "—"} · ${
-                  character.gender ? GENDER_LABEL[character.gender] : "—"
-                }`
-              : "种族资料未记录"}
+            {traits.length > 0 ? traits.join(" · ") : "种族资料未记录"}
           </div>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             <Badge variant="secondary">{character.ship}</Badge>
@@ -162,11 +200,30 @@ export function CharacterSlot({
             ) : null}
           </div>
         </div>
-      </div>
 
-      <div className="mt-2 flex items-center gap-1.5 text-[11px] text-tertiary">
-        <Globe className="size-3 shrink-0" />
-        <span className="truncate">{character.location}</span>
+        {/* 右上角：军团 / 联盟徽标（有哪个画哪个，都没有就整块不出现） */}
+        {imagesBaseUrl ? (
+          <div className="flex shrink-0 items-center gap-1">
+            {character.corporationId ? (
+              <LogoBadge
+                key={`corp-${character.corporationId}`}
+                base={imagesBaseUrl}
+                kind="corporations"
+                id={character.corporationId}
+                label={character.corporationName ?? `军团 ${character.corporationId}`}
+              />
+            ) : null}
+            {character.allianceId ? (
+              <LogoBadge
+                key={`alliance-${character.allianceId}`}
+                base={imagesBaseUrl}
+                kind="alliances"
+                id={character.allianceId}
+                label={character.allianceName ?? `联盟 ${character.allianceId}`}
+              />
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       <div className="mt-auto pt-3">
@@ -224,13 +281,18 @@ export function CharacterSlot({
           </AlertDialog>
         </div>
 
+        {/* 这里原来是「建于 <日期>」，后端根本没给出生时间（一直是 "—"）；
+            换成角色所在星系，和「进入游戏」放在一起才有用 */}
         {character.online ? (
-          <p className="mt-1.5 text-[10px] leading-relaxed text-tertiary">
-            客户端运行中 · 建于 {character.bornAt}
+          <p className="mt-1.5 flex items-center gap-1.5 text-[10px] leading-relaxed text-tertiary">
+            <span className="shrink-0">客户端运行中</span>
+            <Globe className="size-3 shrink-0" />
+            <span className="truncate">{system}</span>
           </p>
         ) : guard.ok ? (
-          <p className="mt-1.5 text-[10px] leading-relaxed text-tertiary">
-            建于 {character.bornAt}
+          <p className="mt-1.5 flex items-center gap-1.5 text-[10px] leading-relaxed text-tertiary">
+            <Globe className="size-3 shrink-0" />
+            <span className="truncate">{system}</span>
           </p>
         ) : (
           <p className="mt-1.5 text-[10px] leading-relaxed text-tertiary">{guard.reason}</p>
