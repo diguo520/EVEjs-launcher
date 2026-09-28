@@ -140,6 +140,18 @@ export function translateInline(text: string, code: LocaleCode): string | null {
   return text.slice(0, lead) + hit + (trail > 0 ? text.slice(text.length - trail) : "")
 }
 
+/**
+ * 这条文案在目录里有没有条目。
+ *
+ * 与 `translate` 的区别：日语「保存」等条目译文与原文相同（同形汉字），
+ * 用「译文 != 原文」判断会误判成没翻；门禁要的是「条目在不在」。
+ */
+export function hasEntry(code: LocaleCode, text: string): boolean {
+  const catalog = CATALOGS[code]
+  if (!catalog) return false
+  return Object.prototype.hasOwnProperty.call(catalog, text.trim().replace(/\s+/g, " "))
+}
+
 /** 目录条目数（门禁与自检用：能一眼看出某种语言翻到哪了） */
 export function catalogSize(code: LocaleCode): number {
   return code === "zh" ? 0 : Object.keys(CATALOGS[code] ?? {}).length

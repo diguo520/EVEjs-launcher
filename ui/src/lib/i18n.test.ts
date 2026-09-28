@@ -5,6 +5,7 @@ import {
   LOCALES,
   catalogSize,
   detectLocale,
+  hasEntry,
   localeName,
   matchLocale,
   resolveLocale,
@@ -85,6 +86,39 @@ describe("i18n", () => {
     expect(localeName("ja")).toBe("日本語")
     expect(localeName("nl")).toBe("Nederlands")
     expect(localeName("zh")).toBe("中文")
+  })
+
+  it("七种外文目录都已落地；外壳必备文案每种语言都必须翻到", () => {
+    for (const code of ["en", "ja", "ko", "fr", "de", "nl", "ru"] as const) {
+      expect(catalogSize(code), code).toBeGreaterThan(0)
+    }
+    // 导航 / 顶栏 / 更新弹窗 / 常用动作：切到任何一种语言都得有译文，缺一条就算回归
+    const chrome = [
+      "主控台",
+      "服务器日志",
+      "账号管理",
+      "指令手册",
+      "数据库",
+      "模组市场",
+      "配置中心",
+      "设置",
+      "界面语言",
+      "启动器更新",
+      "立即更新",
+      "检查更新",
+      "保存",
+      "取消",
+      "删除",
+      "关闭",
+      "搜索",
+      "详情",
+    ]
+    for (const code of ["en", "ja", "ko", "fr", "de", "nl", "ru"] as const) {
+      for (const key of chrome) {
+        // 判「条目在不在」而不是「译文与原文不同」：日语「保存」这类同形汉字译文本来就一样
+        expect(hasEntry(code, key), code + " · " + key).toBe(true)
+      }
+    }
   })
 
   it("英语目录已落地（中文是源语言，不建目录）", () => {
