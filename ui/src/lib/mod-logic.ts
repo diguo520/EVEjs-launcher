@@ -412,9 +412,38 @@ export function displayAuthor(name: string): string {
   return signatureDraft(name) || UNSIGNED_AUTHOR
 }
 
+/**
+ * 同一模组两次提交之间的最短间隔：与 Rust 侧 `SUBMIT_COOLDOWN_MS` 一致（改一边记得改另一边）。
+ * 目的是防止连着重复提交 —— 同一版反复点会刷新同一条 PR、也会重复推 Release。
+ */
+export const SUBMIT_COOLDOWN_MS = 30 * 60 * 1000
+
+/** 距下次可提交还剩多少毫秒；0＝现在就能提交。计时起点是上次**成功**开 PR 的时间。 */
+export function submitCooldownRemaining(
+  submission: { submittedAt?: number } | undefined | null,
+  now: number
+): number {
+  const at = submission?.submittedAt
+  if (typeof at !== "number" || !Number.isFinite(at) || at <= 0) return 0
+  return Math.max(0, SUBMIT_COOLDOWN_MS - Math.max(0, now - at))
+}
+
+/** 冷却剩余时间说成人话 */
+export function cooldownText(remainingMs: number): string {
+  return `还剩约 ${Math.max(1, Math.ceil(remainingMs / 60000))} 分钟`
+}
+
+/** 审核 PR 的状态说法：后端复查回来的 `reviewPrState` */
+export function reviewPrStateLabel(state: string | undefined | null): string {
+  if (state === "merged") return "已合并"
+  if (state === "closed") return "PR 已关闭"
+  if (state === "open") return "审核中"
+  return "状态未确认"
+}
+
 /** 提交前必须解决的一件事：说清缺什么、去哪补 */
 export interface PublishBlocker {
-  id: "signature" | "token"
+  id: "signature" | "token" | "cooldown"
   /** 这一项的名词说法，用来拼「还差 X、Y」 */
   label: string
   /** 缺的是什么 */
@@ -432,12 +461,23 @@ export function publishBlockers({
   credential,
   name,
   now,
+  cooldownMs,
 }: {
   credential: PublishCredential | null
   name: string
   now: number
+  /** 距上次提交还差多少毫秒（0/空＝不受限） */
+  cooldownMs?: number
 }): PublishBlocker[] {
   const blockers: PublishBlocker[] = []
+  if (typeof cooldownMs === "number" && cooldownMs > 0) {
+    blockers.push({
+      id: "cooldown",
+      label: "提交间隔",
+      title: "距上次提交不到 30 分钟",
+      hint: `同一个模组两次提交至少间隔 30 分钟，${cooldownText(cooldownMs)}再试。`,
+    })
+  }
   if (!hasOwnSignature(name)) {
     blockers.push({
       id: "signature",

@@ -19,6 +19,15 @@ use std::path::{Path, PathBuf};
 
 const SUBMISSIONS_FILE: &str = "my-submissions.json";
 
+/// 同一模组两次提交之间的最短间隔（维护者要求：防止连着重复提交）。
+pub const SUBMIT_COOLDOWN_MS: u64 = 30 * 60 * 1000;
+
+/// 「审核中」那条 PR 的状态复查间隔（维护者要求：也按 30 分钟节流，别频繁打 GitHub）。
+pub const REVIEW_RECHECK_MS: u64 = 30 * 60 * 1000;
+
+/// 一次 list_my_mods / my_submissions 最多复查几条 PR（网络慢时别把页面拖住）。
+const REVIEW_RECHECK_MAX: usize = 3;
+
 /* ------------------------------ 台账读写 ------------------------------ */
 
 fn submissions_path(runtime: &RuntimePaths) -> PathBuf {
@@ -87,6 +96,86 @@ pub fn submission_items(runtime: &RuntimePaths) -> Vec<Value> {
 
 pub fn list_submissions(runtime: &RuntimePaths) -> Value {
     json!({ "ok": true, "items": submission_items(runtime) })
+}
+
+/// 这个模组还要等多久才能再次提交（毫秒）；0＝现在就能提交。
+///
+/// 只认**成功提交过**的时间戳（register_source 写完 PR 才写 `submittedAt`）：
+/// 打包失败 / 推仓库失败 / 开 PR 失败都不算，失败重试不会被自己的冷却挡住。
+pub fn submit_cooldown_remaining(runtime: &RuntimePaths, id: &str) -> u64 {
+    let file = read_submission_file(runtime);
+    let now = pkg::epoch_ms() as u64;
+    let last = file
+        .get("items")
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter(|item| item.get("id").and_then(Value::as_str) == Some(id))
+                .filter_map(|item| item.get("submittedAt").and_then(Value::as_u64))
+                .max()
+                .unwrap_or(0)
+        })
+        .unwrap_or(0);
+    if last == 0 {
+        return 0;
+    }
+    SUBMIT_COOLDOWN_MS.saturating_sub(now.saturating_sub(last))
+}
+
+/// 「审核中」的 PR 状态复查：按模组节流（REVIEW_RECHECK_MS 一次），终态不再复查。
+///
+/// 只改台账文件，不改返回值 —— 调用方（my_submissions）照常读一遍就是最新状态。
+pub fn refresh_review_states(runtime: &RuntimePaths) {
+    let token = github::get_token(runtime);
+    if token.is_empty() {
+        return;
+    }
+    let upstream = index_repo(runtime);
+    let mut file = read_submission_file(runtime);
+    let now = pkg::epoch_ms() as u64;
+    let mut looked_up = 0usize;
+    let mut changed = false;
+    if let Some(items) = file.get_mut("items").and_then(Value::as_array_mut) {
+        for item in items.iter_mut() {
+            if looked_up >= REVIEW_RECHECK_MAX {
+                break;
+            }
+            let reference = text_field(item, "sourceReviewUrl");
+            if reference.is_empty() {
+                continue;
+            }
+            let state = text_field(item, "reviewPrState");
+            if state == "merged" || state == "closed" {
+                continue; // 终态：合并/关闭之后不会变回去
+            }
+            let last = item
+                .get("reviewCheckedAt")
+                .and_then(Value::as_u64)
+                .unwrap_or(0);
+            if last > 0 && now.saturating_sub(last) < REVIEW_RECHECK_MS {
+                continue;
+            }
+            looked_up += 1;
+            let pr = github::get_pull_request(&token, &upstream, &reference);
+            let checked_at = pkg::epoch_ms() as u64;
+            let Some(map) = item.as_object_mut() else {
+                continue;
+            };
+            map.insert("reviewCheckedAt".into(), json!(checked_at));
+            if pr.get("ok").and_then(Value::as_bool).unwrap_or(false) {
+                map.insert("reviewPrState".into(), json!(text_field(&pr, "state")));
+                let number = text_field(&pr, "number");
+                if !number.is_empty() {
+                    map.insert("reviewPrNumber".into(), json!(number));
+                }
+                changed = true;
+            }
+        }
+    }
+    if changed {
+        let _ = write_submission_file(runtime, &file);
+    }
 }
 
 fn find_item_index(file: &Value, id: &str, version: &str) -> Option<usize> {
@@ -326,6 +415,20 @@ pub fn prepare_submission(repo_root: &Path, runtime: &RuntimePaths, input: &Valu
         return json!({
             "ok": false,
             "reason": format!("这个模组的作者标识是 {declared_author_id}，不是本机作者，不能替别人提交"),
+        });
+    }
+
+    // 防重复提交：同一模组 30 分钟内只能提交一次（上次**成功**提交起算）
+    let remaining = submit_cooldown_remaining(runtime, &record.id);
+    if remaining > 0 {
+        let minutes = remaining.div_ceil(60_000);
+        return json!({
+            "ok": false,
+            "cooldown": true,
+            "retryAfterMs": remaining,
+            "reason": format!(
+                "「{folder}」刚提交过：同一个模组两次提交至少间隔 30 分钟（还剩约 {minutes} 分钟再试）"
+            ),
         });
     }
 
@@ -1085,6 +1188,8 @@ pub fn check_token(runtime: &RuntimePaths, token: Option<&str>) -> Value {
 
 /// 组合 `mods:mySubmissions`：台账 + 索引仓库地址（渲染层要显示「往哪个仓库提 PR」）
 pub fn my_submissions(runtime: &RuntimePaths) -> Value {
+    // 顺手复查「审核中」那条 PR 开出来了没有 / 是不是已经合并 —— 按模组 30 分钟节流
+    refresh_review_states(runtime);
     let mut payload = list_submissions(runtime);
     if let Some(map) = payload.as_object_mut() {
         map.insert("indexRepo".into(), json!(index_repo(runtime)));
@@ -1157,6 +1262,54 @@ mod tests {
         assert_eq!(fallback["sha256"], "cc");
         assert_eq!(fallback["sizeBytes"], 7);
         assert_eq!(fallback["displayName"], "裸");
+    }
+
+    #[test]
+    fn pull_number_is_taken_from_a_pr_url_but_not_from_junk() {
+        assert_eq!(
+            github::pull_number_from("https://github.com/diguo520/EVEjs-mods/pull/8"),
+            "8"
+        );
+        assert_eq!(github::pull_number_from("8/"), "8");
+        assert_eq!(github::pull_number_from("https://github.com/a/b/pulls"), "");
+        assert_eq!(github::pull_number_from(""), "");
+    }
+
+    #[test]
+    fn submit_cooldown_counts_from_the_last_successful_submit_only() {
+        let runtime = temp_runtime("cooldown");
+        let now = pkg::epoch_ms() as u64;
+
+        // 压根没提交过 → 不挡
+        assert_eq!(submit_cooldown_remaining(&runtime, "evejs-x"), 0);
+
+        // 只有 createdAt（打包/推仓库成功、PR 没开出来）→ 不算数，失败重试不该被挡
+        let file = json!({ "schemaVersion": 1, "items": [
+            { "id": "evejs-x", "version": "1.0.0", "createdAt": now - 1000 }
+        ]});
+        let _ = write_submission_file(&runtime, &file);
+        assert_eq!(submit_cooldown_remaining(&runtime, "evejs-x"), 0);
+
+        // 成功提交过（submittedAt）→ 30 分钟内挡着，且只剩不到 30 分钟
+        let file = json!({ "schemaVersion": 1, "items": [
+            { "id": "evejs-x", "version": "1.0.0", "createdAt": now - 1000, "submittedAt": now - 60_000 }
+        ]});
+        let _ = write_submission_file(&runtime, &file);
+        let left = submit_cooldown_remaining(&runtime, "evejs-x");
+        assert!(
+            left > 0 && left <= SUBMIT_COOLDOWN_MS - 60_000,
+            "left={left}"
+        );
+
+        // 另一个模组互不影响
+        assert_eq!(submit_cooldown_remaining(&runtime, "evejs-y"), 0);
+
+        // 超过 30 分钟 → 放行
+        let file = json!({ "schemaVersion": 1, "items": [
+            { "id": "evejs-x", "version": "1.0.0", "submittedAt": now - SUBMIT_COOLDOWN_MS - 1 }
+        ]});
+        let _ = write_submission_file(&runtime, &file);
+        assert_eq!(submit_cooldown_remaining(&runtime, "evejs-x"), 0);
     }
 
     #[test]

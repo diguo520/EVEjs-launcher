@@ -30,6 +30,8 @@ import { useModSource, type PublishOutcome } from "@/hooks/use-mod-source"
 import {
   ALL_CATEGORY,
   activeConflicts,
+  reviewPrStateLabel,
+  submitCooldownRemaining,
   collectConflictPairs,
   filterMods,
   hasUpdate,
@@ -290,13 +292,20 @@ export function ModulesPage({
     // （publish() 收尾时 reload 过台账，刚提交的记录也会显示成「已登记」）。
     const registered = outcome.registered === true
     const reviewUrl = outcome.reviewUrl
+    // 提交之后**再查一次**那条 PR：只报「已提交」等于没验证
+    const prText = (() => {
+      if (!registered) return "，但版本审核 PR 没有开出来（去「我创建的」里点这条模组重试）"
+      const label = outcome.prNumber ? `审核 PR #${outcome.prNumber}` : "审核 PR"
+      if (outcome.verified !== true) {
+        return `，${label}已提交，但没能确认它的状态${
+          outcome.reviewReason ? `（${outcome.reviewReason}）` : ""
+        }`
+      }
+      return `，${label}${reviewPrStateLabel(outcome.prState)}（维护者合并后，市场更新到这一版）`
+    })()
     toast.success("发布完成", {
       description: outcome.repoSlug
-        ? `「${mod.name}」${payload.version} 已发布到 ${outcome.repoSlug}${
-            registered
-              ? "，版本审核 PR 已提交到索引仓库（维护者合并后，市场更新到这一版）"
-              : "，但版本审核 PR 没有开出来"
-          }。`
+        ? `「${mod.name}」${payload.version} 已发布到 ${outcome.repoSlug}${prText}。`
         : `「${mod.name}」${payload.version} 已发布到你自己名下的仓库。`,
       ...(reviewUrl
         ? {
@@ -876,6 +885,7 @@ export function ModulesPage({
             repo: "",
           })
         }
+        cooldownRemaining={(id) => submitCooldownRemaining(source.lastSubmissionOf(id), Date.now())}
         progress={source.publishProgress}
         phase={source.publishPhase}
         onSubmitted={handleSubmitted}

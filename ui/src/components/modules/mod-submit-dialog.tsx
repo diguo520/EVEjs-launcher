@@ -7,6 +7,7 @@ import {
   Loader2,
   Send,
   Signature,
+  Timer,
   TriangleAlert,
   UploadCloud,
   type LucideIcon,
@@ -30,6 +31,7 @@ import { Progress } from "@/components/ui/progress"
 import { Textarea } from "@/components/ui/textarea"
 import {
   bumpVersion,
+  cooldownText,
   credentialLabel,
   hasOwnSignature,
   isCredentialLive,
@@ -151,6 +153,8 @@ export interface ModSubmitDialogProps {
   authorName: string
   /** 发布凭据（GitHub 令牌）：源码要推到作者自己名下的仓库，缺了就没法发布 */
   credential: PublishCredential | null
+  /** 这个模组距上次提交还差多少毫秒（0＝可以提交）：同一模组两次提交至少间隔 30 分钟 */
+  cooldownRemaining: (modId: string) => number
   /** 已经有源码仓库的模组 id：第一次提交要先建仓库，之后只推新版本 */
   sourceRepos: string[]
   /** 缺署名或令牌时，就地打开「作者身份」去补 */
@@ -183,6 +187,7 @@ export function ModSubmitDialog({
   authorName,
   credential,
   sourceRepos,
+  cooldownRemaining,
   onOpenAuthor,
   onPublish,
   progress,
@@ -209,10 +214,19 @@ export function ModSubmitDialog({
 
   const signed = hasOwnSignature(authorName)
   /** 缺哪样挡哪样：署名与令牌都是硬门槛，两样齐了才放行 */
-  const blockers = publishBlockers({ credential, name: authorName, now })
+  // 同一模组两次提交至少间隔 30 分钟：计时起点是上次**成功**开出审核 PR 的时间
+  const cooldownMs = targetId ? cooldownRemaining(targetId) : 0
+  const blockers = publishBlockers({
+    credential,
+    name: authorName,
+    now,
+    cooldownMs,
+  })
   const ready = blockers.length === 0
-  const blockerHint = (id: "signature" | "token") =>
+  const blockerHint = (id: "signature" | "token" | "cooldown") =>
     blockers.find((item) => item.id === id)?.hint
+  /** 「还差 X、Y」只提需要用户去补的项：冷却只能等，不能补 */
+  const gateLabels = blockers.filter((item) => item.id !== "cooldown").map((item) => item.label)
 
   const target = useMemo(
     () => candidates.find((mod) => mod.id === targetId) ?? null,
@@ -474,6 +488,15 @@ export function ModSubmitDialog({
                   </span>
                 </p>
               )}
+              {cooldownMs > 0 ? (
+                <p className="flex items-start gap-1.5 text-[10px] leading-relaxed text-warning">
+                  <Timer className="mt-px size-3 shrink-0" />
+                  <span>
+                    距上次提交不到 30 分钟：同一个模组两次提交至少间隔 30 分钟，
+                    {cooldownText(cooldownMs)}再试。
+                  </span>
+                </p>
+              ) : null}
             </div>
 
             {error ? (
@@ -535,8 +558,9 @@ export function ModSubmitDialog({
               <p className="flex items-start gap-1.5 text-[11px] leading-relaxed text-warning">
                 <TriangleAlert className="mt-px size-3.5 shrink-0" />
                 <span>
-                  还差{blockers.map((item) => item.label).join("、")}
-                  ，补齐后才能发布。
+                  {gateLabels.length > 0
+                    ? `还差${gateLabels.join("、")}，补齐后才能发布。`
+                    : "提交太频繁了：同一个模组两次提交至少间隔 30 分钟，稍后再来。"}
                 </span>
               </p>
             )}

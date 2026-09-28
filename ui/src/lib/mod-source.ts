@@ -139,6 +139,12 @@ export function applyMine(entry: ModEntry, item: RawMyModItem): ModEntry {
   }
   const note = item.moderationReason
   if (typeof note === "string" && note.length > 0) next.reviewNote = note
+  if (typeof item.reviewPrState === "string" && item.reviewPrState.length > 0) {
+    next.reviewPrState = item.reviewPrState
+  }
+  if (typeof item.reviewPrNumber === "string" && item.reviewPrNumber.length > 0) {
+    next.reviewPrNumber = item.reviewPrNumber
+  }
   return next
 }
 
