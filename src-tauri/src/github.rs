@@ -374,8 +374,27 @@ pub struct SubmitFileInput<'a> {
     pub pr_body: &'a str,
 }
 
+/// 一个要提交到索引仓库的文件（路径 + 文本内容）
+pub struct SubmitFile<'a> {
+    pub path: &'a str,
+    pub content: &'a str,
+}
+
+/// 一次 PR 要带的全部文件。首次发布＝`sources.json` + `mods/<id>.json`；
+/// 版本更新＝只有 `mods/<id>.json`。同一个分支、同一条 PR。
+pub struct SubmitFilesInput<'a> {
+    pub token: &'a str,
+    pub upstream: &'a str,
+    pub files: &'a [SubmitFile<'a>],
+    pub branch: &'a str,
+    pub base_branch: &'a str,
+    pub commit_message: &'a str,
+    pub pr_title: &'a str,
+    pub pr_body: &'a str,
+}
+
 /// fork → 分支 → 提交文件 → 开 PR。失败时把「手动开 PR 的比较页」一并带回去。
-pub fn submit_file_via_pull_request(input: &SubmitFileInput) -> Value {
+pub fn submit_files_via_pull_request(input: &SubmitFilesInput) -> Value {
     let base = if input.base_branch.is_empty() {
         "main"
     } else {
@@ -393,6 +412,16 @@ pub fn submit_file_via_pull_request(input: &SubmitFileInput) -> Value {
         return json!({ "ok": false, "reason": non_empty_or(&object_field(&fork, "reason"), "fork 失败") });
     }
     let fork_name = fork_repo.split('/').nth(1).unwrap_or_default().to_string();
+
+    // 先同步 fork 的 base 分支：索引仓库的 CI 每 6 小时就往 main 提交一次
+    // （docs/mod-index.json），fork 不跟上就建分支，PR 的 diff 里会连带把
+    // 别人已合并的改动「回退」一遍。同步失败不致命（分叉时就同步不了），照常往下走。
+    let _ = call_submit(
+        input.token,
+        "POST",
+        &format!("/repos/{login}/{fork_name}/merge-upstream"),
+        Some(&json!({ "branch": base })),
+    );
 
     let head_ref = call_submit(
         input.token,
@@ -424,40 +453,61 @@ pub fn submit_file_via_pull_request(input: &SubmitFileInput) -> Value {
     if !create_ref.ok && create_ref.status != 422 {
         return json!({ "ok": false, "reason": non_empty_or(&create_ref.reason, "建分支失败") });
     }
-
-    // 文件已存在（更新已有分片）时需要带上它的 blob sha
-    let existing = call_submit(
-        input.token,
-        "GET",
-        &format!(
-            "/repos/{login}/{fork_name}/contents/{}?ref={}",
-            input.file_path,
-            encode_uri(input.branch)
-        ),
-        None,
-    );
-    let existing_sha = existing
-        .data
-        .as_ref()
-        .map(|value| object_field(value, "sha"))
-        .unwrap_or_default();
-
-    let mut put_body = json!({
-        "message": input.commit_message,
-        "content": secrets::base64_encode(input.content.as_bytes()),
-        "branch": input.branch,
-    });
-    if !existing_sha.is_empty() {
-        put_body["sha"] = json!(existing_sha);
+    if create_ref.status == 422 {
+        // 分支已存在（同一模组上一版还开着 PR）：把它拉回 fork 的 base，
+        // 否则旧分支上的旧文件会被算进本次 diff —— 等于顺手回退别人的合并。
+        let reset = call_submit(
+            input.token,
+            "PATCH",
+            &format!("/repos/{login}/{fork_name}/git/refs/heads/{}", input.branch),
+            Some(&json!({ "sha": base_sha, "force": true })),
+        );
+        if !reset.ok {
+            return json!({ "ok": false, "reason": non_empty_or(&reset.reason, "重置提交分支失败") });
+        }
     }
-    let put = call_submit(
-        input.token,
-        "PUT",
-        &format!("/repos/{login}/{fork_name}/contents/{}", input.file_path),
-        Some(&put_body),
-    );
-    if !put.ok {
-        return json!({ "ok": false, "reason": non_empty_or(&put.reason, "提交文件失败") });
+
+    // 一个 PR 可能要带多个文件（首次发布：sources.json + 版本分片）：
+    // 逐个 PUT 到同一个分支，最后只开一条 PR。
+    for file in input.files {
+        // 文件已存在（更新已有分片）时需要带上它的 blob sha
+        let existing = call_submit(
+            input.token,
+            "GET",
+            &format!(
+                "/repos/{login}/{fork_name}/contents/{}?ref={}",
+                file.path,
+                encode_uri(input.branch)
+            ),
+            None,
+        );
+        let existing_sha = existing
+            .data
+            .as_ref()
+            .map(|value| object_field(value, "sha"))
+            .unwrap_or_default();
+
+        let mut put_body = json!({
+            "message": input.commit_message,
+            "content": secrets::base64_encode(file.content.as_bytes()),
+            "branch": input.branch,
+        });
+        if !existing_sha.is_empty() {
+            put_body["sha"] = json!(existing_sha);
+        }
+        let put = call_submit(
+            input.token,
+            "PUT",
+            &format!("/repos/{login}/{fork_name}/contents/{}", file.path),
+            Some(&put_body),
+        );
+        if !put.ok {
+            return json!({
+                "ok": false,
+                "reason": non_empty_or(&put.reason, "提交文件失败"),
+                "failedFile": file.path,
+            });
+        }
     }
 
     let pr = call_submit(
@@ -508,6 +558,23 @@ pub fn submit_file_via_pull_request(input: &SubmitFileInput) -> Value {
         "branch": input.branch,
         "login": login,
         "forkRepo": fork_repo,
+    })
+}
+
+/// 单文件版本（保持原调用点不变）
+pub fn submit_file_via_pull_request(input: &SubmitFileInput) -> Value {
+    submit_files_via_pull_request(&SubmitFilesInput {
+        token: input.token,
+        upstream: input.upstream,
+        files: &[SubmitFile {
+            path: input.file_path,
+            content: input.content,
+        }],
+        branch: input.branch,
+        base_branch: input.base_branch,
+        commit_message: input.commit_message,
+        pr_title: input.pr_title,
+        pr_body: input.pr_body,
     })
 }
 

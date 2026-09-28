@@ -1,6 +1,11 @@
 {
   "target": 8,
-  "completed": 0,
+  "completed": 1,
   "nextVersion": "0.2.1",
-  "changes": []
+  "changes": [
+    {
+      "type": "fix",
+      "text": "模组发布改为每一版都提审核 PR：首次含 sources.json 收录登记，之后每次更新 mods/<id>.json 分片；维护者合并后索引 CI 立刻重建，市场才换到新版本（之前只有第一次发布才提 PR）"
+    }
+  ]
 }

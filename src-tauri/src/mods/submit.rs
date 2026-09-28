@@ -4,6 +4,9 @@
 //! 关键约定：
 //!   - 索引仓库是**分片**结构：一个模组一个 `mods/<id>.json`，作者只动自己那一个，
 //!     避免多人同时改同一个 `mod-index.json` 造成 PR 互相冲突；
+//!   - **每次发布都提一条 PR**：首次＝`sources.json` 收录登记 + `mods/<id>.json` 版本记录，
+//!     之后每次发新版都更新同一个 `mods/<id>.json`（同一条 `release/<id>` 分支上的 PR）；
+//!     索引构建器把**已合并**的版本记录当作该来源的权威版本 —— 合并后新版本才进市场；
 //!   - `mod-index.json` 由 CI 合并 + 签名，作者不直接改；
 //!   - ZIP 由作者自己托管（GitHub / Gitee Releases），索引里只登记 URL + sha256。
 use crate::author;
@@ -718,18 +721,68 @@ pub fn publish_own_repo(
     })
 }
 
-/* --------------------------- ③ 收录源登记 / PR --------------------------- */
+/* --------------------------- ③ 收录 / 版本审核 PR --------------------------- */
 
-/// 一次性动作：把作者自己的仓库登记进索引仓库的 `sources.json`（之后版本更新都不用再提 PR）。
+/// 版本记录在索引仓库里的路径：一个模组一个分片（沿用现役版的 `mods/<id>.json` 约定）。
+pub fn version_record_path(id: &str) -> String {
+    format!("mods/{id}.json")
+}
+
+/// 本次要提交的版本记录。
+///
+/// 只放「发布产物」相关的字段：其余元数据（简介 / readme / 标签 / 分类…）由索引 CI
+/// 从作者仓库的 `evejs-mod.json` 现抓，不在这里重复一份（重复了就会有两份真相）。
+fn version_record_json(id: &str, source_repo: &str, item: &Value) -> Value {
+    let draft = item.get("indexDraft").cloned().unwrap_or(Value::Null);
+    let pick = |key: &str| -> String {
+        let from_draft = text_field(&draft, key);
+        if from_draft.is_empty() {
+            text_field(item, key)
+        } else {
+            from_draft
+        }
+    };
+    json!({
+        "schemaVersion": 1,
+        "id": id,
+        "source": source_repo,
+        "displayName": pick("displayName"),
+        "version": pick("version"),
+        "sha256": pick("sha256"),
+        "sizeBytes": draft
+            .get("sizeBytes")
+            .cloned()
+            .unwrap_or_else(|| item.get("sizeBytes").cloned().unwrap_or(json!(0))),
+        "downloadUrls": draft
+            .get("downloadUrls")
+            .cloned()
+            .unwrap_or_else(|| item.get("downloadUrls").cloned().unwrap_or(json!([]))),
+        "author": draft.get("author").cloned().unwrap_or_else(|| json!({})),
+        "publishedAt": pick("publishedAt"),
+        "submittedAt": pkg::iso_from_ms(pkg::epoch_ms() as u64),
+    })
+}
+
+/// ③ 提交收录 / 版本审核 PR —— **每次发布都提**（2026-09-28 维护者要求：版本更新也要走 PR）。
+///
+/// 提交内容：
+///   - 首次发布：`sources.json`（登记收录源）+ `mods/<id>.json`（本次版本记录）；
+///   - 版本更新：只更新 `mods/<id>.json`。
+///
+/// 两者都走同一个分支 `release/<id>`，所以同一模组的后续版本会**刷新同一条 PR**，
+/// 不会一版一条堆在索引仓库里（分支每次提交前会被重置回 fork 的 base，diff 只含自己的文件）。
+///
+/// 索引仓库的 `build-index.mjs` 把**已合并**的版本记录当作该来源的权威版本 ——
+/// 也就是说合并之后新版本才进市场，这一步才真的叫「审核」。
 pub fn register_source(runtime: &RuntimePaths, id: &str, version: &str) -> Value {
     let file = read_submission_file(runtime);
-    let Some(_) = find_item_index(&file, id, version) else {
+    let Some(item_index) = find_item_index(&file, id, version) else {
         return json!({ "ok": false, "reason": "找不到待提交记录" });
     };
-    let item = file["items"][find_item_index(&file, id, version).unwrap_or(0)].clone();
+    let item = file["items"][item_index].clone();
     let source_repo = text_field(&item, "sourceRepo");
     if source_repo.is_empty() {
-        return json!({ "ok": false, "reason": "请先执行「② 发布到我的仓库」，拿到仓库地址后再申请收录" });
+        return json!({ "ok": false, "reason": "请先执行「② 发布到我的仓库」，拿到仓库地址后再提交审核" });
     }
 
     let token = github::get_token(runtime);
@@ -760,8 +813,7 @@ pub fn register_source(runtime: &RuntimePaths, id: &str, version: &str) -> Value
         });
     }
 
-    let parsed: Result<Value, _> = serde_json::from_str(&current_text);
-    let sources: Vec<String> = match parsed {
+    let sources: Vec<String> = match serde_json::from_str::<Value>(&current_text) {
         Ok(value) => match value.get("sources").and_then(Value::as_array) {
             Some(items) => items
                 .iter()
@@ -777,48 +829,102 @@ pub fn register_source(runtime: &RuntimePaths, id: &str, version: &str) -> Value
         }
     };
 
-    let already = sources
+    let first_time = !sources
         .iter()
-        .any(|item| item.eq_ignore_ascii_case(&source_repo));
-    let mut next = sources.clone();
-    if !already {
+        .any(|entry| entry.eq_ignore_ascii_case(&source_repo));
+
+    let sources_text = if first_time {
+        let mut next: Vec<String> = sources.clone();
         next.push(source_repo.clone());
-    }
-    let branch = format!("register/{}", source_repo.replace('/', "-").to_lowercase());
-    let content = {
         let payload = json!({ "schemaVersion": 1, "sources": next });
         serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".to_string()) + "\n"
+    } else {
+        String::new()
     };
+
+    let record = version_record_json(id, &source_repo, &item);
+    let record_path = version_record_path(id);
+    let record_text =
+        serde_json::to_string_pretty(&record).unwrap_or_else(|_| "{}".to_string()) + "\n";
+
+    let mut files: Vec<github::SubmitFile<'_>> = Vec::new();
+    if first_time {
+        files.push(github::SubmitFile {
+            path: "sources.json",
+            content: sources_text.as_str(),
+        });
+    }
+    files.push(github::SubmitFile {
+        path: record_path.as_str(),
+        content: record_text.as_str(),
+    });
+
+    let display_name = {
+        let value = text_field(&record, "displayName");
+        if value.is_empty() {
+            id.to_string()
+        } else {
+            value
+        }
+    };
+    let zip_name = Path::new(&text_field(&item, "zipPath"))
+        .file_name()
+        .map(|name| name.to_string_lossy().to_string())
+        .unwrap_or_default();
+    let short_sha: String = text_field(&record, "sha256").chars().take(12).collect();
+    let size_bytes = record.get("sizeBytes").and_then(Value::as_u64).unwrap_or(0);
     let pr_body = [
-        "### 收录社区模组源",
-        "",
-        &format!("- 仓库：`{source_repo}`"),
-        "- 上架清单：`evejs-mod.json`（仓库根目录）",
-        &format!(
-            "- 首次登记：{}",
-            if already { "否（已存在，本次为刷新）" } else { "是" }
+        "### 模组版本审核 / mod release review".to_string(),
+        String::new(),
+        format!("- 模组 / mod：`{id}`（{display_name}）"),
+        format!("- 版本 / version：`{}`", text_field(&record, "version")),
+        format!("- 来源仓库 / source：`{source_repo}`"),
+        format!(
+            "- 分片 / shard：`{record_path}`{}",
+            if first_time {
+                "（本 PR 另含 `sources.json` 收录登记 / also registers the source）"
+            } else {
+                ""
+            }
         ),
-        "",
-        "> 登记后，仓库的 `evejs-mod.json` 会被 CI 定时聚合进 `mod-index.json`；之后发新版**不需要**再提 PR。",
+        format!("- 包 / package：`{zip_name}` · {size_bytes} B · sha256 `{short_sha}…`"),
+        format!(
+            "- 署名 / keyId：`{}`",
+            text_field(&record["author"], "keyId")
+        ),
+        String::new(),
+        "合并后索引 CI 会立刻重建 `mod-index.json`，市场里的版本更新到本条记录。".to_string(),
+        "版本记录就是 `mods/<id>.json`，之后每一版都会更新同一个文件（同一条 PR 持续刷新）。".to_string(),
+        String::new(),
+        "After merge the index CI rebuilds `mod-index.json` and the marketplace moves to the version in this record.".to_string(),
     ]
     .join("\n");
 
-    let result = github::submit_file_via_pull_request(&github::SubmitFileInput {
+    let branch = if first_time {
+        // 首次复用「收录登记」那条分支名：老启动器已经开过的申请收录 PR 会被直接刷新成
+        // 版本审核 PR（内容里多出 mods/<id>.json），不会再多一条重复的登记 PR。
+        format!("register/{}", source_repo.replace('/', "-").to_lowercase())
+    } else {
+        format!("release/{id}")
+    };
+    let commit_message = if first_time {
+        format!("Add mod source {source_repo} + release {id} v{version}")
+    } else {
+        format!("release: {id} v{version}")
+    };
+    let pr_title = if first_time {
+        format!("Add mod source {source_repo}（{id} v{version}）")
+    } else {
+        format!("release: {id} v{version}")
+    };
+    let result = github::submit_files_via_pull_request(&github::SubmitFilesInput {
         token: &token,
         upstream: &upstream,
-        file_path: "sources.json",
-        content: &content,
+        files: &files,
         branch: &branch,
         base_branch: "main",
-        commit_message: &if already {
-            format!("chore: refresh {source_repo}")
-        } else {
-            format!("Add mod source {source_repo}")
-        },
-        pr_title: &format!(
-            "{} mod source: {source_repo}",
-            if already { "Refresh" } else { "Add" }
-        ),
+        commit_message: &commit_message,
+        pr_title: &pr_title,
         pr_body: &pr_body,
     });
 
@@ -831,23 +937,30 @@ pub fn register_source(runtime: &RuntimePaths, id: &str, version: &str) -> Value
             value
         }
     };
+    let pr_url = text_field(&result, "prUrl");
     if ok {
         let mut file = file;
         if let Some(index) = find_item_index(&file, id, version) {
-            file["items"][index]["sourceReviewUrl"] = json!(text_field(&result, "prUrl"));
-            // 这一步就是界面上那个「提交审核」：PR 开出来了，状态得跟上，
-            // 否则 myMods 只会说「草稿」，「我创建的」页签既不显示审核中、
-            // 也没有入口打开那条 PR（2026-09-28 报障）。
+            file["items"][index]["sourceReviewUrl"] = json!(pr_url.clone());
+            // 「提交审核」这一步真的开出 PR 了：状态得跟上，否则 myMods 只会说
+            // 「草稿」，「我创建的」页签既不显示审核中、也没有入口打开那条 PR。
+            file["items"][index]["prUrl"] = json!(pr_url.clone());
             file["items"][index]["status"] = json!("submitted");
             let _ = write_submission_file(runtime, &file);
         }
     }
     json!({
         "ok": ok,
-        "prUrl": result.get("prUrl").cloned().unwrap_or(json!("")),
+        "prUrl": pr_url,
         "branch": result_branch.clone(),
         "compareUrl": github::pull_request_compare_url(&upstream, &result_branch, &text_field(&result, "login")),
         "reason": text_field(&result, "reason"),
+        "firstTime": first_time,
+        "files": if first_time {
+            json!(["sources.json", record_path])
+        } else {
+            json!([record_path])
+        },
     })
 }
 
@@ -994,6 +1107,56 @@ mod tests {
             let _ = std::fs::create_dir_all(dir);
         }
         paths
+    }
+
+    #[test]
+    fn version_record_path_is_one_shard_per_mod() {
+        assert_eq!(
+            version_record_path("evejs-automining"),
+            "mods/evejs-automining.json"
+        );
+    }
+
+    #[test]
+    fn version_record_prefers_the_draft_and_falls_back_to_the_item() {
+        let item = json!({
+            "id": "evejs-x",
+            "version": "1.0.1",
+            "sha256": "从条目里读",
+            "sizeBytes": 1,
+            "displayName": "X",
+            "indexDraft": {
+                "version": "1.0.1",
+                "sha256": "bb",
+                "sizeBytes": 4096,
+                "publishedAt": "2026-09-28",
+                "displayName": "X-draft",
+                "author": { "id": "au-1", "keyId": "1382094598d9", "name": "作者" },
+                "downloadUrls": [
+                    { "mirror": "github", "url": "https://github.com/a/b/releases/download/v1.0.1/x.zip", "priority": 1 }
+                ],
+            }
+        });
+        let record = version_record_json("evejs-x", "diguo520/evejs-mod-x", &item);
+        assert_eq!(record["id"], "evejs-x");
+        assert_eq!(record["source"], "diguo520/evejs-mod-x");
+        assert_eq!(record["version"], "1.0.1");
+        // 分片草稿里的是权威值，不能被条目上的旧值盖掉
+        assert_eq!(record["sha256"], "bb");
+        assert_eq!(record["sizeBytes"], 4096);
+        assert_eq!(record["displayName"], "X-draft");
+        assert_eq!(record["author"]["keyId"], "1382094598d9");
+        assert_eq!(record["downloadUrls"][0]["priority"], 1);
+        assert!(record["submittedAt"].as_str().unwrap_or("").len() >= 10);
+
+        // 老台账（没有 indexDraft）也得能出记录：退回条目自身字段
+        let bare =
+            json!({ "version": "0.9.0", "sha256": "cc", "sizeBytes": 7, "displayName": "裸" });
+        let fallback = version_record_json("evejs-y", "a/b", &bare);
+        assert_eq!(fallback["version"], "0.9.0");
+        assert_eq!(fallback["sha256"], "cc");
+        assert_eq!(fallback["sizeBytes"], 7);
+        assert_eq!(fallback["displayName"], "裸");
     }
 
     #[test]

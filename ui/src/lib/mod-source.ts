@@ -196,7 +196,8 @@ export function sourceRepoIds(
   }
   // 本地模组目录里的 .evejs-source.json（scan 读出来的 mod.sourceRepo）同样是「已经有源码仓库」的凭据：
   // 台账只记得住发布成功的那一版，换过数据目录 / 清过 cache 之后就缺了，只认台账会导致
-  // 每次发布都重新建仓 + 重提一次「收录源登记」PR（2026-09-28 报障：发布过却说没提交过审核）。
+  // 每次发布都会重开一条「版本审核 PR」，但**建仓库**这一步不该重复做
+  //（2026-09-28 报障：发布过却说没提交过审核）。
   for (const mod of localMods ?? []) {
     if (mod?.id && mod.sourceRepo) ids.add(mod.id)
   }
