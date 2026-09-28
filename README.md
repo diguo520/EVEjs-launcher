@@ -4,13 +4,13 @@
 ![platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20x64-0078D6)
 ![version](https://img.shields.io/badge/version-0.2.1-22d3ee)
 
-EvEJS 服务端启动器 —— **Tauri 2 重写版**。
+EvEJS Server Launcher 。
 
 ![启动动画](docs/screenshots/01-boot.png)
 
-> 本仓库 `main` 是 **0.2.1 全新框架版**：外壳从 Electron 换成 **Tauri 2（Rust + 系统 WebView2）**，
-> 界面用 **React + shadcn/ui** 重做。
-> 旧的 Electron 版源码已从 `main` 移除，但仍可通过 tag `v0.1.6` … `v0.1.28` 与
+> This repository's `main` is the **0.2.1 brand-new framework version**: the shell has been changed from Electron to **Tauri 2 (Rust system WebView2)**，
+> Redo the interface using **React shadcn/ui**。
+> The old Electron version source code has been removed from `main`, but it can still be accessed via tags `v0.1.6` … `v0.1.28` and
 > [Releases](https://github.com/diguo520/EVEjs-launcher/releases) 取得。
 
 ---
