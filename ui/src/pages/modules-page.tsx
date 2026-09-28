@@ -286,22 +286,22 @@ export function ModulesPage({
   /** 发布完成后的收尾：真流程在弹窗里跑，这里只解释结果 */
   function submitMod(mod: ModEntry, payload: { version: string; note: string }, outcome: PublishOutcome) {
     setTab("mine")
-    // 「是不是首次」只能看发布流程回传的结果：这里再读 sourceRepos 已经晚了一步
-    // （publish() 收尾时 reload 过台账，首次发布也会显示成「已有源码仓库」）。
+    // 有没有开出 PR 只能看发布流程回传的结果：这里再读台账已经晚了一步
+    // （publish() 收尾时 reload 过台账，刚提交的记录也会显示成「已登记」）。
     const registered = outcome.registered === true
     const reviewUrl = outcome.reviewUrl
     toast.success("发布完成", {
       description: outcome.repoSlug
         ? `「${mod.name}」${payload.version} 已发布到 ${outcome.repoSlug}${
             registered
-              ? "，收录源已登记进索引仓库（唯一一次 PR，等维护者合并后即可在市场检索到）"
-              : "，本次只推了新版本，没有 PR"
+              ? "，版本审核 PR 已提交到索引仓库（维护者合并后，市场更新到这一版）"
+              : "，但版本审核 PR 没有开出来"
           }。`
         : `「${mod.name}」${payload.version} 已发布到你自己名下的仓库。`,
       ...(reviewUrl
         ? {
             action: {
-              label: "查看收录源 PR",
+              label: "查看版本审核 PR",
               onClick: () => void source.openExternal(reviewUrl),
             },
           }
@@ -462,7 +462,7 @@ export function ModulesPage({
     const submission = source.lastSubmissionOf(mod.id)
     if (submission?.sourceReviewUrl) {
       void source.openExternal(submission.sourceReviewUrl)
-      toast("已打开收录源 PR", { description: "审核结论以索引仓库那条 PR 的状态为准。" })
+      toast("已打开版本审核 PR", { description: "审核结论以索引仓库那条 PR 的状态为准。" })
       return
     }
     notWired("审核")
@@ -484,7 +484,7 @@ export function ModulesPage({
   }
 
   // 不在候选里过滤「审核中」：新流程下一次发布只是往自己的仓库推一版 + 发 Release，
-  // 收录源一辈子只登记一次，任何审核状态都不该挡住发新版（旧写法会把发过一次的模组永久藏起来，
+  // 审核状态只描述「上一版合并了没有」，不该挡住发新版（旧写法会把发过一次的模组永久藏起来，
   // 用户就再也选不中它了 —— 2026-09-28 报障）。审核状态在卡片上照旧用徽标显示。
   const submitCandidates = useMemo(() => mods.filter((mod) => mod.mine), [mods])
 
@@ -718,8 +718,8 @@ export function ModulesPage({
           tone={reviewing.length ? "warning" : "foreground"}
           delta={
             reviewing.length
-              ? "等索引仓库合并收录源 PR"
-              : "暂无待审的收录源"
+              ? "等索引仓库合并版本审核 PR"
+              : "暂无待审的版本审核 PR"
           }
         />
       </div>

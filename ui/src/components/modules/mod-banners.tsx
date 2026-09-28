@@ -98,7 +98,7 @@ export function ReviewBanner({
   onOpenReview,
 }: {
   mods: ModEntry[]
-  /** 打开这条模组的收录源 PR（审核结论以那条 PR 的状态为准） */
+  /** 打开这条模组的版本审核 PR（审核结论以那条 PR 的状态为准） */
   onOpenReview: (mod: ModEntry) => void
 }) {
   if (mods.length === 0) return null
@@ -116,7 +116,7 @@ export function ReviewBanner({
           </div>
           <div className="text-[11px] text-muted-foreground">
             人工审核通常需要 {REVIEW_WINDOW_MINUTES} 分钟，通过后自动上架到模组市场；
-            审核结论以索引仓库那条收录源 PR 的状态为准。
+            审核结论以索引仓库那条版本审核 PR 的状态为准。
           </div>
         </div>
       </div>
@@ -138,7 +138,7 @@ export function ReviewBanner({
             ) : null}
             <span className="text-[11px] font-semibold text-warning">审核中</span>
             <Button variant="outline" size="sm" onClick={() => onOpenReview(mod)}>
-              查看收录源 PR
+              查看版本审核 PR
             </Button>
           </li>
         ))}

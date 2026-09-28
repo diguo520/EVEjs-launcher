@@ -463,10 +463,10 @@ export function publishBlockers({
 /* ---------------- 提交发布流水线 ---------------- */
 
 /**
- * 提交一版模组要走的环节。**这是与老启动器最大的不同**：
- *   老版：每发一版都要往索引仓库 `mods/<id>.json` 提 PR 等人工合并；
- *   新版：打包 → 推到**作者自己名下的 GitHub 仓库**（建仓库 + 发 Release + 上传 ZIP）→
- *         收录源一辈子只登记一次，之后发新版本完全不需要 PR。
+ * 提交一版模组要走的环节：
+ *   ① 打包（离线）→ ② 推到**作者自己名下的 GitHub 仓库**（建仓库 + 发 Release + 上传 ZIP）
+ *   → ③ 往索引仓库提一条**版本审核 PR**（更新 `mods/<id>.json` 分片；首次的 PR 里
+ *   还多一份 `sources.json` 收录登记）。合并之后索引 CI 重建，市场才换到这一版。
  * credLive 由提交前的前置检查保证为真，留着这个参数是为了把环节算得明白。
  */
 export type PublishStageId = "pack" | "repo" | "upload" | "register"
@@ -490,16 +490,16 @@ const STAGE_TEXT: Record<PublishStageId, Omit<PublishStage, "id">> = {
     done: "Release 已发布",
   },
   register: {
-    pending: "登记收录源（仅首次）",
-    running: "正在登记收录源",
-    done: "收录源已登记",
+    pending: "提交版本审核 PR",
+    running: "正在提交审核 PR",
+    done: "版本审核 PR 已提交",
   },
 }
 
 /**
  * 这一次提交实际要走的环节。
  * 作者的源码仓库按模组建：这个模组还没推过源码就先建仓库，推过就只推新版本；
- * 收录源只登记一次，之后各版本都推同一个仓库，不再走索引仓库的 PR。
+ * 但**每一版**最后都要往索引仓库提一条版本审核 PR —— 合并后市场才更新。
  */
 export function publishStages({
   credLive,
@@ -512,8 +512,8 @@ export function publishStages({
   if (credLive) {
     if (!repoReady) ids.push("repo")
     ids.push("upload")
-    // 第一次提交才登记收录源：登记过之后，版本更新不需要任何 PR
-    if (!repoReady) ids.push("register")
+    // 每一版都提（首次的 PR 里多一份 sources.json 收录登记）
+    ids.push("register")
   }
   return ids.map((id) => ({ id, ...STAGE_TEXT[id] }))
 }

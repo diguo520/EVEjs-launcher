@@ -151,11 +151,11 @@ export interface ModSubmitDialogProps {
   authorName: string
   /** 发布凭据（GitHub 令牌）：源码要推到作者自己名下的仓库，缺了就没法发布 */
   credential: PublishCredential | null
-  /** 已经有源码仓库的模组 id：第一次提交要先建仓库并登记收录源，之后只推新版本 */
+  /** 已经有源码仓库的模组 id：第一次提交要先建仓库，之后只推新版本 */
   sourceRepos: string[]
   /** 缺署名或令牌时，就地打开「作者身份」去补 */
   onOpenAuthor: () => void
-  /** 真发布：本地打包 → 推到作者自己的仓库 →（首次）登记收录源 */
+  /** 真发布：本地打包 → 推到作者自己的仓库 → 提交版本审核 PR */
   onPublish: (
     mod: ModEntry,
     payload: { version: string; note: string }
@@ -170,10 +170,10 @@ export interface ModSubmitDialogProps {
 /**
  * 提交模组到市场。
  *
- * **这一步跟老启动器不一样**：老版每发一版都要往索引仓库提 PR（`mods/<id>.json`），
- * 等人工合并；新版把包推到**作者自己名下的仓库**（建仓库 → 写 evejs-mod.json →
- * 建 Release → 传 ZIP），收录源一辈子只登记一次（往索引仓库的 `sources.json` 提一个 PR）。
- * 之后发新版本完全不走 PR，所以这里的过程条画的是新流程。
+ * 三步：① 本地打包；② 把包推到**作者自己名下的仓库**（建仓库 → 写 evejs-mod.json →
+ * 建 Release → 传 ZIP）；③ 往索引仓库提一条**版本审核 PR**（`mods/<id>.json` 分片，
+ * 首次还多一份 `sources.json` 收录登记）。
+ * ③ 每一版都走：合并之后索引 CI 重建，市场才换到这一版。
  */
 export function ModSubmitDialog({
   open,
@@ -318,7 +318,7 @@ export function ModSubmitDialog({
         <DialogHeader>
           <DialogTitle>发布模组到市场</DialogTitle>
           <DialogDescription>
-            包会推到你自己名下的 GitHub 仓库并生成 Release；收录源只需登记一次，之后发新版本不再提 PR。
+            包会推到你自己名下的 GitHub 仓库并生成 Release，再往索引仓库提一条版本审核 PR；合并后市场更新到这一版。
           </DialogDescription>
         </DialogHeader>
 
@@ -461,16 +461,16 @@ export function ModSubmitDialog({
                 <p className="flex items-start gap-1.5 text-[10px] leading-relaxed text-tertiary">
                   <GitBranch className="mt-px size-3 shrink-0 text-success" />
                   <span>
-                    这个模组已经登记过收录源：本次只往 {sourceRepo(target.id)} 推一个新版本，
-                    不会再有 PR 审核。
+                    这个模组已经有源码仓库：本次往 {sourceRepo(target.id)} 推新版本，
+                    再往索引仓库提一条版本审核 PR（更新这个模组的版本分片）。
                   </span>
                 </p>
               ) : (
                 <p className="flex items-start gap-1.5 text-[10px] leading-relaxed text-tertiary">
                   <UploadCloud className="mt-px size-3 shrink-0 text-primary" />
                   <span>
-                    首次发布：会建好 {sourceRepo(target.id)} 并发布 Release，
-                    再往索引仓库登记一次收录源（唯一的一次 PR）。
+                    首次发布：会建好 {sourceRepo(target.id)}、发布 Release，
+                    再把收录登记和本次版本记录放进同一条 PR。
                   </span>
                 </p>
               )}
@@ -526,8 +526,8 @@ export function ModSubmitDialog({
             </div>
 
             <p className="text-[11px] leading-relaxed text-tertiary">
-              发布后 ZIP 走 GitHub Release 分发；索引里那一条只登记一次来源仓库，
-              之后各版本都靠你自己的仓库更新，玩家端会直接读到新版本。
+              发布后 ZIP 走 GitHub Release 分发；索引仓库那条 PR 里记录本次版本，
+              维护者合并后 CI 重建索引，玩家端就能装到这一版。
             </p>
 
             {/* 按钮为什么是灰的，得写在按钮正上方，别让人对着灰按钮猜 */}
@@ -600,7 +600,7 @@ export function ModSubmitDialog({
                             ? sourceRepo(target.id)
                             : stage.id === "upload"
                               ? "GitHub Release"
-                              : "sources.json"}
+                              : "sources.json + mods/<id>.json"}
                       </span>
                     </li>
                   )
@@ -613,7 +613,7 @@ export function ModSubmitDialog({
               </p>
               <p className="flex items-center gap-1.5 text-[11px] text-tertiary">
                 <FileCheck2 className="size-3.5 shrink-0" />
-                推送完会重载市场索引；老版那种「每版提 PR 等合并」的步骤已经没有了。
+                推送完会重载市场索引；这次也会往索引仓库提一条版本审核 PR，合并后市场才换到新版本。
               </p>
             </div>
           </div>
