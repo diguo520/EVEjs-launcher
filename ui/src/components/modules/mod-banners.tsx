@@ -2,7 +2,7 @@ import { Clock, TriangleAlert } from "lucide-react"
 
 import { StatusDot } from "@/components/common/status-dot"
 import { Button } from "@/components/ui/button"
-import type { ConflictPair } from "@/lib/mod-logic"
+import { reviewPrStateLabel, type ConflictPair } from "@/lib/mod-logic"
 import { REVIEW_WINDOW_MINUTES, type ModEntry } from "@/lib/mock"
 
 export type { ConflictPair }
@@ -136,7 +136,10 @@ export function ReviewBanner({
                 提交于 {mod.submittedAt}
               </span>
             ) : null}
-            <span className="text-[11px] font-semibold text-warning">审核中</span>
+            <span className="text-[11px] font-semibold text-warning">
+              {reviewPrStateLabel(mod.reviewPrState)}
+              {mod.reviewPrNumber ? ` #${mod.reviewPrNumber}` : ""}
+            </span>
             <Button variant="outline" size="sm" onClick={() => onOpenReview(mod)}>
               查看版本审核 PR
             </Button>

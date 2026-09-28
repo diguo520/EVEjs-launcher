@@ -578,6 +578,56 @@ pub fn submit_file_via_pull_request(input: &SubmitFileInput) -> Value {
     })
 }
 
+/// 从 `https://github.com/owner/repo/pull/8` 或 `8` 里取出 PR 编号；不是数字就返回空串。
+pub fn pull_number_from(reference: &str) -> String {
+    let tail = reference
+        .trim()
+        .trim_end_matches('/')
+        .rsplit('/')
+        .next()
+        .unwrap_or("");
+    if !tail.is_empty() && tail.chars().all(|ch| ch.is_ascii_digit()) {
+        tail.to_string()
+    } else {
+        String::new()
+    }
+}
+
+/// 读一条 PR 的当前状态。
+///
+/// 用途：提交完「审核」之后**校验 PR 真的开出来了**（不能只信 PUT 成功的回包），
+/// 以及复查那条 PR 后来是被合并还是被关掉了。失败只报原因，绝不当成提交失败。
+pub fn get_pull_request(token: &str, upstream: &str, reference: &str) -> Value {
+    let number = pull_number_from(reference);
+    if number.is_empty() {
+        return json!({ "ok": false, "reason": "没有 PR 编号" });
+    }
+    let result = call_submit(
+        token,
+        "GET",
+        &format!("/repos/{upstream}/pulls/{number}"),
+        None,
+    );
+    if !result.ok {
+        return json!({ "ok": false, "number": number, "reason": non_empty_or(&result.reason, "读不到 PR 状态") });
+    }
+    let data = result.data.unwrap_or(Value::Null);
+    let merged = data.get("merged").and_then(Value::as_bool).unwrap_or(false);
+    let state = if merged {
+        "merged".to_string()
+    } else {
+        object_field(&data, "state")
+    };
+    json!({
+        "ok": true,
+        "number": number,
+        "state": state,
+        "merged": merged,
+        "title": object_field(&data, "title"),
+        "htmlUrl": object_field(&data, "html_url"),
+    })
+}
+
 fn compare_url(upstream: &str, base: &str, branch: &str, login: &str) -> String {
     format!(
         "https://github.com/{upstream}/compare/{base}...{}?expand=1",

@@ -415,6 +415,9 @@ export interface ModEntry {
   review?: ModReviewState
   /** 提交审核的时间 */
   submittedAt?: string
+  /** 审核 PR 的状态（open / merged / closed）与编号：由台账带出来，没查过就是空 */
+  reviewPrState?: string
+  reviewPrNumber?: string
   /** 被驳回 / 被下架的原因 */
   reviewNote?: string
   /**

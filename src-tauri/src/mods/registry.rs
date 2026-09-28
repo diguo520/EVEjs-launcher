@@ -1151,6 +1151,10 @@ pub fn list_my_mods(repo_root: &Path, runtime: &RuntimePaths) -> Value {
                 "prUrl": pr_url,
                 "sizeBytes": submission_size,
                 "updatedAt": item_u64(Some(submission), "createdAt"),
+                // 审核 PR 的校验结果（提交时读过一次，之后按 30 分钟节流复查）
+                "reviewPrState": item_str(Some(submission), "reviewPrState"),
+                "reviewPrNumber": item_str(Some(submission), "reviewPrNumber"),
+                "reviewSubmittedAt": item_u64(Some(submission), "submittedAt"),
             }),
         );
     }

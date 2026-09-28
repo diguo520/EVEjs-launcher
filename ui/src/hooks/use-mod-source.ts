@@ -57,6 +57,13 @@ export interface PublishOutcome {
   registered?: boolean
   /** 版本审核 PR 的地址（每一步都该有；失败时为空） */
   reviewUrl?: string
+  /** 后端复查那条 PR 的结果：PR 地址是真的，但没能确认状态时为 false */
+  verified?: boolean
+  prNumber?: string
+  /** open（审核中）/ merged（已合并）/ closed（被关闭） */
+  prState?: string
+  /** 复查失败的原因（verified=false 时才有） */
+  reviewReason?: string
 }
 
 /** 发布流水线当前在哪一环：进度环由它 + 真进度百分比共同决定 */
@@ -368,10 +375,21 @@ export function useModSource(): ModSourceState {
       const slug = published.owner && published.repo ? `${published.owner}/${published.repo}` : undefined
       /** 版本审核 PR 的地址：只在这一步刚跑过时才有 */
       let reviewUrl: string | undefined
+      let verified = false
+      let prNumber = ""
+      let prState = ""
+      let reviewReason = ""
       setPublishPhase("register")
       setPublishProgress({ stage: "提交版本审核 PR（GitHub）", percent: 88 })
-      const registered = await callOr<{ ok: boolean; reason?: string; prUrl?: string }>(
-        "modsRegisterSource",
+      const registered = await callOr<{
+        ok: boolean
+        reason?: string
+        prUrl?: string
+        verified?: boolean
+        prNumber?: string
+        prState?: string
+        reviewReason?: string
+      }>("modsRegisterSource",
         null,
         input.mod.id,
         input.version
@@ -389,6 +407,10 @@ export function useModSource(): ModSourceState {
         }
       }
       reviewUrl = typeof registered.prUrl === "string" && registered.prUrl ? registered.prUrl : undefined
+      verified = registered.verified === true
+      prNumber = typeof registered.prNumber === "string" ? registered.prNumber : ""
+      prState = typeof registered.prState === "string" ? registered.prState : ""
+      reviewReason = typeof registered.reviewReason === "string" ? registered.reviewReason : ""
       setPublishProgress({ stage: "完成", percent: 100 })
       setPublishPhase("done")
       await load()
@@ -400,6 +422,10 @@ export function useModSource(): ModSourceState {
         repoSlug: slug,
         registered: true,
         reviewUrl,
+        verified,
+        prNumber,
+        prState,
+        reviewReason,
       }
     },
     [load]

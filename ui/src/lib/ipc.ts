@@ -460,6 +460,12 @@ export interface RawMyModItem {
   moderationReason?: string | null
   moderatedBy?: string
   moderatedAt?: string
+  /** 审核 PR 的状态：open（审核中）/ merged（已合并）/ closed（被关闭）；没查过就是空 */
+  reviewPrState?: string
+  /** 审核 PR 的编号 */
+  reviewPrNumber?: string
+  /** 上次成功开出审核 PR 的时间（epoch ms） */
+  reviewSubmittedAt?: number
 }
 
 export interface RawMyMods {
@@ -484,6 +490,14 @@ export interface RawSubmissionItem {
   sourceRepo: string
   sourceReviewUrl: string
   createdAt: number
+  /** 上次**成功**开出审核 PR 的时间（epoch ms）：没成功过就是空，也是 30 分钟冷却的计时起点 */
+  submittedAt?: number
+  /** 那条审核 PR 的编号（校验通过时才有） */
+  reviewPrNumber?: string
+  /** 那条审核 PR 的状态：open（审核中）/ merged（已合并）/ closed（被关闭） */
+  reviewPrState?: string
+  /** 上次复查这条 PR 的时间（epoch ms）：按 30 分钟节流 */
+  reviewCheckedAt?: number
 }
 
 export interface RawMySubmissions {
