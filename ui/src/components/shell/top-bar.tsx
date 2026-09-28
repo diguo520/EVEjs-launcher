@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
-import { Globe, Minus, Square, X } from "lucide-react"
+import { Check, Globe, Minus, Square, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
@@ -12,10 +12,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { useLocale } from "@/components/shell/locale-provider"
 import { LogoMark } from "@/components/shell/logo-mark"
 import { ServiceChip } from "@/components/shell/service-chip"
 import { useLauncherVersion } from "@/components/shell/launcher-version"
 import { call } from "@/lib/ipc"
+import { localeName } from "@/lib/i18n"
 import { LAUNCHER_META, type Service } from "@/lib/mock"
 
 function useClock() {
@@ -46,6 +48,7 @@ export function TopBar({
 }) {
   const clock = useClock()
   const { version } = useLauncherVersion()
+  const { locale, setLocale, languages } = useLocale()
 
   return (
     // data-tauri-drag-region="deep"：整条顶栏都能拖着走窗口（窗口无系统边框，
@@ -96,18 +99,26 @@ export function TopBar({
         <DropdownMenuTrigger asChild>
           <Button variant="outline" size="sm" className="gap-1.5">
             <Globe />
-            <span className="hidden sm:inline">中文</span>
+            <span data-i18n-skip className="hidden sm:inline">
+              {localeName(locale)}
+            </span>
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuLabel>界面语言</DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => toast.info("原型仅提供中文界面")}>
-            中文
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => toast.info("原型仅提供中文界面")}>
-            English
-          </DropdownMenuItem>
+          {languages.map((item) => (
+            <DropdownMenuItem key={item.code} onClick={() => setLocale(item.code)}>
+              {/* 语言名按各自母语显示，永不翻译：data-i18n-skip 挡住翻译桥 */}
+              <span data-i18n-skip className="mr-2">
+                {item.flag}
+              </span>
+              <span data-i18n-skip>{item.name}</span>
+              {item.code === locale ? (
+                <Check className="ml-auto size-3.5 text-primary" />
+              ) : null}
+            </DropdownMenuItem>
+          ))}
         </DropdownMenuContent>
       </DropdownMenu>
 

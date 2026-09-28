@@ -1,0 +1,146 @@
+/**
+ * 界面多语言（i18n）。
+ *
+ * 口径**逐条对齐现役 Electron 0.1.28**（`eve-launcher.html` 的 `I18N` / `TRANSLATE`）：
+ *   1) 语言集合一致：中文 + en / ja / ko / fr / de / nl / ru；
+ *   2) 首次启动跟随系统语言，认不出就用英文（老版 `detectLang()` 的兜底）；
+ *   3) 选择存 `localStorage["evejs-language"]` —— 与老版**同一个键**，
+ *      老用户切过语言的话，换到新外壳不用再选一次。
+ *
+ * 目录（catalog）以**中文原文为键**：`zh` 是源语言不需要目录，其余 7 种各一份
+ * `ui/src/locales/<code>.json`。缺条目一律回退中文原文（宁可显示中文，也不显示 key）。
+ */
+import en from "@/locales/en.json"
+import ja from "@/locales/ja.json"
+import ko from "@/locales/ko.json"
+import fr from "@/locales/fr.json"
+import de from "@/locales/de.json"
+import nl from "@/locales/nl.json"
+import ru from "@/locales/ru.json"
+
+/** 语言清单（顺序与老版下拉一致，名称按各自母语显示，永不翻译） */
+export const LOCALES = [
+  { code: "zh", name: "中文", flag: "🇨🇳" },
+  { code: "en", name: "English", flag: "🇬🇧" },
+  { code: "ja", name: "日本語", flag: "🇯🇵" },
+  { code: "ko", name: "한국어", flag: "🇰🇷" },
+  { code: "fr", name: "Français", flag: "🇫🇷" },
+  { code: "de", name: "Deutsch", flag: "🇩🇪" },
+  { code: "nl", name: "Nederlands", flag: "🇳🇱" },
+  { code: "ru", name: "Русский", flag: "🇷🇺" },
+] as const
+
+export type LocaleCode = (typeof LOCALES)[number]["code"]
+
+/** 与老版共用的存储键：换外壳不丢用户的语言选择 */
+export const LOCALE_STORAGE_KEY = "evejs-language"
+
+/** 认不出系统语言时的兜底（老版同口径） */
+export const FALLBACK_LOCALE: LocaleCode = "en"
+
+type Catalog = Record<string, string>
+
+/** 非中文目录；中文是源语言，直接回原文 */
+const CATALOGS: Partial<Record<LocaleCode, Catalog>> = {
+  en: en as Catalog,
+  ja: ja as Catalog,
+  ko: ko as Catalog,
+  fr: fr as Catalog,
+  de: de as Catalog,
+  nl: nl as Catalog,
+  ru: ru as Catalog,
+}
+
+export function isLocaleCode(value: unknown): value is LocaleCode {
+  return typeof value === "string" && LOCALES.some((item) => item.code === value)
+}
+
+export function localeName(code: LocaleCode): string {
+  return LOCALES.find((item) => item.code === code)?.name ?? code
+}
+
+/**
+ * BCP-47 语言标签 → 我们支持的语言码。
+ * 只按主语言匹配（`zh-Hans-CN` / `zh-TW` 都算中文，`en-GB` 算英文）。
+ */
+export function matchLocale(tag: string | null | undefined): LocaleCode | null {
+  if (!tag) return null
+  const primary = tag.toLowerCase().split(/[-_]/)[0]
+  if (!primary) return null
+  const found = LOCALES.find((item) => item.code === primary)
+  return found ? found.code : null
+}
+
+/** 按浏览器/系统的语言偏好挑一个（顺序即优先级），都不认就用英文 */
+export function detectLocale(languages: readonly string[]): LocaleCode {
+  for (const tag of languages) {
+    const matched = matchLocale(tag)
+    if (matched) return matched
+  }
+  return FALLBACK_LOCALE
+}
+
+/** 系统语言偏好：WebView 里的 `navigator.languages` 就是操作系统那一份 */
+function systemLocales(): readonly string[] {
+  if (typeof navigator === "undefined") return []
+  const list = navigator.languages
+  if (Array.isArray(list) && list.length > 0) return list
+  return navigator.language ? [navigator.language] : []
+}
+
+/** 已存的选择优先；没存过（或存的值不认识）才跟随系统语言 */
+export function resolveLocale(stored: string | null | undefined, languages: readonly string[]): LocaleCode {
+  return isLocaleCode(stored) ? stored : detectLocale(languages)
+}
+
+export function readStoredLocale(): LocaleCode {
+  try {
+    return resolveLocale(localStorage.getItem(LOCALE_STORAGE_KEY), systemLocales())
+  } catch {
+    return detectLocale(systemLocales())
+  }
+}
+
+export function writeStoredLocale(code: LocaleCode): void {
+  try {
+    localStorage.setItem(LOCALE_STORAGE_KEY, code)
+  } catch {
+    // 隐私模式等拿不到 localStorage：本次会话照常生效，只是记不住
+  }
+}
+
+/**
+ * 取一条文案：`{name}` 形式的占位符按 vars 替换，缺的占位符原样保留。
+ * 目录里没有的条目回退原文（中文），调用方不必为「还没翻译」写兜底分支。
+ */
+export function translate(code: LocaleCode, text: string, vars?: Record<string, string | number>): string {
+  const catalog = CATALOGS[code]
+  const hit = catalog ? catalog[text] : undefined
+  const out = hit ?? text
+  if (!vars) return out
+  return out.replace(/\{(\w+)\}/g, (whole, name: string) =>
+    Object.prototype.hasOwnProperty.call(vars, name) ? String(vars[name]) : whole
+  )
+}
+
+/**
+ * 翻译**一个文本节点**的内容：命中目录就返回替换后的整串，没命中返回 null。
+ *
+ * 只换掉去掉首尾空白之后的那一段，前后的空白原样保留 —— JSX 里
+ * `{" "}` 与换行缩进带来的间距全靠它，吃掉一个空格两段文字就粘在一起了。
+ * 键按「折叠空白」匹配，所以 JSX 里跨行的文案与目录里的单行键是同一条。
+ */
+export function translateInline(text: string, code: LocaleCode): string | null {
+  const trimmed = text.trim()
+  if (!trimmed) return null
+  const hit = translate(code, trimmed.replace(/\s+/g, " "))
+  if (hit === trimmed.replace(/\s+/g, " ")) return null
+  const lead = text.length - text.trimStart().length
+  const trail = text.length - text.trimEnd().length
+  return text.slice(0, lead) + hit + (trail > 0 ? text.slice(text.length - trail) : "")
+}
+
+/** 目录条目数（门禁与自检用：能一眼看出某种语言翻到哪了） */
+export function catalogSize(code: LocaleCode): number {
+  return code === "zh" ? 0 : Object.keys(CATALOGS[code] ?? {}).length
+}

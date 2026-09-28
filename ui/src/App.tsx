@@ -10,6 +10,7 @@ import {
 import { TopBar } from "@/components/shell/top-bar"
 import { SideNav } from "@/components/shell/side-nav"
 import { BootSplash } from "@/components/shell/boot-splash"
+import { LocaleProvider } from "@/components/shell/locale-provider"
 import { StatusBar } from "@/components/shell/status-bar"
 import type { NavBadges, ViewId } from "@/components/shell/nav-config"
 import { useLauncher } from "@/hooks/use-launcher"
@@ -147,7 +148,8 @@ export function App() {
   }
 
   return (
-    <LauncherVersionProvider value={launcherVersion}>
+    <LocaleProvider>
+      <LauncherVersionProvider value={launcherVersion}>
       <TooltipProvider delayDuration={180}>
         {/* data-evejs-renderer="react"：G1 运行时自检（src-tauri/src/ipc/smoke.rs）靠它判定 React
             渲染层真的挂载了（要求该节点有子元素）。属性不可改名、不可删除。 */}
@@ -194,7 +196,8 @@ export function App() {
 
         <Toaster />
       </TooltipProvider>
-    </LauncherVersionProvider>
+      </LauncherVersionProvider>
+    </LocaleProvider>
   )
 }
 
