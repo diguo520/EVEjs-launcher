@@ -221,6 +221,10 @@ pub struct ModRecord {
     pub source: String,
     pub source_repo: String,
     pub source_version: String,
+    /// `README.md` 里的正文（「## 详细介绍」按空行拆成的段落）
+    pub readme: Vec<String>,
+    /// `README.md` 里「## 功能要点」的条目
+    pub highlights: Vec<String>,
 }
 
 impl ModRecord {
@@ -262,6 +266,8 @@ impl ModRecord {
             "source": self.source,
             "sourceRepo": self.source_repo,
             "sourceVersion": self.source_version,
+            "readme": self.readme,
+            "highlights": self.highlights,
         })
     }
 }
@@ -304,6 +310,8 @@ fn empty_record(folder: &str, dir: &Path, manifest_path: &Path, error: &str) -> 
         source: "local".to_string(),
         source_repo: String::new(),
         source_version: String::new(),
+        readme: Vec::new(),
+        highlights: Vec::new(),
     }
 }
 
@@ -783,7 +791,13 @@ pub fn scan_mods(repo_root: &Path, runtime: &RuntimePaths) -> ModScanResult {
         if !entry.path().join(MANIFEST_NAME).is_file() {
             continue;
         }
-        let record = read_mod_dir(&name, &entry.path());
+        let mut record = read_mod_dir(&name, &entry.path());
+        // README 正文与功能要点跟着 `mods:list` 一起回（复用提交时那套解析）：
+        // 作者改完信息、或本机草稿还没上架时，详情页也要能立刻看到内容，
+        // 不能等索引刷新 —— 索引要审核合并之后才更新。
+        let (readme, highlights) = super::submit::readme_for_listing(repo_root, &name);
+        record.readme = readme;
+        record.highlights = highlights;
         by_id.insert(record.id.to_lowercase(), result.mods.len());
         result.mods.push(record);
     }
@@ -1151,5 +1165,61 @@ mod tests {
             assert!(record.unsupported_reason.contains(fragment));
             assert!(!record.enabled);
         }
+    }
+
+    #[test]
+    fn mods_list_carries_readme_and_highlights() {
+        let repo = repo_for("readme");
+        write_mod(
+            &repo,
+            "withreadme",
+            manifest("withreadme", json!({})),
+            Some("// noop"),
+        );
+        fs::write(
+            repo.join("mods").join("withreadme").join("README.md"),
+            "# With README\n\n一句话简介\n\n## 功能要点\n\n- 要点一\n\n- 要点一\n\n## 详细介绍\n\n正文第一段\n\n正文第二段\n\n## 安装与启用\n\n1. 启用它\n",
+        )
+        .unwrap();
+        write_mod(
+            &repo,
+            "noreadme",
+            manifest("noreadme", json!({})),
+            Some("// noop"),
+        );
+
+        let runtime = runtime_for("readme");
+        let scan = scan_mods(&repo, &runtime);
+        let with = scan
+            .mods
+            .iter()
+            .find(|item| item.id == "withreadme")
+            .expect("应扫到 withreadme");
+        assert_eq!(
+            with.readme,
+            vec!["正文第一段".to_string(), "正文第二段".to_string()]
+        );
+        // 重复的要点只留一条（与上架时同一套去重口径）
+        assert_eq!(with.highlights, vec!["要点一".to_string()]);
+
+        // 没有 README 的目录给空数组：详情页按「空 = 没有说明」画
+        let without = scan
+            .mods
+            .iter()
+            .find(|item| item.id == "noreadme")
+            .expect("应扫到 noreadme");
+        assert!(without.readme.is_empty());
+        assert!(without.highlights.is_empty());
+
+        // 回包里必须带上：详情页读的是 `mods:list`
+        let json = scan.to_json();
+        let first = json["mods"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|item| item["id"] == "withreadme")
+            .unwrap();
+        assert_eq!(first["readme"][1], "正文第二段");
+        assert_eq!(first["highlights"][0], "要点一");
     }
 }

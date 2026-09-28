@@ -6,9 +6,11 @@ import {
   applyMine,
   buildMods,
   categoriesOf,
+  changelogItems,
   fromMarket,
   isoDate,
   latestSubmission,
+  readmeOf,
   reviewStateOf,
   sourceRepoIds,
   toMB,
@@ -186,5 +188,113 @@ describe("categoriesOf", () => {
       ]),
     })
     expect(categoriesOf(mods)).toEqual(["经济", "玩法"])
+  })
+})
+
+/**
+ * 2026-09-29 报障：详情页「功能说明 / 版本历史」永远是空的，
+ * 作者改完模组信息回详情也看不到。这两块的数据来源在这里钉住。
+ */
+describe("readmeOf / 版本历史", () => {
+  it("正文 + 功能要点合成详情页读的段落", () => {
+    expect(readmeOf(["第一段", "第二段"], ["要点一", "要点二"])).toEqual([
+      "第一段",
+      "第二段",
+      "功能要点",
+      "· 要点一",
+      "· 要点二",
+    ])
+    expect(readmeOf(undefined, undefined)).toEqual([])
+  })
+
+  it("已经带「功能要点」标题的段落原样使用，不重复加", () => {
+    const paragraphs = ["第一段", "功能要点", "· 要点一"]
+    expect(readmeOf(paragraphs, ["要点一"])).toEqual(paragraphs)
+  })
+
+  it("版本说明按行拆，去掉 Markdown 列表符号", () => {
+    expect(changelogItems("- 修复 A\n* 修复 B\n· 修复 C\n\n")).toEqual([
+      "修复 A",
+      "修复 B",
+      "修复 C",
+    ])
+    expect(changelogItems(undefined)).toEqual([])
+  })
+
+  it("市场条目带出当前版本与更早的 history（最新的在前）", () => {
+    const entry = fromMarket({
+      id: "demo",
+      version: "1.2.0",
+      publishedAt: "2026-09-20",
+      changelog: "修复 A",
+      history: [
+        { version: "1.1.0", changelog: "老版本说明", at: Date.UTC(2026, 7, 1) },
+      ],
+    } as unknown as RawMarketMod)
+    expect(entry.changelog).toEqual([
+      { version: "1.2.0", date: "2026-09-20", items: ["修复 A"] },
+      { version: "1.1.0", date: "2026-08-01", items: ["老版本说明"] },
+    ])
+  })
+
+  it("本地扫描的正文覆盖索引那份（作者改完立刻可见）", () => {
+    const entry = fromMarket({
+      id: "demo",
+      version: "1.0.0",
+      readme: ["旧正文"],
+      highlights: ["旧要点"],
+    } as unknown as RawMarketMod)
+    const merged = applyLocal(entry, {
+      id: "demo",
+      folder: "demo",
+      readme: ["新正文"],
+      highlights: ["新要点"],
+    } as unknown as RawMod)
+    expect(merged.readme).toEqual(["新正文", "功能要点", "· 新要点"])
+    // 本地没读到 README 时保留索引那份，别把正文抹掉
+    const kept = applyLocal(entry, { id: "demo", folder: "demo" } as unknown as RawMod)
+    expect(kept.readme).toEqual(["旧正文", "功能要点", "· 旧要点"])
+  })
+
+  it("提交台账补出版本历史：同版本只留最新一条，最新的在前", () => {
+    const mods = buildMods({
+      mine: mine([{ id: "demo", displayName: "演示", status: "listed" }]),
+      submissions: [
+        {
+          id: "demo",
+          version: "1.0.0",
+          changelog: "首个版本",
+          createdAt: Date.UTC(2026, 7, 1),
+        },
+        {
+          id: "demo",
+          version: "1.1.0",
+          changelog: "修复 A",
+          createdAt: Date.UTC(2026, 8, 1),
+        },
+        { id: "other", version: "9.9.9", changelog: "别的模组", createdAt: Date.UTC(2026, 8, 2) },
+      ] as unknown as RawSubmissionItem[],
+    })
+    expect(mods[0].changelog).toEqual([
+      { version: "1.1.0", date: "2026-09-01", items: ["修复 A"] },
+      { version: "1.0.0", date: "2026-08-01", items: ["首个版本"] },
+    ])
+  })
+
+  it("台账里没有的条目退回索引带的版本历史", () => {
+    const mods = buildMods({
+      market: market([
+        {
+          id: "demo",
+          version: "2.0.0",
+          publishedAt: "2026-09-10",
+          changelog: "市场版说明",
+        },
+      ]),
+      submissions: [],
+    })
+    expect(mods[0].changelog).toEqual([
+      { version: "2.0.0", date: "2026-09-10", items: ["市场版说明"] },
+    ])
   })
 })

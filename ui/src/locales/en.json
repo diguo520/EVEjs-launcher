@@ -1504,6 +1504,7 @@
  "暂不支持 Zip64 格式的压缩包": "Zip64 format archives are not supported yet",
  "暂无待审的版本审核 PR": "No version review PRs pending",
  "暂无日志输出": "No log output yet",
+ "暂无版本历史": "No version history yet",
  "暂无评分": "No ratings yet",
  "暂时忽略": "Ignore for now",
  "更改立即生效": "Changes take effect immediately",

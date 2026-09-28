@@ -1504,6 +1504,7 @@
  "暂不支持 Zip64 格式的压缩包": "Les archives au format Zip64 ne sont pas encore prises en charge",
  "暂无待审的版本审核 PR": "Aucune PR de révision de version en attente",
  "暂无日志输出": "Aucune sortie de journal pour l'instant",
+ "暂无版本历史": "Aucun historique des versions pour l'instant",
  "暂无评分": "Aucune note pour l'instant",
  "暂时忽略": "Ignorer pour l'instant",
  "更改立即生效": "Les modifications prennent effet immédiatement",

@@ -17,7 +17,8 @@ import type {
   RawMyMods,
   RawSubmissionItem,
 } from "./ipc"
-import type { ModEntry, ModReviewState } from "./mock"
+import { FEATURES_HEADING, readmeParagraphs } from "./mod-logic"
+import type { ModChangelog, ModEntry, ModReviewState } from "./mock"
 
 const BYTES_PER_MB = 1024 * 1024
 
@@ -54,6 +55,83 @@ export function reviewStateOf(status: string): ModReviewState {
       // "local"：本机有这个文件夹，但还没提交过
       return "draft"
   }
+}
+
+/** 版本说明文本 → 详情页的条目：按行拆，去掉 Markdown 列表符号 */
+export function changelogItems(text: string | undefined | null): string[] {
+  if (typeof text !== "string") return []
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trim().replace(/^[-*·]\s*/, ""))
+    .filter(Boolean)
+}
+
+/**
+ * 正文 + 功能要点 → 详情页读的段落数组（与编辑表单写出去的是同一套格式）。
+ * 索引分片里 `readme` 只放「详细介绍」的段落，要点另存在 `highlights`，这里合成一段；
+ * 手写 README 没有小节标题时 `readme` 已经是整篇，那就原样用，别再加一遍标题。
+ */
+export function readmeOf(
+  detail: string[] | undefined,
+  highlights: string[] | undefined
+): string[] {
+  const paragraphs = (detail ?? []).filter(
+    (item) => typeof item === "string" && item.trim().length > 0
+  )
+  if (paragraphs.some((item) => item.trim() === FEATURES_HEADING)) return paragraphs
+  const features = (highlights ?? []).filter(
+    (item) => typeof item === "string" && item.trim().length > 0
+  )
+  return readmeParagraphs(paragraphs.join("\n\n"), features)
+}
+
+/** 市场索引的「当前版本说明 + 更早版本 history」→ 版本历史（最新的在前） */
+export function marketChangelog(mod: RawMarketMod): ModChangelog[] {
+  const out: ModChangelog[] = []
+  if (mod.version) {
+    out.push({
+      version: mod.version,
+      date: mod.publishedAt || "",
+      items: changelogItems(mod.changelog),
+    })
+  }
+  const history = Array.isArray(mod.history) ? mod.history : []
+  // 后端往 history 里是按时间追加的，倒着读才是「最新的在前」
+  for (let index = history.length - 1; index >= 0; index -= 1) {
+    const item = history[index]
+    if (!item || typeof item.version !== "string" || !item.version) continue
+    out.push({
+      version: item.version,
+      date: isoDate(typeof item.at === "number" ? item.at : 0),
+      items: changelogItems(item.changelog),
+    })
+  }
+  return out
+}
+
+/**
+ * 提交台账 → 版本历史（最新的在前，同一个版本只留最新一条）。
+ * 这是作者自己的逐版本记录：本地草稿、审核中、已上架的版本都在里面，
+ * 索引要等审核合并才更新，改完信息后想看历史只能靠它。
+ */
+export function submissionChangelog(
+  items: RawSubmissionItem[] | undefined,
+  id: string
+): ModChangelog[] {
+  const seen = new Set<string>()
+  return (items ?? [])
+    .filter((item) => item?.id === id && typeof item.version === "string" && item.version)
+    .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))
+    .filter((item) => {
+      if (seen.has(item.version)) return false
+      seen.add(item.version)
+      return true
+    })
+    .map((item) => ({
+      version: item.version,
+      date: isoDate(item.createdAt),
+      items: changelogItems(item.changelog),
+    }))
 }
 
 function baseEntry(id: string): ModEntry {
@@ -97,7 +175,8 @@ export function fromMarket(mod: RawMarketMod): ModEntry {
     updatedAt: mod.publishedAt || "",
     publishedAt: mod.publishedAt || "",
     gameVersion: mod.evejsVersions?.[0] ?? "",
-    readme: Array.isArray(mod.readme) ? mod.readme : [],
+    readme: readmeOf(mod.readme, mod.highlights),
+    changelog: marketChangelog(mod),
     mine: false,
     inMarket: true,
   }
@@ -113,6 +192,12 @@ export function applyLocal(entry: ModEntry, mod: RawMod): ModEntry {
     author: mod.authorName || entry.author,
     cat: mod.category || entry.cat,
     desc: mod.description || entry.desc,
+    // 本机 README 是作者改完立刻能看到的唯一来源（索引要等审核合并才更新）；
+    // 没读到 README 时保留原来那份，别把市场里的正文抹掉
+    readme:
+      (mod.readme?.length ?? 0) > 0 || (mod.highlights?.length ?? 0) > 0
+        ? readmeOf(mod.readme, mod.highlights)
+        : entry.readme,
     tags: mod.tags?.length ? mod.tags : entry.tags,
     installed: true,
     enabled: mod.enabled === true,
@@ -153,6 +238,8 @@ export function buildMods(input: {
   list?: RawModList | null
   market?: RawMarketList | null
   mine?: RawMyMods | null
+  /** 提交台账：作者自己的逐版本记录，用来补「版本历史」 */
+  submissions?: RawSubmissionItem[] | null
 }): ModEntry[] {
   const byId = new Map<string, ModEntry>()
 
@@ -172,6 +259,13 @@ export function buildMods(input: {
     if (!item?.id) continue
     const previous = byId.get(item.id) ?? { ...baseEntry(item.id), inMarket: false }
     byId.set(item.id, applyMine(previous, item))
+  }
+
+  // 版本历史：作者自己的逐版本台账最全（本地草稿、审核中、没上架的版本都在里面），
+  // 台账里没有的 id 才退回索引带的那一份
+  for (const [id, entry] of byId) {
+    const fromLedger = submissionChangelog(input.submissions ?? undefined, id)
+    if (fromLedger.length > 0) byId.set(id, { ...entry, changelog: fromLedger })
   }
 
   // 市场最新版本：与本地版本不同才挂「可更新」
