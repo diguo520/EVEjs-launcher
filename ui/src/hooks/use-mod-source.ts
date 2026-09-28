@@ -61,6 +61,8 @@ export interface ModSourceState {
   /** 服务端根目录（模组目录相对它定位） */
   repoRoot: string
   rootOk: boolean
+  /** 服务端根目录下有没有 mods/ 文件夹（没有时界面提示一键创建） */
+  modsExists: boolean
   /** 本机作者身份 */
   authorId: string
   authorName: string
@@ -395,6 +397,7 @@ export function useModSource(): ModSourceState {
     loaded,
     repoRoot: list?.repoRoot ?? "",
     rootOk: list?.repoRootLooksValid !== false,
+    modsExists: list?.exists === true,
     authorId: author?.author?.id ?? "",
     authorName: author?.author?.name ?? "",
     keyId: author?.author?.keyId ?? "",

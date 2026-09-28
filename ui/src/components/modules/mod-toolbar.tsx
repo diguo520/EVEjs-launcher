@@ -1,5 +1,4 @@
-import { FolderOpen, RefreshCw, Search, Upload, X } from "lucide-react"
-import { toast } from "sonner"
+import { FolderOpen, Loader2, RefreshCw, Search, Upload, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -92,6 +91,9 @@ export function ModToolbar({
   tag,
   onTagChange,
   onRefresh,
+  onOpenModsDir,
+  onImportZip,
+  importing,
 }: {
   query: string
   category: string
@@ -115,6 +117,12 @@ export function ModToolbar({
   rating?: RatingFilter
   onRatingChange?: (value: RatingFilter) => void
   onRefresh: () => void
+  /** 打开服务端根目录下的 mods 目录（后端会先确保它存在） */
+  onOpenModsDir?: () => void
+  /** 弹系统「打开文件」选 ZIP 导入；成功与否都由页面处理提示 */
+  onImportZip?: () => void
+  /** 导入进行中：按钮转圈并禁用，避免连点弹两次系统对话框 */
+  importing?: boolean
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -214,22 +222,18 @@ export function ModToolbar({
         </SelectContent>
       </Select>
 
-      <Button
-        variant="outline"
-        onClick={() => toast("已打开 mods 目录", { description: "mods\\ · 9 个条目" })}
-      >
+      <Button variant="outline" onClick={() => onOpenModsDir?.()}>
         <FolderOpen />
         打开 mods 目录
       </Button>
 
       <Button
         variant="outline"
-        onClick={() =>
-          toast("已选择模组包…", { description: "sovereignty-timer-1.5.0.zip · 24.6 MB" })
-        }
+        disabled={importing}
+        onClick={() => onImportZip?.()}
       >
-        <Upload />
-        导入 ZIP
+        {importing ? <Loader2 className="animate-spin" /> : <Upload />}
+        {importing ? "正在导入…" : "导入 ZIP"}
       </Button>
 
       <Button variant="outline" onClick={onRefresh}>

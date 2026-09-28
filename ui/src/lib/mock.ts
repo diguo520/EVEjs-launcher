@@ -1034,30 +1034,8 @@ export interface CheckItem {
   fix?: CheckFix
 }
 
-/**
- * 服务端根目录下长着的两样东西：主服务器依赖与市场服务二进制。
- * 目录写错、或者整个目录被挪走，它们就是真的找不到——不是文案上的差别，
- * 跟客户端证书一样挡住一键启动，模组目录也相对同一个根定位。
- */
-const ROOT_BOUND: Record<
-  string,
-  { missingDetail: (root: string) => string; hint: string }
-> = {
-  serverDeps: {
-    missingDetail: (root) => `${root}\\node_modules 不存在 · 服务端拉不起来`,
-    hint: "服务端主程序目录对不上，依赖自然找不到。把「服务端根目录」改回主程序所在的位置即可。",
-  },
-  marketBin: {
-    missingDetail: (root) => `${root}\\market\\market-service.exe 不存在`,
-    hint: "市场服务二进制在服务端根目录的 market 子目录下，随启动拉起市场服务时要用到它。",
-  },
-}
-
 /** 主服务器依赖找到之后长这样，跟目录无关 */
 const SERVER_DEPS_OK = "412 个包已就绪 · node_modules 完整"
-
-/** 这两项没什么可补的，动的是配置里的根目录 */
-const ROOT_FIX_ACTION = "改回默认目录"
 
 /** 市场服务二进制：跟着启动器构建走，启动器一更新它就落后了 */
 export const MARKET_BIN = {
@@ -1077,92 +1055,6 @@ export function binTargetVersion(launcherVersion: string): string {
   return launcherVersion.split(".").slice(0, 3).join(".")
 }
 
-/** 配置里的服务端根目录，还指不指向主程序所在的位置 */
-export function isServerRootValid(root: string): boolean {
-  return root.trim().toLowerCase() === SERVER_CONFIG.root.toLowerCase()
-}
-
-export interface CheckInputs {
-  /** 配置里的服务端根目录 */
-  root: string
-  /** 本地那份市场服务二进制的版本 */
-  binVersion: string
-  /** 启动器当前构建 */
-  launcherVersion: string
-}
-
-/**
- * 依赖与二进制这两项不吃死数据，跟着外部状态走：
- * 根目录换了它们就找不到、改回来又都在；启动器更新之后二进制就落后一个版本。
- * 这是自检里唯一会自己变的两项，其余几项原样返回——重算不会把作者补好的证书打回未检测到。
- *
- * 根目录不对时先算「找不到」：版本落后的事等目录对了再说，一次只讲一件。
- */
-export function applyDerivedChecks(
-  items: CheckItem[],
-  input: CheckInputs
-): CheckItem[] {
-  const root = input.root.trim()
-  const rootOk = isServerRootValid(root)
-  const target = binTargetVersion(input.launcherVersion)
-
-  return items.map((item) => {
-    const bound = ROOT_BOUND[item.id]
-    if (!bound) return item
-
-    if (!rootOk) {
-      return {
-        ...item,
-        ok: false,
-        level: "missing" as const,
-        detail: bound.missingDetail(root || "（根目录为空）"),
-        fix: {
-          hint: bound.hint,
-          action: ROOT_FIX_ACTION,
-          repair: "root" as const,
-          okDetail:
-            item.id === "marketBin" ? binDetail(input.binVersion) : SERVER_DEPS_OK,
-          done: "服务端根目录已改回主程序所在的位置，依赖与二进制都回来了。",
-        },
-      }
-    }
-
-    if (item.id === "serverDeps") {
-      return {
-        ...item,
-        ok: true,
-        level: "ok" as const,
-        detail: SERVER_DEPS_OK,
-        fix: undefined,
-      }
-    }
-
-    // 二进制还在，只是版本落后：不该挡住启动，但得提醒，并且真能同步
-    if (input.binVersion === target) {
-      return {
-        ...item,
-        ok: true,
-        level: "ok" as const,
-        detail: binDetail(input.binVersion),
-        fix: undefined,
-      }
-    }
-    return {
-      ...item,
-      ok: false,
-      level: "warn" as const,
-      detail: binDetail(input.binVersion),
-      fix: {
-        hint: `启动器已经更新到 ${input.launcherVersion}，这份二进制还停在 ${input.binVersion}，市场服务与启动器会对不上版本。`,
-        action: `同步到 ${target}`,
-        repair: "bin" as const,
-        okDetail: binDetail(target),
-        done: `市场服务二进制已同步到 ${target}，与启动器构建一致。`,
-      },
-    }
-  })
-}
-
 /**
  * 启动前的依赖门禁：先看工具链，再看依赖与二进制，最后是客户端证书。
  * 内存 / 磁盘这类运行期读数在资源监控里看，不在这里重复。
@@ -1170,8 +1062,8 @@ export function applyDerivedChecks(
  * 这里留了一项「未检测到」——自检的价值全在没通过的时候，全绿的界面看不出门禁到底管不管用。
  * 挑客户端证书是因为它确实会缺（换机器、清过 bin 目录都会），
  * 而且启动器能自己补，作者不会卡死在这一步。
- * 依赖与二进制那两项跟着外部状态走（配置里的服务端根目录、启动器当前构建），
- * 见 applyDerivedChecks。
+ * 依赖与二进制那两项在后端自检里各有真判据：根目录对不对由扫描器说了算，
+ * 不在渲染层拿写死的目录名比对（2026-09-28 那次报障就是被这种假判据挡住的）。
  */
 export const CHECK_ITEMS: CheckItem[] = [
   { id: "node", name: "Node.js", detail: "v26.5.0 · 16 逻辑线程", ok: true, level: "ok" },

@@ -3,6 +3,7 @@ import {
   ArrowUpCircle,
   BadgeCheck,
   BookOpen,
+  Loader2,
   MessageSquare,
   Plus,
   Send,
@@ -46,7 +47,7 @@ import {
   type ModTab,
   type RatingFilter,
 } from "@/lib/mod-logic"
-import { formatMB, isServerRootValid, type ModEntry } from "@/lib/mock"
+import { formatMB, type ModEntry } from "@/lib/mock"
 import type { ViewId } from "@/components/shell/nav-config"
 
 const MOD_TABS: ModTab[] = ["installed", "mine", "market"]
@@ -77,8 +78,14 @@ export function ModulesPage({
     setMods(source.mods)
   }, [source.mods])
 
-  /** 根目录指错地方，模组建出来也没人加载，页面上得先说这件事 */
-  const rootOk = source.rootOk && isServerRootValid(serverRoot)
+  /**
+   * 根目录对不对只信后端：mods:list 会回 repoRootLooksValid（服务端主程序在不在那儿）。
+   * 这里以前还 && 过一个「配置里的路径是不是写死的那个 E:\\Games\\EveJS-v0.12.8」的假判据，
+   * 换到别的版本目录（0.12.9）就必然误报，2026-09-28 那次报障就是它。
+   */
+  const rootOk = source.rootOk
+  /** 根目录对、但目录下还没有 mods/：不是错误，是「还没建」，给一键创建 */
+  const modsRootMissing = rootOk && source.loaded && !source.modsExists
 
   const authorName = source.authorName
   const credential = source.credential
@@ -103,6 +110,8 @@ export function ModulesPage({
   const [submitOpen, setSubmitOpen] = useState(false)
   const [submitTarget, setSubmitTarget] = useState<string | null>(null)
   const [conflictDismissed, setConflictDismissed] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const [creatingModsFolder, setCreatingModsFolder] = useState(false)
 
   /* ---------------- 下载队列 ---------------- */
 
@@ -293,6 +302,65 @@ export function ModulesPage({
     toast(`${action}：${NOT_WIRED}`, {
       description: "评分、评论与作者回复由模组市场服务托管，当前版本尚未接入，界面暂不落任何假数据。",
     })
+  }
+
+  /* ---------------- 目录与导入 ---------------- */
+
+  /** 打开服务端根目录下的 mods 目录（后端会先确保它存在） */
+  async function openModsDir() {
+    const reply = await source.openFolder()
+    if (!reply.ok) {
+      toast.error("打不开 mods 目录", { description: reply.reason ?? "系统没有返回原因" })
+    }
+  }
+
+  /**
+   * 导入 ZIP：弹系统「打开文件」选包，取消就静默（后端回 canceled:true）。
+   * 成功必须重扫列表 —— 导入是真往 mods/ 里落目录，不重扫界面上什么都看不见。
+   */
+  async function importZip() {
+    setImporting(true)
+    try {
+      const reply = await source.importZip()
+      if (reply.canceled === true) return
+      if (!reply.ok) {
+        toast.error("导入模组包失败", { description: reply.reason ?? "系统没有返回原因" })
+        return
+      }
+      await source.reload()
+      const folder = typeof reply.folder === "string" ? reply.folder : ""
+      const name =
+        typeof reply.displayName === "string" && reply.displayName ? reply.displayName : folder
+      toast.success(`模组「${name}」已导入`, {
+        description: [
+          folder ? `已写入 mods/${folder}/` : "已写入 mods/",
+          reply.disabledAfterImport === true ? "导入的包默认禁用，去列表里启用后才加载" : "",
+          reply.trusted === true ? "" : "市场索引里没有这个包的收录记录，来源请自行确认",
+        ]
+          .filter(Boolean)
+          .join(" · "),
+      })
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  /** 一键补出 mods/：建完重扫，提示条自己会消失 */
+  async function createModsFolder() {
+    setCreatingModsFolder(true)
+    try {
+      const reply = await source.createFolder()
+      if (!reply.ok) {
+        toast.error("创建 mods 目录失败", { description: reply.reason ?? "系统没有返回原因" })
+        return
+      }
+      await source.reload()
+      toast.success("已创建 mods 目录", {
+        description: "把模组放进去，服务端下一次启动就会加载。",
+      })
+    } finally {
+      setCreatingModsFolder(false)
+    }
   }
 
   /* ---------------- 创建 / 编辑 ---------------- */
@@ -488,13 +556,35 @@ export function ModulesPage({
             <span className="tabular break-all text-destructive">
               {source.repoRoot || serverRoot || "（空）"}
             </span>
-            ，模组骨架会建到这个目录下，服务端加载不到；主服务器依赖与市场服务二进制也已经找不到了。
+            ，这个目录里找不到服务端主程序，模组骨架建过去服务端也加载不到。
           </span>
           <Button size="sm" variant="outline" onClick={() => onNavigate("config")}>
             去改根目录
           </Button>
         </div>
       )}
+
+      {/* 根目录对了但还没有 mods/：服务端不会加载任何模组，给一键创建而不是让用户自己去翻目录 */}
+      {modsRootMissing ? (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-warning/45 bg-warning/[0.07] px-3 py-2.5">
+          <TriangleAlert className="size-4 shrink-0 text-warning" />
+          <span className="min-w-0 flex-1 text-[12px] leading-relaxed text-muted-foreground">
+            <span className="tabular break-all text-foreground">
+              {source.repoRoot || serverRoot}
+            </span>{" "}
+            下还没有 <span className="tabular text-warning">mods/</span> 文件夹，服务端不会加载任何模组。
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={creatingModsFolder}
+            onClick={() => void createModsFolder()}
+          >
+            {creatingModsFolder ? <Loader2 className="animate-spin" /> : null}
+            {creatingModsFolder ? "正在创建…" : "自动创建 mods/"}
+          </Button>
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         {/* min-w-0：这一行是 flex，页签不压缩的话窄窗会被它顶出横向滚动 */}
@@ -638,6 +728,9 @@ export function ModulesPage({
         onRatingChange={tab === "market" ? setRatingFilter : undefined}
         tag={activeTag}
         onTagChange={setActiveTag}
+        onOpenModsDir={() => void openModsDir()}
+        onImportZip={() => void importZip()}
+        importing={importing}
         onRefresh={() => {
           void source.reload()
           toast.success("模组列表已刷新", {
@@ -729,6 +822,7 @@ export function ModulesPage({
         existingIds={mods.map((mod) => mod.id)}
         onSubmit={(input) => void saveMod(input)}
         serverRoot={source.repoRoot || serverRoot}
+        rootOk={rootOk}
         templates={source.templates}
       />
 
