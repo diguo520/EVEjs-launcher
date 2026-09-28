@@ -4,6 +4,7 @@ import { ArrowDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { splitHits } from "@/lib/log-logic"
 import type { LogLevel, LogLine } from "@/lib/mock"
+import { t } from "@/lib/i18n"
 
 const levelClass: Record<LogLevel, string> = {
   INFO: "text-primary/90",
@@ -115,7 +116,7 @@ export function ConsoleView({
           className="absolute bottom-2 right-3 inline-flex items-center gap-1 rounded-sm border border-primary/40 bg-background/90 px-2 py-0.5 text-[10px] font-semibold text-primary transition-colors hover:bg-primary/10"
         >
           <ArrowDown className="size-3" />
-          {missed > 0 ? `${missed} 条新日志` : "回到最新"}
+          {missed > 0 ? t("{count} 条新日志", { count: missed }) : "回到最新"}
         </button>
       )}
     </div>

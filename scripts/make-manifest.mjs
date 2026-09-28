@@ -65,6 +65,15 @@ if (fs.existsSync(notesFile)) {
     console.error("更新说明的 type 只能是 new / fix / opt，发现：" + bad.type);
     process.exit(2);
   }
+  // 中英必须成对且同样多：单边被丢空（例如把 en 写成纯字符串数组，pick() 会全过滤掉）
+  // 时，那一边的用户在自更新弹窗里只会看到一片空白 —— 宁可打包失败，也不要半边空的说明。
+  if (zh.length !== en.length) {
+    console.error(
+      `更新说明中英条数不一致（zh ${zh.length} 条 / en ${en.length} 条）：` +
+        path.relative(ROOT, notesFile) + "（两边都要写成 { type, text } 对象）"
+    );
+    process.exit(2);
+  }
   changelog = { zh, en };
 }
 else if (value("--changelog")) {

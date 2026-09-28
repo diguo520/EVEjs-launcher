@@ -13,6 +13,7 @@ import {
   sourceRepoIds,
   toMB,
 } from "@/lib/mod-source"
+import { isPublished } from "@/lib/mod-logic"
 
 function market(list: unknown[]): RawMarketList {
   return { ok: true, source: "cache", cached: true, mods: list } as unknown as RawMarketList
@@ -140,6 +141,19 @@ describe("buildMods", () => {
 
   it("空来源给空列表", () => {
     expect(buildMods({})).toEqual([])
+  })
+
+  it("在架条目不被「我创建的」草稿状态顶下去（2026-09-28 报障）", () => {
+    // 索引里有这条（已上架），本机台账同 id 的状态是 draft（新版本还没提审）：
+    // 合并后 review 会变成 draft，但 inMarket 仍是 true，市场页签必须保留这张卡
+    const mods = buildMods({
+      market: market([{ id: "demo", displayName: "演示", version: "1.0.7" }]),
+      mine: mine([{ id: "demo", displayName: "演示", status: "draft" }]),
+    })
+    expect(mods).toHaveLength(1)
+    expect(mods[0].inMarket).toBe(true)
+    expect(mods[0].review).toBe("draft")
+    expect(isPublished(mods[0])).toBe(true)
   })
 })
 

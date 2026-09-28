@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   ArrowUpCircle,
   BadgeCheck,
@@ -12,6 +12,7 @@ import {
 import { toast } from "sonner"
 
 import { SectionHeading, StatTile } from "@/components/common/panel"
+import { useLocale } from "@/components/shell/locale-provider"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ModCard } from "@/components/modules/mod-card"
@@ -30,6 +31,7 @@ import { useModSource, type PublishOutcome } from "@/hooks/use-mod-source"
 import {
   ALL_CATEGORY,
   activeConflicts,
+  publishIntervalRemaining,
   reviewPrStateLabel,
   submitCooldownRemaining,
   collectConflictPairs,
@@ -60,6 +62,9 @@ const TAB_LABEL: Record<ModTab, string> = {
   market: "模组市场",
 }
 
+/** 索引「算旧」的阈值：进市场页签时超过它没同步过就强制联网拉一次（后端自动 TTL 同为 2 分钟） */
+const MARKET_STALE_MS = 2 * 60 * 1000
+
 /** 后端还没有的市场社区能力，统一回一句实话，别假装做完了 */
 const NOT_WIRED = "当前启动器还没接上这项市场服务能力"
 
@@ -73,6 +78,7 @@ export function ModulesPage({
 }) {
   /* ---------------- 真数据源 ---------------- */
 
+  const { t } = useLocale()
   const source = useModSource()
   /** 本地副本：真值来自 source.mods，写动作成功后由后端重扫回填 */
   const [mods, setMods] = useState<ModEntry[]>(source.mods)
@@ -115,22 +121,86 @@ export function ModulesPage({
   const [importing, setImporting] = useState(false)
   const [creatingModsFolder, setCreatingModsFolder] = useState(false)
 
+  /**
+   * 两次发布之间的 60 秒：上一次发布**走完**的时刻（0＝还没发过）。
+   *
+   * 和「同一模组 30 分钟」那条冷却不是一回事：这条挡的是连着发布（换个模组也一样等），
+   * 免得连着两次发布撞上 GitHub 限流、两条 PR 抢同一次索引重建。
+   */
+  const [lastPublishedAt, setLastPublishedAt] = useState(0)
+  const [publishClock, setPublishClock] = useState(() => Date.now())
+  const publishIntervalMs = publishIntervalRemaining(lastPublishedAt, publishClock)
+  const publishCooling = publishIntervalMs > 0
+  // 只在倒计时期间每秒走一格：平时不白跑定时器，也不让整页每秒重渲染
+  useEffect(() => {
+    if (!publishCooling) return
+    const timer = window.setInterval(() => setPublishClock(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [publishCooling])
+
+  /**
+   * 进「模组市场」页签就把索引对齐一次：缓存超过 2 分钟才强制联网，正常切页签不打扰。
+   *
+   * 后端自动路径有 2 分钟 TTL；界面再不传 force 的话，「审核台刚下架 → 市场还挂着」
+   * 就只能等 TTL 到点（2026-09-28 报障）。这里只在明显过期时拉，拉一次就记时间。
+   */
+  const marketSyncedAtRef = useRef(0)
+  // 先取出这三个值：依赖表里写 source.xxx 时 exhaustive-deps 会要求把整个 source 也带上
+  const marketLoaded = source.loaded
+  const marketFetchedAt = source.marketFetchedAt
+  const refreshMarket = source.refreshMarket
+  useEffect(() => {
+    if (tab !== "market" || !marketLoaded) return
+    if (marketFetchedAt > 0 && Date.now() - marketFetchedAt < MARKET_STALE_MS) return
+    if (Date.now() - marketSyncedAtRef.current < MARKET_STALE_MS) return
+    marketSyncedAtRef.current = Date.now()
+    void refreshMarket()
+  }, [tab, marketLoaded, marketFetchedAt, refreshMarket])
+
+  /** 工具条上的刷新：**真的**强制联网同步索引，再重扫本地 mods/（不再只读缓存却报「已刷新」） */
+  async function refreshModsAndMarket() {
+    const fresh = await source.refreshMarket()
+    await source.reload()
+    if (!fresh || fresh.ok !== true) {
+      // 连缓存都没有：别把 ok:false 说成「已同步」
+      toast.error("索引同步失败", {
+        description: fresh?.reason ?? "网络不可用，本地也还没有可用的缓存",
+      })
+      return
+    }
+    if (fresh.cached === true) {
+      toast.warning("索引同步失败，暂用本地缓存", {
+        description: fresh.reason ?? "网络不可用",
+      })
+      return
+    }
+    toast.success("市场索引已同步", {
+      description: t("索引 {count} 条 · 已重扫本地 mods/", {
+        count: fresh?.mods?.length ?? source.marketCount,
+      }),
+    })
+  }
+
   /* ---------------- 下载队列 ---------------- */
 
   const handleDownloadDone = useCallback((task: DownloadTask) => {
     if (task.kind === "install") {
-      toast.success(`「${task.name}」安装完成`, {
-        description: `v${task.targetVersion} 已启用，重启对应服务后生效。`,
+      toast.success(t("「{name}」安装完成", { name: task.name }), {
+        description: t("v{version} 已启用，重启对应服务后生效。", {
+          version: task.targetVersion,
+        }),
       })
     } else {
-      toast.success(`「${task.name}」已更新到 ${task.targetVersion}`, {
-        description: `旧版本 ${task.fromVersion} 已备份，重启对应服务后生效。`,
+      toast.success(t("「{name}」已更新到 {version}", { name: task.name, version: task.targetVersion }), {
+        description: t("旧版本 {version} 已备份，重启对应服务后生效。", {
+          version: task.fromVersion,
+        }),
       })
     }
   }, [])
 
   const handleDownloadFailed = useCallback((mod: ModEntry, reason: string) => {
-    toast.error(`「${mod.name}」下载失败`, { description: reason })
+    toast.error(t("「{name}」下载失败", { name: mod.name }), { description: reason })
   }, [])
 
   const downloads = useModDownloads(
@@ -211,12 +281,17 @@ export function ModulesPage({
     )
     const reply = await source.setEnabled(keyOf(mod), next)
     if (!reply.ok) {
-      toast.error(next ? `启用 ${mod.name} 失败` : `停用 ${mod.name} 失败`, {
-        description: reply.reason ?? "后端没说明原因",
-      })
+      toast.error(
+        next
+          ? t("启用 {name} 失败", { name: mod.name })
+          : t("停用 {name} 失败", { name: mod.name }),
+        {
+          description: reply.reason ?? "后端没说明原因",
+        }
+      )
       return
     }
-    toast(next ? `已启用 ${mod.name}` : `已停用 ${mod.name}`)
+    toast(next ? t("已启用 {name}", { name: mod.name }) : t("已停用 {name}", { name: mod.name }))
   }
 
   async function disableMod(mod: ModEntry) {
@@ -224,7 +299,9 @@ export function ModulesPage({
       prev.map((item) => (item.id === mod.id ? { ...item, enabled: false } : item))
     )
     await source.setEnabled(keyOf(mod), false)
-    toast(`已停用 ${mod.name}`, { description: "冲突已解除，重启对应服务后生效。" })
+    toast(t("已停用 {name}", { name: mod.name }), {
+      description: "冲突已解除，重启对应服务后生效。",
+    })
   }
 
   async function disableAllConflicts() {
@@ -242,7 +319,7 @@ export function ModulesPage({
       prev.map((mod) => (ids.has(mod.id) ? { ...mod, enabled: false } : mod))
     )
     for (const folder of folders) await source.setEnabled(folder, false)
-    toast(`已停用 ${ids.size} 个冲突模组`, {
+    toast(t("已停用 {count} 个冲突模组", { count: ids.size }), {
       description: "全部冲突项已停用，重启对应服务后生效。",
     })
   }
@@ -255,8 +332,8 @@ export function ModulesPage({
       targetVersion,
       run: () => source.installFromMarket(mod.id),
     })
-    toast(`开始下载「${mod.name}」`, {
-      description: `${formatMB(mod.sizeMB)} · 来自模组市场`,
+    toast(t("开始下载「{name}」", { name: mod.name }), {
+      description: t("{size} · 来自模组市场", { size: formatMB(mod.sizeMB) }),
     })
   }
 
@@ -268,8 +345,12 @@ export function ModulesPage({
       targetVersion,
       run: () => source.installFromMarket(mod.id),
     })
-    toast(`开始更新「${mod.name}」`, {
-      description: `${mod.version} → ${targetVersion} · ${formatMB(mod.sizeMB)}`,
+    toast(t("开始更新「{name}」", { name: mod.name }), {
+      description: t("{from} → {to} · {size}", {
+        from: mod.version,
+        to: targetVersion,
+        size: formatMB(mod.sizeMB),
+      }),
     })
   }
 
@@ -277,16 +358,18 @@ export function ModulesPage({
     downloads.cancel(mod.id)
     const reply = await source.uninstall(keyOf(mod))
     if (!reply.ok) {
-      toast.error(`卸载 ${mod.name} 失败`, {
+      toast.error(t("卸载 {name} 失败", { name: mod.name }), {
         description: reply.reason ?? "后端没说明原因",
       })
       return
     }
-    toast(`已卸载 ${mod.name}`)
+    toast(t("已卸载 {name}", { name: mod.name }))
   }
 
   /** 发布完成后的收尾：真流程在弹窗里跑，这里只解释结果 */
   function submitMod(mod: ModEntry, payload: { version: string; note: string }, outcome: PublishOutcome) {
+    // 「发布模组」按钮从这一刻起进入 60 秒倒计时（RELEASE 已推、PR 已开，再点就是连发）
+    if (outcome.ok) setLastPublishedAt(Date.now())
     setTab("mine")
     // 有没有开出 PR 只能看发布流程回传的结果：这里再读台账已经晚了一步
     // （publish() 收尾时 reload 过台账，刚提交的记录也会显示成「已登记」）。
@@ -294,19 +377,36 @@ export function ModulesPage({
     const reviewUrl = outcome.reviewUrl
     // 提交之后**再查一次**那条 PR：只报「已提交」等于没验证
     const prText = (() => {
-      if (!registered) return "，但版本审核 PR 没有开出来（去「我创建的」里点这条模组重试）"
-      const label = outcome.prNumber ? `审核 PR #${outcome.prNumber}` : "审核 PR"
+      if (!registered)
+        return t("，但版本审核 PR 没有开出来（去「我创建的」里点这条模组重试）")
+      const label = outcome.prNumber
+        ? t("审核 PR #{number}", { number: outcome.prNumber })
+        : t("审核 PR")
       if (outcome.verified !== true) {
-        return `，${label}已提交，但没能确认它的状态${
-          outcome.reviewReason ? `（${outcome.reviewReason}）` : ""
-        }`
+        return t("，{label}已提交，但没能确认它的状态{reason}", {
+          label,
+          reason: outcome.reviewReason
+            ? t("（{reason}）", { reason: outcome.reviewReason })
+            : "",
+        })
       }
-      return `，${label}${reviewPrStateLabel(outcome.prState)}（维护者合并后，市场更新到这一版）`
+      return t("，{label}{state}（维护者合并后，市场更新到这一版）", {
+        label,
+        state: t(reviewPrStateLabel(outcome.prState)),
+      })
     })()
     toast.success("发布完成", {
       description: outcome.repoSlug
-        ? `「${mod.name}」${payload.version} 已发布到 ${outcome.repoSlug}${prText}。`
-        : `「${mod.name}」${payload.version} 已发布到你自己名下的仓库。`,
+        ? t("「{name}」{version} 已发布到 {repo}{pr}。", {
+            name: mod.name,
+            version: payload.version,
+            repo: outcome.repoSlug,
+            pr: prText,
+          })
+        : t("「{name}」{version} 已发布到你自己名下的仓库。", {
+            name: mod.name,
+            version: payload.version,
+          }),
       ...(reviewUrl
         ? {
             action: {
@@ -321,7 +421,7 @@ export function ModulesPage({
   /* ---------------- 评分与评论：后端还没有这项服务 ---------------- */
 
   function notWired(action: string) {
-    toast(`${action}：${NOT_WIRED}`, {
+    toast(t("{action}：{reason}", { action, reason: NOT_WIRED }), {
       description: "评分、评论与作者回复由模组市场服务托管，当前版本尚未接入，界面暂不落任何假数据。",
     })
   }
@@ -353,9 +453,9 @@ export function ModulesPage({
       const folder = typeof reply.folder === "string" ? reply.folder : ""
       const name =
         typeof reply.displayName === "string" && reply.displayName ? reply.displayName : folder
-      toast.success(`模组「${name}」已导入`, {
+      toast.success(t("模组「{name}」已导入", { name }), {
         description: [
-          folder ? `已写入 mods/${folder}/` : "已写入 mods/",
+          folder ? t("已写入 mods/{folder}/", { folder }) : "已写入 mods/",
           reply.disabledAfterImport === true ? "导入的包默认禁用，去列表里启用后才加载" : "",
           reply.trusted === true ? "" : "市场索引里没有这个包的收录记录，来源请自行确认",
         ]
@@ -408,15 +508,18 @@ export function ModulesPage({
       sign: input.build.signAfterCreate,
     })
     if (!reply.ok) {
-      toast.error(`模组「${input.name}」创建失败`, {
+      toast.error(t("模组「{name}」创建失败", { name: input.name }), {
         description: reply.reason ?? "后端没说明原因",
       })
       return
     }
     setTab("mine")
     await source.reload()
-    toast.success(`模组「${input.name}」已创建`, {
-      description: `骨架已写入 mods/${input.id}/ · ${input.version}，接着可以发布上架。`,
+    toast.success(t("模组「{name}」已创建", { name: input.name }), {
+      description: t("骨架已写入 mods/{id}/ · {version}，接着可以发布上架。", {
+        id: input.id,
+        version: input.version,
+      }),
       action: { label: "去发布", onClick: () => openSubmit(input.id) },
     })
   }
@@ -443,12 +546,12 @@ export function ModulesPage({
       highlights: input.features,
     })
     if (!reply.ok) {
-      toast.error(`模组「${input.name}」保存失败`, {
+      toast.error(t("模组「{name}」保存失败", { name: input.name }), {
         description: reply.reason ?? "后端没说明原因",
       })
       return
     }
-    toast.success(`模组「${input.name}」已保存`, {
+    toast.success(t("模组「{name}」已保存", { name: input.name }), {
       description: `清单与 README 已更新并重新签名（release 内的模组需要重启主服务器后生效）。`,
     })
   }
@@ -462,7 +565,7 @@ export function ModulesPage({
       return
     }
     toast("草稿已删除", {
-      description: `「${mod.name}」已从本地模组库移除。`,
+      description: t("「{name}」已从本地模组库移除。", { name: mod.name }),
     })
   }
 
@@ -506,14 +609,14 @@ export function ModulesPage({
       list.push({
         id: "signature",
         label: "署名",
-        hint: "署名会印在模组的作者栏上，先在「作者身份」里填上你自己的署名。",
+        hint: "署名会印在模组的作者栏上，先在「令牌配置」里填上你自己的署名。",
       })
     }
     if (!credential) {
       list.push({
         id: "token",
         label: "发布凭据",
-        hint: "发布凭据就是你自己的 GitHub 令牌：源码要推到你名下的仓库，先在「作者身份」里配好。",
+        hint: "发布凭据就是你自己的 GitHub 令牌：源码要推到你名下的仓库，先在「令牌配置」里配好。",
       })
     }
     return list
@@ -535,24 +638,43 @@ export function ModulesPage({
   const emptyHint = (() => {
     const keyword = query.trim()
     const active = [
-      keyword ? `关键词「${keyword}」` : null,
-      category !== ALL_CATEGORY ? `分类「${category}」` : null,
-      activeTag ? `标签「${activeTag}」` : null,
+      keyword ? t("关键词「{value}」", { value: keyword }) : null,
+      category !== ALL_CATEGORY ? t("分类「{value}」", { value: category }) : null,
+      activeTag ? t("标签「{value}」", { value: activeTag }) : null,
     ].filter((part): part is string => part !== null)
     if (active.length > 1) {
-      return `${active.join(" + ")} 叠在一起没有结果，去掉其中一个再试。`
+      return t("{list} 叠在一起没有结果，去掉其中一个再试。", { list: active.join(" + ") })
     }
-    if (keyword) return `没有模组匹配「${keyword}」，清空搜索框再看看。`
+    if (keyword) return t("没有模组匹配「{value}」，清空搜索框再看看。", { value: keyword })
     if (category !== ALL_CATEGORY) {
-      return `「${category}」分类下没有模组，把分类切回「全部」试试。`
+      return t("「{value}」分类下没有模组，把分类切回「全部」试试。", { value: category })
     }
     if (activeTag) {
-      return `没有模组带「${activeTag}」标签，点一下筛选条上的标签就能取消。`
+      return t("没有模组带「{value}」标签，点一下筛选条上的标签就能取消。", { value: activeTag })
     }
     if (tab === "market" && source.marketBlockedCount > 0) {
-      return `市场索引里有 ${source.marketBlockedCount} 个模组声明只兼容别的服务端版本（当前 ${source.marketEvejsVersion || "未知"}），已被隐藏；等作者发布兼容版本后就会出现。`
+      return t(
+        "市场索引里有 {count} 个模组声明只兼容别的服务端版本（当前 {version}），已被隐藏；等作者发布兼容版本后就会出现。",
+        { count: source.marketBlockedCount, version: source.marketEvejsVersion || t("未知") }
+      )
     }
     return "试试更换关键词、分类或标签。"
+  })()
+
+  /** 最近一次索引同步失败了吗（marketReason 只在失败时非空）：黄条与页头标注都看它 */
+  const marketFallback = source.marketReason !== ""
+
+  /** 页头那半句「索引 HH:MM 更新」：让用户一眼看出手里这份是不是旧缓存 */
+  const marketFreshness = (() => {
+    if (!source.loaded) return ""
+    if (source.marketRefreshing) return t(" · 正在同步索引…")
+    if (!source.marketFetchedAt) return ""
+    const at = new Date(source.marketFetchedAt)
+    const hhmm = `${String(at.getHours()).padStart(2, "0")}:${String(at.getMinutes()).padStart(2, "0")}`
+    return t(" · 索引 {time} 更新{cached}", {
+      time: hhmm,
+      cached: marketFallback ? t("（本地缓存）") : "",
+    })
   })()
 
   return (
@@ -563,11 +685,43 @@ export function ModulesPage({
         actions={
           <span className="tabular text-[11px] text-muted-foreground">
             {source.loaded
-              ? `已扫描 ${mods.length} 个模组 · 索引 ${source.marketCount} 条`
+              ? t("已扫描 {scanned} 个模组 · 索引 {indexed} 条{freshness}", {
+                  scanned: mods.length,
+                  indexed: source.marketCount,
+                  freshness: marketFreshness,
+                })
               : "正在扫描 mods/ 与市场索引…"}
           </span>
         }
       />
+
+      {/* 网络拉不动、只能吃缓存（或者连缓存都没有）时说实话：标明现状，并给一个一键重试 */}
+      {tab === "market" && marketFallback ? (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-warning/45 bg-warning/[0.07] px-3 py-2.5">
+          <TriangleAlert className="size-4 shrink-0 text-warning" />
+          <span className="min-w-0 flex-1 text-[12px] leading-relaxed text-muted-foreground">
+            {source.marketCached
+              ? t("模组市场现在显示的是本地缓存{fetched}", {
+                  fetched: source.marketFetchedAt
+                    ? t("（{time} 拉取）", {
+                        time: new Date(source.marketFetchedAt).toLocaleString(),
+                      })
+                    : "",
+                })
+              : "模组市场索引本地还没有缓存，也没能从网上拉到"}
+            {source.marketReason ? t("：{reason}", { reason: source.marketReason }) : "。"}
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={source.marketRefreshing}
+            onClick={() => void refreshModsAndMarket()}
+          >
+            {source.marketRefreshing ? <Loader2 className="animate-spin" /> : null}
+            {source.marketRefreshing ? "同步中…" : "重新同步索引"}
+          </Button>
+        </div>
+      ) : null}
 
       {/* 根目录不对是全局问题，摆在最上面：下面每张卡片能不能装、建出来的骨架落在哪儿都看它 */}
       {rootOk ? null : (
@@ -621,13 +775,13 @@ export function ModulesPage({
                 {item === "market" && updatableCount > 0 ? (
                   <span className="tabular flex items-center gap-0.5 rounded-sm border border-primary/35 bg-primary/10 px-1.5 text-[10px] font-semibold text-primary">
                     <ArrowUpCircle className="size-2.5" />
-                    可更新 {updatableCount}
+                    {t("可更新 {count}", { count: updatableCount })}
                   </span>
                 ) : null}
                 {item === "mine" && mineCounts.pending > 0 ? (
                   <span className="tabular flex items-center gap-0.5 rounded-sm border border-warning/35 bg-warning/10 px-1.5 text-[10px] font-semibold text-warning">
                     <MessageSquare className="size-2.5" />
-                    待回复 {mineCounts.pending}
+                    {t("待回复 {count}", { count: mineCounts.pending })}
                   </span>
                 ) : null}
               </TabsTrigger>
@@ -647,9 +801,23 @@ export function ModulesPage({
             <Plus />
             创建模组
           </Button>
-          <Button variant="outline" onClick={() => openSubmit(null)}>
+          {/* 发布一次之后按钮自己进 60 秒倒计时：连点会重复推 Release、抢同一次索引重建 */}
+          <Button
+            variant="outline"
+            disabled={publishCooling}
+            onClick={() => openSubmit(null)}
+            title={
+              publishCooling
+                ? t("距上次发布还差 {seconds} 秒，倒计时结束才能再发一次", {
+                    seconds: Math.ceil(publishIntervalMs / 1000),
+                  })
+                : undefined
+            }
+          >
             <Send />
-            发布模组
+            {publishCooling
+              ? t("发布模组 · {seconds}s", { seconds: Math.ceil(publishIntervalMs / 1000) })
+              : "发布模组"}
           </Button>
           {/* 发布前置没补齐时点一个小黄点：别等进了提交弹窗才发现要配东西 */}
           <Button
@@ -657,14 +825,14 @@ export function ModulesPage({
             onClick={() => setAuthorOpen(true)}
             title={
               pendingBlockers.length > 0
-                ? `还差${pendingBlockers
-                    .map((item) => item.label)
-                    .join("、")}，发布模组前要在这里补齐`
+                ? t("还差{list}，发布模组前要在这里补齐", {
+                    list: pendingBlockers.map((item) => item.label).join("、"),
+                  })
                 : undefined
             }
           >
             <BadgeCheck />
-            作者身份
+            令牌配置
             {pendingBlockers.length > 0 ? (
               <span className="size-1.5 rounded-full bg-warning" aria-hidden />
             ) : null}
@@ -695,14 +863,14 @@ export function ModulesPage({
           value={installedCount}
           unit="个"
           tone="telemetry"
-          delta={`共 ${mods.length} 个模组在库`}
+          delta={t("共 {count} 个模组在库", { count: mods.length })}
         />
         <StatTile
           label="已启用数"
           value={enabledCount}
           unit="个"
           tone="success"
-          delta={`已停用 ${installedCount - enabledCount} 个`}
+          delta={t("已停用 {count} 个", { count: installedCount - enabledCount })}
         />
         <StatTile
           label="可更新数"
@@ -754,10 +922,7 @@ export function ModulesPage({
         onImportZip={() => void importZip()}
         importing={importing}
         onRefresh={() => {
-          void source.reload()
-          toast.success("模组列表已刷新", {
-            description: `已重新扫描 mods 目录与市场索引 · ${mods.length} 个模组`,
-          })
+          void refreshModsAndMarket()
         }}
       />
 
@@ -885,7 +1050,8 @@ export function ModulesPage({
             repo: "",
           })
         }
-        cooldownRemaining={(id) => submitCooldownRemaining(source.lastSubmissionOf(id), Date.now())}
+          cooldownRemaining={(id) => submitCooldownRemaining(source.lastSubmissionOf(id), Date.now())}
+        intervalRemainingMs={publishIntervalMs}
         progress={source.publishProgress}
         phase={source.publishPhase}
         onSubmitted={handleSubmitted}

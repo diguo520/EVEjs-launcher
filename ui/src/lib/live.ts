@@ -10,6 +10,7 @@ import {
   type CheckItem,
   type LogLevel,
   type LogLine,
+  type LogSegment,
   type Metric,
   type Service,
   type ServiceState,
@@ -26,6 +27,8 @@ import type {
   RawService,
   RawTokenStatus,
 } from "@/lib/ipc"
+import { t } from "@/lib/i18n"
+import { renderSegments } from "@/lib/log-logic"
 
 /* ------------------------------ 服务端日志 ------------------------------ */
 
@@ -140,12 +143,12 @@ export function uptimeText(
 ): string {
   if (typeof startedAt !== "number" || !Number.isFinite(startedAt)) return "—"
   const seconds = Math.floor(Math.max(0, now - startedAt) / 1000)
-  if (seconds < 60) return `${seconds} 秒`
+  if (seconds < 60) return t("{n} 秒", { n: seconds })
   const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${minutes} 分 ${seconds % 60} 秒`
+  if (minutes < 60) return t("{m} 分 {s} 秒", { m: minutes, s: seconds % 60 })
   const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours} 小时 ${minutes % 60} 分`
-  return `${Math.floor(hours / 24)} 天 ${hours % 24} 小时`
+  if (hours < 24) return t("{h} 小时 {m} 分", { h: hours, m: minutes % 60 })
+  return t("{d} 天 {h} 小时", { d: Math.floor(hours / 24), h: hours % 24 })
 }
 
 export function serviceCards(
@@ -166,8 +169,16 @@ export function serviceCards(
     // 读数取自真正在服务这些端口的进程（图片 / 网关 = 主服务器进程）
     const stats = byId.get(binding.statsFrom)
     const alive = health ? health[binding.health] : undefined
+    // starting / stopping / error 时后端会写一条可读文案（启动进度：等了多久、在加载几个模组；
+    // 失败原因：退出码与日志尾巴）。描述位换成它是为了让「慢」和「坏」当场看得见；
+    // running / idle 仍用静态描述 —— 那时的 message 是「运行中（PID x）」这类冗余信息。
+    const note =
+      owned?.message && ["starting", "stopping", "error"].includes(owned.state)
+        ? owned.message
+        : null
     return {
       ...template,
+      desc: note ?? template.desc,
       port: real[template.id as keyof typeof real] ?? template.port,
       state: stateOf(owned?.state, alive),
       pid: stats?.pid ?? null,
@@ -257,7 +268,7 @@ export function metricsFrom(
     },
     {
       key: "disk",
-      label: `磁盘卷 ${raw.diskRoot ?? "C:"}`,
+      label: t("磁盘卷 {name}", { name: raw.diskRoot ?? "C:" }),
       value: percent(diskUsed, diskTotal),
       display: diskUsed.toFixed(0),
       unit: `GB / ${(diskTotal / 1024).toFixed(1)}TB`,
@@ -333,9 +344,9 @@ export function envItemsFrom(report: RawEnvReport | null): CheckItem[] {
         !check.ok && initKey
           ? {
               hint: check.message,
-              action: `执行「${check.label}」初始化`,
+              action: t("执行「{name}」初始化", { name: check.label }),
               okDetail: check.message,
-              done: `${check.label} 初始化已执行，重新自检确认结果。`,
+              done: t("{name} 初始化已执行，重新自检确认结果。", { name: check.label }),
             }
           : undefined,
     }
@@ -369,27 +380,74 @@ export function startupBannerLines(input: {
   at: number
 }): LogDraft[] {
   const { app, token, market, at } = input
-  const t = stampOf(at)
-  const line = (level: LogLevel, msg: string): LogDraft => ({ t, level, src: "sys", msg })
+  const stamp = stampOf(at)
+  /* 正文按「片段」给：msg 只是生成这一刻的快照，parts 留着切语言时重算 */
+  const line = (level: LogLevel, parts: LogSegment[]): LogDraft => ({
+    t: stamp,
+    level,
+    src: "sys",
+    msg: renderSegments(parts),
+    parts,
+  })
   const out: LogDraft[] = [
     line(
       "INFO",
-      `[启动器] EvEJS Launcher ${app ? `v${app.version}` : "版本未知"} · EVEJS ${app?.evejsVersion ?? "—"} · ${app?.platform ?? "—"}`
+      [
+        {
+          key: "[启动器] EvEJS Launcher {version} · EVEJS {evejs} · {platform}",
+          vars: {
+            version: app ? `v${app.version}` : { key: "版本未知" },
+            evejs: app?.evejsVersion ?? "—",
+            platform: app?.platform ?? "—",
+          },
+        },
+      ]
     ),
-    line("INFO", `[启动器] 仓库: ${app?.repoRoot ?? "—"}`),
+    line("INFO", [{ key: "[启动器] 仓库: {path}", vars: { path: app?.repoRoot ?? "—" } }]),
     token?.hasToken
-      ? line("INFO", `[启动器] GitHub 令牌: 已配置${token.encrypted ? "（DPAPI 加密）" : ""}`)
-      : line("WARN", "[启动器] GitHub 令牌: 未配置 · MOD制作者需要配置令牌，可在模组市场里设置"),
+      ? line(
+          "INFO",
+          [
+            {
+              key: "[启动器] GitHub 令牌: 已配置{encrypted}",
+              vars: { encrypted: token.encrypted ? { key: "（DPAPI 加密）" } : "" },
+            },
+          ]
+        )
+      : line(
+          "WARN",
+          ["[启动器] GitHub 令牌: 未配置 · MOD制作者需要配置令牌，可在模组市场里设置"]
+        ),
     market?.ok
       ? line(
           "INFO",
-          `[启动器] 模组市场清单: 可获取 · 索引 ${market.mods.length} 条${market.cached ? "（本地缓存）" : ""}`
+          [
+            {
+              key: "[启动器] 模组市场清单: 可获取 · 索引 {count} 条{cached}",
+              vars: {
+                count: market.mods.length,
+                cached: market.cached ? { key: "（本地缓存）" } : "",
+              },
+            },
+          ]
         )
-      : line("WARN", `[启动器] 模组市场清单: 获取失败 · ${market?.reason ?? "未知原因"}`),
+      : line(
+          "WARN",
+          [
+            {
+              key: "[启动器] 模组市场清单: 获取失败 · {reason}",
+              vars: { reason: market?.reason ?? { key: "未知原因" } },
+            },
+          ]
+        ),
   ]
   const legacy = app?.legacy
   if (legacy?.adopted && legacy.items.length) {
-    out.push(line("INFO", `[启动器] 已接管老启动器数据 ${legacy.items.length} 项`))
+    out.push(
+      line("INFO", [
+        { key: "[启动器] 已接管老启动器数据 {count} 项", vars: { count: legacy.items.length } },
+      ])
+    )
   }
   return out
 }
@@ -402,9 +460,24 @@ export function modsSignature(mods: RawModList | null): string {
     .join("|")
 }
 
-/** 一条模组行的正文：名字 + 版本 + 分类 + 启停 + 不健康的地方 */
-function modLine(msg: string, level: LogLevel, at: number): LogDraft {
-  return { t: stampOf(at), level, src: "sys", msg, badge: "MOD" }
+/**
+ * 一条模组行的正文：几段拼起来，段间固定用「 · 」。
+ * 分隔符不进目录（`t(" · ")` 查不到条目，原样输出），不参与翻译。
+ */
+function modLine(parts: LogSegment[], level: LogLevel, at: number): LogDraft {
+  const separated: LogSegment[] = []
+  for (const part of parts) {
+    if (separated.length) separated.push(" · ")
+    separated.push(part)
+  }
+  return {
+    t: stampOf(at),
+    level,
+    src: "sys",
+    msg: renderSegments(separated),
+    parts: separated,
+    badge: "MOD",
+  }
 }
 
 /** 首次加载：全量模组逐条列出（行尾挂 MOD 徽标），前面先给一句汇总 */
@@ -412,11 +485,23 @@ export function modLines(mods: RawModList | null, at: number): LogDraft[] {
   if (!mods?.ok) return []
   const out: LogDraft[] = []
   const { total, enabled, disabled, conflicts } = mods.stats
+  const parts: LogSegment[] = [
+    {
+      key: "[启动器] 已加载模组: 共 {total} 个 · 启用 {enabled} · 禁用 {disabled}{conflicts}",
+      vars: {
+        total,
+        enabled,
+        disabled,
+        conflicts: conflicts ? { key: " · 冲突 {count}", vars: { count: conflicts } } : "",
+      },
+    },
+  ]
   out.push({
     t: stampOf(at),
     level: conflicts > 0 ? "WARN" : "INFO",
     src: "sys",
-    msg: `[启动器] 已加载模组: 共 ${total} 个 · 启用 ${enabled} · 禁用 ${disabled}${conflicts ? ` · 冲突 ${conflicts}` : ""}`,
+    msg: renderSegments(parts),
+    parts,
   })
   for (const mod of mods.mods) out.push(modLogOf(mod, at))
   return out
@@ -424,12 +509,24 @@ export function modLines(mods: RawModList | null, at: number): LogDraft[] {
 
 /** 单个模组 → 一行（供全量清单与增量变化共用） */
 function modLogOf(mod: RawMod, at: number): LogDraft {
-  const parts = [`模组 ${mod.displayName} v${mod.version}`, mod.category, mod.enabled ? "已启用" : "已禁用"]
-  if (!mod.valid) parts.push(`无效: ${mod.error || "结构不合法"}`)
-  else if (!mod.supported) parts.push(`不兼容: ${mod.unsupportedReason || "与当前服务端版本不匹配"}`)
-  if (mod.activeConflicts.length) parts.push(`冲突: ${mod.activeConflicts.join("、")}`)
+  // 分类是固定词汇（游戏性 / 界面 / 平衡…）：当**原文段**给，跟着目录翻；
+  // 模组名与版本是数据，走模板的 vars，原样输出不翻。
+  const parts: LogSegment[] = [
+    { key: "模组 {name} v{version}", vars: { name: mod.displayName, version: mod.version } },
+    mod.category,
+    mod.enabled ? "已启用" : "已禁用",
+  ]
+  if (!mod.valid)
+    parts.push({ key: "无效: {reason}", vars: { reason: mod.error || { key: "结构不合法" } } })
+  else if (!mod.supported)
+    parts.push({
+      key: "不兼容: {reason}",
+      vars: { reason: mod.unsupportedReason || { key: "与当前服务端版本不匹配" } },
+    })
+  if (mod.activeConflicts.length)
+    parts.push({ key: "冲突: {list}", vars: { list: mod.activeConflicts } })
   const level: LogLevel = !mod.valid || !mod.supported || mod.activeConflicts.length ? "ERROR" : mod.enabled ? "INFO" : "DEBUG"
-  return modLine(parts.join(" · "), level, at)
+  return modLine(parts, level, at)
 }
 
 /** 增量：拿相邻两次 mods:list 比出「新加载 / 已卸下 / 启停 / 换版本」，没有变化就返回空 */
@@ -446,15 +543,45 @@ export function modDiffLines(
   for (const [folder, mod] of now) {
     const before = was.get(folder)
     if (!before) {
-      out.push(modLine(`模组已加载 · ${mod.displayName} v${mod.version} · ${mod.category}`, "INFO", at))
+      out.push(
+        modLine(
+          [
+            {
+              key: "模组已加载 · {name} v{version} · {category}",
+              vars: { name: mod.displayName, version: mod.version, category: mod.category },
+            },
+          ],
+          "INFO",
+          at
+        )
+      )
       continue
     }
     if (before.version !== mod.version) {
-      out.push(modLine(`模组已更新 · ${mod.displayName} ${before.version} → ${mod.version}`, "INFO", at))
+      out.push(
+        modLine(
+          [
+            {
+              key: "模组已更新 · {name} {from} → {to}",
+              vars: { name: mod.displayName, from: before.version, to: mod.version },
+            },
+          ],
+          "INFO",
+          at
+        )
+      )
     }
     if (before.enabled !== mod.enabled) {
       out.push(
-        modLine(`模组${mod.enabled ? "已启用" : "已禁用"} · ${mod.displayName} v${mod.version}`, mod.enabled ? "INFO" : "WARN", at)
+        modLine(
+          [
+            mod.enabled
+              ? { key: "模组已启用 · {name} v{version}", vars: { name: mod.displayName, version: mod.version } }
+              : { key: "模组已禁用 · {name} v{version}", vars: { name: mod.displayName, version: mod.version } },
+          ],
+          mod.enabled ? "INFO" : "WARN",
+          at
+        )
       )
     }
     if (keyOf(before) === keyOf(mod)) continue
@@ -463,7 +590,19 @@ export function modDiffLines(
     }
   }
   for (const [folder, mod] of was) {
-    if (!now.has(folder)) out.push(modLine(`模组已卸下 · ${mod.displayName} v${mod.version}`, "WARN", at))
+    if (!now.has(folder))
+      out.push(
+        modLine(
+          [
+            {
+              key: "模组已卸下 · {name} v{version}",
+              vars: { name: mod.displayName, version: mod.version },
+            },
+          ],
+          "WARN",
+          at
+        )
+      )
   }
   return out
 }

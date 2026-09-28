@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 
 import { callOr, hasIpc } from "@/lib/ipc"
+import { t } from "@/lib/i18n"
 import type {
   RawAccount,
   RawAccountList,
@@ -240,7 +241,7 @@ export function useLauncherAccounts(): LauncherAccountsState {
       const trimmed = name.trim()
       if (!trimmed) return { ok: false, reason: "账号名不能为空" }
       if (accountsRef.current.some((a) => a.name.toLowerCase() === trimmed.toLowerCase())) {
-        return { ok: false, reason: `账号「${trimmed}」已存在` }
+        return { ok: false, reason: t("账号「{name}」已存在", { name: trimmed }) }
       }
       if (!ipc) return { ok: false, reason: "没有连接后端，无法创建账号" }
       const secret = password ?? ""
@@ -252,7 +253,7 @@ export function useLauncherAccounts(): LauncherAccountsState {
           return
         }
         await load()
-        toast.success(`账号「${trimmed}」已创建`, {
+        toast.success(t("账号「{name}」已创建", { name: trimmed }), {
           description: "密码已用当前 Windows 账户加密保存，进游戏不用重填。",
         })
       })()
@@ -315,7 +316,10 @@ export function useLauncherAccounts(): LauncherAccountsState {
       if (account.status === "SUSPENDED") return { ok: false, reason: "账号已停用，进不去客户端" }
       const online = account.characters.find((c) => c.online)
       if (online && online.id !== characterId) {
-        return { ok: false, reason: `同账号的 ${online.name} 正在线上，先让它下线` }
+        return {
+          ok: false,
+          reason: t("同账号的 {name} 正在线上，先让它下线", { name: online.name }),
+        }
       }
       if (!ipc) return { ok: false, reason: "没有连接后端，无法拉起客户端" }
       void (async () => {
@@ -378,7 +382,11 @@ export function useLauncherAccounts(): LauncherAccountsState {
         return { ok: false, reason: "槽位已满，已无法再建号" }
       }
       const online = account.characters.find((c) => c.online)
-      if (online) return { ok: false, reason: `同账号的 ${online.name} 正在线上，先让它下线` }
+      if (online)
+        return {
+          ok: false,
+          reason: t("同账号的 {name} 正在线上，先让它下线", { name: online.name }),
+        }
       if (creatingRef.current?.accountId === accountId) {
         return { ok: false, reason: "客户端已经在角色创建界面" }
       }
@@ -407,7 +415,7 @@ export function useLauncherAccounts(): LauncherAccountsState {
               const name = fresh?.roles?.[count - 1]?.characterName ?? "新角色"
               setCreating(null)
               await load()
-              toast.success(`角色 ${name} 已在游戏内创建`, {
+              toast.success(t("角色 {name} 已在游戏内创建", { name }), {
                 description: "已同步回启动器。",
               })
               return

@@ -3,6 +3,7 @@ import { useMemo, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { useManualData } from "@/hooks/use-manual-data"
 import { MANUAL_META } from "@/lib/manual-data"
+import { t } from "@/lib/i18n"
 import {
   buildIdPair,
   buildItemCommand,
@@ -116,7 +117,7 @@ export function ItemPanel() {
                 <CopyButton
                   text={buildItemCommand(it.nameEn, qty)}
                   label="刷取"
-                  message={`已复制 · ${it.nameEn} × ${qty}`}
+                  message={t("已复制 · {name} × {qty}", { name: it.nameEn, qty })}
                   className="h-6 px-1.5 text-[11px]"
                 />
               </RefCardFoot>

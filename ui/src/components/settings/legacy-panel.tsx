@@ -4,6 +4,7 @@ import { CheckCircle2, PackageOpen } from "lucide-react"
 import { Panel } from "@/components/common/panel"
 import { Badge } from "@/components/ui/badge"
 import { callOr, hasIpc } from "@/lib/ipc"
+import { t } from "@/lib/i18n"
 import type { RawAppInfo, RawLegacyAdoption } from "@/lib/ipc"
 
 /** 接管条目的中文说法：路径 → 人话 */
@@ -18,12 +19,14 @@ function labelOf(item: string): string {
   const normalized = item.replace(/\\/g, "/")
   if (ITEM_LABEL[normalized]) return ITEM_LABEL[normalized]
   if (normalized.startsWith("mod-keys/")) {
-    return `签名私钥 ${normalized.slice("mod-keys/".length)}`
+    return t("签名私钥 {name}", { name: normalized.slice("mod-keys/".length) })
   }
   // `launcher-settings.json:accountCredentials` 这类「文件:字段」条目
   const [entryFile, entryField] = normalized.split(":")
   if (ITEM_LABEL[entryFile]) {
-    return entryField ? `${ITEM_LABEL[entryFile]}（${entryField}）` : ITEM_LABEL[entryFile]
+    return entryField
+      ? t("{label}（{field}）", { label: t(ITEM_LABEL[entryFile]), field: entryField })
+      : ITEM_LABEL[entryFile]
   }
   return item
 }
@@ -80,7 +83,7 @@ export function LegacyPanel() {
               ? "身份 key 与 GitHub 令牌都不用重置"
               : "身份 key 不用重新生成"}
           </span>
-          ，打开「作者身份」就能看到。
+          ，打开「令牌配置」就能看到。
         </p>
 
         {tokenAdopted ? null : (

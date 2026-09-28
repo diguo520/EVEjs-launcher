@@ -10,7 +10,7 @@ import {
 import { TopBar } from "@/components/shell/top-bar"
 import { SideNav } from "@/components/shell/side-nav"
 import { BootSplash } from "@/components/shell/boot-splash"
-import { LocaleProvider } from "@/components/shell/locale-provider"
+import { useLocale } from "@/components/shell/locale-provider"
 import { StatusBar } from "@/components/shell/status-bar"
 import type { NavBadges, ViewId } from "@/components/shell/nav-config"
 import { useLauncher } from "@/hooks/use-launcher"
@@ -65,6 +65,8 @@ function useNavBadges(accountCount: number): NavBadges {
  * 服务与日志状态提升到这里，供主控台、服务器日志、顶栏、状态栏共用。
  */
 export function App() {
+  // LocaleProvider 由 main.tsx 挂在最外层，这里能直接取当前语言与 `t()`
+  const { t } = useLocale()
   const launcher = useLauncher()
   const launcherVersion = useLauncherVersionState()
   /** 账号与角色：到游戏里建号要等客户端几秒，状态挂在外壳上，切页也不会丢 */
@@ -110,10 +112,12 @@ export function App() {
   function inspectService(name: string) {
     const svc = launcher.services.find((s) => s.name === name)
     if (!svc) return
-    toast.info(`${svc.name} · ${svc.desc}`, {
-      description: `端口 ${svc.port} · ${
-        svc.state === "running" ? "运行中" : "未启动"
-      } · PID ${svc.pid ?? "—"}`,
+    toast.info(t("{name} · {desc}", { name: t(svc.name), desc: t(svc.desc) }), {
+      description: t("端口 {port} · {state} · PID {pid}", {
+        port: svc.port,
+        state: svc.state === "running" ? t("运行中") : t("未启动"),
+        pid: svc.pid ?? "—",
+      }),
     })
   }
 
@@ -148,8 +152,7 @@ export function App() {
   }
 
   return (
-    <LocaleProvider>
-      <LauncherVersionProvider value={launcherVersion}>
+    <LauncherVersionProvider value={launcherVersion}>
       <TooltipProvider delayDuration={180}>
         {/* data-evejs-renderer="react"：G1 运行时自检（src-tauri/src/ipc/smoke.rs）靠它判定 React
             渲染层真的挂载了（要求该节点有子元素）。属性不可改名、不可删除。 */}
@@ -196,8 +199,7 @@ export function App() {
 
         <Toaster />
       </TooltipProvider>
-      </LauncherVersionProvider>
-    </LocaleProvider>
+    </LauncherVersionProvider>
   )
 }
 

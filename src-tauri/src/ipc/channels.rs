@@ -1,6 +1,6 @@
 //! 由 scripts/gen-contract.mjs 生成 —— 请勿手改。源: contract/ipc-channels.json
 //! 抽取源: E:\Games\EveJS-v0.12.8\launcher\launcher
-//! 生成时间: 2026-09-28T00:21:23.325Z
+//! 生成时间: 2026-09-28T19:04:37.801Z
 
 #![allow(dead_code)]
 

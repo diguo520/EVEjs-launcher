@@ -22,6 +22,15 @@ const SUBMISSIONS_FILE: &str = "my-submissions.json";
 /// 同一模组两次提交之间的最短间隔（维护者要求：防止连着重复提交）。
 pub const SUBMIT_COOLDOWN_MS: u64 = 30 * 60 * 1000;
 
+/// 两次发布之间的最短间隔：60 秒。
+///
+/// 与 `SUBMIT_COOLDOWN_MS`（同一模组 30 分钟）不是一个维度：那条管的是反复提交同一个模组，
+/// 这条管的是**连着发布**（换个模组也一样等）—— 一次发布要打包、推仓库、建 Release、传 ZIP、
+/// 开审核 PR，紧接着再发一次会撞上 GitHub 限流，两条 PR 还会抢同一次索引重建。
+/// 计时起点同样是上一次**成功**提交（register_source 写的 `submittedAt`），所以失败重试不受影响。
+/// 前端 `ui/src/lib/mod-logic.ts` 的 `PUBLISH_INTERVAL_MS` 与它一致（改一边记得改另一边）。
+pub const PUBLISH_INTERVAL_MS: u64 = 60 * 1000;
+
 /// 「审核中」那条 PR 的状态复查间隔（维护者要求：也按 30 分钟节流，别频繁打 GitHub）。
 pub const REVIEW_RECHECK_MS: u64 = 30 * 60 * 1000;
 
@@ -121,6 +130,27 @@ pub fn submit_cooldown_remaining(runtime: &RuntimePaths, id: &str) -> u64 {
         return 0;
     }
     SUBMIT_COOLDOWN_MS.saturating_sub(now.saturating_sub(last))
+}
+
+/// 距可以再次发布还剩多少毫秒（0＝现在就能发）：取台账里**任何**模组最近一次成功提交的时间。
+pub fn publish_interval_remaining(runtime: &RuntimePaths) -> u64 {
+    let file = read_submission_file(runtime);
+    let now = pkg::epoch_ms() as u64;
+    let last = file
+        .get("items")
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|item| item.get("submittedAt").and_then(Value::as_u64))
+                .max()
+                .unwrap_or(0)
+        })
+        .unwrap_or(0);
+    if last == 0 {
+        return 0;
+    }
+    PUBLISH_INTERVAL_MS.saturating_sub(now.saturating_sub(last))
 }
 
 /// 「审核中」的 PR 状态复查：按模组节流（REVIEW_RECHECK_MS 一次），终态不再复查。
@@ -429,6 +459,18 @@ pub fn prepare_submission(repo_root: &Path, runtime: &RuntimePaths, input: &Valu
             "reason": format!(
                 "「{folder}」刚提交过：同一个模组两次提交至少间隔 30 分钟（还剩约 {minutes} 分钟再试）"
             ),
+        });
+    }
+
+    // 连发拦截：两次发布之间至少间隔 60 秒（换个模组也一样等），见 PUBLISH_INTERVAL_MS
+    let interval = publish_interval_remaining(runtime);
+    if interval > 0 {
+        let seconds = interval.div_ceil(1000);
+        return json!({
+            "ok": false,
+            "cooldown": true,
+            "retryAfterMs": interval,
+            "reason": format!("刚刚发布过一次：两次发布之间至少间隔 60 秒（还剩约 {seconds} 秒再试）"),
         });
     }
 
@@ -1310,6 +1352,42 @@ mod tests {
         ]});
         let _ = write_submission_file(&runtime, &file);
         assert_eq!(submit_cooldown_remaining(&runtime, "evejs-x"), 0);
+    }
+
+    #[test]
+    fn publish_interval_counts_from_the_latest_successful_submit_of_any_mod() {
+        let runtime = temp_runtime("publish-interval");
+        let now = pkg::epoch_ms() as u64;
+
+        // 压根没提交过 → 不挡
+        assert_eq!(publish_interval_remaining(&runtime), 0);
+
+        // 只有 createdAt（打包/推仓库成功、PR 没开出来）→ 不算数，失败重试不该被挡
+        let file = json!({ "schemaVersion": 1, "items": [
+            { "id": "evejs-x", "version": "1.0.0", "createdAt": now - 1000 }
+        ]});
+        let _ = write_submission_file(&runtime, &file);
+        assert_eq!(publish_interval_remaining(&runtime), 0);
+
+        // 刚成功提交过 → 60 秒内挡着；换个模组也照样挡（这条是发布间隔，不是模组冷却）
+        let file = json!({ "schemaVersion": 1, "items": [
+            { "id": "evejs-x", "version": "1.0.0", "submittedAt": now - 10_000 },
+            { "id": "evejs-y", "version": "1.0.0", "submittedAt": now - 20_000 }
+        ]});
+        let _ = write_submission_file(&runtime, &file);
+        let left = publish_interval_remaining(&runtime);
+        assert!(
+            left > 0 && left <= PUBLISH_INTERVAL_MS - 10_000,
+            "left={left}"
+        );
+
+        // 超过 60 秒 → 放行
+        let file = json!({ "schemaVersion": 1, "items": [
+            { "id": "evejs-x", "version": "1.0.0", "submittedAt": now - PUBLISH_INTERVAL_MS - 1 }
+        ]});
+        let _ = write_submission_file(&runtime, &file);
+        assert_eq!(publish_interval_remaining(&runtime), 0);
+        let _ = std::fs::remove_dir_all(&runtime.root);
     }
 
     #[test]

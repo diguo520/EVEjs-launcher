@@ -24,6 +24,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Progress } from "@/components/ui/progress"
+import { t } from "@/lib/i18n"
 import { hasIpc } from "@/lib/ipc"
 import { LAUNCHER_RELEASE } from "@/lib/mock"
 
@@ -96,7 +97,9 @@ export function LauncherUpdateDialog({
               ? "正在检查更新通道…"
               : done
                 ? `当前已是最新版本，下面是这一版带来的改动。`
-                : `安装包 ${sizeText}，装完后替换旧版本，配置与世界存档不受影响。`}
+                : t("安装包 {size}，装完后替换旧版本，配置与世界存档不受影响。", {
+                    size: sizeText,
+                  })}
           </DialogDescription>
         </DialogHeader>
 

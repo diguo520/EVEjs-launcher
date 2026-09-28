@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { StatusDot, type DotTone } from "@/components/common/status-dot"
+import { useLocale } from "@/components/shell/locale-provider"
 import { SERVICE_STATE_LABEL, type Service, type ServiceState } from "@/lib/mock"
 
 /**
@@ -46,6 +47,7 @@ export function ServiceCard({
   onStop: () => void
   onRestart: () => void
 }) {
+  const { t } = useLocale()
   const isRunning = service.state === "running"
 
   const readouts = [
@@ -77,7 +79,7 @@ export function ServiceCard({
         </div>
 
         <div className="tabular mt-1 text-[10px] tracking-[0.1em] text-tertiary">
-          {service.en} · 端口 {service.port}
+          {t("{name} · 端口 {port}", { name: service.en, port: service.port })}
         </div>
 
         <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">

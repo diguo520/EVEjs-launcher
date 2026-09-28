@@ -8,6 +8,7 @@ import {
   type NewAccountPayload,
 } from "@/components/accounts/create-account-dialog"
 import { Panel, SectionHeading, StatTile } from "@/components/common/panel"
+import { useLocale } from "@/components/shell/locale-provider"
 import { useNow } from "@/hooks/use-now"
 import type { LauncherAccountsState } from "@/hooks/use-launcher-accounts"
 import {
@@ -23,6 +24,7 @@ import {
  * 搜索与状态筛选是这一页自己的事，留在这里算。
  */
 export function AccountsPage({ store }: { store: LauncherAccountsState }) {
+  const { t } = useLocale()
   const [query, setQuery] = useState("")
   const [status, setStatus] = useState<StatusFilter>("ALL")
   const [accountOpen, setAccountOpen] = useState(false)
@@ -64,14 +66,14 @@ export function AccountsPage({ store }: { store: LauncherAccountsState }) {
       toast.error("无法登录", { description: guard.reason })
       return
     }
-    toast.info(`正在为 ${character.name} 拉起客户端…`, {
+    toast.info(t("正在为 {name} 拉起客户端…", { name: character.name }), {
       description: "客户端将在数秒内启动，请勿关闭启动器。",
     })
   }
 
   function exitGame(accountId: string, character: Character) {
     store.exitGame(accountId, character.id)
-    toast.success(`${character.name} 已下线`, {
+    toast.success(t("{name} 已下线", { name: character.name }), {
       description: "角色槽已释放，可登录同账号的其他角色。",
     })
   }
@@ -82,7 +84,7 @@ export function AccountsPage({ store }: { store: LauncherAccountsState }) {
       toast.error("无法删除角色", { description: guard.reason })
       return
     }
-    toast.success(`正在删除角色 ${character.name}`, {
+    toast.success(t("正在删除角色 {name}", { name: character.name }), {
       description: "该角色的舰船与资产记录会一并清除，槽位随即空出。",
     })
   }
@@ -93,9 +95,9 @@ export function AccountsPage({ store }: { store: LauncherAccountsState }) {
       toast.error("无法删除账号", { description: guard.reason })
       return
     }
-    toast.success(`已删除账号 ${account.name}`, {
+    toast.success(t("已删除账号 {name}", { name: account.name }), {
       description: account.characters.length
-        ? `${account.characters.length} 个角色及其资产记录已一并清除。`
+        ? t("{count} 个角色及其资产记录已一并清除。", { count: account.characters.length })
         : "该账号下没有角色。",
     })
   }
@@ -122,7 +124,7 @@ export function AccountsPage({ store }: { store: LauncherAccountsState }) {
             stats.accounts === 0
               ? "尚无账号"
               : stats.suspended
-                ? `其中 ${stats.suspended} 个已停用`
+                ? t("其中 {count} 个已停用", { count: stats.suspended })
                 : "全部可用"
           }
         />
@@ -132,20 +134,20 @@ export function AccountsPage({ store }: { store: LauncherAccountsState }) {
           delta={
             stats.characters === 0
               ? "尚无角色"
-              : `平均每账号 ${stats.avg} 个角色`
+              : t("平均每账号 {count} 个角色", { count: stats.avg })
           }
         />
         <StatTile
           label="在线角色"
           value={stats.online}
           tone="success"
-          delta={`${stats.characters - stats.online} 个离线`}
+          delta={t("{count} 个离线", { count: stats.characters - stats.online })}
         />
         <StatTile
           label="空余槽位"
           value={stats.freeSlots}
           tone="warning"
-          delta={`总容量 ${stats.accounts * MAX_CHARACTERS_PER_ACCOUNT} 个`}
+          delta={t("总容量 {count} 个", { count: stats.accounts * MAX_CHARACTERS_PER_ACCOUNT })}
         />
       </div>
 

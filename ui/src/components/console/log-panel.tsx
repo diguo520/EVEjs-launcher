@@ -13,9 +13,11 @@ import {
   LOG_TAB_LABEL,
   filterLogs,
   levelCounts,
+  renderLogLines,
   type LevelFilter,
   type LogTab,
 } from "@/lib/log-logic"
+import { useLocale } from "@/components/shell/locale-provider"
 import type { LogLine } from "@/lib/mock"
 
 /** 全高终端面板：页签切换日志来源，关键字与级别二次收窄，内部滚动 */
@@ -28,13 +30,16 @@ export function LogPanel({
   onClear: () => void
   className?: string
 }) {
+  const { t, locale } = useLocale()
   const [tab, setTab] = useState<LogTab>("sys")
   const [level, setLevel] = useState<LevelFilter>("all")
   const [keyword, setKeyword] = useState("")
 
+  // 日志行是生成时定下的快照：切了语言要按当前语言重算正文，否则一直停在旧语言
+  const rendered = useMemo(() => renderLogLines(logs), [logs, locale])
   const matched = useMemo(
-    () => filterLogs(logs, { tab, keyword }),
-    [logs, tab, keyword]
+    () => filterLogs(rendered, { tab, keyword }),
+    [rendered, tab, keyword]
   )
   const counts = useMemo(() => levelCounts(matched), [matched])
   const visible = useMemo(() => filterLogs(matched, { level }), [matched, level])
@@ -45,8 +50,8 @@ export function LogPanel({
       .join("\n")
     try {
       await navigator.clipboard.writeText(text)
-      toast.success(`已复制 ${visible.length} 行日志`, {
-        description: `来源：${LOG_TAB_LABEL[tab]}`,
+      toast.success(t("已复制 {count} 行日志", { count: visible.length }), {
+        description: t("来源：{tab}", { tab: t(LOG_TAB_LABEL[tab]) }),
       })
     } catch {
       toast.error("复制失败", { description: "当前环境未授权访问剪贴板。" })
@@ -57,7 +62,7 @@ export function LogPanel({
     <Panel
       tag="// SHELL"
       title={<span className="normal-case">root@tranquility</span>}
-      meta={`${visible.length} / ${logs.length} 行`}
+      meta={t("{shown} / {total} 行", { shown: visible.length, total: rendered.length })}
       flush
       className={cn("h-[420px]", className)}
       bodyClassName="flex min-h-0 flex-col"
@@ -77,7 +82,7 @@ export function LogPanel({
             variant="ghost"
             size="sm"
             onClick={onClear}
-            disabled={logs.length === 0}
+            disabled={rendered.length === 0}
             title="清空全部日志"
             className="hover:text-destructive"
           >
@@ -91,9 +96,9 @@ export function LogPanel({
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-input px-4 py-1.5">
           {/* min-w-0：标签条得能在这一行里被压缩，压不动就会把整页撑出横向滚动 */}
           <TabsList className="min-w-0 border-0">
-            {LOG_TABS.map((t) => (
-              <TabsTrigger key={t} value={t} className="px-2 py-1">
-                {LOG_TAB_LABEL[t]}
+            {LOG_TABS.map((tabId) => (
+              <TabsTrigger key={tabId} value={tabId} className="px-2 py-1">
+                {LOG_TAB_LABEL[tabId]}
               </TabsTrigger>
             ))}
           </TabsList>

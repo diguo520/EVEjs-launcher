@@ -1,8 +1,10 @@
 import * as React from "react"
 
 import {
+  getActiveLocale,
   LOCALES,
   readStoredLocale,
+  setActiveLocale,
   translate,
   translateInline,
   writeStoredLocale,
@@ -143,10 +145,26 @@ function LocaleBridge({ locale }: { locale: LocaleCode }) {
 export function LocaleProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = React.useState<LocaleCode>(() => readStoredLocale())
 
+  // 渲染期同步模块级语言：非 React 代码（日志、toast、事件回调）里的 `t()` 靠它取当前语言。
+  // 必须在子节点渲染前生效，所以放在这里而不是 useEffect 里。
+  setActiveLocale(locale)
+
   const setLocale = React.useCallback((code: LocaleCode) => {
     writeStoredLocale(code)
     setLocaleState(code)
   }, [])
+
+  /**
+   * 文案取值函数**刻意做成稳定引用**：读的是模块级的当前语言，而不是闭包里的 locale。
+   * 事件回调里常有 `useCallback(fn, [])` 这种空依赖写法，若 `t` 随语言变化换引用，
+   * 那些回调会一直拿着**切语言之前**的那份 `t`（toast 里就会冒出一句旧语言）。
+   * 稳定引用 + 模块级 locale 让两边都成立：随时取到当前语言，依赖表也不用改。
+   */
+  const t = React.useCallback(
+    (text: string, vars?: Record<string, string | number>) =>
+      translate(getActiveLocale(), text, vars),
+    []
+  )
 
   React.useEffect(() => {
     document.documentElement.lang = locale === "zh" ? "zh-CN" : locale
@@ -156,10 +174,10 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
     () => ({
       locale,
       setLocale,
-      t: (text, vars) => translate(locale, text, vars),
+      t,
       languages: LOCALES,
     }),
-    [locale, setLocale]
+    [locale, setLocale, t]
   )
 
   return (

@@ -106,6 +106,12 @@ impl<'a> PtySpec<'a> {
 
 pub struct PtyManager {
     sessions: Mutex<HashMap<String, Session>>,
+    /// 每个 tab 最后一次观察到的退出码（退出监视线程写入）。
+    ///
+    /// 为什么要留一份：进程退出后 Windows 的进程对象随时可能被回收，再拿 PID 去
+    /// `GetExitCodeProcess` 往往已经拿不到；而「启动失败要报 exit code」只有退出那一刻
+    /// 这一个机会。`remove` 与下一次 spawn 都会清掉，避免读到上一轮的值。
+    exits: Arc<Mutex<HashMap<String, i64>>>,
 }
 
 impl Default for PtyManager {
@@ -118,7 +124,13 @@ impl PtyManager {
     pub fn new() -> Self {
         Self {
             sessions: Mutex::new(HashMap::new()),
+            exits: Arc::new(Mutex::new(HashMap::new())),
         }
+    }
+
+    /// 该 tab 最后一次退出码（没退出过 / 已被清理时为 None）
+    pub fn last_exit_code(&self, id: &str) -> Option<i64> {
+        self.exits.lock().ok()?.get(id).copied()
     }
 
     /// 启动一个 PTY 会话，输出与退出交给**回调**处理（这一层没有任何 Tauri 依赖）。
@@ -137,6 +149,10 @@ impl PtyManager {
         F: Fn(&str, &str) + Send + 'static,
         G: Fn(&str, i64) + Send + 'static,
     {
+        // 上一轮的退出码先清掉：新会话的 last_exit_code 只能是这一轮留下的
+        if let Ok(mut guard) = self.exits.lock() {
+            guard.remove(id);
+        }
         let pty_system = native_pty_system();
         let pair = pty_system
             .openpty(PtySize {
@@ -196,11 +212,16 @@ impl PtyManager {
 
         // 退出监视：子进程所有权交给监视线程；kill 走 taskkill /T /F（与现役版 killOwned 一致）
         let id_exit = id.to_string();
+        let exits = Arc::clone(&self.exits);
         std::thread::spawn(move || {
             let code = match child.wait() {
                 Ok(status) => status.exit_code() as i64,
                 Err(_) => -1,
             };
+            // 先记码再回调：回调那边（process.rs）可能正等着这个数字写失败原因
+            if let Ok(mut guard) = exits.lock() {
+                guard.insert(id_exit.clone(), code);
+            }
             on_exit(&id_exit, code);
         });
 
@@ -283,6 +304,9 @@ impl PtyManager {
 
     pub fn remove(&self, id: &str) {
         if let Ok(mut guard) = self.sessions.lock() {
+            guard.remove(id);
+        }
+        if let Ok(mut guard) = self.exits.lock() {
             guard.remove(id);
         }
     }
@@ -425,6 +449,44 @@ mod tests {
         // 普通输出不应答，避免无谓写回
         assert!(answer_terminal_queries("plain log line").is_none());
         assert!(answer_terminal_queries("\u{1b}[2J\u{1b}[H").is_none());
+    }
+
+    /// 退出码要在退出那一刻记下来：Windows 的进程对象随后会被回收，事后拿 PID 是取不到的。
+    /// 「启动失败要报 exit code」（process.rs 的 exited_head）靠的就是这一份。
+    #[test]
+    fn exit_code_is_recorded_when_the_session_ends() {
+        let cwd = std::env::current_dir().expect("拿不到工作目录");
+        let pty = PtyManager::new();
+        let seen: Arc<Mutex<Option<i64>>> = Arc::new(Mutex::new(None));
+        let sink = Arc::clone(&seen);
+        let _ = pty
+            .spawn_streaming(
+                "exit-code",
+                PtySpec::new("cmd.exe", &cwd).args(vec!["/c".to_string(), "exit 7".to_string()]),
+                |_tab, _text| {},
+                move |_tab, code| {
+                    if let Ok(mut guard) = sink.lock() {
+                        *guard = Some(code);
+                    }
+                },
+            )
+            .expect("启动 PTY 失败");
+
+        // 回调与 last_exit_code 都该在 5s 内就位（两者都从退出那一刻取数）
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            let callback = seen.lock().ok().and_then(|guard| *guard);
+            if let (Some(code), Some(recorded)) = (callback, pty.last_exit_code("exit-code")) {
+                assert_eq!(code, 7, "退出码应原样传给回调");
+                assert_eq!(recorded, 7, "last_exit_code 应记下同一个数");
+                break;
+            }
+            assert!(Instant::now() < deadline, "5s 内没等到退出码");
+            std::thread::sleep(Duration::from_millis(50));
+        }
+
+        pty.remove("exit-code");
+        assert_eq!(pty.last_exit_code("exit-code"), None, "remove 要清掉旧码");
     }
 
     #[test]

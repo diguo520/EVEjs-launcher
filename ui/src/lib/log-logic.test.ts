@@ -8,8 +8,11 @@ import {
   matchKeyword,
   matchLogTab,
   overlapTail,
+  renderLogLines,
+  renderSegments,
   splitHits,
 } from "@/lib/log-logic"
+import { getActiveLocale, setActiveLocale, translate } from "@/lib/i18n"
 
 function line(partial: Partial<LogLine> & Pick<LogLine, "src" | "msg">): LogLine {
   return {
@@ -29,8 +32,14 @@ const LINES: LogLine[] = [
 ]
 
 describe("matchLogTab", () => {
-  it("sys 页签不过滤任何来源", () => {
-    for (const item of LINES) expect(matchLogTab(item.src, "sys")).toBe(true)
+  it("sys 页签只收启动器自己的记录（MOD / 功能启停），不收各服务的原始输出", () => {
+    expect(matchLogTab("sys", "sys")).toBe(true)
+    expect(matchLogTab("node", "sys")).toBe(false)
+    expect(matchLogTab("server", "sys")).toBe(false)
+    expect(matchLogTab("gateway", "sys")).toBe(false)
+    expect(matchLogTab("images", "sys")).toBe(false)
+    expect(matchLogTab("market", "sys")).toBe(false)
+    expect(matchLogTab("client", "sys")).toBe(false)
   })
 
   it("node 页签收主服务器的实时流与日志文件（node/server/gateway/images）", () => {
@@ -67,6 +76,8 @@ describe("filterLogs", () => {
   it("三道过滤按 页签 → 关键字 → 级别 收窄", () => {
     expect(filterLogs(LINES).length).toBe(5)
     expect(filterLogs(LINES, { tab: "node" }).map((l) => l.id)).toEqual([1, 2, 5])
+    // 系统页只认 src="sys"：这批行里一条都没有，所以是空的
+    expect(filterLogs(LINES, { tab: "sys" })).toEqual([])
     expect(
       filterLogs(LINES, { tab: "node", keyword: "ready" }).map((l) => l.id)
     ).toEqual([2])
@@ -138,5 +149,55 @@ describe("lineKey / overlapTail", () => {
 
   it("尾巴比这一批还长时也要能对上", () => {
     expect(overlapTail(["a", "b", "c", "d"], ["c", "d"])).toBe(2)
+  })
+})
+
+describe("renderLogLines", () => {
+  /** 一条「可重翻」的行：parts 是真相，msg 只是生成那一刻的快照 */
+  const banner: LogLine = {
+    id: 1,
+    t: "12:00:00",
+    level: "INFO",
+    src: "sys",
+    msg: "[启动器] 仓库: C:\\tq",
+    parts: [{ key: "[启动器] 仓库: {path}", vars: { path: "C:\\tq" } }],
+  }
+  /** 服务端原始输出：死文本，没有也不该有译文 */
+  const dead: LogLine = { id: 2, t: "12:00:00", level: "INFO", src: "node", msg: "服务端自己打的一行" }
+
+  it("中文（源语言）重算前后一模一样", () => {
+    expect(renderLogLines([banner, dead])[0]).toBe(banner)
+    expect(renderLogLines([dead])[0]).toBe(dead)
+  })
+
+  it("切到外文后按当前语言重算；死文本连对象都不换", () => {
+    const previous = getActiveLocale()
+    setActiveLocale("en")
+    try {
+      const [first, second, third] = renderLogLines([
+        banner,
+        dead,
+        { ...banner, id: 3, parts: ["启动序列完成"], msg: "启动序列完成" },
+      ])
+      expect(first.msg).toBe(translate("en", "[启动器] 仓库: {path}", { path: "C:\\tq" }))
+      expect(first.msg).not.toBe(banner.msg)
+      expect(second).toBe(dead)
+      // 纯静态的一段（没有插值）也要跟着翻
+      expect(third.msg).toBe(translate("en", "启动序列完成"))
+    } finally {
+      setActiveLocale(previous)
+    }
+  })
+
+  it("数组变量按当前语言的列表分隔符拼：中文顿号、英文逗号", () => {
+    const parts = [{ key: "冲突: {list}", vars: { list: ["m1", "m2"] } }]
+    expect(renderSegments(parts)).toBe("冲突: m1、m2")
+    const previous = getActiveLocale()
+    setActiveLocale("en")
+    try {
+      expect(renderSegments(parts)).toBe(translate("en", "冲突: {list}", { list: "m1, m2" }))
+    } finally {
+      setActiveLocale(previous)
+    }
   })
 })

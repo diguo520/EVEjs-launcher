@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react"
 import { toast } from "sonner"
 
+import { t } from "@/lib/i18n"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -101,11 +102,13 @@ export function AddCommandDialog({
     })
 
     if (!accepted) {
-      toast.error("该指令已存在", { description: `${cmd} 已在手册里，换个名字再试。` })
+      toast.error("该指令已存在", { description: t("{cmd} 已在手册里，换个名字再试。", { cmd }) })
       return
     }
 
-    toast.success(`已添加 ${cmd}`, { description: `归类到「${draft.cat.trim()}」` })
+    toast.success(t("已添加 {cmd}", { cmd }), {
+      description: t("归类到「{cat}」", { cat: draft.cat.trim() }),
+    })
     reset()
     onOpenChange(false)
   }

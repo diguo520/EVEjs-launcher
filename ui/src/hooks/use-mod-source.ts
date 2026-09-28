@@ -94,6 +94,16 @@ export interface ModSourceState {
   marketBlockedCount: number
   /** 后端判兼容性用的本机 EveJS 版本（marketList 回包的 evejsVersion） */
   marketEvejsVersion: string
+  /** 索引缓存写入时间（毫秒时间戳）；0 = 还没成功拉到过 */
+  marketFetchedAt: number
+  /** 这份索引是不是「网络不可用时的本地缓存」 */
+  marketCached: boolean
+  /** 回退到缓存的原因（marketCached 为 true 时才有） */
+  marketReason: string
+  /** 正在强制联网同步索引 */
+  marketRefreshing: boolean
+  /** 强制联网同步一次索引（绕过 TTL），返回这次的原始回包 */
+  refreshMarket: () => Promise<RawMarketList | null>
   /** 作者身份数据目录（author:get.dataDir） */
   dataDir: string
   /** 身份创建时间（毫秒时间戳） */
@@ -151,6 +161,11 @@ export function useModSource(): ModSourceState {
   const ipc = hasIpc()
   const [list, setList] = useState<RawModList | null>(null)
   const [market, setMarket] = useState<RawMarketList | null>(null)
+  /** 「这份索引是不是缓存、什么时候拉的」：页头与提示条都要用它说实话 */
+  const [marketFetchedAt, setMarketFetchedAt] = useState(0)
+  const [marketCached, setMarketCached] = useState(false)
+  const [marketReason, setMarketReason] = useState("")
+  const [marketRefreshing, setMarketRefreshing] = useState(false)
   const [mine, setMine] = useState<RawMyMods | null>(null)
   const [submissions, setSubmissions] = useState<RawMySubmissions | null>(null)
   const [author, setAuthor] = useState<RawAuthorState | null>(null)
@@ -166,6 +181,43 @@ export function useModSource(): ModSourceState {
   const listRef = useRef<RawModList | null>(null)
   listRef.current = list
 
+  /**
+   * 索引回包 → 状态：条目与「这份是不是缓存」的元信息一起收。
+   *
+   * ok:false（没网、本地又没有缓存）只有一句 reason、没有 mods：拿它覆盖会把界面上
+   * 已经在显示的清单清成 0 条。所以这种情况只记原因，列表留给上一份好数据。
+   */
+  const applyMarket = useCallback((next: RawMarketList | null) => {
+    if (!next) return
+    const reason = typeof next.reason === "string" ? next.reason : ""
+    if (next.ok !== true) {
+      setMarketReason(reason)
+      return
+    }
+    setMarket(next)
+    setMarketCached(next.cached === true)
+    setMarketReason(reason)
+    setMarketFetchedAt(typeof next.fetchedAt === "number" ? next.fetchedAt : 0)
+  }, [])
+
+  /**
+   * 强制同步索引：`force=true` 时后端才绕过 TTL 联网。
+   *
+   * 市场页签与工具条的刷新必须走这条 —— 普通 load() 传的是 noforce，只会读那份缓存，
+   * 「审核台刚下架、市场还挂着」时点刷新没反应就是它（2026-09-28 报障）。
+   */
+  const refreshMarket = useCallback(async (): Promise<RawMarketList | null> => {
+    if (!ipc) return null
+    setMarketRefreshing(true)
+    try {
+      const next = await callOr<RawMarketList>("modsMarketList", null, true)
+      applyMarket(next)
+      return next
+    } finally {
+      setMarketRefreshing(false)
+    }
+  }, [ipc, applyMarket])
+
   const load = useCallback(async () => {
     if (!ipc) return
     setLoading(true)
@@ -180,7 +232,7 @@ export function useModSource(): ModSourceState {
         callOr<{ ok: boolean; templates: RawModTemplate[] }>("modsTemplates", null),
       ])
     setList(nextList)
-    setMarket(nextMarket)
+    applyMarket(nextMarket)
     setMine(nextMine)
     setSubmissions(nextSubs)
     setAuthor(nextAuthor)
@@ -188,7 +240,7 @@ export function useModSource(): ModSourceState {
     setTemplates(nextTemplates?.templates ?? [])
     setLoaded(true)
     setLoading(false)
-  }, [ipc])
+  }, [ipc, applyMarket])
 
   useEffect(() => {
     void load()
@@ -447,6 +499,11 @@ export function useModSource(): ModSourceState {
     marketCount: market?.mods?.length ?? 0,
     marketBlockedCount: market?.blocked?.length ?? 0,
     marketEvejsVersion: market?.evejsVersion ?? "",
+    marketFetchedAt,
+    marketCached,
+    marketReason,
+    marketRefreshing,
+    refreshMarket,
     dataDir: author?.dataDir ?? "",
     authorSince: typeof author?.author?.since === "number" ? author.author.since : 0,
     lastSubmissionOf: (id: string) => latestSubmission(submissions?.items, id),

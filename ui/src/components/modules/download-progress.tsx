@@ -1,5 +1,6 @@
 import { Download, Package, ShieldCheck, X } from "lucide-react"
 
+import { t } from "@/lib/i18n"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { PHASE_LABEL, type DownloadTask } from "@/hooks/use-mod-downloads"
@@ -78,7 +79,7 @@ export function DownloadProgress({
         </span>
         <span>
           {task.phase === "downloading"
-            ? `剩余 ${formatMB(Math.max(0, task.sizeMB - moved))}`
+            ? t("剩余 {size}", { size: formatMB(Math.max(0, task.sizeMB - moved)) })
             : "本地处理中"}
         </span>
       </div>

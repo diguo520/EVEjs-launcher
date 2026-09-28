@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { t } from "@/lib/i18n"
 import { Loader2, Save } from "lucide-react"
 import { toast } from "sonner"
 
@@ -87,7 +88,7 @@ export function ConfigPage({
         onRootSaved(reply.repoRoot ?? root)
         if (reply.corrected) {
           toast.info("根目录已按实际位置校正", {
-            description: `保存为 ${reply.repoRoot ?? root}`,
+            description: t("保存为 {path}", { path: reply.repoRoot ?? root }),
           })
         }
       }

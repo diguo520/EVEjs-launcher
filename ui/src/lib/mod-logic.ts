@@ -4,6 +4,7 @@
  */
 import { pinyin } from "pinyin-pro"
 
+import { t } from "@/lib/i18n"
 import {
   GAME_VERSIONS,
   type ModEntry,
@@ -80,7 +81,9 @@ export function formatBytes(bytes: number): string {
 export function templateSizeLabel(template: ModTemplateCard): string {
   const count = template.fileCount ?? template.files.length
   const bytes = template.sizeBytes ?? 0
-  return bytes > 0 ? `${count} 个文件 · 约 ${formatBytes(bytes)}` : `${count} 个文件`
+  return bytes > 0
+    ? t("{count} 个文件 · 约 {size}", { count, size: formatBytes(bytes) })
+    : t("{count} 个文件", { count })
 }
 
 /**
@@ -161,11 +164,21 @@ export type ModTab = "installed" | "mine" | "market"
 export const FALLBACK_CONFLICT_REASON =
   "两者注册了同一份运行时钩子，同时启用会互相覆盖。"
 
-/** 是否已上架到市场：非本地模组默认已上架，本地模组看审核状态 */
+/**
+ * 是否已上架到市场（决定它出不出现在「模组市场」页签、以及能不能点安装）。
+ *
+ * 只认一件事：**这条在不在市场索引里**。
+ *   - `inMarket === false`：本地扫到、索引里没有（自己塞进 mods/ 的第三方包）→ 未上架；
+ *   - `inMarket === true`：索引里挂着它就是上架了 —— 不能再拿本机审核状态去否掉它。
+ *     「我创建的」里那条台账记录（status=draft）说的是「我手里这一版还没提交」，
+ *     不是「市场里那一版没上架」。2026-09-28 报障：作者自己的 evejs-automining 明明
+ *     在市场里可安装，却被本地台账的 draft 顶掉审核状态 → 市场页签只剩 2 条（索引里 3 条），
+ *     连安装按钮一起没了。删掉的那条 `review` 判定还会误伤「新版本审核中、旧版仍在架」。
+ *   - `undefined`：原型/演示数据，按老语义走（不传就算是已上架）。
+ */
 export function isPublished(mod: ModEntry): boolean {
-  // inMarket === false：本地扫到、但市场索引里没有这条（自己塞进 mods/ 的第三方包）。
-  // 它谈不上「已上架」，不该出现在模组市场页签；undefined 走原型语义（不传就是已上架）。
   if (mod.inMarket === false) return false
+  if (mod.inMarket === true) return true
   return (mod.review ?? "approved") === "approved"
 }
 
@@ -374,7 +387,7 @@ export function credentialLabel(cred: PublishCredential, now: number): string {
   // 真令牌不回填明文：界面上只报「已在盘上」，不假装知道它的样子
   if (cred.kind === "pat") return cred.token ? maskToken(cred.token) : "GitHub 令牌 · 已保存"
   const left = minutesLeft(cred, now)
-  return left > 0 ? `设备授权 · 剩余 ${left} 分钟` : "设备授权 · 已过期"
+  return left > 0 ? t("设备授权 · 剩余 {minutes} 分钟", { minutes: left }) : "设备授权 · 已过期"
 }
 
 /* ---------------- 发布前置条件 ---------------- */
@@ -428,9 +441,33 @@ export function submitCooldownRemaining(
   return Math.max(0, SUBMIT_COOLDOWN_MS - Math.max(0, now - at))
 }
 
+/**
+ * 两次发布之间的最短间隔：60 秒。与 Rust 侧 `PUBLISH_INTERVAL_MS` 一致（改一边记得改另一边）。
+ *
+ * 和上面那条「同一模组 30 分钟」不是一个维度：那条管的是反复提交同一个模组，这条管的是
+ * **连着发布**（不同模组也算）—— 一次发布要打包、推仓库、建 Release、传 ZIP、开审核 PR，
+ * 紧接着再发一次会撞上 GitHub 限流，两条 PR 还会抢同一次索引重建。
+ * 计时起点是上一次发布**走完**的时刻。
+ */
+export const PUBLISH_INTERVAL_MS = 60 * 1000
+
+/** 距可以再次发布还剩多少毫秒；0＝现在就能发。`at`＝上一次发布走完的时刻。 */
+export function publishIntervalRemaining(
+  at: number | null | undefined,
+  now: number
+): number {
+  if (typeof at !== "number" || !Number.isFinite(at) || at <= 0) return 0
+  return Math.max(0, PUBLISH_INTERVAL_MS - Math.max(0, now - at))
+}
+
+/** 秒级间隔说成人话：60 秒这种粒度用分钟会算成「还剩约 1 分钟」，等于没说 */
+export function intervalText(remainingMs: number): string {
+  return t("还剩 {seconds} 秒", { seconds: Math.max(1, Math.ceil(remainingMs / 1000)) })
+}
+
 /** 冷却剩余时间说成人话 */
 export function cooldownText(remainingMs: number): string {
-  return `还剩约 ${Math.max(1, Math.ceil(remainingMs / 60000))} 分钟`
+  return t("还剩约 {minutes} 分钟", { minutes: Math.max(1, Math.ceil(remainingMs / 60000)) })
 }
 
 /** 审核 PR 的状态说法：后端复查回来的 `reviewPrState` */
@@ -443,7 +480,7 @@ export function reviewPrStateLabel(state: string | undefined | null): string {
 
 /** 提交前必须解决的一件事：说清缺什么、去哪补 */
 export interface PublishBlocker {
-  id: "signature" | "token" | "cooldown"
+  id: "signature" | "token" | "cooldown" | "interval"
   /** 这一项的名词说法，用来拼「还差 X、Y」 */
   label: string
   /** 缺的是什么 */
@@ -462,12 +499,15 @@ export function publishBlockers({
   name,
   now,
   cooldownMs,
+  intervalMs,
 }: {
   credential: PublishCredential | null
   name: string
   now: number
   /** 距上次提交还差多少毫秒（0/空＝不受限） */
   cooldownMs?: number
+  /** 距上次发布走完还差多少毫秒（0/空＝不受限）：两次发布之间的 60 秒间隔 */
+  intervalMs?: number
 }): PublishBlocker[] {
   const blockers: PublishBlocker[] = []
   if (typeof cooldownMs === "number" && cooldownMs > 0) {
@@ -475,7 +515,19 @@ export function publishBlockers({
       id: "cooldown",
       label: "提交间隔",
       title: "距上次提交不到 30 分钟",
-      hint: `同一个模组两次提交至少间隔 30 分钟，${cooldownText(cooldownMs)}再试。`,
+      hint: t("同一个模组两次提交至少间隔 30 分钟，{left}再试。", {
+        left: cooldownText(cooldownMs),
+      }),
+    })
+  }
+  if (typeof intervalMs === "number" && intervalMs > 0) {
+    blockers.push({
+      id: "interval",
+      label: "发布间隔",
+      title: "距上次发布不到 60 秒",
+      hint: t("两次发布之间至少间隔 60 秒（{left}）再试。", {
+        left: intervalText(intervalMs),
+      }),
     })
   }
   if (!hasOwnSignature(name)) {
@@ -483,7 +535,7 @@ export function publishBlockers({
       id: "signature",
       label: "署名",
       title: "还没填署名",
-      hint: "署名会印在模组的作者栏上，先在「作者身份」里填上你自己的署名。",
+      hint: "署名会印在模组的作者栏上，先在「令牌配置」里填上你自己的署名。",
     })
   }
   if (!isCredentialLive(credential, now)) {
@@ -493,8 +545,8 @@ export function publishBlockers({
       title: credential ? "GitHub 令牌已过期" : "还没配置 GitHub 令牌",
       // 「发布凭据」和「GitHub 令牌」是两个叫法一件事，这里把话说明白
       hint: credential
-        ? "发布凭据就是你那把 GitHub 令牌，已经过期了，在「作者身份」里重新授权一次。"
-        : "发布凭据就是你自己的 GitHub 令牌：源码要推到你名下的仓库，先在「作者身份」里配好。",
+        ? "发布凭据就是你那把 GitHub 令牌，已经过期了，在「令牌配置」里重新授权一次。"
+        : "发布凭据就是你自己的 GitHub 令牌：源码要推到你名下的仓库，先在「令牌配置」里配好。",
     })
   }
   return blockers
@@ -564,7 +616,7 @@ export function publishStages({
  * 不拿原型里的占位账号冒充用户。
  */
 export function sourceRepo(modId: string, owner?: string): string {
-  return `${owner && owner.trim() ? owner.trim() : "你的 GitHub 账号"}/${modId}`
+  return `${owner && owner.trim() ? owner.trim() : t("你的 GitHub 账号")}/${modId}`
 }
 
 /** 打包产物的文件名，进度里直接把包名点出来 */
@@ -602,9 +654,10 @@ export function relativeDate(date: string, today: string): string {
   if (days === 0) return "今天"
   if (days === 1) return "昨天"
   // 满 30 天仍说「30 天前」，31 天才进位到「1 个月前」；月份最多说到 11 个月
-  if (days <= 30) return `${days} 天前`
-  if (days < 365) return `${Math.min(11, Math.max(1, Math.round(days / 30)))} 个月前`
-  return `${Math.max(1, Math.round(days / 365))} 年前`
+  if (days <= 30) return t("{days} 天前", { days })
+  if (days < 365)
+    return t("{months} 个月前", { months: Math.min(11, Math.max(1, Math.round(days / 30))) })
+  return t("{years} 年前", { years: Math.max(1, Math.round(days / 365)) })
 }
 
 /* ---------------- 评论列表的分档与排序 ---------------- */
@@ -781,7 +834,7 @@ export function validateNewMod(
   if (existingIds.includes(fullId)) {
     return {
       message: "这个标识已经被占用了",
-      detail: `${fullId} 已在本地模组库里，换个模组名再试。`,
+      detail: t("{id} 已在本地模组库里，换个模组名再试。", { id: fullId }),
     }
   }
   return null

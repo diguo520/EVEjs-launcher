@@ -15,6 +15,7 @@ import { toast } from "sonner"
 
 import { cn, copyText } from "@/lib/utils"
 import { Panel } from "@/components/common/panel"
+import { useLocale } from "@/components/shell/locale-provider"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
@@ -34,8 +35,8 @@ const levelClass = {
   missing: "text-destructive",
 } as const
 
-/** 报告里给每项加个前缀，纯文本粘贴出去也能看出结论 */
-const levelMark = {
+/** 报告里给每项加个前缀，纯文本粘贴出去也能看出结论（文案过词典） */
+const LEVEL_MARK = {
   ok: "[通过]",
   warn: "[提醒]",
   error: "[失败]",
@@ -43,6 +44,7 @@ const levelMark = {
 } as const
 
 export function EnvCheck({ env }: { env: EnvCheckState }) {
+  const { t } = useLocale()
   const {
     items,
     checking,
@@ -68,7 +70,9 @@ export function EnvCheck({ env }: { env: EnvCheckState }) {
   /** 缺的这几项能不能挡住启动，说法完全不一样，得分开讲 */
   const gateNote =
     blockers.length > 0
-      ? `缺少 ${blockers.join("、")}，一键启动已被挡住；照下面每项的指引补上就会放行。`
+      ? t("缺少 {list}，一键启动已被挡住；照下面每项的指引补上就会放行。", {
+          list: blockers.join("、"),
+        })
       : "缺的是本地编译模组用的工具链，不影响启动服务器，但建模组时会编译失败。"
 
   /** 进度环与进度条共用一个数：检测中是「跑了几项」，平时是「通过几项」 */
@@ -85,15 +89,21 @@ export function EnvCheck({ env }: { env: EnvCheckState }) {
 
   /** 一键把结果复制成纯文本，方便贴给帮忙排查的人；未检测到的项连修复办法一起带上 */
   async function copyReport() {
-    const lines = [`EveJS 环境自检 · ${checkedAt}`]
+    const lines = [t("EveJS 环境自检 · {time}", { time: checkedAt })]
     for (const item of items) {
-      lines.push(`${levelMark[item.level]} ${item.name} — ${item.detail}`)
+      lines.push(
+        t("{mark} {name} — {detail}", {
+          mark: t(LEVEL_MARK[item.level]),
+          name: item.name,
+          detail: item.detail,
+        })
+      )
       if (item.level === "missing" && item.fix) {
-        lines.push(`    修复：${item.fix.hint}`)
-        if (item.fix.cmd) lines.push(`    命令：${item.fix.cmd}`)
+        lines.push("    " + t("修复：{hint}", { hint: item.fix.hint }))
+        if (item.fix.cmd) lines.push("    " + t("命令：{command}", { command: item.fix.cmd }))
       }
     }
-    lines.push(`结果：${passCount}/${items.length} 通过`)
+    lines.push(t("结果：{pass}/{total} 通过", { pass: passCount, total: items.length }))
     const ok = await copyText(lines.join("\n"))
     if (ok) {
       toast.success("环境报告已复制", { description: "可直接粘贴给协助排查的人。" })
@@ -106,7 +116,13 @@ export function EnvCheck({ env }: { env: EnvCheckState }) {
     <Panel
       tag="// HEALTH"
       title="环境自检"
-      meta={`${passCount}/${items.length} 通过${missingCount ? ` · ${missingCount} 项未检测到` : ""}${warnCount ? ` · ${warnCount} 项提醒` : ""}`}
+      meta={t("{pass}/{total} 通过{extra}", {
+        pass: passCount,
+        total: items.length,
+        extra:
+          (missingCount ? t(" · {count} 项未检测到", { count: missingCount }) : "") +
+          (warnCount ? t(" · {count} 项提醒", { count: warnCount }) : ""),
+      })}
       actions={
         <div className="flex items-center gap-2">
           <Button size="sm" variant="ghost" onClick={copyReport}>

@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { useLocale } from "@/components/shell/locale-provider"
 import {
   ACCOUNT_ROLE_LABEL,
   ACCOUNT_STATUS_LABEL,
@@ -61,6 +62,7 @@ export function AccountCard({
   onDeleteAccount: (account: Account) => void
   onCreate: (accountId: string) => void
 }) {
+  const { t } = useLocale()
   const online = onlineCharacter(account)
   const pending = creating?.accountId === account.id ? creating.step : null
   const free = freeSlots(account)
@@ -68,8 +70,11 @@ export function AccountCard({
   const canDelete = canDeleteAccount(account)
   const deleteHint =
     account.characters.length > 0
-      ? `将永久删除账号「${account.name}」及其 ${account.characters.length} 个角色，角色名会一并释放、可被重新占用。该操作不可撤销。`
-      : `将永久删除账号「${account.name}」。该操作不可撤销。`
+      ? t("将永久删除账号「{name}」及其 {count} 个角色，角色名会一并释放、可被重新占用。该操作不可撤销。", {
+          name: account.name,
+          count: account.characters.length,
+        })
+      : t("将永久删除账号「{name}」。该操作不可撤销。", { name: account.name })
   // 槽位固定 3 个：有角色的按顺序填，剩下的留空位
   const slots = Array.from({ length: MAX_CHARACTERS_PER_ACCOUNT }, (_, i) => ({
     index: i,
@@ -81,7 +86,10 @@ export function AccountCard({
       flush
       tag={`// ${ACCOUNT_ROLE_LABEL[account.role]}`}
       title={account.name}
-      meta={`槽位 ${account.characters.length}/${MAX_CHARACTERS_PER_ACCOUNT}`}
+      meta={t("槽位 {used}/{total}", {
+        used: account.characters.length,
+        total: MAX_CHARACTERS_PER_ACCOUNT,
+      })}
       actions={
         <div className="flex items-center gap-1.5">
           {online ? <Badge variant="success">在线 1</Badge> : null}
@@ -96,10 +104,10 @@ export function AccountCard({
                 size="icon-sm"
                 className="hover:text-destructive"
                 disabled={!canDelete.ok}
-                title={canDelete.ok ? `删除账号 ${account.name}` : canDelete.reason}
+                title={canDelete.ok ? t("删除账号 {name}", { name: account.name }) : canDelete.reason}
               >
                 <Trash2 />
-                <span className="sr-only">删除账号 {account.name}</span>
+                <span className="sr-only">{t("删除账号 {name}", { name: account.name })}</span>
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
@@ -145,7 +153,7 @@ export function AccountCard({
         </span>
         <div className="min-w-2 flex-1" />
         <span className="tabular text-[10px] text-muted-foreground">
-          {free > 0 ? `空余 ${free} 个槽位` : "槽位已满"}
+          {free > 0 ? t("空余 {count} 个槽位", { count: free }) : "槽位已满"}
         </span>
       </footer>
     </Panel>

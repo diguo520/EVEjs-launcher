@@ -17,6 +17,7 @@ import {
 import { callOr, hasIpc } from "@/lib/ipc"
 import type { RawAck, RawDbBackups, RawDbOverview, RawDbTable } from "@/lib/ipc"
 import { DB_META, DB_TABLES } from "@/lib/mock"
+import { useLocale } from "@/components/shell/locale-provider"
 
 /** 单次载入的行数：SQLite 表可能几十万行，页面只拉前这么多，其余由总量读数交代 */
 const PAGE_ROWS = 200
@@ -42,6 +43,7 @@ function bytesToMB(bytes: number | undefined): number {
 }
 
 export function DatabasePage() {
+  const { t } = useLocale()
   const ipc = hasIpc()
   const [overview, setOverview] = useState<RawDbOverview | null>(null)
   const [tables, setTables] = useState<DbTableModel[]>(() => (ipc ? [] : demoModels()))
@@ -86,7 +88,9 @@ export function DatabasePage() {
       const reply = await callOr<RawDbTable>("databaseTable", null, name, PAGE_ROWS, 0)
       setTableLoading(false)
       if (!reply?.ok) {
-        toast.error(`读表 ${name} 失败`, { description: reply?.reason ?? "后端没说明原因" })
+        toast.error(t("读表 {name} 失败", { name }), {
+          description: reply?.reason ?? "后端没说明原因",
+        })
         return
       }
       setLoaded(tableFromRaw(reply))
@@ -154,7 +158,7 @@ export function DatabasePage() {
       return
     }
     const name = typeof reply.name === "string" ? reply.name : "（后端未返回文件名）"
-    toast.success(`已创建备份 ${name}`)
+    toast.success(t("已创建备份 {name}", { name }))
     await loadBackups()
   }
 
@@ -171,13 +175,14 @@ export function DatabasePage() {
     const newest = list.reduce((best, item) =>
       (item.createdAt ?? 0) > (best.createdAt ?? 0) ? item : best
     )
-    if (!window.confirm(`用备份「${newest.name}」覆盖当前世界存档？服务端运行时会拒绝。`)) return
+    if (!window.confirm(t("用备份「{name}」覆盖当前世界存档？服务端运行时会拒绝。", { name: newest.name })))
+      return
     const reply = await callOr<RawAck>("databaseRestore", null, newest.name)
     if (!reply?.ok) {
       toast.error("恢复失败", { description: reply?.reason ?? "后端没说明原因" })
       return
     }
-    toast.success(`已从 ${newest.name} 恢复`)
+    toast.success(t("已从 {name} 恢复", { name: newest.name }))
     await loadOverview()
     await loadTable(activeName)
   }
@@ -250,12 +255,17 @@ export function DatabasePage() {
         title="数据浏览器"
         meta={
           ipc
-            ? `${tables.length} 张表已挂载${
-                activeTable.loaded !== undefined
-                  ? ` · 本表载入 ${activeTable.loaded.toLocaleString("en-US")} / ${activeTable.rows.toLocaleString("en-US")} 行`
-                  : ""
-              }`
-            : `${tables.length} 张表已挂载`
+            ? t("{count} 张表已挂载{extra}", {
+                count: tables.length,
+                extra:
+                  activeTable.loaded !== undefined
+                    ? t(" · 本表载入 {loaded} / {rows} 行", {
+                        loaded: activeTable.loaded.toLocaleString("en-US"),
+                        rows: activeTable.rows.toLocaleString("en-US"),
+                      })
+                    : "",
+              })
+            : t("{count} 张表已挂载", { count: tables.length })
         }
         className="min-h-[520px]"
         bodyClassName="flex min-h-0"
@@ -282,7 +292,7 @@ export function DatabasePage() {
             }}
             onInsert={() => void insertRow()}
             loading={tableLoading}
-            extra={`${activeColumns} 列`}
+            extra={t("{count} 列", { count: activeColumns })}
             /* min-w-0：格子里是宽表格，不给它收缩的余地就会把整个网格撑出横向滚动 */
             className="min-w-0 border-b border-input lg:border-b-0 lg:border-r"
           />

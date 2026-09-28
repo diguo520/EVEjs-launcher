@@ -1,4 +1,5 @@
-import type { LogLevel, LogLine } from "@/lib/mock"
+import type { LogLevel, LogLine, LogSegment, LogTemplate, LogVar } from "@/lib/mock"
+import { listSeparator, t } from "@/lib/i18n"
 
 /** 日志面板的四个来源页签 */
 export type LogTab = "sys" | "node" | "market" | "client"
@@ -12,8 +13,15 @@ export const LOG_TAB_LABEL: Record<LogTab, string> = {
   client: "客户端",
 }
 
-const TAB_SOURCES: Record<LogTab, string[] | null> = {
-  sys: null, // 系统页签 = 不过滤，看全量（启动横幅、模组清单也在这里）
+/**
+ * 每个页签只收自己那一类来源。
+ *
+ * 系统页签收的是**启动器自己的记录**（启动横幅、模组清单、功能启停提示），
+ * 主服务器 / 市场服务 / 客户端的原始输出各归各页 —— 2026-09-29 报障：
+ * 系统页以前「不过滤」，把三个服务的原始输出（服务端自己打的中文）也混了进来。
+ */
+const TAB_SOURCES: Record<LogTab, string[]> = {
+  sys: ["sys"],
   // node = 实时流；server = server.log 日志文件（同一台主服务器，两个来源都归这页）
   node: ["node", "server", "gateway", "images"],
   market: ["market"],
@@ -21,8 +29,7 @@ const TAB_SOURCES: Record<LogTab, string[] | null> = {
 }
 
 export function matchLogTab(src: string, tab: LogTab): boolean {
-  const allow = TAB_SOURCES[tab]
-  return allow === null || allow.includes(src)
+  return TAB_SOURCES[tab].includes(src)
 }
 
 /** 级别档位：all 之外与日志级别一一对应 */
@@ -130,4 +137,47 @@ export function splitHits(text: string, keyword: string): TextPart[] {
   }
   if (from < text.length) parts.push({ text: text.slice(from), hit: false })
   return parts.length ? parts : [{ text, hit: false }]
+}
+
+/* ------------------------------ 正文重翻 ------------------------------ */
+
+/** 模板变量 → 文字：数据原样、数组按当前语言的列表分隔符拼、模板再翻一层 */
+function renderVar(value: LogVar): string {
+  if (typeof value === "string") return value
+  if (typeof value === "number") return String(value)
+  if (Array.isArray(value)) return value.join(listSeparator())
+  return renderTemplate(value)
+}
+
+function renderTemplate(template: LogTemplate): string {
+  const vars = template.vars
+  if (!vars) return t(template.key)
+  const filled: Record<string, string | number> = {}
+  for (const [name, value] of Object.entries(vars)) filled[name] = renderVar(value)
+  return t(template.key, filled)
+}
+
+/** 把一段正文按当前语言拼出来 */
+export function renderSegments(parts: LogSegment[]): string {
+  return parts
+    .map((part) => (typeof part === "string" ? t(part) : renderTemplate(part)))
+    .join("")
+}
+
+/**
+ * 一条日志行按当前语言重算正文。
+ *
+ * 生成时的正文是**当时的语言**，切了语言只有重算才跟得上（2026-09-29 报障：
+ * 启动横幅那一块永远是中文）。没有 `parts` 的行是死文本 —— 服务端自己打的输出、
+ * 日志文件里读回来的行 —— 原样返回：那些内容本来就没有、也不该有译文。
+ */
+export function renderLogLine(line: LogLine): LogLine {
+  if (!line.parts) return line
+  const msg = renderSegments(line.parts)
+  return msg === line.msg ? line : { ...line, msg }
+}
+
+/** 整批重算：面板在渲染期调用，关键字搜索 / 显示 / 复制都用重算后的正文 */
+export function renderLogLines(lines: LogLine[]): LogLine[] {
+  return lines.map(renderLogLine)
 }

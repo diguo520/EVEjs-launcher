@@ -123,6 +123,57 @@ mod tests {
         assert_eq!(parse_status_code("HTTP/1.0 200 OK\r\n"), Some(200));
         assert_eq!(parse_status_code("garbage"), None);
     }
+
+    /// 借系统要一个当前空闲的端口（绑上拿到号就放掉，紧接着自己占回来；测试里够稳）
+    fn free_port() -> u16 {
+        let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).expect("要不到空闲端口");
+        let port = listener.local_addr().expect("拿不到端口号").port();
+        drop(listener);
+        port
+    }
+
+    /// 进程已经退出 → 立刻认死，不把 60s 预算空耗在等一个不存在的进程上
+    #[tokio::test]
+    async fn wait_port_until_gives_up_at_once_when_the_process_is_gone() {
+        let port = free_port();
+        let started = Instant::now();
+        let outcome = wait_port_until(port, 60_000, 500, || false).await;
+        assert_eq!(outcome, PortWait::Exited);
+        assert!(
+            started.elapsed() < Duration::from_secs(5),
+            "不该空等预算：{:?}",
+            started.elapsed()
+        );
+    }
+
+    /// 慢启动（450ms 才监听）但进程活着 → 等到就算成功，这才是 L4 场景的判据
+    #[tokio::test]
+    async fn wait_port_until_sees_a_listener_that_shows_up_late() {
+        let port = free_port();
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(450)).await;
+            let listener = tokio::net::TcpListener::bind(("127.0.0.1", port))
+                .await
+                .expect("绑定失败");
+            // 保持监听：wait_port_until 的探针只连一下就断，不需要 accept
+            tokio::time::sleep(Duration::from_millis(1_500)).await;
+            drop(listener);
+        });
+        assert_eq!(
+            wait_port_until(port, 5_000, 100, || true).await,
+            PortWait::Ready
+        );
+    }
+
+    /// 进程活着但端口一直不开 → 到点返回 Timeout（调用方据此决定继续等还是停）
+    #[tokio::test]
+    async fn wait_port_until_stops_at_the_deadline_while_the_process_lives() {
+        let port = free_port();
+        let started = Instant::now();
+        let outcome = wait_port_until(port, 600, 100, || true).await;
+        assert_eq!(outcome, PortWait::Timeout);
+        assert!(started.elapsed() >= Duration::from_millis(600));
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -150,14 +201,46 @@ pub async fn check_all() -> HealthResult {
     }
 }
 
-/// 轮询等待端口就绪（现役版 waitPort 的等价物）
-pub async fn wait_port(port: u16, total_ms: u64, step_ms: u64) -> bool {
+/// 端口等待的三种结局。
+///
+/// 现役版的 waitPort 只有「到点返回 false」一种结局：进程早就崩了也要空等满预算，
+/// 「慢」和「死」被混成同一个「启动超时」。拆开之后调用方才能分别处理 ——
+/// 死了立刻带原因报错，活着就继续等（启动慢不等于启动失败）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PortWait {
+    /// 端口开始监听
+    Ready,
+    /// 进程已退出，端口不可能再开了
+    Exited,
+    /// 到点仍未监听，但进程还活着
+    Timeout,
+}
+
+/// 轮询等待端口就绪，同时盯着进程是否还活着（现役版 waitPort 的等价物）。
+///
+/// `alive` 每轮调一次（默认 500ms 一轮，开销可以忽略）：返回 false 立刻收摊，
+/// 不把预算耗在「等一个已经不在的进程」上，也就不会丢掉真正的失败原因。
+/// 到点仍在等就返回 [`PortWait::Timeout`]，杀不杀由调用方决定（主服务器选择不杀：见 process.rs）。
+pub async fn wait_port_until<F>(port: u16, total_ms: u64, step_ms: u64, mut alive: F) -> PortWait
+where
+    F: FnMut() -> bool,
+{
     let deadline = Instant::now() + Duration::from_millis(total_ms);
-    while Instant::now() < deadline {
+    loop {
         if tcp_alive(port).await {
-            return true;
+            return PortWait::Ready;
+        }
+        if !alive() {
+            // 退出与监听可能挤在同一个瞬间（子进程已经监听、父壳才退出）：补探一次再认死
+            return if tcp_alive(port).await {
+                PortWait::Ready
+            } else {
+                PortWait::Exited
+            };
+        }
+        if Instant::now() >= deadline {
+            return PortWait::Timeout;
         }
         tokio::time::sleep(Duration::from_millis(step_ms)).await;
     }
-    false
 }

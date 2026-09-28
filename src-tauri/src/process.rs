@@ -254,18 +254,251 @@ pub async fn start_service(app: &AppHandle, service_id: &str) -> Result<Value, S
     }
 }
 
+/* ------------------------------ 启动预算 ------------------------------ */
+
+/// 主服务器启动的基价（现役版 Electron 给的就是 60s）
+const MAIN_START_BASE_MS: u64 = 60_000;
+/// 每个模组 loader 追加的预算：NODE_OPTIONS 里每个 `--require` 都是一次真实读盘 + 编译 + 执行
+const MAIN_START_PER_LOADER_MS: u64 = 3_000;
+/// 启动预算的硬上限：模组再多也不能无限等
+const MAIN_START_MAX_MS: u64 = 180_000;
+/// 启动进度的回写间隔（状态文案里的秒数靠它走字）
+const START_PROGRESS_STEP_MS: u64 = 5_000;
+
+/// 主服务器启动预算：60s 基价 + 每个模组 loader 3s，封顶 180s。
+///
+/// 为什么按 loader 数放大：20 个模组的 NODE_OPTIONS 就是 20 条 `--require`，
+/// node 启动时要逐个读盘、编译、执行；写死 30s（现役版是 60s）在慢盘上会把
+/// 「还在加载」误判成「启动超时」，然后把已经起来的服务杀掉。
+fn main_start_budget_ms(loader_count: usize) -> u64 {
+    MAIN_START_BASE_MS
+        .saturating_add(MAIN_START_PER_LOADER_MS.saturating_mul(loader_count as u64))
+        .min(MAIN_START_MAX_MS)
+}
+
+/// 启动中的状态文案，如 `启动中 45s / 120s · 正在加载 20 个模组…`。
+///
+/// 超预算之后换成「已超出预算 · 仍在等待端口」：进程还活着，只是慢，
+/// 文案不能带失败口吻（此刻界面仍然是「启动中」）。
+fn start_progress_message(
+    elapsed_ms: u64,
+    budget_ms: u64,
+    loader_count: usize,
+    over_budget: bool,
+) -> String {
+    let seconds = elapsed_ms / 1000;
+    let budget = budget_ms / 1000;
+    let loading = if loader_count > 0 {
+        format!("正在加载 {loader_count} 个模组")
+    } else {
+        "正在启动服务端".to_string()
+    };
+    if over_budget {
+        format!("启动中 {seconds}s · {loading} · 已超出 {budget}s 预算，仍在等待端口…")
+    } else {
+        format!("启动中 {seconds}s / {budget}s · {loading}…")
+    }
+}
+
+/// 这次启动是否还归我们管：用户点了停止、或别的路径已经判过失败时，别再覆盖状态
+fn is_starting(app: &AppHandle, service_id: &str) -> bool {
+    app.try_state::<AppState>()
+        .map(|state| state.services.state_of(service_id) == "starting")
+        .unwrap_or(false)
+}
+
+/// 这次启动的结局是否还该由我们写。
+///
+/// 与 [`is_starting`] 的区别：`error` 也算「归我们」—— 进程退出时 `on_pty_exit`
+/// （pty 退出线程）几乎总会抢先写下「异常退出（exit N）」，我们要用它更完整的
+/// 退出码 + 日志末尾覆盖它；只有用户点停止（stopping / idle）才不该再插嘴。
+fn start_outcome_owned(app: &AppHandle, service_id: &str) -> bool {
+    match app.try_state::<AppState>() {
+        Some(state) => matches!(
+            state.services.state_of(service_id).as_str(),
+            "starting" | "error"
+        ),
+        None => false,
+    }
+}
+
+/// 「进程已退出」的出错前缀：带上 PTY 侧记到的退出码（拿不到就只报 PID）
+fn exited_head(app: &AppHandle, service_id: &str, name: &str, pid: u32) -> String {
+    let code = app
+        .try_state::<AppState>()
+        .and_then(|state| state.pty.last_exit_code(session_id(service_id)));
+    match code {
+        Some(code) => format!("{name}进程已退出（exit {code}）"),
+        None => format!("{name}进程已退出（PID {pid}）"),
+    }
+}
+
+/// 主服务器的失败原因：退出码 + 服务端日志末几行（node 的报错通常只留在这一份日志里）
+fn main_server_exit_reason(app: &AppHandle, pid: u32, root: &Path) -> String {
+    let head = exited_head(app, MAIN_SERVER, "主服务器", pid);
+    let tail = server_log_tail(root, 3);
+    if tail.is_empty() {
+        head
+    } else {
+        format!("{head}，日志末尾：{}", tail.join(" | "))
+    }
+}
+
+/// 服务端日志的末几行（复用 log:read 的候选路径解析；读不到就返回空，不编内容）
+fn server_log_tail(root: &Path, count: usize) -> Vec<String> {
+    let value = crate::log::read_server_log(root);
+    let lines: Vec<String> = value
+        .get("lines")
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .map(shorten_line)
+                .collect()
+        })
+        .unwrap_or_default();
+    let start = lines.len().saturating_sub(count);
+    lines[start..].to_vec()
+}
+
+/// 单行日志压到能塞进错误文案的长度（toast 装不下整段堆栈）
+fn shorten_line(line: &str) -> String {
+    const MAX_CHARS: usize = 160;
+    if line.chars().count() <= MAX_CHARS {
+        line.to_string()
+    } else {
+        line.chars().take(MAX_CHARS).collect::<String>() + "…"
+    }
+}
+
+/// 等主服务器端口就绪，每 [`START_PROGRESS_STEP_MS`] 回写一次进度。
+///
+/// 预算用尽但进程还活着 → 转成无限等（`over_budget`）：**到点不杀**。
+/// 慢不是坏，服务真起来了就该让它跑完；只有进程退出才立刻失败。
+async fn await_main_server_ready(
+    app: &AppHandle,
+    pid: u32,
+    budget_ms: u64,
+    loader_count: usize,
+) -> health::PortWait {
+    let started = std::time::Instant::now();
+    let mut over_budget = false;
+    loop {
+        let elapsed = started.elapsed().as_millis() as u64;
+        if is_starting(app, MAIN_SERVER) {
+            set_state(
+                app,
+                MAIN_SERVER,
+                "starting",
+                Some(pid),
+                Some(start_progress_message(
+                    elapsed,
+                    budget_ms,
+                    loader_count,
+                    over_budget,
+                )),
+            );
+        }
+        let slice = if over_budget {
+            START_PROGRESS_STEP_MS
+        } else {
+            budget_ms
+                .saturating_sub(elapsed)
+                .clamp(1, START_PROGRESS_STEP_MS)
+        };
+        let outcome = health::wait_port_until(crate::config::DEFAULT_GAME_PORT, slice, 500, || {
+            crate::win32::alive(pid)
+        })
+        .await;
+        match outcome {
+            health::PortWait::Ready | health::PortWait::Exited => return outcome,
+            health::PortWait::Timeout if !over_budget && elapsed + slice >= budget_ms => {
+                over_budget = true;
+            }
+            health::PortWait::Timeout => {}
+        }
+    }
+}
+
+/// 预算用完还在等（进程活着）时的兜底：留一个后台任务继续探端口。
+///
+/// 仪表盘本来就 2s 轮询 health:check，但那只决定卡片颜色；这里负责把状态从
+/// starting 推到 running / error —— 进程真起来了就收尾，真死了才把原因写清楚。
+fn spawn_main_server_watch(
+    app: &AppHandle,
+    pid: u32,
+    root: PathBuf,
+    budget_ms: u64,
+    loader_count: usize,
+) {
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let started = std::time::Instant::now();
+        loop {
+            if !is_starting(&app, MAIN_SERVER) {
+                return;
+            }
+            let elapsed = budget_ms + started.elapsed().as_millis() as u64;
+            set_state(
+                &app,
+                MAIN_SERVER,
+                "starting",
+                Some(pid),
+                Some(start_progress_message(
+                    elapsed,
+                    budget_ms,
+                    loader_count,
+                    true,
+                )),
+            );
+            match health::wait_port_until(
+                crate::config::DEFAULT_GAME_PORT,
+                START_PROGRESS_STEP_MS,
+                500,
+                || crate::win32::alive(pid),
+            )
+            .await
+            {
+                health::PortWait::Ready => {
+                    if is_starting(&app, MAIN_SERVER) {
+                        set_state(
+                            &app,
+                            MAIN_SERVER,
+                            "running",
+                            Some(pid),
+                            Some(format!("运行中（PID {pid}）")),
+                        );
+                    }
+                    return;
+                }
+                health::PortWait::Exited => {
+                    if start_outcome_owned(&app, MAIN_SERVER) {
+                        let reason = main_server_exit_reason(&app, pid, &root);
+                        set_state(&app, MAIN_SERVER, "error", None, Some(reason));
+                    }
+                    return;
+                }
+                health::PortWait::Timeout => {}
+            }
+        }
+    });
+}
+
 async fn start_main_server(app: &AppHandle) -> Result<Value, String> {
     let state = app.state::<AppState>();
     let root = state.repo_root();
     let server_dir = root.join("server");
 
-    if health::tcp_alive(26000).await {
+    // 端口取 config 里的单一声明（现役版这几处都是字面量 26000）
+    let port = crate::config::DEFAULT_GAME_PORT;
+    if health::tcp_alive(port).await {
         set_state(
             app,
             MAIN_SERVER,
             "running",
             None,
-            Some("端口 26000 已监听（外部已启动）".to_string()),
+            Some(format!("端口 {port} 已监听（外部已启动）")),
         );
         return Ok(json!({ "ok": true, "reason": "already-running" }));
     }
@@ -290,8 +523,10 @@ async fn start_main_server(app: &AppHandle) -> Result<Value, String> {
     // 模组 loader：通过 NODE_OPTIONS=--require 注入，服务端文件零改动。
     // 注意 NODE_OPTIONS 的解析规则：反斜杠会被当转义符吃掉，且按空格分词，
     // 所以路径必须转成正斜杠并加双引号（已实测验证；plan_loaders 保证斜杠方向）。
-    if let Some(options) = mods_loader_node_options(&root, &state.runtime) {
-        env_vars.push(("NODE_OPTIONS".to_string(), options));
+    // 注入个数同时决定启动预算：每个 loader 都要读盘 + 编译 + 执行。
+    let loader = mods_loader_injection(&root, &state.runtime);
+    if let Some(options) = &loader.node_options {
+        env_vars.push(("NODE_OPTIONS".to_string(), options.clone()));
     }
 
     set_state(
@@ -308,33 +543,44 @@ async fn start_main_server(app: &AppHandle) -> Result<Value, String> {
             .args(vec!["/c".to_string(), "npm start".to_string()])
             .env(env_vars),
     )?;
-    set_state(
-        app,
-        MAIN_SERVER,
-        "starting",
-        Some(pid),
-        Some(format!("已启动（PID {pid}），等待 26000 端口…")),
-    );
 
-    if health::wait_port(26000, 30_000, 500).await {
-        set_state(
-            app,
-            MAIN_SERVER,
-            "running",
-            Some(pid),
-            Some(format!("运行中（PID {pid}）")),
-        );
-        Ok(json!({ "ok": true, "reason": "ok", "pid": pid }))
-    } else {
-        stop_tree(app, MAIN_SERVER);
-        set_state(
-            app,
-            MAIN_SERVER,
-            "error",
-            None,
-            Some("启动超时：26000 未在 30s 内监听".to_string()),
-        );
-        Err("主服务器启动超时（26000 端口 30s 未监听）".to_string())
+    let budget_ms = main_start_budget_ms(loader.count);
+    let outcome = await_main_server_ready(app, pid, budget_ms, loader.count).await;
+    match outcome {
+        health::PortWait::Ready if is_starting(app, MAIN_SERVER) => {
+            set_state(
+                app,
+                MAIN_SERVER,
+                "running",
+                Some(pid),
+                Some(format!("运行中（PID {pid}）")),
+            );
+            Ok(json!({ "ok": true, "reason": "ok", "pid": pid }))
+        }
+        health::PortWait::Exited if start_outcome_owned(app, MAIN_SERVER) => {
+            let reason = main_server_exit_reason(app, pid, &root);
+            set_state(app, MAIN_SERVER, "error", None, Some(reason.clone()));
+            Err(reason)
+        }
+        health::PortWait::Timeout => {
+            // 慢 ≠ 坏：预算用尽但进程还活着，不杀也不报错，交后台继续等端口
+            set_state(
+                app,
+                MAIN_SERVER,
+                "starting",
+                Some(pid),
+                Some(start_progress_message(
+                    budget_ms,
+                    budget_ms,
+                    loader.count,
+                    true,
+                )),
+            );
+            spawn_main_server_watch(app, pid, root.clone(), budget_ms, loader.count);
+            Ok(json!({ "ok": true, "reason": "still-starting", "pid": pid }))
+        }
+        // Ready / Exited 但状态已被别的路径（用户点停止）改掉：不覆盖，也不算失败
+        _ => Ok(json!({ "ok": true, "reason": "state-changed", "pid": pid })),
     }
 }
 
@@ -358,11 +604,22 @@ pub fn on_pty_exit(app: &AppHandle, tab_id: &str, code: i64) {
         set_state(app, service_id, "error", None, Some(message));
     }
 }
+/// 模组 loader 的注入结果。
+///
+/// 为什么要连着个数一起给：启动预算按 loader 数放大（见 [`main_start_budget_ms`]），
+/// 而 `plan_loaders` 已经算过一遍了，再读一次盘纯属浪费。
+struct LoaderInjection {
+    /// 要注入的 `NODE_OPTIONS`（没有模组时为 None）
+    node_options: Option<String>,
+    /// 实际注入的 loader 个数
+    count: usize,
+}
+
 /// 计算要注入主服务器的 `NODE_OPTIONS`：`--require "<正斜杠路径>"` 逐个拼接。
 ///
 /// 现役版还会把「注入了几个 loader / 跳过了哪个模组」写进启动器日志，
 /// Rust 侧暂时只做注入（没有启动器日志写入通道），跳过理由仍可从 `mods:plan` 读到。
-fn mods_loader_node_options(root: &Path, runtime: &crate::runtime::RuntimePaths) -> Option<String> {
+fn mods_loader_injection(root: &Path, runtime: &crate::runtime::RuntimePaths) -> LoaderInjection {
     let plan = crate::mods::plan::plan_loaders(root, runtime);
     let paths: Vec<String> = plan
         .get("paths")
@@ -376,7 +633,10 @@ fn mods_loader_node_options(root: &Path, runtime: &crate::runtime::RuntimePaths)
         })
         .unwrap_or_default();
     if paths.is_empty() {
-        return None;
+        return LoaderInjection {
+            node_options: None,
+            count: 0,
+        };
     }
     let require_args = paths
         .iter()
@@ -389,19 +649,23 @@ fn mods_loader_node_options(root: &Path, runtime: &crate::runtime::RuntimePaths)
         .filter(|part| !part.trim().is_empty())
         .collect::<Vec<_>>()
         .join(" ");
-    Some(combined)
+    LoaderInjection {
+        node_options: Some(combined),
+        count: paths.len(),
+    }
 }
 async fn start_market_server(app: &AppHandle) -> Result<Value, String> {
     let state = app.state::<AppState>();
     let root = state.repo_root();
 
-    if health::tcp_alive(40110).await {
+    let port = crate::config::DEFAULT_MARKET_PORT;
+    if health::tcp_alive(port).await {
         set_state(
             app,
             MARKET_SERVER,
             "running",
             None,
-            Some("端口 40110 已监听（外部已启动）".to_string()),
+            Some(format!("端口 {port} 已监听（外部已启动）")),
         );
         return Ok(json!({ "ok": true, "reason": "already-running" }));
     }
@@ -431,10 +695,13 @@ async fn start_market_server(app: &AppHandle) -> Result<Value, String> {
         MARKET_SERVER,
         "starting",
         Some(pid),
-        Some(format!("已启动（PID {pid}），等待 40110 端口…")),
+        Some(format!("已启动（PID {pid}），等待 {port} 端口…")),
     );
 
-    if health::wait_port(40110, 30_000, 500).await {
+    // 市场服务是独立 exe，30s 够它监听（现役版也是 30s）；这里多的是「早死早报」：
+    // 进程退出就立刻失败，不再空等满 30s 才说一句笼统的「启动超时」。
+    let outcome = health::wait_port_until(port, 30_000, 500, || crate::win32::alive(pid)).await;
+    if outcome == health::PortWait::Ready {
         set_state(
             app,
             MARKET_SERVER,
@@ -444,15 +711,15 @@ async fn start_market_server(app: &AppHandle) -> Result<Value, String> {
         );
         Ok(json!({ "ok": true, "reason": "ok", "pid": pid }))
     } else {
+        // 先取退出码再收树：stop_tree 会顺手清掉 PTY 里记的那一份
+        let message = if outcome == health::PortWait::Exited {
+            exited_head(app, MARKET_SERVER, "市场服务", pid)
+        } else {
+            format!("启动超时：{port} 未在 30s 内监听")
+        };
         stop_tree(app, MARKET_SERVER);
-        set_state(
-            app,
-            MARKET_SERVER,
-            "error",
-            None,
-            Some("启动超时：40110 未在 30s 内监听".to_string()),
-        );
-        Err("市场服务启动超时（40110 端口 30s 未监听）".to_string())
+        set_state(app, MARKET_SERVER, "error", None, Some(message.clone()));
+        Err(message)
     }
 }
 
@@ -1197,7 +1464,7 @@ mod tests {
 
     /// 模组 loader 注入：路径必须是正斜杠 + 双引号（NODE_OPTIONS 会把反斜杠当转义吃掉）
     #[test]
-    fn loader_node_options_uses_forward_slashes_and_quotes() {
+    fn loader_injection_uses_forward_slashes_and_quotes_and_counts_loaders() {
         let root = std::env::temp_dir().join(format!("evejs-loader-env-{}", iso_log_stamp()));
         let repo = root.join("repo");
         let mods = repo.join("mods");
@@ -1207,11 +1474,9 @@ mod tests {
         std::fs::create_dir_all(&runtime.cache).unwrap();
 
         std::fs::create_dir_all(&mods).unwrap();
-        assert_eq!(
-            mods_loader_node_options(&repo, &runtime),
-            None,
-            "没有模组时不应注入"
-        );
+        let empty = mods_loader_injection(&repo, &runtime);
+        assert_eq!(empty.node_options, None, "没有模组时不应注入");
+        assert_eq!(empty.count, 0, "没有模组时 loader 数为 0");
 
         let dir = mods.join("demo");
         std::fs::create_dir_all(&dir).unwrap();
@@ -1231,7 +1496,9 @@ mod tests {
         )
         .unwrap();
 
-        let options = mods_loader_node_options(&repo, &runtime).expect("应注入一个 loader");
+        let single = mods_loader_injection(&repo, &runtime);
+        assert_eq!(single.count, 1, "注入个数要跟着 paths 走：预算靠它放大");
+        let options = single.node_options.expect("应注入一个 loader");
         assert!(options.contains("--require \""), "{options}");
         assert!(options.contains("/mods/demo/loader.js\""), "{options}");
         assert!(
@@ -1254,5 +1521,42 @@ mod tests {
         // 未配置 CA 时不得设置证书变量，避免把不存在的路径塞给客户端
         assert!(!env.contains_key("SSL_CERT_FILE"));
         assert_eq!(env["EVEJS_NO_PROXY"], "127.0.0.1,localhost,::1");
+    }
+
+    /// 启动预算：60s 基价 + 每 loader 3s，封顶 180s（20 个模组 = 120s）
+    #[test]
+    fn main_start_budget_grows_with_mods_and_is_capped() {
+        assert_eq!(main_start_budget_ms(0), 60_000);
+        assert_eq!(main_start_budget_ms(1), 63_000);
+        assert_eq!(main_start_budget_ms(20), 120_000);
+        assert_eq!(main_start_budget_ms(40), 180_000);
+        assert_eq!(main_start_budget_ms(500), 180_000);
+    }
+
+    /// 启动进度文案：要带秒数、预算与模组个数；超预算的口吻是「还在等」，不是「失败」
+    #[test]
+    fn start_progress_message_reports_mods_and_overrun() {
+        let text = start_progress_message(45_000, 120_000, 20, false);
+        assert!(text.contains("45s"), "{text}");
+        assert!(text.contains("120s"), "{text}");
+        assert!(text.contains("20 个模组"), "{text}");
+
+        let over = start_progress_message(130_000, 120_000, 20, true);
+        assert!(over.contains("已超出 120s 预算"), "{over}");
+        assert!(!over.contains("失败"), "还在等就不能写成失败：{over}");
+
+        let plain = start_progress_message(3_000, 60_000, 0, false);
+        assert!(plain.contains("正在启动服务端"), "{plain}");
+        assert!(!plain.contains("模组"), "没模组就别提模组：{plain}");
+    }
+
+    /// 日志行压长：toast 放不下整段堆栈，但也不能把短行改了
+    #[test]
+    fn shorten_line_keeps_short_lines_and_cuts_long_ones() {
+        assert_eq!(shorten_line("short"), "short");
+        let long = "字".repeat(300);
+        let cut = shorten_line(&long);
+        assert_eq!(cut.chars().count(), 161);
+        assert!(cut.ends_with('…'));
     }
 }

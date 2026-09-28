@@ -1,5 +1,6 @@
 import { FolderOpen, Loader2, RefreshCw, Search, Upload, X } from "lucide-react"
 
+import { t } from "@/lib/i18n"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -141,7 +142,7 @@ export function ModToolbar({
         <button
           type="button"
           onClick={() => onTagChange?.(null)}
-          title={`取消「${tag}」标签筛选`}
+          title={t("取消「{tag}」标签筛选", { tag })}
           className={cn(
             "flex items-center gap-1 rounded-sm border border-primary/55 bg-primary/10 px-2 py-1 text-[11px] text-primary transition-colors",
             "hover:border-primary/80 hover:bg-primary/15 focus-visible:outline-none focus-visible:shadow-focus"

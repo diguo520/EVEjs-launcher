@@ -2,6 +2,7 @@ import { useMemo, useState } from "react"
 
 import { QA_ROWS } from "@/lib/manual-data"
 import { buildItemCommand, displayName, filterQa } from "@/lib/manual-logic"
+import { t } from "@/lib/i18n"
 import {
   CopyButton,
   EmptyHint,
@@ -70,7 +71,7 @@ export function QaPanel() {
                 <CopyButton
                   text={buildItemCommand(it.nameEn, qty)}
                   label="发放"
-                  message={`已复制 · ${it.nameEn} × ${qty}`}
+                  message={t("已复制 · {name} × {qty}", { name: it.nameEn, qty })}
                   className="h-6 px-1.5 text-[11px]"
                 />
               </RefCardFoot>

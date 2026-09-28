@@ -3,6 +3,7 @@ import { useMemo, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { useManualData } from "@/hooks/use-manual-data"
 import { MANUAL_META } from "@/lib/manual-data"
+import { t } from "@/lib/i18n"
 import {
   buildNpcCommand,
   countBy,
@@ -120,7 +121,7 @@ export function NpcPanel() {
                 <CopyButton
                   text={buildNpcCommand(n.key, qty)}
                   label="刷怪"
-                  message={`已复制 · ${n.nameEn} × ${qty}`}
+                  message={t("已复制 · {name} × {qty}", { name: n.nameEn, qty })}
                   className="h-6 px-1.5 text-[11px]"
                 />
               </RefCardFoot>

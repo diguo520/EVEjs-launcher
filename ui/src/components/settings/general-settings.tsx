@@ -5,6 +5,7 @@ import { Panel } from "@/components/common/panel"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { startMarketOf } from "@/lib/config-map"
+import { t } from "@/lib/i18n"
 import { callOr, hasIpc } from "@/lib/ipc"
 import type { RawAck, RawSettings } from "@/lib/ipc"
 
@@ -102,7 +103,7 @@ export function GeneralSettings() {
       toast.error("设置没能写入", { description: reply?.reason ?? "后端没说明原因" })
       return
     }
-    toast.success(`已${next ? "开启" : "关闭"}：${item.label}`, {
+    toast.success(next ? t("已开启：{label}", { label: item.label }) : t("已关闭：{label}", { label: item.label }), {
       description: next ? item.hint : "该项设置已停用，可随时重新开启。",
     })
   }
@@ -122,7 +123,9 @@ export function GeneralSettings() {
               {item.wired ? null : <Badge variant="secondary">未接</Badge>}
             </div>
             <p className="mt-0.5 text-[11px] leading-relaxed text-tertiary">
-              {item.wired ? item.hint : `${item.hint} · 现役后端还没有这个设置项`}
+              {item.wired
+                ? item.hint
+                : t("{hint} · 现役后端还没有这个设置项", { hint: item.hint })}
             </p>
           </div>
           <Switch
