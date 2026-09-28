@@ -48,7 +48,7 @@ import {
   type NewModError,
   type NewModInput,
 } from "@/lib/mod-logic"
-import { isServerRootValid, type ModEntry } from "@/lib/mock"
+import type { ModEntry } from "@/lib/mock"
 import { cn } from "@/lib/utils"
 
 /** 构建选项：三项都是开关，排成一行，跟骨架文件一起生成 */
@@ -115,6 +115,7 @@ export function ModFormDialog({
   existingIds,
   onSubmit,
   serverRoot,
+  rootOk,
   templates = [],
 }: {
   open: boolean
@@ -126,6 +127,8 @@ export function ModFormDialog({
   onSubmit: (input: NewModInput) => void
   /** 服务端根目录：模组目录相对它定位，指错了骨架就落错地方 */
   serverRoot: string
+  /** 服务端根目录是不是真的服务端（后端扫描器说了算，不在渲染层猜） */
+  rootOk: boolean
   /** 骨架模板：真值来自后端 `mods:templates`，后端缺席时退回内置兜底 */
   templates?: ModTemplateCard[]
 }) {
@@ -625,7 +628,7 @@ export function ModFormDialog({
                 <p className="text-[11px] leading-relaxed text-tertiary">
                   按「{picked.name}」模板生成 · {templateSizeLabel(picked)}
                 </p>
-                {isServerRootValid(serverRoot) ? null : (
+                {rootOk ? null : (
                   <p className="text-[11px] leading-relaxed text-destructive">
                     服务端根目录现在指向{" "}
                     <span className="tabular break-all">

@@ -595,12 +595,29 @@ pub fn create_mod(
         }
     }
 
-    // 默认禁用（loader.js.disabled）；只有明确勾了「立即启用」才改名
+    // 默认禁用（loader.js.disabled）；只有明确勾了「立即启用」才改名。
+    // 改名失败不吞：勾了「立即启用」却落成 loader.js.disabled，用户看到的就是
+    // 「明明勾了还生成 .disabled」——这种失败必须把原因带回渲染层（2026-09-28 报障）。
     if draft.get("enabled").and_then(Value::as_bool) == Some(true) {
-        let _ = fs::rename(
-            target.join(scan::LOADER_DISABLED),
-            target.join(scan::LOADER_ENABLED),
-        );
+        let disabled = target.join(scan::LOADER_DISABLED);
+        let enabled = target.join(scan::LOADER_ENABLED);
+        if let Err(err) = fs::rename(&disabled, &enabled) {
+            // 报错但文件其实已就位（杀软短暂占用之类）不算失败，先确认结果再下结论
+            if !enabled.is_file() {
+                let note = format!("模组已创建，但启用失败（{err}），文件仍是 loader.js.disabled");
+                let previous = result
+                    .get("reason")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_string();
+                let merged = if previous.is_empty() {
+                    note
+                } else {
+                    format!("{previous}；{note}")
+                };
+                result.insert("reason".to_string(), json!(merged));
+            }
+        }
     }
 
     Value::Object(result)
@@ -1086,6 +1103,42 @@ mod tests {
         // evejsVersion 不像版本号 → 不写 compatibility
         let manifest = fs::read_to_string(custom_dir.join(scan::MANIFEST_NAME)).unwrap();
         assert!(!manifest.contains("compatibility"));
+    }
+
+    /// 界面默认是「立即启用 + 立即签名」两个勾都打上（DEFAULT_BUILD_OPTIONS），
+    /// 所以这个组合必须单独钉住：先签名后改名的顺序不能反过来把启用弄丢。
+    #[test]
+    fn create_mod_enabled_and_signed_together() {
+        let root = temp_dir("create-enabled-signed");
+        let runtime = runtime_at(&root);
+        let repo = root.join("repo");
+        fs::create_dir_all(&repo).unwrap();
+
+        // 先在「作者身份」建好身份（等价界面里已经建过身份的用户）
+        let state = crate::author::get_state(&runtime);
+        assert_eq!(state["ok"], json!(true));
+
+        let mut both = draft("on-and-signed", "又启用又签名");
+        both["enabled"] = json!(true);
+        both["sign"] = json!(true);
+        let result = create_mod(&repo, &both, "0.12.8", &runtime);
+        assert_eq!(result["ok"], json!(true), "{result}");
+        assert_eq!(result["signed"], json!(true), "{result}");
+        assert!(result["reason"].is_null(), "{result}");
+
+        let dir = repo.join("mods").join("on-and-signed");
+        assert!(dir.join(scan::LOADER_ENABLED).is_file());
+        assert!(!dir.join(scan::LOADER_DISABLED).exists());
+
+        // 签名块要覆盖「已经改名后的清单」，扫描器必须认它是有效的
+        let record = scan::read_mod_dir("on-and-signed", &dir);
+        assert!(record.valid, "{}", record.error);
+        assert!(record.enabled);
+        assert_eq!(
+            record.signature_state, "valid",
+            "{}",
+            record.signature_error
+        );
     }
 
     #[test]
