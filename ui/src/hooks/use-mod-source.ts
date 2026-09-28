@@ -266,8 +266,9 @@ export function useModSource(): ModSourceState {
   }, [ipc])
 
   const mods = useMemo(
-    () => buildMods({ list, market, mine }),
-    [list, market, mine]
+    // 提交台账也带上：详情页的「版本历史」在索引更新前只能靠作者的逐版本记录
+    () => buildMods({ list, market, mine, submissions: submissions?.items }),
+    [list, market, mine, submissions]
   )
 
   const marketById = useMemo(() => {

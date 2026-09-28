@@ -295,55 +295,67 @@ export function ModDetailDialog({
             ) : null}
 
             <Section title="功能说明">
-              <div className="space-y-2">
-                {paragraphs.map((paragraph) => (
-                  <p
-                    key={paragraph.slice(0, 12)}
-                    className="text-[12px] leading-relaxed text-muted-foreground"
-                  >
-                    {paragraph}
-                  </p>
-                ))}
-              </div>
+              {paragraphs.length > 0 ? (
+                <div className="space-y-2">
+                  {paragraphs.map((paragraph) => (
+                    <p
+                      key={paragraph.slice(0, 12)}
+                      className="text-[12px] leading-relaxed text-muted-foreground"
+                    >
+                      {paragraph}
+                    </p>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[12px] leading-relaxed text-muted-foreground">
+                  还没有填写功能说明。
+                </p>
+              )}
             </Section>
 
             <Section icon={<History className="size-3.5 text-tertiary" />} title="版本历史">
-              <ol className="space-y-3">
-                {mod.changelog.map((entry) => (
-                  <li
-                    key={entry.version}
-                    className="relative border-l border-input pl-3"
-                  >
-                    <span
-                      className={cn(
-                        "absolute -left-[3px] top-1.5 size-1.5 rounded-full",
-                        entry.version === mod.version ? "bg-primary" : "bg-border"
-                      )}
-                    />
-                    <div className="flex flex-wrap items-baseline gap-2">
-                      <span className="tabular text-[12px] font-semibold text-foreground">
-                        {entry.version}
-                      </span>
-                      <span className="tabular text-[10px] text-tertiary">
-                        {entry.date}
-                      </span>
-                      {entry.version === mod.version ? (
-                        <Badge variant="default">当前版本</Badge>
-                      ) : null}
-                    </div>
-                    <ul className="mt-1 space-y-0.5">
-                      {entry.items.map((item) => (
-                        <li
-                          key={item}
-                          className="text-[11px] leading-relaxed text-muted-foreground"
-                        >
-                          · {item}
-                        </li>
-                      ))}
-                    </ul>
-                  </li>
-                ))}
-              </ol>
+              {mod.changelog.length > 0 ? (
+                <ol className="space-y-3">
+                  {mod.changelog.map((entry) => (
+                    <li
+                      key={entry.version}
+                      className="relative border-l border-input pl-3"
+                    >
+                      <span
+                        className={cn(
+                          "absolute -left-[3px] top-1.5 size-1.5 rounded-full",
+                          entry.version === mod.version ? "bg-primary" : "bg-border"
+                        )}
+                      />
+                      <div className="flex flex-wrap items-baseline gap-2">
+                        <span className="tabular text-[12px] font-semibold text-foreground">
+                          {entry.version}
+                        </span>
+                        <span className="tabular text-[10px] text-tertiary">
+                          {entry.date}
+                        </span>
+                        {entry.version === mod.version ? (
+                          <Badge variant="default">当前版本</Badge>
+                        ) : null}
+                      </div>
+                      <ul className="mt-1 space-y-0.5">
+                        {entry.items.map((item) => (
+                          <li
+                            key={item}
+                            className="text-[11px] leading-relaxed text-muted-foreground"
+                          >
+                            · {item}
+                          </li>
+                        ))}
+                      </ul>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <p className="text-[12px] leading-relaxed text-muted-foreground">
+                  暂无版本历史
+                </p>
+              )}
             </Section>
 
             {/* 评价最长，放在版本历史后面：先看完这个模组本身，再看别人怎么说 */}

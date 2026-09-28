@@ -260,7 +260,8 @@ fn contains_ignore_case(haystack: &str, needle: &str) -> bool {
 /// 从 `mods/<id>/README.md` 里抽出上架用的正文：
 /// 创建模组时生成的 README 有「## 功能要点」与「## 详细介绍」两段 ——
 /// 前者去重后进 highlights，后者按空行拆成段落进 readme；没有标题的手写 README 则整篇当正文。
-fn readme_for_listing(repo_root: &Path, folder: &str) -> (Vec<String>, Vec<String>) {
+/// `mods:list` 也调它：作者改完 README 要能在详情里立刻看到，不必等索引刷新。
+pub(crate) fn readme_for_listing(repo_root: &Path, folder: &str) -> (Vec<String>, Vec<String>) {
     let safe = sanitize_folder_name(folder);
     let safe = if safe.is_empty() {
         folder.to_string()

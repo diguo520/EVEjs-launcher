@@ -893,7 +893,7 @@ export function parseLines(raw: string): string[] {
 }
 
 /** README 里功能要点那一段的标题与条目前缀，写和读都用同一套 */
-const FEATURES_HEADING = "功能要点"
+export const FEATURES_HEADING = "功能要点"
 const FEATURE_BULLET = "· "
 
 /**

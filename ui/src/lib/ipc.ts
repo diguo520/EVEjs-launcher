@@ -379,6 +379,10 @@ export interface RawMod {
   sourceRepo: string
   sourceVersion: string
   updatedAt: number
+  /** README 正文段落（后端与上架同一套解析，作者改完立刻可见） */
+  readme?: string[]
+  /** README 里「功能要点」的条目 */
+  highlights?: string[]
   readmePath?: string
   manifestPath?: string
 }
@@ -415,6 +419,8 @@ export interface RawMarketMod {
   featured?: boolean
   publishedAt?: string
   changelog?: string
+  /** 更早版本的历史（上一版提交过才会有；现役版恒为 []） */
+  history?: { version?: string; changelog?: string; at?: number }[]
   evejsVersions?: string[]
   readme?: string[]
   highlights?: string[]
