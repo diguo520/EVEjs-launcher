@@ -156,3 +156,36 @@ export function hasEntry(code: LocaleCode, text: string): boolean {
 export function catalogSize(code: LocaleCode): number {
   return code === "zh" ? 0 : Object.keys(CATALOGS[code] ?? {}).length
 }
+
+/**
+ * 当前生效的语言（模块级）。
+ *
+ * 静态文案由 `LocaleBridge` 自动翻；**带插值的动态文案**（`索引 {0} 条`）必须显式调用
+ * `t()` —— 那类文本 React 会拆成多个节点，桥没法在不破坏节点的前提下改写。
+ * React 组件里优先用 `useLocale().t`（换语言会重渲染）；事件回调、日志生成、toast
+ * 这类不在渲染期跑的代码用这里导出的 `t()`。
+ */
+let activeLocale: LocaleCode = "zh"
+
+/** 由 `LocaleProvider` 在渲染期同步；默认中文（zh）＝原文，未接提供者时行为不变 */
+export function setActiveLocale(code: LocaleCode): void {
+  activeLocale = code
+}
+
+export function getActiveLocale(): LocaleCode {
+  return activeLocale
+}
+
+/** 取一条**当前语言**的文案（`{name}` 占位符按 vars 替换）；目录缺条目回退中文原文 */
+export function t(text: string, vars?: Record<string, string | number>): string {
+  return translate(activeLocale, text, vars)
+}
+
+/**
+ * 列表分隔符：中文用顿号，其余语言用逗号。
+ *
+ * 纯排版，不进目录 —— 顿号是中文标点，英文 / 日文界面里冒出来很突兀。
+ */
+export function listSeparator(): string {
+  return activeLocale === "zh" ? "、" : ", "
+}

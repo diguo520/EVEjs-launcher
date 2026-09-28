@@ -3,6 +3,7 @@ import { ChevronDown, ChevronUp, Copy, Loader2, Search } from "lucide-react"
 import { toast } from "sonner"
 
 import { cn, copyText } from "@/lib/utils"
+import { t } from "@/lib/i18n"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
@@ -406,7 +407,7 @@ export function EmptyHint({ text }: { text: string }) {
 export function LoadingHint({ failed = false, label }: { failed?: boolean; label: string }) {
   if (failed) {
     return (
-      <EmptyHint text={`${label}加载失败，切到别的标签页再回来可重试`} />
+      <EmptyHint text={t("{label}加载失败，切到别的标签页再回来可重试", { label })} />
     )
   }
   return (

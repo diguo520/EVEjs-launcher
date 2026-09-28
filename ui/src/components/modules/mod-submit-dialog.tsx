@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react"
+import { t } from "@/lib/i18n"
 import {
   Check,
   FileCheck2,
@@ -34,6 +35,7 @@ import {
   cooldownText,
   credentialLabel,
   hasOwnSignature,
+  intervalText,
   isCredentialLive,
   packageFileName,
   publishBlockers,
@@ -155,6 +157,8 @@ export interface ModSubmitDialogProps {
   credential: PublishCredential | null
   /** 这个模组距上次提交还差多少毫秒（0＝可以提交）：同一模组两次提交至少间隔 30 分钟 */
   cooldownRemaining: (modId: string) => number
+  /** 距上一次发布走完还差多少毫秒（0＝可以发布）：两次发布之间至少间隔 60 秒 */
+  intervalRemainingMs: number
   /** 已经有源码仓库的模组 id：第一次提交要先建仓库，之后只推新版本 */
   sourceRepos: string[]
   /** 缺署名或令牌时，就地打开「作者身份」去补 */
@@ -188,6 +192,7 @@ export function ModSubmitDialog({
   credential,
   sourceRepos,
   cooldownRemaining,
+  intervalRemainingMs,
   onOpenAuthor,
   onPublish,
   progress,
@@ -221,12 +226,15 @@ export function ModSubmitDialog({
     name: authorName,
     now,
     cooldownMs,
+    intervalMs: intervalRemainingMs,
   })
   const ready = blockers.length === 0
-  const blockerHint = (id: "signature" | "token" | "cooldown") =>
+  const blockerHint = (id: "signature" | "token" | "cooldown" | "interval") =>
     blockers.find((item) => item.id === id)?.hint
-  /** 「还差 X、Y」只提需要用户去补的项：冷却只能等，不能补 */
-  const gateLabels = blockers.filter((item) => item.id !== "cooldown").map((item) => item.label)
+  /** 「还差 X、Y」只提需要用户去补的项：冷却与发布间隔只能等，不能补 */
+  const gateLabels = blockers
+    .filter((item) => item.id !== "cooldown" && item.id !== "interval")
+    .map((item) => item.label)
 
   const target = useMemo(
     () => candidates.find((mod) => mod.id === targetId) ?? null,
@@ -449,7 +457,7 @@ export function ModSubmitDialog({
                     ready ? "text-success" : "text-warning"
                   )}
                 >
-                  {ready ? "都已就绪" : `还差 ${blockers.length} 项`}
+                  {ready ? "都已就绪" : t("还差 {count} 项", { count: blockers.length })}
                 </span>
               </div>
 
@@ -494,6 +502,15 @@ export function ModSubmitDialog({
                   <span>
                     距上次提交不到 30 分钟：同一个模组两次提交至少间隔 30 分钟，
                     {cooldownText(cooldownMs)}再试。
+                  </span>
+                </p>
+              ) : null}
+              {intervalRemainingMs > 0 ? (
+                <p className="flex items-start gap-1.5 text-[10px] leading-relaxed text-warning">
+                  <Timer className="mt-px size-3 shrink-0" />
+                  <span>
+                    距上次发布不到 60 秒：两次发布之间至少间隔 60 秒，
+                    {intervalText(intervalRemainingMs)}再试。
                   </span>
                 </p>
               ) : null}
@@ -559,8 +576,8 @@ export function ModSubmitDialog({
                 <TriangleAlert className="mt-px size-3.5 shrink-0" />
                 <span>
                   {gateLabels.length > 0
-                    ? `还差${gateLabels.join("、")}，补齐后才能发布。`
-                    : "提交太频繁了：同一个模组两次提交至少间隔 30 分钟，稍后再来。"}
+                    ? t("还差{list}，补齐后才能发布。", { list: gateLabels.join("、") })
+                    : (blockers[0]?.hint ?? "现在还不能发布，稍后再来。")}
                 </span>
               </p>
             )}
@@ -633,7 +650,10 @@ export function ModSubmitDialog({
 
               <p className="flex items-center gap-1.5 text-[11px] text-tertiary">
                 <KeyRound className="size-3.5 shrink-0 text-success" />
-                {`源码用 ${credText} 推送到 ${sourceRepo(target.id)}`}
+                {t("源码用 {cred} 推送到 {repo}", {
+                  cred: credText,
+                  repo: sourceRepo(target.id),
+                })}
               </p>
               <p className="flex items-center gap-1.5 text-[11px] text-tertiary">
                 <FileCheck2 className="size-3.5 shrink-0" />

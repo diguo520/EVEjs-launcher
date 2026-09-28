@@ -64,14 +64,23 @@ const MARKET_CACHE = "cache/mod-index.json";
  * 索引（两条镜像，单镜像 8s、总预算 12s）。本机实测：连不带任何场景的只读自检都会因此生成
  * userdata/cache/mod-index.json。不预置的话 E2E 就变成「网络相关 + 计时竞态」的测试：索引抢在
  * 进程被杀之前拉到/没拉到，会让沙箱里多/少一个文件，两轮指纹永远对不上。
- * 预置之后命中 30 分钟 TTL 缓存（fetch_mod_index 走 source=cache 分支），全程不出网。
+ * 预置之后命中 TTL 缓存（fetch_mod_index 走 source=cache 分支），全程不出网。
+ *
+ * ⚠️ 时间戳故意写成**未来**：TTL 是可调参数（2026-09-28 从 30 分钟降到 2 分钟），写成
+ * `now` 的话，跑得久的那一轮中途就过期 → 渲染层静默出网重拉 → 「本轮没有出网」随机变红。
+ * 写成未来值后 Δ 为负，Rust 的 saturating_sub 与前端 `Date.now() - fetchedAt` 都判成
+ * 「新鲜」，沙箱的密闭性就不再绑死在某个 TTL 数值上。
  */
 export function seedMarketIndexCache(userdataDir, now = Date.now()) {
   const file = path.join(userdataDir, ...MARKET_CACHE.split("/"));
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(
     file,
-    JSON.stringify({ fetchedAt: now, index: { schemaVersion: 1, mods: [] } }, null, 2) + "\n",
+    JSON.stringify(
+      { fetchedAt: now + 24 * 60 * 60 * 1000, index: { schemaVersion: 1, mods: [] } },
+      null,
+      2,
+    ) + "\n",
     "utf8",
   );
   return file;

@@ -3,6 +3,7 @@ import { toast } from "sonner"
 import { Copy, FolderOpen, RefreshCw, ScrollText } from "lucide-react"
 
 import { cn, copyText } from "@/lib/utils"
+import { t } from "@/lib/i18n"
 import { Panel } from "@/components/common/panel"
 import { Button } from "@/components/ui/button"
 import { LauncherUpdateDialog } from "@/components/shell/launcher-update-dialog"
@@ -60,7 +61,7 @@ export function AboutPanel() {
     <Panel
       tag="// ABOUT"
       title="关于"
-      meta={`通道 ${LAUNCHER_META.channel}`}
+      meta={t("通道 {channel}", { channel: LAUNCHER_META.channel })}
     >
       <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
         {fields.map((f) => (

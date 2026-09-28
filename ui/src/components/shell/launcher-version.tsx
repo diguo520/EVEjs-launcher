@@ -1,5 +1,6 @@
 import * as React from "react"
 
+import { useLocale } from "@/components/shell/locale-provider"
 import {
   call,
   callOr,
@@ -9,7 +10,7 @@ import {
   type RawUpdateCheck,
   type RawUpdateState,
 } from "@/lib/ipc"
-import { releaseNotesFrom } from "@/lib/release-notes"
+import { changelogLanguage, releaseNotesFrom } from "@/lib/release-notes"
 import { LAUNCHER_META, type ReleaseNoteGroup } from "@/lib/mock"
 
 export interface LauncherVersionValue {
@@ -82,6 +83,7 @@ const LauncherVersionContext = React.createContext<LauncherVersionValue>(FALLBAC
  * （清单 `update-manifest.json` 里的 `{ zh, en }`），见 lib/release-notes.ts。
  */
 export function useLauncherVersionState(): LauncherVersionValue {
+  const { locale } = useLocale()
   const live = hasIpc()
   const [update, setUpdate] = React.useState<RawUpdateState | null>(null)
   const [info, setInfo] = React.useState<RawAppInfo | null>(null)
@@ -130,9 +132,11 @@ export function useLauncherVersionState(): LauncherVersionValue {
     update?.state === "installing"
   const progress = Math.max(0, Math.min(100, Number(update?.percent ?? 0)))
 
+  // 更新说明按界面语言取：中文看 changelog.zh，其余语言看 changelog.en
   const notes = React.useMemo(
-    () => (check?.changelog ? releaseNotesFrom(check.changelog) : []),
-    [check]
+    () =>
+      check?.changelog ? releaseNotesFrom(check.changelog, changelogLanguage(locale)) : [],
+    [check, locale]
   )
   const sizeText = formatSize(Number(check?.size ?? 0))
   const releaseDate = typeof check?.date === "string" ? check.date : ""

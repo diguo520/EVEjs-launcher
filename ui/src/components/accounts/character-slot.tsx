@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { useLocale } from "@/components/shell/locale-provider"
 import { cn } from "@/lib/utils"
 import {
   GENDER_LABEL,
@@ -94,6 +95,7 @@ export function CharacterSlot({
   onDelete: (accountId: string, character: Character) => void
   onCreate: (accountId: string) => void
 }) {
+  const { t } = useLocale()
   if (!character) {
     const guard = canCreateInGame(account)
     const stepIndex = creatingStep ? IN_GAME_STEP_ORDER.indexOf(creatingStep) : -1
@@ -142,7 +144,9 @@ export function CharacterSlot({
         ) : (
           <span className="px-1 text-[10px] leading-relaxed text-tertiary">
             {guard.ok
-              ? `角色在游戏内创建 · 该账号还有 ${MAX_CHARACTERS_PER_ACCOUNT - account.characters.length} 个空槽`
+              ? t("角色在游戏内创建 · 该账号还有 {count} 个空槽", {
+                  count: MAX_CHARACTERS_PER_ACCOUNT - account.characters.length,
+                })
               : guard.reason}
           </span>
         )}
@@ -156,7 +160,10 @@ export function CharacterSlot({
     race?.name,
     character.bloodline,
     character.gender ? GENDER_LABEL[character.gender] : undefined,
-  ].filter((part): part is string => Boolean(part))
+  ]
+    .filter((part): part is string => Boolean(part))
+    // 逐项过一遍词典：种族 / 血统 / 性别都是独立条目，拼起来的一整句反而查不到
+    .map((part) => t(part))
   /** 角色所在星系：服务端给的是「星系 · 停靠点」，这里只要星系 */
   const system = character.system ?? character.location
   const guard = canLogin(account, character)
@@ -186,7 +193,7 @@ export function CharacterSlot({
             ) : null}
           </div>
           <div className="mt-0.5 truncate text-[11px] text-muted-foreground">
-            {traits.length > 0 ? traits.join(" · ") : "种族资料未记录"}
+            {traits.length > 0 ? traits.join(" · ") : t("种族资料未记录")}
           </div>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             <Badge variant="secondary">{character.ship}</Badge>
@@ -195,7 +202,7 @@ export function CharacterSlot({
             </span>
             {onlineFor ? (
               <Badge variant="success" className="tabular">
-                在线 {onlineFor}
+                {t("在线 {duration}", { duration: onlineFor })}
               </Badge>
             ) : null}
           </div>
@@ -210,7 +217,7 @@ export function CharacterSlot({
                 base={imagesBaseUrl}
                 kind="corporations"
                 id={character.corporationId}
-                label={character.corporationName ?? `军团 ${character.corporationId}`}
+                label={character.corporationName ?? t("军团 {id}", { id: character.corporationId })}
               />
             ) : null}
             {character.allianceId ? (
@@ -219,7 +226,7 @@ export function CharacterSlot({
                 base={imagesBaseUrl}
                 kind="alliances"
                 id={character.allianceId}
-                label={character.allianceName ?? `联盟 ${character.allianceId}`}
+                label={character.allianceName ?? t("联盟 {id}", { id: character.allianceId })}
               />
             ) : null}
           </div>

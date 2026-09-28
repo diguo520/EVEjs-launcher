@@ -48,7 +48,7 @@ export function TopBar({
 }) {
   const clock = useClock()
   const { version } = useLauncherVersion()
-  const { locale, setLocale, languages } = useLocale()
+  const { locale, setLocale, languages, t } = useLocale()
 
   return (
     // data-tauri-drag-region="deep"：整条顶栏都能拖着走窗口（窗口无系统边框，
@@ -156,7 +156,7 @@ export function TopBar({
                 <div className="rounded-md border border-border bg-white p-1.5">
                   <img
                     src={channel.src}
-                    alt={`${channel.label}收款码`}
+                    alt={t("{label}收款码", { label: channel.label })}
                     className="h-40 w-full rounded-sm object-contain"
                   />
                 </div>
@@ -194,7 +194,7 @@ export function TopBar({
             onClick={() => {
               // 窗口无系统边框（tauri.conf.json decorations:false），这三个按钮是唯一的窗口控制入口
               void call(action).catch(() =>
-                toast.info(`${label}：当前不在启动器窗口里`)
+                toast.info(t("{label}：当前不在启动器窗口里", { label }))
               )
             }}
           >

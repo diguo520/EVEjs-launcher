@@ -88,6 +88,27 @@ export const SERVICE_STATE_LABEL: Record<ServiceState, string> = {
 
 export type LogLevel = "INFO" | "WARN" | "ERROR" | "DEBUG"
 
+/**
+ * 日志正文的「可重翻」表示。
+ *
+ * 日志行是**快照**：正文在生成那一刻就拼成了字符串，切语言时它不会跟着变 ——
+ * 2026-09-29 报障的「启动横幅一直是中文」就是这么来的。带 `parts` 的行由面板在
+ * 渲染期按当前语言重算（见 lib/log-logic.ts 的 `renderLogLines`）。
+ */
+export type LogSegment = string | LogTemplate
+
+/** 带插值的一段文案：`key` 是中文原文（目录键），`vars` 是要填进去的值 */
+export interface LogTemplate {
+  key: string
+  /**
+   * 插值：字符串 / 数字**原样**（模组名、路径这类数据）、字符串数组按当前语言的
+   * 列表分隔符拼、模板对象再按当前语言翻一层（如「结构不合法」这类固定说法）。
+   */
+  vars?: Record<string, LogVar>
+}
+
+export type LogVar = string | number | string[] | LogTemplate
+
 export interface LogLine {
   id: number
   t: string
@@ -96,6 +117,8 @@ export interface LogLine {
   msg: string
   /** 行首的小徽标（如模组行的 MOD）：渲染成方括号标签，不占正文 */
   badge?: string
+  /** 可重翻的正文片段；没有就是死文本（服务端原始输出、解析回来的日志文件行） */
+  parts?: LogSegment[]
 }
 
 export const LOG_SOURCES = [
@@ -1244,4 +1267,3 @@ export function formatMB(mb: number): string {
   if (mb >= 1024) return `${(mb / 1024).toFixed(2)} GB`
   return `${mb.toFixed(1)} MB`
 }
-

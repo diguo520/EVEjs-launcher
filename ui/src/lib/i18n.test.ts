@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest"
 
+import de from "@/locales/de.json"
+import en from "@/locales/en.json"
+import fr from "@/locales/fr.json"
+import ja from "@/locales/ja.json"
+import ko from "@/locales/ko.json"
+import nl from "@/locales/nl.json"
+import ru from "@/locales/ru.json"
 import {
   FALLBACK_LOCALE,
   LOCALES,
@@ -124,5 +131,62 @@ describe("i18n", () => {
   it("英语目录已落地（中文是源语言，不建目录）", () => {
     expect(catalogSize("zh")).toBe(0)
     expect(catalogSize("en")).toBeGreaterThan(500)
+  })
+
+  /**
+   * 目录**逐条对齐**：七种外文的键集合必须完全一致。
+   * 少一条就回退中文，用户看到的就是「切了语言还有中文」——2026-09-29 那次报障
+   * （日志区 / 环境自检 / 角色种族 / 指令手册 / 右下角提示）就是这类缺口攒出来的。
+   * 这里只比集合，不比译文：日语「保存」这类同形汉字译文与原文相同是正常的。
+   */
+  it("七种外文目录的键集合完全一致", () => {
+    const catalogs: Record<string, Record<string, string>> = { en, ja, ko, fr, de, nl, ru }
+    const reference = Object.keys(en).sort()
+    expect(reference.length).toBeGreaterThan(1000)
+    for (const [code, catalog] of Object.entries(catalogs)) {
+      expect(Object.keys(catalog).sort(), code).toEqual(reference)
+    }
+  })
+
+  /**
+   * 2026-09-29 补齐的那批文案：静态文案走翻译桥、带插值的走 `t()`，
+   * 两条路都要求目录里有条目。这里挑每个报障点各留一条，回归了当场就红。
+   */
+  it("这批报障文案在七种语言里都有条目", () => {
+    const keys = [
+      // 图1 日志区（启动横幅与已加载模组一行）
+      "[启动器] EvEJS Launcher {version} · EVEJS {evejs} · {platform}",
+      "[启动器] 已加载模组: 共 {total} 个 · 启用 {enabled} · 禁用 {disabled}{conflicts}",
+      // 图2/图3/图5 状态行
+      "{count} 张表已挂载{extra}",
+      " · 本表载入 {loaded} / {rows} 行",
+      "{count} 个文件 · 约 {size}",
+      "{count} 行 · 自动滚动",
+      // 图4 服务卡片
+      "{name} · 端口 {port}",
+      // 环境自检（Rust 侧重测读数 + 面板读数）
+      "server/node_modules 已就绪",
+      "release 二进制已构建",
+      "CA 证书就绪",
+      "{pass}/{total} 通过{extra}",
+      // 角色种族 / 血统
+      "加达里",
+      "德泰斯",
+      // 右下角提示
+      "已停用 {name}",
+      "账号名「{name}」已存在",
+      "删除账号 {name}",
+      // 2026-09-29 「作者身份」改名「令牌配置」＋系统页签里剩下的中文
+      "令牌配置",
+      "署名会印在模组的作者栏上，先在「令牌配置」里填上你自己的署名。",
+      "，打开「令牌配置」就能看到。",
+      "[启动器] GitHub 令牌: 未配置 · MOD制作者需要配置令牌，可在模组市场里设置",
+      "[启动器] {service} · {action}",
+      "一键启动序列开始 · 环境自检门禁通过",
+      "启动序列完成",
+    ]
+    for (const code of ["en", "ja", "ko", "fr", "de", "nl", "ru"] as const) {
+      for (const key of keys) expect(hasEntry(code, key), code + " · " + key).toBe(true)
+    }
   })
 })

@@ -29,8 +29,9 @@ import {
   startupBannerLines,
   type LogDraft,
 } from "@/lib/live"
-import { lineKey, overlapTail } from "@/lib/log-logic"
-import type { LogLevel, LogLine, Metric, Service } from "@/lib/mock"
+import { lineKey, overlapTail, renderSegments } from "@/lib/log-logic"
+import { t } from "@/lib/i18n"
+import type { LogLevel, LogLine, LogSegment, Metric, Service } from "@/lib/mock"
 
 /** 服务表 + 端口探针 + 资源读数：2s 一轮，够快又不至于把主进程叫醒太频繁 */
 const POLL_MS = 2000
@@ -40,6 +41,25 @@ const LOG_POLL_MS = 4000
 const MODS_POLL_MS = 6000
 /** 日志面板保留的最大行数（与现役版一致） */
 const MAX_LOGS = 400
+
+/**
+ * 功能启停日志用的服务名与动作名。
+ *
+ * 系统页签里写的是「[启动器] 主服务器 · 启动」这种人话，而不是卡片 id 与
+ * IPC 通道名（`node · serviceStart → mainServer`）—— 那两个是内部标识。
+ */
+const CARD_LABEL: Record<string, string> = {
+  node: "主服务器",
+  market: "市场服务",
+  images: "图片服务",
+  gateway: "网关代理",
+}
+
+const ACTION_LABEL: Record<"serviceStart" | "serviceStop" | "serviceRestart", string> = {
+  serviceStart: "启动",
+  serviceStop: "停止",
+  serviceRestart: "重启",
+}
 
 export interface DiskVolume {
   name: string
@@ -146,9 +166,21 @@ export function useLauncher(): LauncherState {
     })
   }, [])
 
+  /** 死文本一行：服务端原始输出这类内容没有译文，不参与重翻 */
   const appendLog = useCallback(
     (level: LogLevel, src: string, msg: string) => {
       appendLines([{ t: stamp(), level, src, msg }])
+    },
+    [appendLines]
+  )
+
+  /**
+   * 可重翻的一行：`msg` 是当前语言的快照，`parts` 留着切语言时重算。
+   * 日志行会一直留在面板上，只存快照的话切了语言就定格在旧语言（2026-09-29 报障）。
+   */
+  const appendParts = useCallback(
+    (level: LogLevel, src: string, parts: LogSegment[]) => {
+      appendLines([{ t: stamp(), level, src, msg: renderSegments(parts), parts }])
     },
     [appendLines]
   )
@@ -291,7 +323,9 @@ export function useLauncher(): LauncherState {
     })
 
     const offExit = subscribe("onTerminalExit", (_tabId, code) => {
-      appendLog("WARN", "node", `服务端进程已退出（code=${String(code)}）`)
+      appendParts("WARN", "node", [
+        { key: "服务端进程已退出（code={code}）", vars: { code: String(code) } },
+      ])
     })
 
     return () => {
@@ -315,24 +349,36 @@ export function useLauncher(): LauncherState {
     (cardId: string, action: "serviceStart" | "serviceStop" | "serviceRestart") => {
       const target = backendServiceId(cardId)
       if (!target) {
-        toast.info("这一项随主服务器进程启动", {
-          description: "图片服务与网关代理不是独立进程，启停请用主服务器那张卡或一键启动。",
+        toast.info(t("这一项随主服务器进程启动"), {
+          description: t("图片服务与网关代理不是独立进程，启停请用主服务器那张卡或一键启动。"),
         })
         return
       }
       setBusyId(cardId)
-      appendLog("INFO", "sys", `${cardId} · ${action} → ${target}`)
+      appendParts(
+        "INFO",
+        "sys",
+        [
+          {
+            key: "[启动器] {service} · {action}",
+            vars: {
+              service: { key: CARD_LABEL[cardId] ?? cardId },
+              action: { key: ACTION_LABEL[action] },
+            },
+          },
+        ]
+      )
       void call<unknown>(action, target)
         .catch((error: unknown) => {
           const message = error instanceof Error ? error.message : String(error)
-          toast.error("操作失败", { description: message })
+          toast.error(t("操作失败"), { description: message })
         })
         .finally(() => {
           window.setTimeout(() => setBusyId(null), 600)
           void refreshServices()
         })
     },
-    [appendLog, refreshServices]
+    [appendParts, refreshServices]
   )
 
   const startService = useCallback(
@@ -351,26 +397,35 @@ export function useLauncher(): LauncherState {
   /** 一键启动：后端 engage:start 会按「主服务器 → 市场服务（受启动选项控制）」的顺序拉起来 */
   const launchAll = useCallback(() => {
     setBusyId("all")
-    appendLog("INFO", "sys", "一键启动序列开始 · 环境自检门禁通过")
+    appendParts("INFO", "sys", ["一键启动序列开始 · 环境自检门禁通过"])
     void call<{ ok?: boolean; reason?: string }>("engageStart")
       .then((result) => {
         if (result && result.ok === false) {
-          appendLog("ERROR", "sys", `启动序列失败 · ${result.reason ?? "未知原因"}`)
-          toast.error("启动失败", { description: result.reason })
+          appendParts(
+            "ERROR",
+            "sys",
+            [
+              {
+                key: "启动序列失败 · {reason}",
+                vars: { reason: result.reason ?? { key: "未知原因" } },
+              },
+            ]
+          )
+          toast.error(t("启动失败"), { description: result.reason })
           return
         }
-        appendLog("INFO", "sys", "启动序列完成")
+        appendParts("INFO", "sys", ["启动序列完成"])
       })
       .catch((error: unknown) => {
         const message = error instanceof Error ? error.message : String(error)
-        appendLog("ERROR", "sys", `启动序列失败 · ${message}`)
-        toast.error("启动失败", { description: message })
+        appendParts("ERROR", "sys", [{ key: "启动序列失败 · {reason}", vars: { reason: message } }])
+        toast.error(t("启动失败"), { description: message })
       })
       .finally(() => {
         window.setTimeout(() => setBusyId(null), 800)
         void refreshServices()
       })
-  }, [appendLog, refreshServices])
+  }, [appendParts, refreshServices])
 
   const runningCount = useMemo(
     () => services.filter((s) => s.state === "running").length,

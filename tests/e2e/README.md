@@ -52,8 +52,10 @@ node tests/e2e/run.mjs --scenario config-settings      # config:* + settings:*
 场景的只读自检**都会因此生成 `userdata/cache/mod-index.json` —— 索引抢在进程被杀之前拉到/没拉到，会让
 沙箱里多/少一个文件，两轮指纹永远对不上。
 
-所以 `buildSandbox()` 会预置一份 `fetchedAt = 现在` 的空索引缓存：命中 30 分钟 TTL，走 `source=cache`
-分支，全程不出网。编排脚本还会断言这份缓存**没有被重写**（重写 = 本轮出网了 = 失败）。
+所以 `buildSandbox()` 会预置一份空索引缓存（`fetchedAt` 故意写成**未来** 24 小时）：无论 TTL 被调成
+多少，它都判成「新鲜」，走 `source=cache` 分支，全程不出网 —— 沙箱的密闭性不绑死在某个 TTL 数值上
+（2026-09-28 把 TTL 从 30 分钟降到 2 分钟后，写成 `now` 的长跑轮次就会中途过期出网）。
+编排脚本还会断言这份缓存**没有被重写**（重写 = 本轮出网了 = 失败）。
 
 ## 4. 一轮里都断言了什么
 

@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils"
+import { t } from "@/lib/i18n"
 import { StatusDot, type DotTone } from "@/components/common/status-dot"
 import { SERVICE_STATE_LABEL, type Service, type ServiceState } from "@/lib/mock"
 
@@ -27,7 +28,11 @@ export function ServiceChip({
     <button
       type="button"
       onClick={onClick}
-      title={`${service.name} · ${service.desc} · 端口 ${service.port}`}
+      title={t("{name} · {desc} · 端口 {port}", {
+        name: t(service.name),
+        desc: t(service.desc),
+        port: service.port,
+      })}
       className={cn(
         "inline-flex items-center gap-2 rounded-md border border-border bg-secondary/60 px-2.5 py-1.5 transition-colors",
         "hover:border-primary/45 hover:bg-secondary",

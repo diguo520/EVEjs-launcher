@@ -26,7 +26,9 @@ import type {
   RawServerLog,
   RawService,
 } from "@/lib/ipc"
-import { SERVICES } from "@/lib/mock"
+import { SERVICES, type LogLine } from "@/lib/mock"
+import { renderLogLines } from "@/lib/log-logic"
+import { getActiveLocale, setActiveLocale, translate } from "@/lib/i18n"
 
 /* ------------------------------ 服务端日志 ------------------------------ */
 
@@ -101,8 +103,8 @@ describe("portsOf", () => {
   })
 })
 
-function svc(id: string, state: string, pid?: number | null): RawService {
-  return { id, name: id, state, pid: pid ?? null }
+function svc(id: string, state: string, pid?: number | null, message?: string): RawService {
+  return { id, name: id, state, pid: pid ?? null, message }
 }
 
 const HEALTH_UP: RawHealth = { game: true, images: true, gateway: true, market: true }
@@ -174,6 +176,25 @@ describe("serviceCards", () => {
     // 主服务器在跑，但这两个端口还没起来 → 卡片必须是未启动，不能显示运行中
     expect(cards.find((c) => c.id === "images")!.state).toBe("ready")
     expect(cards.find((c) => c.id === "gateway")!.state).toBe("ready")
+  })
+
+  it("启动中 / 失败时用后端的实时文案当描述，运行中与未启动仍用静态描述", () => {
+    const starting = serviceCards(
+      [svc("mainServer", "starting", 1, "启动中 45s / 120s · 正在加载 20 个模组…")],
+      null,
+      null
+    )
+    expect(starting.find((c) => c.id === "node")!.desc).toContain("正在加载 20 个模组")
+
+    const failed = serviceCards([svc("mainServer", "error", null, "主服务器进程已退出（exit 1）")], null, null)
+    expect(failed.find((c) => c.id === "node")!.desc).toContain("exit 1")
+
+    // 「运行中（PID x）」这种后端文案没有信息量，别把静态描述顶掉
+    const running = serviceCards([svc("mainServer", "running", 1, "运行中（PID 1）")], null, null)
+    expect(running.find((c) => c.id === "node")!.desc).toBe("世界模拟 / 星图 / 战斗结算")
+
+    const idle = serviceCards([svc("mainServer", "idle", null, "已停止")], null, null)
+    expect(idle.find((c) => c.id === "node")!.desc).toBe("世界模拟 / 星图 / 战斗结算")
   })
 })
 
@@ -429,6 +450,28 @@ describe("startupBannerLines", () => {
     const lines = startupBannerLines({ app, token: null, market: null, at: 0 })
     expect(lines.some((l) => l.msg.includes("接管"))).toBe(true)
   })
+
+  it("每行都带可重翻片段：换语言重算后不再是中文快照", () => {
+    const lines: LogLine[] = startupBannerLines({
+      app: APP,
+      token: { hasToken: true, encrypted: true, path: "p" },
+      market: { ok: true, mods: [], cached: true },
+      at: 0,
+    }).map((line, index) => ({ ...line, id: index + 1 }))
+    expect(lines.every((line) => Array.isArray(line.parts) && line.parts.length > 0)).toBe(true)
+
+    const previous = getActiveLocale()
+    setActiveLocale("en")
+    try {
+      const translated = renderLogLines(lines)
+      expect(translated[1].msg).toBe(
+        translate("en", "[启动器] 仓库: {path}", { path: APP.repoRoot })
+      )
+      expect(translated[1].msg).not.toBe(lines[1].msg)
+    } finally {
+      setActiveLocale(previous)
+    }
+  })
 })
 
 function modOf(folder: string, extra: Partial<RawMod> = {}): RawMod {
@@ -501,6 +544,22 @@ describe("modLines / modsSignature / modDiffLines", () => {
     expect(lines[1].msg).toContain("已启用")
     expect(lines[2].msg).toContain("已禁用")
     expect(lines[2].level).toBe("DEBUG")
+  })
+
+  it("模组行同样是片段拼的：冲突列表跟着当前语言的分隔符走", () => {
+    const list = modListOf([
+      modOf("evejs-market-pack", { activeConflicts: ["evejs-quiet-dock", "evejs-cargo"] }),
+    ])
+    const lines: LogLine[] = modLines(list, 0).map((line, index) => ({ ...line, id: index + 1 }))
+    expect(lines[1].msg).toContain("evejs-quiet-dock、evejs-cargo")
+
+    const previous = getActiveLocale()
+    setActiveLocale("en")
+    try {
+      expect(renderLogLines(lines)[1].msg).toContain("evejs-quiet-dock, evejs-cargo")
+    } finally {
+      setActiveLocale(previous)
+    }
   })
 
   it("坏模组（无效 / 不兼容 / 冲突）画成 ERROR 并带上原因", () => {

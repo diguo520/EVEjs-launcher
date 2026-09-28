@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { t } from "@/lib/i18n"
 import { ArrowUpCircle, Download, Loader2 } from "lucide-react"
 
 import { LauncherUpdateDialog } from "@/components/shell/launcher-update-dialog"
@@ -28,8 +29,8 @@ export function LauncherUpdate({ compact = false }: { compact?: boolean }) {
 
     /** 图标条上放不下版本号，悬停提示里把两个版本都写出来 */
     const hint = updating
-      ? `正在更新启动器 ${Math.floor(progress)}%`
-      : `启动器有新版本 ${version} → ${latestVersion}`
+      ? t("正在更新启动器 {percent}%", { percent: Math.floor(progress) })
+      : t("启动器有新版本 {from} → {to}", { from: version, to: latestVersion })
 
     return (
       <>

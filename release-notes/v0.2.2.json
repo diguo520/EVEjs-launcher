@@ -1,0 +1,81 @@
+{
+  "version": "0.2.2",
+  "changelog": {
+    "zh": [
+      {
+        "type": "fix",
+        "text": "模组市场真的会同步了：刷新按钮与市场页签改为强制联网拉索引（之前只重读本地缓存却报「已刷新」），索引缓存有效期从 30 分钟缩到 2 分钟，jsDelivr 备用镜像补上 docs/ 前缀（那条地址一直 404，Pages 不通时只能吃旧缓存）；拉不动时界面明说「显示的是本地缓存」并给一键重试"
+      },
+      {
+        "type": "new",
+        "text": "「发布模组」加了 60 秒间隔：发布一次之后按钮自己进入倒计时，倒计时结束才能再发第二次（前端拦、后端也拦，换个模组一样要等）——免得连点重复推 Release、两条审核 PR 抢同一次索引重建"
+      },
+      {
+        "type": "fix",
+        "text": "模组装得多也能正常启动了：主服务器启动预算从写死的 30 秒改成「60 秒 + 每个模组 3 秒」（封顶 180 秒），进程真的退出就立刻连退出码与日志末尾一起报出来（不再空等满一轮），预算用完但仍在加载时也不再杀进程 —— 留在「启动中」由后台继续探端口，卡片上实时显示已等待秒数与「正在加载 N 个模组」"
+      },
+      {
+        "type": "fix",
+        "text": "修掉「索引明明 3 条、市场页签只有 2 个」：合并市场索引与本机台账时，自己那份还没提交的草稿状态（draft）不再把已在架的条目顶下去 —— 页头计数、刷新提示和市场页签现在都按索引里的在架条目算，安装/详情按钮也跟着回来"
+      },
+      {
+        "type": "fix",
+        "text": "启动器多语言补齐：日志区、环境自检、角色种族、指令手册、服务卡片与右下角提示里剩下的中文全部落进 7 种外文目录（目录 1084 → 2436 条），带插值的动态文案改成显式 t() —— 之前这类文案会被 React 拆成多个文本节点，翻译桥接不上，切了语言仍旧显示中文"
+      },
+      {
+        "type": "fix",
+        "text": "实时日志的四类来源不再混着看：系统页签只留启动器自己的记录（启动横幅、模组清单、功能启停提示），主服务器 / 市场服务 / 客户端的原始输出各归各页 —— 之前系统页不过滤，把服务端自己打的中文日志也混进了系统页；功能启停提示也从内部标识（node · serviceStart → mainServer）改成「[启动器] 主服务器 · 启动」这样的人话"
+      },
+      {
+        "type": "opt",
+        "text": "模组页的「作者身份」改名「令牌配置」（弹窗标题、按钮与各处的指引一起改，七种外文同步换名），跟这一页实际做的事对上"
+      },
+      {
+        "type": "fix",
+        "text": "日志区终于跟着语言走了：日志行以前是「生成那一刻的快照」，切了语言就定格在旧语言 —— 启动横幅那五行永远是中文。现在每行带上可重翻的正文片段，面板在渲染期按当前语言重算（关键字搜索、显示、复制都用重算后的正文）；服务端自己打的原始输出仍是死文本，不参与翻译"
+      },
+      {
+        "type": "fix",
+        "text": "更新说明也跟着语言走了：以前不管界面选哪种语言，自更新弹窗里的更新说明一律读清单的 changelog.zh，外语用户看到的是中文。现在按界面语言取 —— 中文看 changelog.zh，其余七种语言看 changelog.en（与现役 Electron 版的判断一致）"
+      }
+    ],
+    "en": [
+      {
+        "type": "fix",
+        "text": "The mod marketplace actually syncs now: the refresh button and the market tab force a live index fetch (they used to re-read the local cache and still report “refreshed”), the index cache TTL drops from 30 minutes to 2, and the jsDelivr fallback mirror URL gained the missing docs/ prefix (that address had been returning 404, so a Pages outage left you on a stale cache). When the fetch fails the UI now says outright that it is showing the local cache and offers a one-click retry"
+      },
+      {
+        "type": "new",
+        "text": "“Publish mod” now has a 60-second cooldown: after one publish the button counts down by itself and a second publish has to wait for it (enforced in the UI and again on the backend, and switching to another mod does not skip the wait), so rapid clicks can no longer push duplicate releases or race two review PRs against the same index rebuild"
+      },
+      {
+        "type": "fix",
+        "text": "The launcher starts fine with many mods installed: the main-server startup budget went from a hard-coded 30 seconds to “60 seconds + 3 seconds per mod” (capped at 180), a process that really exited is reported immediately together with its exit code and log tail instead of burning the whole budget, and running out of budget while still loading no longer kills the process — the card stays on “starting” while the background keeps probing the port, showing the elapsed seconds and “loading N mods” live"
+      },
+      {
+        "type": "fix",
+        "text": "Fixed “the index clearly has 3 entries but the market tab only shows 2”: when merging the marketplace index with the local ledger, your own unpublished draft no longer displaces an entry that is already listed — the header count, the refresh notice and the market tab now all count the listed entries from the index, with the install and details buttons back"
+      },
+      {
+        "type": "fix",
+        "text": "Filled in the launcher’s missing translations: the Chinese left in the log area, environment check, character race, command manual, service cards and the bottom-right toasts all landed in the seven foreign-language catalogs (1084 → 2436 entries), and interpolated strings now call t() explicitly — React used to split those into several text nodes, the translation bridge could not reach them, and they stayed Chinese after switching language"
+      },
+      {
+        "type": "fix",
+        "text": "The four sources in the live log no longer mix: the system tab keeps only the launcher’s own records (boot banner, mod list, feature start/stop notices) while raw main-server / market-service / client output each stay on their own tab — the system tab used to be unfiltered and pulled the servers’ own Chinese log lines into it. Feature notices also stopped being internal identifiers (node · serviceStart → mainServer) and now read like “[launcher] main server · started”"
+      },
+      {
+        "type": "opt",
+        "text": "The mod page’s “Author identity” is now “Token settings” (dialog title, button and every pointer updated, with the seven foreign catalogs renamed to match), which is what that page actually does"
+      },
+      {
+        "type": "fix",
+        "text": "The log area follows the language now: a log line used to be a snapshot taken the moment it was generated, so switching language left it frozen in the old one — the five boot-banner lines were always Chinese. Every line now carries re-translatable body segments and the panel recomputes them at render time for the current language (keyword search, display and copy all use the recomputed text); raw server output stays dead text and is not translated"
+      },
+      {
+        "type": "fix",
+        "text": "The update notes follow the language now: whichever UI language you picked, the self-update dialog always read changelog.zh from the manifest, so non-Chinese users saw Chinese. It is picked by UI language now — Chinese reads changelog.zh, the other seven read changelog.en, matching the rule the current Electron build uses"
+      }
+    ]
+  }
+}

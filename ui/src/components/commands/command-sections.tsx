@@ -2,6 +2,7 @@ import { useMemo, useState } from "react"
 import { X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { t } from "@/lib/i18n"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -208,7 +209,7 @@ export function CommandSections({
                         <CopyButton
                           iconOnly
                           text={r.cmd}
-                          label={`复制 ${r.cmd}`}
+                          label={t("复制 {cmd}", { cmd: r.cmd })}
                           className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
                         />
                         {r.custom ? (
@@ -216,7 +217,7 @@ export function CommandSections({
                             type="button"
                             size="sm"
                             variant="ghost"
-                            title={`删除自定义指令 ${r.cmd}`}
+                            title={t("删除自定义指令 {cmd}", { cmd: r.cmd })}
                             onClick={() => onDeleteCustom(r.cmd)}
                             className="h-7 w-7 px-0 opacity-0 hover:text-destructive group-hover:opacity-100 focus-visible:opacity-100"
                           >

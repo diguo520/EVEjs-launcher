@@ -11,9 +11,11 @@ import {
   LOG_TAB_LABEL,
   filterLogs,
   levelCounts,
+  renderLogLines,
   type LevelFilter,
   type LogTab,
 } from "@/lib/log-logic"
+import { useLocale } from "@/components/shell/locale-provider"
 import type { LogLine } from "@/lib/mock"
 
 export function LiveConsole({
@@ -23,14 +25,17 @@ export function LiveConsole({
   logs: LogLine[]
   onClear: () => void
 }) {
+  const { t, locale } = useLocale()
   const [tab, setTab] = useState<LogTab>("sys")
   const [level, setLevel] = useState<LevelFilter>("all")
   const [keyword, setKeyword] = useState("")
 
+  // 日志行是生成时定下的快照：切了语言要按当前语言重算正文，否则一直停在旧语言
+  const rendered = useMemo(() => renderLogLines(logs), [logs, locale])
   // 计数按"页签 + 关键字"收窄后的结果算：点某一档就知道这一档有几条命中
   const matched = useMemo(
-    () => filterLogs(logs, { tab, keyword }),
-    [logs, tab, keyword]
+    () => filterLogs(rendered, { tab, keyword }),
+    [rendered, tab, keyword]
   )
   const counts = useMemo(() => levelCounts(matched), [matched])
   const visible = useMemo(() => filterLogs(matched, { level }), [matched, level])
@@ -39,7 +44,7 @@ export function LiveConsole({
     <Panel
       tag="// CONSOLE"
       title="实时日志"
-      meta={`${visible.length} 行 · 自动滚动`}
+      meta={t("{count} 行 · 自动滚动", { count: visible.length })}
       flush
       // 只兜住最小高度：单列时给终端一块够用的地方，两列时由同行的面板决定行高
       className="min-h-[420px]"
@@ -55,9 +60,9 @@ export function LiveConsole({
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-input px-4 py-1.5">
           {/* min-w-0：标签条得能在这一行里被压缩，压不动就会把整页撑出横向滚动 */}
           <TabsList className="min-w-0 border-0">
-            {LOG_TABS.map((t) => (
-              <TabsTrigger key={t} value={t}>
-                {LOG_TAB_LABEL[t]}
+            {LOG_TABS.map((tabId) => (
+              <TabsTrigger key={tabId} value={tabId}>
+                {LOG_TAB_LABEL[tabId]}
               </TabsTrigger>
             ))}
           </TabsList>

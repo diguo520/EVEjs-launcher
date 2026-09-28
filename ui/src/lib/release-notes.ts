@@ -55,6 +55,17 @@ export function changelogForLanguage(value: unknown, language: "zh" | "en" = "zh
   return []
 }
 
+/**
+ * 界面语言 → 更新说明语言。
+ *
+ * 更新说明只有中英两份（清单里就是 `{ zh, en }`），所以除中文外一律取英文，
+ * 与现役 Electron 0.1.28 的 `changelogForLanguage()` 判断完全一致
+ * （`curLang === "zh" ? "zh" : "en"`）。
+ */
+export function changelogLanguage(locale: string): "zh" | "en" {
+  return locale === "zh" ? "zh" : "en"
+}
+
 /** 把逐条说明按 type 分组，顺序固定「新增 / 优化 / 修复 / 其它」 */
 export function groupNotes(notes: unknown): ReleaseNoteGroup[] {
   const items: { type: string; text: string }[] = []

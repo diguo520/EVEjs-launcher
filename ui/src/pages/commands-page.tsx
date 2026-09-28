@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { useLauncherVersion } from "@/components/shell/launcher-version"
 import { useCustomCommands } from "@/hooks/use-custom-commands"
 import { COMMAND_CATEGORIES, BASE_COMMAND_ROWS, MANUAL_META } from "@/lib/manual-data"
+import { t } from "@/lib/i18n"
 import type { CommandRow } from "@/lib/manual-logic"
 import { CommandGenerator } from "@/components/commands/command-generator"
 import { CommandStats, CommandUsageHint } from "@/components/commands/command-overview"
@@ -62,7 +63,10 @@ export function CommandsPage() {
       a.click()
       URL.revokeObjectURL(url)
       toast.success("已导出指令包", {
-        description: `${MANUAL_META.commands + custom.length} 条指令 · 含 ${custom.length} 条自定义`,
+        description: t("{total} 条指令 · 含 {custom} 条自定义", {
+          total: MANUAL_META.commands + custom.length,
+          custom: custom.length,
+        }),
       })
     } catch {
       toast.error("导出失败", { description: "浏览器不允许下载文件。" })
@@ -87,7 +91,7 @@ export function CommandsPage() {
         if (cleaned.length === 0) throw new Error("没有可用条目")
 
         replaceAll(cleaned)
-        toast.success(`已导入 ${cleaned.length} 条自定义指令`, {
+        toast.success(t("已导入 {count} 条自定义指令", { count: cleaned.length }), {
           description: "原有自定义指令已被替换。",
         })
       } catch {

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react"
 import { toast } from "sonner"
 
 import { cn, copyText } from "@/lib/utils"
+import { t } from "@/lib/i18n"
 import { Panel } from "@/components/common/panel"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -122,7 +123,7 @@ export function CommandGenerator() {
         : kind === "npc"
           ? buildNpcCommand(value, qty)
           : buildItemCommand(value, qty)
-    void copy(cmd, `已复制并选中 · ${value}`)
+    void copy(cmd, t("已复制并选中 · {value}", { value }))
   }
 
   return (
@@ -220,7 +221,9 @@ export function CommandGenerator() {
         {kind === "ship"
           ? "/ship 只生成船体，需要手动从机库登舰；不接数量参数。"
           : kind === "item"
-            ? `提示：输入中文名会自动换成英文名（服务端只认英文）；留空则用占位符 ${ITEM_PLACEHOLDER}。`
+            ? t("提示：输入中文名会自动换成英文名（服务端只认英文）；留空则用占位符 {placeholder}。", {
+                placeholder: ITEM_PLACEHOLDER,
+              })
             : "提示：/npc 的第一个参数是 NPC 档案键，不是 typeID。"}
       </p>
     </Panel>

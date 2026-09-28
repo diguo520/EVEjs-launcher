@@ -1,4 +1,5 @@
 import { StatTile } from "@/components/common/panel"
+import { t } from "@/lib/i18n"
 import { MANUAL_META } from "@/lib/manual-data"
 import { formatCount } from "@/lib/mock"
 
@@ -13,8 +14,11 @@ export function CommandStats({ customCount }: { customCount: number }) {
         tone="telemetry"
         delta={
           customCount > 0
-            ? `${MANUAL_META.categories} 个分类 · 含 ${customCount} 条自定义`
-            : `${MANUAL_META.categories} 个分类`
+            ? t("{count} 个分类 · 含 {custom} 条自定义", {
+                count: MANUAL_META.categories,
+                custom: customCount,
+              })
+            : t("{count} 个分类", { count: MANUAL_META.categories })
         }
       />
       <StatTile

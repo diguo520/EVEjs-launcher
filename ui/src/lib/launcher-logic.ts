@@ -2,6 +2,7 @@
  * 启动器账号页的纯逻辑：种族血统表、角色槽规则、登录判定与状态迁移。
  * 与 React 无关，方便单独验证；组件只负责渲染。
  */
+import { t } from "@/lib/i18n"
 
 /** 每个账号的角色槽上限 —— 与官方登录器一致 */
 export const MAX_CHARACTERS_PER_ACCOUNT = 3
@@ -243,22 +244,22 @@ export function canCreateInGame(account: Account): Guard {
     return deny(`槽位已满，已无法再建号`)
   }
   const other = onlineCharacter(account)
-  if (other) return deny(`同账号的 ${other.name} 正在线上，先让它下线`)
+  if (other) return deny(t("同账号的 {name} 正在线上，先让它下线", { name: other.name }))
   return ALLOW
 }
 
 export function canLogin(account: Account, character: Character): Guard {
   if (account.status === "SUSPENDED") return deny("账号已停用，无法登录")
-  if (character.online) return deny(`${character.name} 已经在线上`)
+  if (character.online) return deny(t("{name} 已经在线上", { name: character.name }))
   const other = onlineCharacter(account)
-  if (other) return deny(`同账号的 ${other.name} 正在线上，请先让它下线`)
+  if (other) return deny(t("同账号的 {name} 正在线上，请先让它下线", { name: other.name }))
   return ALLOW
 }
 
 /** 账号里有角色在线时不许删，否则客户端还在跑、账号却没了 */
 export function canDeleteAccount(account: Account): Guard {
   const online = onlineCharacter(account)
-  if (online) return deny(`账号内的 ${online.name} 正在线上，请先让它下线`)
+  if (online) return deny(t("账号内的 {name} 正在线上，请先让它下线", { name: online.name }))
   return ALLOW
 }
 
@@ -379,7 +380,7 @@ export function validateAccountName(name: string, accounts: Account[]): Guard {
     return deny("账号名需 3–20 位，只能用字母、数字、下划线、点或连字符")
   }
   if (accounts.some((a) => a.name.toLowerCase() === v.toLowerCase())) {
-    return deny(`账号名「${v}」已存在`)
+    return deny(t("账号名「{name}」已存在", { name: v }))
   }
   return ALLOW
 }
@@ -485,15 +486,19 @@ export function formatDate(d: Date): string {
 export function formatDuration(ms: number): string {
   const min = Math.floor(Math.max(0, ms) / 60_000)
   if (min < 1) return "不到 1 分钟"
-  if (min < 60) return `${min} 分钟`
+  if (min < 60) return t("{minutes} 分钟", { minutes: min })
   const hours = Math.floor(min / 60)
   if (hours < 24) {
     const rest = min % 60
-    return rest ? `${hours} 小时 ${rest} 分钟` : `${hours} 小时`
+    return rest
+      ? t("{hours} 小时 {minutes} 分钟", { hours, minutes: rest })
+      : t("{hours} 小时", { hours })
   }
   const days = Math.floor(hours / 24)
   const restHours = hours % 24
-  return restHours ? `${days} 天 ${restHours} 小时` : `${days} 天`
+  return restHours
+    ? t("{days} 天 {hours} 小时", { days, hours: restHours })
+    : t("{days} 天", { days })
 }
 
 /** 这个角色在线多久了；不在线（或不知道什么时候上线的）返回 null */

@@ -3,6 +3,7 @@
  * 与 React 无关，方便单独验证；组件只负责渲染。
  */
 import { formatCount } from "@/lib/mock"
+import { t } from "@/lib/i18n"
 
 /* ---------------- 原始数据形状 ---------------- */
 
@@ -376,15 +377,15 @@ export function resolveItemTarget(items: ItemRow[], input: string): string {
 export const ITEM_PLACEHOLDER = "<名称|ID>"
 
 export function buildItemCommand(target: string, qty: number): string {
-  return `/item ${target || ITEM_PLACEHOLDER} ${qty}`
+  return `/item ${target || t(ITEM_PLACEHOLDER)} ${qty}`
 }
 
 export function buildShipCommand(name: string): string {
-  return `/ship ${name.trim() || "<舰船名|typeID>"}`
+  return `/ship ${name.trim() || t("<舰船名|typeID>")}`
 }
 
 export function buildNpcCommand(key: string, qty: number): string {
-  return `/npc ${key || "<npc键|typeID>"} ${qty}`
+  return `/npc ${key || t("<npc键|typeID>")} ${qty}`
 }
 
 /** 异常生成用的是模板 id，不是模板名 */

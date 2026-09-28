@@ -3,6 +3,8 @@ import { toast } from "sonner"
 
 import { call, callOr, hasIpc, subscribe, type RawEnvReport, type RawInitState } from "@/lib/ipc"
 import { envItemsFrom, initKeyOf } from "@/lib/live"
+import { localizeEnvItem } from "@/lib/env-i18n"
+import { useLocale } from "@/components/shell/locale-provider"
 import { CHECK_ITEMS, ENV_META, type CheckItem } from "@/lib/mock"
 
 /** 检测时间戳，格式与日志一致：14:05:32 */
@@ -42,6 +44,7 @@ export interface EnvCheckState {
  * 浏览器里（没有桥）退回原型自带的静态自检项，界面还是完整的。
  */
 export function useEnvCheck(): EnvCheckState {
+  const { t, locale } = useLocale()
   const live = hasIpc()
   const [report, setReport] = useState<RawEnvReport | null>(null)
   const [checking, setChecking] = useState(false)
@@ -53,8 +56,9 @@ export function useEnvCheck(): EnvCheckState {
   busyRef.current = busy !== null || (job?.busy ?? false)
 
   const items = useMemo<CheckItem[]>(
-    () => (live ? envItemsFrom(report) : CHECK_ITEMS),
-    [live, report]
+    () => (live ? envItemsFrom(report) : CHECK_ITEMS).map(localizeEnvItem),
+    // locale 进依赖：换语言要重算（重点是 `t()` 模板那几条带变量的读数）
+    [live, report, locale]
   )
 
   const refresh = useCallback(async () => {
@@ -103,7 +107,7 @@ export function useEnvCheck(): EnvCheckState {
       if (busyRef.current) return
       const item = items.find((entry) => entry.id === id)
       void refresh().then(() => {
-        toast.info(item ? `${item.name} 已重测` : "已重测", {
+        toast.info(item ? t("{name} 已重测", { name: item.name }) : t("已重测"), {
           description: "结果以刚刚这一轮自检为准。",
         })
       })
@@ -131,7 +135,7 @@ export function useEnvCheck(): EnvCheckState {
           if (result && result.ok === false) {
             toast.error("初始化失败", { description: result.reason })
           } else {
-            toast.success(`${item?.name ?? id} 初始化已提交`, {
+            toast.success(t("{name} 初始化已提交", { name: item?.name ?? id }), {
               description: "跑完之后本文自检会自动刷新。",
             })
           }

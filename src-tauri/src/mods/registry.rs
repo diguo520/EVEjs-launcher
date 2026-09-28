@@ -19,15 +19,24 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-/// 默认索引地址（GitHub Pages 主站 + jsDelivr 镜像）
+/// 默认索引地址（GitHub Pages 主站 + jsDelivr 镜像）。
+///
+/// ⚠️ 两条地址的路径形状**不一样**：Pages 是从仓库的 `docs/` 目录发布的，所以 Pages
+/// 地址不带 `docs/`；jsDelivr 直接读仓库文件，路径必须带 `docs/`。少这段前缀就是 404
+/// —— 2026-09-28 实测那条镜像一直 404（备用源等于不存在，Pages 不通时只能吃旧缓存，
+/// 表现出来就是「模组市场不同步」）。
 pub const DEFAULT_INDEX_URLS: [&str; 2] = [
     "https://diguo520.github.io/EVEjs-mods/mod-index.json",
-    "https://cdn.jsdelivr.net/gh/diguo520/EVEjs-mods@main/mod-index.json",
+    "https://cdn.jsdelivr.net/gh/diguo520/EVEjs-mods@main/docs/mod-index.json",
 ];
 
 const CACHE_FILE: &str = "mod-index.json";
-/// 缓存有效期 30 分钟
-const TTL_MS: u128 = 30 * 60 * 1000;
+/// 自动路径的缓存有效期：2 分钟。
+///
+/// 原先是 30 分钟：审核台在后台下架/上架之后市场最长半小时不动，而界面上那个「刷新」
+/// 当时又不传 force，用户点了也只是再读一遍这份缓存（2026-09-28 报障的根因）。
+/// 缩短到 2 分钟让自动路径也跟得上；要「立刻同步」就走市场页签与刷新按钮的 force。
+const TTL_MS: u128 = 2 * 60 * 1000;
 const FETCH_TIMEOUT: Duration = Duration::from_secs(8);
 /// 多镜像轮询的总预算（单镜像 8s 超时 ×N 不能无限拖下去）
 const TOTAL_BUDGET: Duration = Duration::from_secs(12);
@@ -1371,6 +1380,21 @@ mod tests {
         write_cache(&runtime, &tampered);
         assert!(read_index_cache(&runtime).is_none());
         let _ = std::fs::remove_dir_all(&runtime.root);
+    }
+
+    /// 镜像地址必须带 `docs/`：Pages 从仓库 docs/ 发布（地址不带），jsDelivr 直接读仓库
+    /// 文件（必须带）。少这段前缀就是 404 —— 2026-09-28 实测那条备用镜像一直 404，
+    /// 于是 Pages 不通时只能吃旧缓存，表现出来就是「模组市场不同步」。
+    #[test]
+    fn default_index_urls_point_at_the_jsdelivr_docs_path() {
+        assert_eq!(
+            DEFAULT_INDEX_URLS[0],
+            "https://diguo520.github.io/EVEjs-mods/mod-index.json"
+        );
+        assert_eq!(
+            DEFAULT_INDEX_URLS[1],
+            "https://cdn.jsdelivr.net/gh/diguo520/EVEjs-mods@main/docs/mod-index.json"
+        );
     }
 
     #[test]

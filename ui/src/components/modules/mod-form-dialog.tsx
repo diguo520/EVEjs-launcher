@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react"
+import { t } from "@/lib/i18n"
 import { toast } from "sonner"
 import { Check, CircleCheck, CircleDashed, Loader2 } from "lucide-react"
 
@@ -90,10 +91,12 @@ function buildSteps(
 ): string[] {
   const rows = files.length > 0 ? files : SKELETON_FILES
   return [
-    `创建目录 mods/${withEvejsPrefix(userPart.trim() || "<id>")}/`,
+    t("创建目录 mods/{id}/", { id: withEvejsPrefix(userPart.trim() || "<id>") }),
     ...rows.map(
       (name) =>
-        `写入 ${name === "loader.js" && !enableAfterCreate ? "loader.js.disabled" : name}`
+        t("写入 {file}", {
+          file: name === "loader.js" && !enableAfterCreate ? "loader.js.disabled" : name,
+        })
     ),
     "注册到本地模组库",
   ]
@@ -281,7 +284,7 @@ export function ModFormDialog({
             <span className="tabular text-[10px] font-semibold tracking-[0.18em] text-primary/85">
               {editing ? "// EDIT MOD" : "// CREATE MOD"}
             </span>
-            <span>{editing ? `编辑「${mod.name}」` : "创建模组"}</span>
+            <span>{editing ? t("编辑「{name}」", { name: mod.name }) : "创建模组"}</span>
           </DialogTitle>
           {editing ? (
             <DialogDescription>
@@ -476,7 +479,7 @@ export function ModFormDialog({
                 ) : idIssue ? (
                   <p className="text-[11px] leading-relaxed text-destructive">
                     {idIssue.message}
-                    {idIssue.detail ? `：${idIssue.detail}` : "。"}
+                    {idIssue.detail ? t("：{detail}", { detail: idIssue.detail }) : "。"}
                   </p>
                 ) : null}
               </div>

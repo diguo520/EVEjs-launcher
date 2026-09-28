@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest"
 
-import { changelogForLanguage, groupNotes, releaseNotesFrom } from "@/lib/release-notes"
+import {
+  changelogForLanguage,
+  changelogLanguage,
+  groupNotes,
+  releaseNotesFrom,
+} from "@/lib/release-notes"
 
 describe("changelogForLanguage", () => {
   it("双语对象按语言取，缺了退回另一种", () => {
@@ -56,11 +61,30 @@ describe("groupNotes", () => {
 })
 
 describe("releaseNotesFrom", () => {
-  it("双语清单直接出中文分组", () => {
-    const notes = releaseNotesFrom({
-      zh: [{ type: "new", text: "中文新增" }],
-      en: [{ type: "new", text: "en new" }],
-    })
-    expect(notes).toEqual([{ group: "新增", items: ["中文新增"] }])
+  const bilingual = {
+    zh: [{ type: "new", text: "中文新增" }],
+    en: [{ type: "new", text: "en new" }],
+  }
+
+  it("双语清单按语言出分组：中文取 zh，英文取 en", () => {
+    expect(releaseNotesFrom(bilingual, "zh")).toEqual([{ group: "新增", items: ["中文新增"] }])
+    expect(releaseNotesFrom(bilingual, "en")).toEqual([{ group: "新增", items: ["en new"] }])
+  })
+
+  it("界面语言一路映射到说明语言：中文看中文，其余七种语言看英文", () => {
+    for (const locale of ["zh", "en", "ja", "ko", "fr", "de", "nl", "ru"]) {
+      const notes = releaseNotesFrom(bilingual, changelogLanguage(locale))
+      const expected = locale === "zh" ? "中文新增" : "en new"
+      expect(notes).toEqual([{ group: "新增", items: [expected] }])
+    }
+  })
+})
+
+describe("changelogLanguage", () => {
+  it("只有中文取中文，外语目录一律取英文（清单里只有 zh / en 两份）", () => {
+    expect(changelogLanguage("zh")).toBe("zh")
+    for (const code of ["en", "ja", "ko", "fr", "de", "nl", "ru"]) {
+      expect(changelogLanguage(code)).toBe("en")
+    }
   })
 })

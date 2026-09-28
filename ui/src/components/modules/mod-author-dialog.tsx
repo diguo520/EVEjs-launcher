@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { t } from "@/lib/i18n"
 import { toast } from "sonner"
 import { Loader2 } from "lucide-react"
 
@@ -121,7 +122,7 @@ export function ModAuthorDialog({
       return
     }
     onSaveName(trimmed)
-    toast.success(`署名已改为「${trimmed}」`, {
+    toast.success(t("署名已改为「{name}」", { name: trimmed }), {
       description: "之后新建的模组与发表的评价都会用这个署名。",
     })
   }
@@ -157,7 +158,9 @@ export function ModAuthorDialog({
     setCheck(reply)
     if (reply.ok) {
       toast.success("令牌可用", {
-        description: reply.login ? `已通过 GitHub 校验，登录名 ${reply.login}` : "已通过 GitHub 校验。",
+        description: reply.login
+          ? t("已通过 GitHub 校验，登录名 {login}", { login: reply.login })
+          : "已通过 GitHub 校验。",
       })
     } else {
       toast.error("令牌不可用", { description: reply.reason ?? "GitHub 拒绝了这次校验" })
@@ -182,9 +185,9 @@ export function ModAuthorDialog({
         <DialogHeader>
           <DialogTitle className="flex flex-wrap items-baseline gap-2">
             <span className="tabular text-[10px] font-semibold tracking-[0.18em] text-primary/85">
-              // AUTHOR
+              // TOKEN
             </span>
-            <span>作者身份</span>
+            <span>令牌配置</span>
           </DialogTitle>
           {/* 先把「哪个能改、哪个不能改」说清楚，免得有人想改指纹 */}
           <DialogDescription className="rounded-md border border-border border-l-2 border-l-primary/60 bg-background/40 px-3 py-2 text-[11px] leading-relaxed text-tertiary">
@@ -334,7 +337,9 @@ export function ModAuthorDialog({
             >
               最近一次校验：
               {check.ok
-                ? `通过${check.login ? `，登录名 ${check.login}` : ""}`
+                ? check.login
+                  ? t("通过，登录名 {login}", { login: check.login })
+                  : "通过"
                 : check.reason ?? "未通过"}
             </p>
           ) : null}

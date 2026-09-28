@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { t } from "@/lib/i18n"
 import {
   ChevronDown,
   ChevronUp,
@@ -90,7 +91,7 @@ function StarPicker({
         <button
           key={n}
           type="button"
-          aria-label={`${n} 星`}
+          aria-label={t("{n} 星", { n })}
           aria-pressed={n === value}
           onClick={() => onChange(n)}
           className="rounded-sm p-0.5 transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:shadow-focus"
@@ -148,7 +149,7 @@ function MyRating({
         <span className="text-[12px] font-semibold text-foreground">我的评分</span>
         <StarPicker value={stars} onChange={setStars} />
         <span className="text-[11px] text-tertiary">
-          {stars > 0 ? `${stars} 星` : "点星星打分"}
+          {stars > 0 ? t("{n} 星", { n: stars }) : "点星星打分"}
         </span>
         <span className="min-w-2 flex-1" />
         <span className="text-[10px] text-tertiary">
@@ -661,7 +662,7 @@ export function ModReviews({
         <div className="flex justify-center">
           <Button variant="ghost" size="sm" onClick={() => setShowAll(!showAll)}>
             {showAll ? <ChevronUp /> : <ChevronDown />}
-            {showAll ? "收起" : `展开全部 ${reviews.length} 条评价`}
+            {showAll ? "收起" : t("展开全部 {count} 条评价", { count: reviews.length })}
           </Button>
         </div>
       ) : null}

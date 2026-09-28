@@ -1,5 +1,6 @@
 import { Download, MessageSquare, Send, Star } from "lucide-react"
 
+import { t } from "@/lib/i18n"
 import { StatusDot } from "@/components/common/status-dot"
 import {
   AlertDialog,
@@ -242,7 +243,11 @@ export function ModCard({
                 type="button"
                 onClick={() => onTagClick(tag)}
                 aria-pressed={on}
-                title={on ? `取消「${tag}」标签筛选` : `只看带「${tag}」标签的模组`}
+                title={
+                  on
+                    ? t("取消「{tag}」标签筛选", { tag })
+                    : t("只看带「{tag}」标签的模组", { tag })
+                }
                 className={cn(
                   "rounded-sm border px-1.5 py-0.5 text-[10px] transition-colors",
                   "focus-visible:outline-none focus-visible:shadow-focus",

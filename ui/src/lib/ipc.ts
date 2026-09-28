@@ -9,6 +9,8 @@
  * 调用方拿到 null 就退回原型自带的演示数据，而不是整页崩掉。
  */
 
+import { t } from "@/lib/i18n"
+
 type ApiFn = (...args: unknown[]) => unknown
 
 interface LauncherApi {
@@ -37,7 +39,7 @@ export async function call<T>(name: string, ...args: unknown[]): Promise<T> {
   const api = bridge()
   const fn = api?.[name]
   if (typeof fn !== "function") {
-    throw new Error(`window.api.${name} 不可用（当前不在启动器里？）`)
+    throw new Error(t("window.api.{name} 不可用（当前不在启动器里？）", { name }))
   }
   return (await fn.apply(api, args)) as T
 }
@@ -626,4 +628,3 @@ export interface RawPublishProgress {
   stage: string
   percent: number
 }
-
