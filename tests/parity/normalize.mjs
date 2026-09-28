@@ -42,6 +42,10 @@ export const SHAPE_ONLY_CHANNELS = new Set([
   "init:state",
   "database:overview",
   "database:table",
+  // env:check 报的是**本机环境**（Node 版本、VS 构建工具路径、server/node_modules 是否存在…）：
+  // 换机器 / 换 Node / CI runner 上必然不同，取值不可冻结。只比键集合与值类型
+  // （checks[0] 是 Node 那一项，顺序稳定），语义本身由 env.rs 的单测保。
+  "env:check",
 ]);
 
 export function normalize(node) {

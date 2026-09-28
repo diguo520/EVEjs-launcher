@@ -4,7 +4,7 @@
  *
  * 为什么需要它：跨实现比对如果不给两边**同一个仓库根目录**，得到的差异全是
  * 环境差异（路径、版本、有没有 server/node_modules…），真正的实现差异会被淹掉。
- * 这里按现役安装目录（只读）镜像出启动器真正会读的那几个文件：
+ * 这里内置一份**冻结内容**，铺出启动器真正会读的那几个文件（默认不看本机安装目录，见下）：
  *   server/autostart.js       ← 两边判定「这是仓库根」的唯一标记
  *   server/package.json       ← 版本探测的第三顺位
  *   config/server.json        ← 端口配置
@@ -16,7 +16,12 @@
  *
  * 用法：
  *   node tests/parity/make-repo-fixture.mjs                     # 默认 ./ 输出 .parity-out/parity-repo
- *   node tests/parity/make-repo-fixture.mjs --source "E:/Games/EveJS-v0.12.8" --out .parity-out/parity-repo
+ *   node tests/parity/make-repo-fixture.mjs --mirror            # 从本机现役安装目录镜像真文件（人工排查用）
+ *
+ * ⚠️ 默认**不镜像**本机安装目录：夹具内容必须逐字节确定，否则「有现役版」的开发机与
+ *    CI runner 会产出两份不同的仓库根，golden 就变成只能在本机绿的假门禁
+ *    （2026-09-28 CI 实测：config:get.client 只因本机 bat 里 clientExe 为空就判成差异）。
+ *    跨实现比对（diff-cross）不受影响：两侧读的是同一份夹具。
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -25,7 +30,7 @@ const ROOT = path.resolve(import.meta.dirname, "..", "..");
 export const DEFAULT_SOURCE = "E:/Games/EveJS-v0.12.8";
 export const DEFAULT_FIXTURE = path.join(ROOT, ".parity-out", "parity-repo");
 
-/** 现役安装目录里「启动器会读」的文件 → fixture 内的相对路径 */
+/** 现役安装目录里「启动器会读」的文件 → fixture 内的相对路径（--mirror 时才用） */
 const MIRROR = [
   ["server/autostart.js", null], // null = 生成占位内容
   ["server/package.json", "server/package.json"],
@@ -59,7 +64,11 @@ const FALLBACK = {
   ].join("\r\n"),
 };
 
-export function ensureRepoFixture({ source = DEFAULT_SOURCE, out = DEFAULT_FIXTURE } = {}) {
+export function ensureRepoFixture({
+  source = DEFAULT_SOURCE,
+  out = DEFAULT_FIXTURE,
+  mirror = process.env.EVEJS_PARITY_MIRROR === "1",
+} = {}) {
   fs.mkdirSync(out, { recursive: true });
   const copied = [];
   const synthesized = [];
@@ -72,7 +81,7 @@ export function ensureRepoFixture({ source = DEFAULT_SOURCE, out = DEFAULT_FIXTU
       continue;
     }
     const src = path.join(source, relative);
-    if (fs.existsSync(src)) {
+    if (mirror && fs.existsSync(src)) {
       fs.copyFileSync(src, dest);
       copied.push(relative);
     } else {
@@ -94,6 +103,7 @@ function main() {
   const result = ensureRepoFixture({
     source: value("--source", DEFAULT_SOURCE),
     out: path.resolve(ROOT, value("--out", path.relative(ROOT, DEFAULT_FIXTURE))),
+    mirror: args.includes("--mirror") || process.env.EVEJS_PARITY_MIRROR === "1",
   });
   console.log(`fixture 仓库根：${path.relative(ROOT, result.out)}`);
   console.log(`  镜像自现役安装目录：${result.copied.length} 个（${result.copied.join(", ")}）`);
@@ -101,3 +111,37 @@ function main() {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(import.meta.filename)) main();
+/* ---------------------- 运行时数据目录夹具（parity 专用） ---------------------- */
+
+/** 与 driver-* 共用的隔离运行时根目录（EVEJS_USER_DATA_DIR 语义：user_data 直接就是它） */
+export const DEFAULT_USER_DATA_FIXTURE = path.join(ROOT, ".parity-out", "parity-userdata");
+
+/**
+ * 本机作者身份的固定替身：id / keyId 都是明显的夹具值，一眼能看出不是真身份。
+ * 不给 mod-keys：夹具里没有任何需要签名的东西，缺私钥反而少一条「读到真身份」的路径。
+ * since 写死成 1：read_profile 只在 >0 时才用它，0 会退化成 now_ms()（每次跑都变）。
+ */
+const FIXTURE_AUTHOR = {
+  id: "au-parityfixture0000",
+  keyId: "f03359e919c1",
+  name: "Parity Fixture",
+  privateKeyPath: "mod-keys/f03359e919c1.key",
+  // 真实形状的 Ed25519 公钥（与 author.rs / sign.rs 的黄金夹具同一把）：
+  // read_profile 要求 publicKey 非空，空串会被当成「身份不存在」。
+  publicKey: "u+H9syVu7cmdmN8073Eef0IdISAUNyKysfLki9Twl5I=",
+  since: 1,
+};
+
+/**
+ * 重置并铺好 parity 用的运行时数据目录。
+ *
+ * 为什么每次都清空：data/ 是**有状态**的（作者身份、提交台账、GitHub 令牌、设置），
+ * 上一次跑剩下来的文件会让下一次跑出不同的回包 —— golden 就跟着环境漂。
+ * 清空 + 只写一份固定身份，等价于「全新用户第一次打开启动器」，两台机器结果一致。
+ */
+export function ensureUserDataFixture({ out = DEFAULT_USER_DATA_FIXTURE } = {}) {
+  fs.rmSync(out, { recursive: true, force: true });
+  fs.mkdirSync(out, { recursive: true });
+  fs.writeFileSync(path.join(out, "author.json"), JSON.stringify(FIXTURE_AUTHOR, null, 2) + "\n", "utf8");
+  return out;
+}

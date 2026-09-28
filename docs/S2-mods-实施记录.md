@@ -115,3 +115,22 @@
   `blank` 与 `broadcast` 两套模板的四个文件（`evejs-launcher.mod.json` / `loader.js.disabled` /
   `README.md` / `CHANGELOG.md`）SHA256 全部一致。`scaffold_loader.rs` 同时用
   `scripts/extract-loader-skeleton.mjs` 重抽比对，仍是逐字节一致。
+
+## 8. 新增写通道 `mods:updateMeta`（2026-09-28）
+
+报障「在模组列表里编辑信息保存不了」—— 现役版没有这个通道，旧 UI 只能提示「请直接编辑清单文件」。
+
+- **契约**：走 `contract/extensions.json` 扩展登记（不污染基线，见 S10 §11.6）。
+- **实现**：`scaffold.rs::update_mod_meta(repo_root, runtime, folder, patch)` 只改**非身份字段**
+  （`displayName` / `description` / `category` / `tags` / `conflicts` / `requiresRestart` + README），
+  写盘前先摘 `signature`，写完调 `plan::sign_mod_folder` 重签；**签名失败整份回滚**（清单 + README）。
+- **安全**：目录名走 `join_within` 白名单校验；署名不是本人的模组直接拒绝且不动文件。
+- **版式单一来源**：README 渲染抽成 `render_readme()`，与新建骨架共用同一份版式（空段落不写）。
+- **测试**：`mods::scaffold::tests::update_mod_meta*` 3 例（正常改 + 重签、非法 patch 不动文件、拒改他人模组）。
+
+## 9. 报障修复：新建模组落 `loader.js.disabled`（2026-09-28）
+
+- 真根因是 **UI 传错键**：后端（与现役版 `modScaffold.createMod` 一致）读 `draft.enabled` / `draft.sign`，
+  而 `modules-page.tsx` 传的是 `enableAfterCreate` / `signAfterCreate` → 即使勾了也照样落 `.disabled`。
+  已改传 `enabled` / `sign`；`mod-logic.ts` 的 `DEFAULT_BUILD_OPTIONS.enableAfterCreate` 同步改 `true`。
+- §7 逐字节复核里出现的 `loader.js.disabled`，是**现役版默认值**，不代表新框架行为。

@@ -3,13 +3,7 @@
     "accounts:checkRunning": {
       "listening": [],
       "ports": [
-        30000,
-        11,
-        2,
-        127,
-        26000,
-        26002,
-        26400
+        26000
       ],
       "running": false
     },
@@ -32,7 +26,7 @@
     "config:get": {
       "client": {
         "caPem": "<abs-path>",
-        "clientExe": "",
+        "clientExe": "eve.exe",
         "clientPath": "<abs-path>",
         "proxyUrl": "http://127.0.0.1:26002/",
         "safeGraphics": "off",
@@ -104,25 +98,27 @@
           "ok": false
         },
         {
+          "hint": "在 EvEJSConfig.bat / 配置面板中填写客户端安装路径",
           "key": "clientPath",
           "label": "客户端路径",
-          "message": "客户端: <abs-path>",
-          "ok": true,
-          "warn": false
+          "message": "路径不存在: <abs-path>",
+          "ok": false,
+          "warn": true
         },
         {
+          "hint": "运行 SetupEveJS.bat 或检查 EVEJS_CA_PEM 指向",
           "key": "caCert",
           "label": "客户端证书 CA",
-          "message": "CA 证书就绪",
-          "ok": true,
-          "warn": false
+          "message": "CA 证书缺失",
+          "ok": false,
+          "warn": true
         }
       ],
       "node": {
         "ok": true,
         "version": "26.5.0"
       },
-      "passCount": 5,
+      "passCount": 3,
       "repoRoot": "<abs-path>",
       "sys": {
         "cpuThreads": 12,
@@ -158,10 +154,10 @@
       "size": 0
     },
     "metrics:get": {
-      "cpuPercent": 26.975230948253337,
+      "cpuPercent": 23.821782625386724,
       "diskRoot": "E:",
       "diskTotalGB": 976.5624961853027,
-      "diskUsedGB": 864.4106483459473,
+      "diskUsedGB": 871.8747940063477,
       "gpuDedicatedTotalGB": null,
       "gpuDedicatedUsedGB": null,
       "gpuMemoryTotalGB": null,
@@ -169,39 +165,38 @@
       "gpuPercent": null,
       "gpuSharedUsedGB": null,
       "memTotalGB": 31.855934143066406,
-      "memUsedGB": 15.199237823486328,
+      "memUsedGB": 17.3363037109375,
       "netBytesPerSec": 0,
-      "onlinePlayers": 0,
       "virtualMemTotalGB": null,
       "virtualMemUsedGB": null,
       "volumes": [
         {
-          "freeGB": 44.98625183105469,
-          "percent": 79.77506819876523,
+          "freeGB": 45.37015914916992,
+          "percent": 79.60247103828085,
           "root": "C:",
           "totalGB": 222.42968368530273,
-          "usedGB": 177.44343185424805
+          "usedGB": 177.0595245361328
         },
         {
-          "freeGB": 145.09650039672852,
-          "percent": 50.473727219709986,
+          "freeGB": 144.74559783935547,
+          "percent": 50.59350196085289,
           "root": "D:",
           "totalGB": 292.96874618530273,
-          "usedGB": 147.87224578857422
+          "usedGB": 148.22314834594727
         },
         {
-          "freeGB": 112.15184783935547,
-          "percent": 88.51565073638926,
+          "freeGB": 104.68770217895508,
+          "percent": 89.27997925499992,
           "root": "E:",
           "totalGB": 976.5624961853027,
-          "usedGB": 864.4106483459473
+          "usedGB": 871.8747940063477
         },
         {
-          "freeGB": 447.4195213317871,
-          "percent": 81.7861124914933,
+          "freeGB": 447.31017684936523,
+          "percent": 81.79056376822031,
           "root": "F:",
           "totalGB": 2456.4746055603027,
-          "usedGB": 2009.0550842285156
+          "usedGB": 2009.1644287109375
         }
       ]
     },

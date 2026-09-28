@@ -66,6 +66,8 @@ pub const HANDLED: &[&str] = &[
     "mods:sign",
     "mods:templates",
     "mods:uninstall",
+    // 本工程扩展通道（现役版没有）：契约见 contract/extensions.json
+    "mods:updateMeta",
     "service:restart",
     "service:start",
     "service:stop",

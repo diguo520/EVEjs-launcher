@@ -1,13 +1,13 @@
 {
   "generatedFrom": "E:\\Games\\EveJS-v0.12.8\\launcher\\launcher",
-  "generatedAt": "2026-09-27T23:13:19.159Z",
+  "generatedAt": "2026-09-28T00:21:23.325Z",
   "counts": {
-    "invoke": 76,
+    "invoke": 77,
     "send": 6,
     "events": 7,
-    "requests": 82,
+    "requests": 83,
     "registered": 82,
-    "apiTotal": 89
+    "apiTotal": 90
   },
   "invoke": [
     {
@@ -547,6 +547,16 @@
       ]
     },
     {
+      "api": "modsUpdateMeta",
+      "channel": "mods:updateMeta",
+      "kind": "invoke",
+      "signature": "folder: string, patch: Record<string, unknown>",
+      "params": [
+        "folder",
+        "patch"
+      ]
+    },
+    {
       "api": "openExternal",
       "channel": "shell:openExternal",
       "kind": "invoke",
@@ -732,5 +742,12 @@
     "terminal:exit",
     "update:changed"
   ],
-  "dynamicRegistrations": 0
+  "dynamicRegistrations": 0,
+  "extensions": {
+    "invoke": [
+      "mods:updateMeta"
+    ],
+    "send": [],
+    "events": []
+  }
 }

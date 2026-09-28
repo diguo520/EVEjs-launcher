@@ -1,6 +1,6 @@
 /* 由 scripts/gen-contract.mjs 生成 —— 请勿手改。源: contract/ipc-channels.json */
 /* 抽取源: E:\Games\EveJS-v0.12.8\launcher\launcher */
-/* 生成时间: 2026-09-27T23:13:19.159Z */
+/* 生成时间: 2026-09-28T00:21:23.325Z */
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
@@ -100,6 +100,7 @@ export const api = {
   modsSubmitPrepare: (input: Record<string, unknown>): Promise<unknown> => request("mods:submitPrepare", [input]),
   modsTemplates: (): Promise<unknown> => request("mods:templates", []),
   modsUninstall: (folder: string): Promise<unknown> => request("mods:uninstall", [folder]),
+  modsUpdateMeta: (folder: string, patch: Record<string, unknown>): Promise<unknown> => request("mods:updateMeta", [folder, patch]),
   openExternal: (url: string): Promise<unknown> => request("shell:openExternal", [url]),
   readServerLog: (): Promise<unknown> => request("log:read", []),
   serviceRestart: (id: string): Promise<unknown> => request("service:restart", [id]),

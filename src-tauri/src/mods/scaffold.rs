@@ -192,12 +192,6 @@ fn draft_strings(draft: &Value, key: &str) -> Vec<String> {
 /* ------------------------------ 生成正文 ------------------------------ */
 
 fn readme_from(draft: &Value, template: &ScaffoldTemplate) -> String {
-    let mut lines: Vec<String> = Vec::new();
-    lines.push(format!("# {}", draft_str(draft, "displayName")));
-    lines.push(String::new());
-    lines.push(draft_str(draft, "description"));
-    lines.push(String::new());
-
     let highlights = {
         let from_draft = draft_strings(draft, "highlights");
         if from_draft.is_empty() {
@@ -210,16 +204,37 @@ fn readme_from(draft: &Value, template: &ScaffoldTemplate) -> String {
             from_draft
         }
     };
+    render_readme(
+        &draft_str(draft, "displayName"),
+        &draft_str(draft, "description"),
+        &highlights,
+        &draft_str(draft, "readme"),
+    )
+}
+
+/// README 版式（单一来源）：新建骨架与「编辑信息」都走这里，改一处两边一起变。
+/// 空段落直接不写 —— 作者把功能要点清空时，README 里就不该再留着那一段。
+fn render_readme(
+    display_name: &str,
+    description: &str,
+    highlights: &[String],
+    readme: &str,
+) -> String {
+    let mut lines: Vec<String> = Vec::new();
+    lines.push(format!("# {display_name}"));
+    lines.push(String::new());
+    lines.push(description.to_string());
+    lines.push(String::new());
+
     if !highlights.is_empty() {
         lines.push("## 功能要点".to_string());
         lines.push(String::new());
-        for item in &highlights {
+        for item in highlights {
             lines.push(format!("- {item}"));
         }
         lines.push(String::new());
     }
 
-    let readme = draft_str(draft, "readme");
     if !readme.trim().is_empty() {
         lines.push("## 详细介绍".to_string());
         lines.push(String::new());
@@ -718,6 +733,126 @@ pub fn open_authoring_doc(app: &AppHandle, runtime: &RuntimePaths) -> Value {
         Err(reason) => json!({ "ok": false, "reason": reason, "path": path }),
     }
 }
+/* ------------------------- 编辑已有模组的信息 ------------------------- */
+
+/// 「编辑信息」：只改**非身份字段**，身份由签名保护。
+///
+/// 允许改：displayName / description / category / tags / conflicts / requiresRestart，
+/// 以及 README.md（readme 正文 + highlights 功能要点；这两项由界面成对提交，
+/// 只带其中一项时另一项按空处理 —— 直接调 IPC 的人要知道这一点）。
+/// 一律不碰：id / version / kind / activation / author（署名）/ signature。
+///
+/// 为什么写完必须重签：清单参与签名，改一个字节旧签名就失效，模组会立刻变成
+/// 「签名无效」（scan 会把它标成被篡改）。重签复用 `plan::sign_mod_folder` ——
+/// 与手动点「签名」完全同一条路径，归属保护（不能替别人签名）也在那里面，
+/// 所以这里不重复实现一遍。重签失败时把清单与 README 回滚成原样，
+/// 绝不留下「改了一半又没签名」的模组。
+pub fn update_mod_meta(
+    repo_root: &Path,
+    runtime: &RuntimePaths,
+    folder: &str,
+    patch: &Value,
+) -> Value {
+    let Some(dir) = crate::mods::join_within(&crate::mods::mods_root(repo_root), folder) else {
+        return json!({ "ok": false, "reason": "模组目录名非法" });
+    };
+    let safe = crate::mods::safe_folder_name(folder);
+    let manifest_path = dir.join(MANIFEST_NAME);
+    if !manifest_path.is_file() {
+        return json!({ "ok": false, "reason": format!("找不到 {MANIFEST_NAME}") });
+    }
+    let original_manifest = fs::read_to_string(&manifest_path).unwrap_or_default();
+    let mut manifest = match scan::read_manifest(&manifest_path) {
+        Ok(manifest) => manifest,
+        Err(reason) => return json!({ "ok": false, "reason": reason }),
+    };
+    let Some(patch_object) = patch.as_object() else {
+        return json!({ "ok": false, "reason": "没有要改的字段" });
+    };
+
+    // 显示名：给了就必须非空（列表里不该出现一张没有标题的卡片）
+    if patch_object.contains_key("displayName") {
+        let name = draft_str(patch, "displayName").trim().to_string();
+        if name.is_empty() {
+            return json!({ "ok": false, "reason": "模组名不能为空" });
+        }
+        manifest.insert("displayName".to_string(), json!(name));
+    }
+    for key in ["description", "category"] {
+        if patch_object.contains_key(key) {
+            manifest.insert(key.to_string(), json!(draft_str(patch, key)));
+        }
+    }
+    // 数组字段做类型过滤（非字符串项丢掉），与脚手架读 draft 的口径一致
+    for key in ["tags", "conflicts"] {
+        if patch_object.contains_key(key) {
+            manifest.insert(key.to_string(), json!(draft_strings(patch, key)));
+        }
+    }
+    if patch_object.contains_key("requiresRestart") {
+        // 与 manifest_from 同一套映射：false → none，其余（含缺省）→ game_server
+        let restart = if patch.get("requiresRestart").and_then(Value::as_bool) == Some(false) {
+            "none"
+        } else {
+            "game_server"
+        };
+        manifest.insert("restart".to_string(), json!(restart));
+    }
+
+    // 清单内容变了 → 旧签名失效，先摘掉（重签那一步会补回来）
+    manifest.remove("signature");
+    let updated = Value::Object(manifest);
+    let text = serde_json::to_string_pretty(&updated).unwrap_or_default() + "\n";
+    if let Err(error) = fs::write(&manifest_path, text) {
+        return json!({ "ok": false, "reason": format!("清单写入失败: {error}") });
+    }
+
+    // README：补丁里带了正文或功能要点就整篇按版式重渲染。
+    // 只带 description / displayName 时不动 README —— 否则「改个简介」会把功能要点整段抹掉。
+    let readme_path = dir.join("README.md");
+    let original_readme = fs::read_to_string(&readme_path).ok();
+    let touched_readme =
+        patch_object.contains_key("readme") || patch_object.contains_key("highlights");
+    if touched_readme {
+        let body = render_readme(
+            &draft_str(&updated, "displayName"),
+            &draft_str(&updated, "description"),
+            &draft_strings(patch, "highlights"),
+            &draft_str(patch, "readme"),
+        );
+        if let Err(error) = fs::write(&readme_path, body) {
+            let _ = fs::write(&manifest_path, &original_manifest);
+            return json!({ "ok": false, "reason": format!("README 写入失败: {error}") });
+        }
+    }
+
+    let signed = super::plan::sign_mod_folder(repo_root, &safe, runtime);
+    if signed.get("ok").and_then(Value::as_bool) != Some(true) {
+        let _ = fs::write(&manifest_path, &original_manifest);
+        match original_readme {
+            Some(text) => {
+                let _ = fs::write(&readme_path, text);
+            }
+            None => {
+                let _ = fs::remove_file(&readme_path);
+            }
+        }
+        let reason = signed
+            .get("reason")
+            .and_then(Value::as_str)
+            .unwrap_or("重新签名失败");
+        return json!({ "ok": false, "reason": reason });
+    }
+
+    json!({
+        "ok": true,
+        "folder": safe,
+        "manifestPath": manifest_path.to_string_lossy(),
+        "readmeUpdated": touched_readme,
+        "keyId": signed.get("keyId").cloned().unwrap_or(Value::Null),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -951,6 +1086,151 @@ mod tests {
         // evejsVersion 不像版本号 → 不写 compatibility
         let manifest = fs::read_to_string(custom_dir.join(scan::MANIFEST_NAME)).unwrap();
         assert!(!manifest.contains("compatibility"));
+    }
+
+    #[test]
+    fn update_mod_meta_rewrites_fields_readme_and_resigns() {
+        let root = temp_dir("update-meta");
+        let runtime = runtime_at(&root);
+        let repo = root.join("repo");
+        fs::create_dir_all(&repo).unwrap();
+
+        // 身份先备好：编辑信息复用「手动签名」那条路径，没有身份必须整份回滚
+        let state = crate::author::get_state(&runtime);
+        assert_eq!(state["ok"], json!(true), "{state}");
+
+        let created = create_mod(&repo, &draft("edit-me", "改之前"), "0.12.8", &runtime);
+        assert_eq!(created["ok"], json!(true), "{created}");
+        let dir = repo.join("mods").join("edit-me");
+        // 先用真身份签一次，模拟「已经签过名的模组」
+        let signed = super::super::plan::sign_mod_folder(&repo, "edit-me", &runtime);
+        assert_eq!(signed["ok"], json!(true), "{signed}");
+
+        let patched = update_mod_meta(
+            &repo,
+            &runtime,
+            "edit-me",
+            &json!({
+                "displayName": "改之后",
+                "description": "新简介",
+                "category": "经济",
+                "tags": ["a", 1, "b"],
+                "conflicts": ["other-mod"],
+                "requiresRestart": false,
+                "readme": "正文段落",
+                "highlights": ["要点一", "要点二"],
+            }),
+        );
+        assert_eq!(patched["ok"], json!(true), "{patched}");
+        assert_eq!(patched["readmeUpdated"], json!(true));
+
+        let record = scan::read_mod_dir("edit-me", &dir);
+        assert!(
+            record.valid,
+            "编辑后的清单必须仍能通过校验：{}",
+            record.error
+        );
+        assert_eq!(record.display_name, "改之后");
+        assert_eq!(record.description, "新简介");
+        assert_eq!(record.category, "经济");
+        // 数组里的非字符串项被丢掉（与脚手架读 draft 的口径一致）
+        assert_eq!(record.tags, vec!["a".to_string(), "b".to_string()]);
+        assert_eq!(record.conflicts, vec!["other-mod".to_string()]);
+        assert_eq!(record.restart, "none");
+        // 身份字段一个都不能被碰
+        assert_eq!(record.id, "edit-me");
+        assert_eq!(record.version, "1.2.3");
+        // 内容改了就必须重签，否则扫描器会判成「签名对不上」
+        assert_eq!(
+            record.signature_state, "valid",
+            "{}",
+            record.signature_error
+        );
+
+        let readme = fs::read_to_string(dir.join("README.md")).unwrap();
+        assert!(readme.contains("# 改之后"), "{readme}");
+        assert!(readme.contains("新简介"));
+        assert!(readme.contains("- 要点一"));
+        assert!(readme.contains("## 详细介绍"));
+        assert!(readme.contains("正文段落"));
+    }
+
+    #[test]
+    fn update_mod_meta_rejects_bad_patch_without_touching_files() {
+        let root = temp_dir("update-meta-bad");
+        let runtime = runtime_at(&root);
+        let repo = root.join("repo");
+        fs::create_dir_all(&repo).unwrap();
+        let created = create_mod(&repo, &draft("keep-me", "保持原样"), "0.12.8", &runtime);
+        assert_eq!(created["ok"], json!(true), "{created}");
+        let dir = repo.join("mods").join("keep-me");
+        let manifest_path = dir.join(scan::MANIFEST_NAME);
+        let before = fs::read_to_string(&manifest_path).unwrap();
+
+        for bad in [json!({ "displayName": "   " }), json!(null), json!({})] {
+            let reply = update_mod_meta(&repo, &runtime, "keep-me", &bad);
+            assert_eq!(reply["ok"], json!(false), "{reply}");
+            assert_eq!(
+                fs::read_to_string(&manifest_path).unwrap(),
+                before,
+                "被拒绝的补丁不能改动清单"
+            );
+        }
+
+        // 目录名非法 / 不存在的模组：明确报错而不是 panic
+        let bad_folder =
+            update_mod_meta(&repo, &runtime, "../escape", &json!({ "description": "x" }));
+        assert_eq!(bad_folder["ok"], json!(false), "{bad_folder}");
+        let missing = update_mod_meta(
+            &repo,
+            &runtime,
+            "no-such-mod",
+            &json!({ "description": "x" }),
+        );
+        assert_eq!(missing["ok"], json!(false), "{missing}");
+    }
+
+    #[test]
+    fn update_mod_meta_refuses_another_authors_mod() {
+        let root = temp_dir("update-meta-foreign");
+        let runtime = runtime_at(&root);
+        let repo = root.join("repo");
+        fs::create_dir_all(&repo).unwrap();
+        let state = crate::author::get_state(&runtime);
+        assert_eq!(state["ok"], json!(true), "{state}");
+
+        let created = create_mod(
+            &repo,
+            &draft("someone-else", "别人的模组"),
+            "0.12.8",
+            &runtime,
+        );
+        assert_eq!(created["ok"], json!(true), "{created}");
+        let dir = repo.join("mods").join("someone-else");
+        let manifest_path = dir.join(scan::MANIFEST_NAME);
+        // 把署名改成别人的 id：编辑必须被拒（sign_mod_folder 的归属保护），且文件原样
+        let mut manifest: Value =
+            serde_json::from_str(&fs::read_to_string(&manifest_path).unwrap()).unwrap();
+        manifest["author"] = json!({ "id": "au-someoneelse", "name": "别人", "keyId": "deadbeef" });
+        let spoofed = serde_json::to_string_pretty(&manifest).unwrap() + "\n";
+        fs::write(&manifest_path, &spoofed).unwrap();
+
+        let reply = update_mod_meta(
+            &repo,
+            &runtime,
+            "someone-else",
+            &json!({ "description": "偷改" }),
+        );
+        assert_eq!(reply["ok"], json!(false), "{reply}");
+        assert!(
+            reply["reason"].as_str().unwrap().contains("不是本机作者"),
+            "{reply}"
+        );
+        assert_eq!(
+            fs::read_to_string(&manifest_path).unwrap(),
+            spoofed,
+            "拒绝后清单必须原样保留"
+        );
     }
 
     #[test]

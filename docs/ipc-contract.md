@@ -2,17 +2,17 @@
 
 > 由 scripts/gen-contract.mjs 生成 —— 请勿手改。源: contract/ipc-channels.json
 > 抽取源：`E:\Games\EveJS-v0.12.8\launcher\launcher`
-> 生成时间：2026-09-27T23:13:19.159Z
+> 生成时间：2026-09-28T00:21:23.325Z
 
 ## 计数
 
 | 项 | 数量 |
 | --- | --- |
-| invoke（有回包） | 76 |
+| invoke（有回包） | 77 |
 | send（无回包） | 6 |
-| 请求通道合计 | 82 |
+| 请求通道合计 | 83 |
 | 事件通道（主进程 → 渲染层） | 7 |
-| window.api 入口合计 | 89 |
+| window.api 入口合计 | 90 |
 | ipc.ts 注册数 | 82 |
 
 ## 交叉校验
@@ -21,7 +21,7 @@
 - 暴露未注册：init:changed, mod:downloadProgress, mod:publishProgress, services:changed, terminal:data, terminal:exit, update:changed（事件通道不经 ipcMain 注册，属预期）
 - 动态注册点：0
 
-## 请求通道（82）
+## 请求通道（83）
 
 | window.api | 通道 | 类型 | 参数 |
 | --- | --- | --- | --- |
@@ -90,6 +90,7 @@
 | `modsSubmitPrepare` | `mods:submitPrepare` | invoke | `input: Record<string, unknown>` |
 | `modsTemplates` | `mods:templates` | invoke | `-` |
 | `modsUninstall` | `mods:uninstall` | invoke | `folder: string` |
+| `modsUpdateMeta` | `mods:updateMeta` | invoke | `folder: string, patch: Record<string, unknown>` |
 | `serviceRestart` | `service:restart` | invoke | `id: string` |
 | `serviceStart` | `service:start` | invoke | `id: string` |
 | `serviceStop` | `service:stop` | invoke | `id: string` |

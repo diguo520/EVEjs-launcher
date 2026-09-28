@@ -19,7 +19,13 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
-import path from "node:path";import { ensureRepoFixture, DEFAULT_FIXTURE } from "./make-repo-fixture.mjs";
+import path from "node:path";
+import {
+  ensureRepoFixture,
+  ensureUserDataFixture,
+  DEFAULT_FIXTURE,
+  DEFAULT_USER_DATA_FIXTURE,
+} from "./make-repo-fixture.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "..", "..");
 const args = process.argv.slice(2);
@@ -34,8 +40,9 @@ const TIMEOUT_MS = Number(value("--timeout", "180")) * 1000;
 // 与 Electron 侧共用同一个仓库根 fixture（跨实现比对的先决条件，见 make-repo-fixture.mjs）。
 // cwd 单独放一个空目录：启动器按 cwd 找 launcher.config.json，写在这里不会污染仓库根。
 const CWD = path.resolve(ROOT, value("--cwd", path.join(".parity-out", "parity-run")));
-// 与 Electron 侧共用运行时数据目录，保证 settings:get 之类的默认值来源一致
-const USER_DATA_DIR = path.join(ROOT, ".parity-out", "parity-userdata");
+// 与 Electron 侧共用运行时数据目录，保证 settings:get 之类的默认值来源一致。
+// 每次跑前重置成「全新用户」：data/ 有状态（身份 / 台账 / 令牌），留着上一次的会让 golden 漂。
+const USER_DATA_DIR = DEFAULT_USER_DATA_FIXTURE;
 const REPO_ROOT =
   value("--repo-root", "") === ""
     ? ensureRepoFixture({ out: DEFAULT_FIXTURE }).out
@@ -50,7 +57,7 @@ const rawFile = path.join(os.tmpdir(), `evejs-parity-${process.pid}.json`);
 if (fs.existsSync(rawFile)) fs.rmSync(rawFile);
 
 fs.mkdirSync(CWD, { recursive: true });
-fs.mkdirSync(USER_DATA_DIR, { recursive: true });
+ensureUserDataFixture({ out: USER_DATA_DIR });
 fs.writeFileSync(path.join(CWD, "launcher.config.json"), JSON.stringify({ repoRoot: REPO_ROOT }, null, 2) + "\n", "utf8");
 
 const child = spawn(EXE, ["--self-test"], {

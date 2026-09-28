@@ -104,6 +104,8 @@ export interface ModSourceState {
   saveText: (defaultName: string, content: string) => Promise<RawAck>
   installFromMarket: (id: string) => Promise<RawAck>
   createMod: (draft: Record<string, unknown>) => Promise<RawAck>
+  /** 编辑已有模组的信息（本工程扩展通道；改完后端会重签） */
+  updateMeta: (folder: string, patch: Record<string, unknown>) => Promise<RawAck>
   setAuthorName: (name: string) => Promise<RawAck>
   exportKey: () => Promise<RawAck>
   importKey: () => Promise<RawAck>
@@ -207,8 +209,9 @@ export function useModSource(): ModSourceState {
   }, [market])
 
   const sourceRepos = useMemo(
-    () => sourceRepoIds(mine, submissions?.items),
-    [mine, submissions]
+    // 第三个来源是本地 mods/ 扫描出来的 .evejs-source.json（见 mod-source.ts 的注释）
+    () => sourceRepoIds(mine, submissions?.items, list?.mods),
+    [mine, submissions, list]
   )
 
   const credential = useMemo<PublishCredential | null>(() => {
@@ -251,6 +254,10 @@ export function useModSource(): ModSourceState {
   )
   const createMod = useCallback(
     (draft: Record<string, unknown>) => act("modsCreate", draft),
+    [act]
+  )
+  const updateMeta = useCallback(
+    (folder: string, patch: Record<string, unknown>) => act("modsUpdateMeta", folder, patch),
     [act]
   )
   const setAuthorName = useCallback((name: string) => act("authorSetName", name), [act])
@@ -417,6 +424,7 @@ export function useModSource(): ModSourceState {
     saveText,
     installFromMarket,
     createMod,
+    updateMeta,
     setAuthorName,
     exportKey,
     importKey,

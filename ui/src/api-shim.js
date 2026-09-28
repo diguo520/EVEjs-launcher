@@ -111,6 +111,7 @@
     modsSubmitPrepare: function (input) { return request("mods:submitPrepare", [input]); },
     modsTemplates: function () { return request("mods:templates", []); },
     modsUninstall: function (folder) { return request("mods:uninstall", [folder]); },
+    modsUpdateMeta: function (folder, patch) { return request("mods:updateMeta", [folder, patch]); },
     openExternal: function (url) { return request("shell:openExternal", [url]); },
     readServerLog: function () { return request("log:read", []); },
     serviceRestart: function (id) { return request("service:restart", [id]); },
