@@ -458,7 +458,7 @@ export function ModulesPage({
   }
 
   /** 审核由索引仓库的 PR 流程托管：这里把作者带到那条 PR 上 */
-  function resolveReview(mod: ModEntry, _result: "approved" | "rejected") {
+  function openReview(mod: ModEntry) {
     const submission = source.lastSubmissionOf(mod.id)
     if (submission?.sourceReviewUrl) {
       void source.openExternal(submission.sourceReviewUrl)
@@ -677,7 +677,7 @@ export function ModulesPage({
       )}
 
       {tab === "mine" ? (
-        <ReviewBanner mods={reviewing} onResolve={resolveReview} />
+        <ReviewBanner mods={reviewing} onOpenReview={openReview} />
       ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">

@@ -835,6 +835,10 @@ pub fn register_source(runtime: &RuntimePaths, id: &str, version: &str) -> Value
         let mut file = file;
         if let Some(index) = find_item_index(&file, id, version) {
             file["items"][index]["sourceReviewUrl"] = json!(text_field(&result, "prUrl"));
+            // 这一步就是界面上那个「提交审核」：PR 开出来了，状态得跟上，
+            // 否则 myMods 只会说「草稿」，「我创建的」页签既不显示审核中、
+            // 也没有入口打开那条 PR（2026-09-28 报障）。
+            file["items"][index]["status"] = json!("submitted");
             let _ = write_submission_file(runtime, &file);
         }
     }
