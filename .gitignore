@@ -32,6 +32,12 @@ launcher.config.json
 .keys/
 *.eve-key
 
+# --- 本地开发资料（2026-09-28 维护者要求：公开仓库不放这些） ---
+# docs/*.md 是各阶段实施记录；assets/ 是界面原型工程。两者都只在维护者本机保留。
+# docs/screenshots/ 仍然入库（README 用图），所以这里只忽略 docs 下的 Markdown。
+docs/*.md
+assets/
+
 # --- 来自旧 Electron 仓库（仍然适用，保留兼容） ---
 _launcher/
 updater/bin/*.exe
