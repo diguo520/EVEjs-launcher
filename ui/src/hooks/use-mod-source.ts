@@ -48,6 +48,15 @@ export interface PublishOutcome {
   releaseUrl?: string | null
   /** GitHub 上的 owner/repo（发布回包里带出来的真名，展示用） */
   repoSlug?: string
+  /**
+   * 这次是不是首次发布（真的往索引仓库登记了收录源）。
+   * 必须由发布流程回传：页面在 publish() 之后会 reload 一遍台账，
+   * 那时 sourceRepos 已经有这条记录了，再拿它判断「是不是第一次」必然是 false
+   * ——2026-09-28 报障：首次发布完成了却提示「没有 PR」。
+   */
+  registered?: boolean
+  /** 收录源登记 PR 的地址（首次发布才有；失败时为空） */
+  reviewUrl?: string
 }
 
 /** 发布流水线当前在哪一环：进度环由它 + 真进度百分比共同决定 */
@@ -353,13 +362,15 @@ export function useModSource(): ModSourceState {
       if (!published?.ok) {
         setPublishProgress(null)
         setPublishPhase("failed")
-        return { ok: false, step: "publish", reason: published?.reason ?? "推送失败" }
+        return { ok: false, step: "publish", reason: published?.reason ?? "推送失败", registered: false }
       }
       const slug = published.owner && published.repo ? `${published.owner}/${published.repo}` : undefined
       const firstTime = !sourceRepos.includes(input.mod.id)
+      /** 收录源登记 PR 的地址：只在这一步刚跑过时才有 */
+      let reviewUrl: string | undefined
       if (firstTime) {
         setPublishPhase("register")
-        const registered = await callOr<{ ok: boolean; reason?: string }>(
+        const registered = await callOr<{ ok: boolean; reason?: string; prUrl?: string }>(
           "modsRegisterSource",
           null,
           input.mod.id,
@@ -374,8 +385,10 @@ export function useModSource(): ModSourceState {
             reason: registered?.reason ?? "收录源登记失败",
             repoUrl: published.repoUrl,
             repoSlug: slug,
+            registered: false,
           }
         }
+        reviewUrl = typeof registered.prUrl === "string" && registered.prUrl ? registered.prUrl : undefined
       }
       setPublishProgress({ stage: "完成", percent: 100 })
       setPublishPhase("done")
@@ -386,6 +399,8 @@ export function useModSource(): ModSourceState {
         repoUrl: published.repoUrl,
         releaseUrl: published.releaseUrl ?? null,
         repoSlug: slug,
+        registered: firstTime,
+        reviewUrl,
       }
     },
     [load, sourceRepos]
