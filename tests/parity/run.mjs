@@ -15,6 +15,8 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
+import { compareChannel } from "./normalize.mjs";
+
 const ROOT = path.resolve(import.meta.dirname, "..", "..");
 const MANIFEST_DIR = path.join(ROOT, "tests", "parity", "fixtures", "manifest");
 const PASSWORD_FIXTURE = path.join(ROOT, "tests", "parity", "fixtures", "password-hash.json");
@@ -76,6 +78,42 @@ for (const vector of fixture.vectors) {
 }
 if (hashOk === fixture.vectors.length) {
   pass(`密码哈希 ${hashOk}/${fixture.vectors.length} 条向量与现役版冻结值一致（argv + --password-stdin 两条路）`);
+}
+
+/* ---------- D) 通道级结构口径：条件键不进结构指纹 ---------- */
+
+// env:check 的检查项只在「未就绪 / 部分就绪」时才带 hint / installUrl（见 env.rs::check_item）。
+// CI runner 是 Node 22（低于 node_check 的 ≥24 门槛）、本机是 Node 26，两边键集合天生不同；
+// 结构比对必须对这种条件键免疫，否则 CI 第 11 步永远红（2026-09-28 实测）。
+{
+  const notReady = {
+    ok: false,
+    passCount: 0,
+    sys: { level: "warn" },
+    checks: [
+      {
+        key: "node",
+        label: "Node.js 运行时",
+        ok: false,
+        message: "未检测到可用 Node（当前: 22.0.0）",
+        hint: "请手动安装 Node.js 24+（LTS 版本即可）",
+        installUrl: "https://nodejs.org",
+      },
+    ],
+  };
+  const ready = {
+    ok: true,
+    passCount: 1,
+    sys: { level: "ok" },
+    checks: [{ key: "node", label: "Node.js 运行时", ok: true, message: "Node v26.5.0（满足 ≥24）" }],
+  };
+  const diff = compareChannel("env:check", notReady, ready);
+  if (diff === null) pass("env:check：条件键（hint / installUrl / warn）不进结构指纹，未就绪与就绪两种机器形态同形");
+  else fail("env:check：条件键仍被算进结构指纹", JSON.stringify(diff));
+
+  const missing = { ok: true, passCount: 1, sys: { level: "ok" }, checks: [{ key: "node", ok: true }] };
+  if (compareChannel("env:check", ready, missing) !== null) pass("env:check：必备键（label / message）缺失仍能被结构比对抓到");
+  else fail("env:check：必备键缺失却没被结构比对抓到");
 }
 
 /* ---------- 汇总 ---------- */

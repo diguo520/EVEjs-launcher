@@ -48,6 +48,36 @@ export const SHAPE_ONLY_CHANNELS = new Set([
   "env:check",
 ]);
 
+/**
+ * 条件键：**键本身**只在特定取值下才出现，于是「本机装没装某项」会直接改变结构指纹。
+ *
+ * env:check 的检查项就是这个形状：src-tauri/src/env.rs::check_item 只在「未就绪 / 部分就绪」时
+ * 才插入 hint / installUrl（有修复建议才有得可点），warn 同理。CI runner 装的是 Node 22，而
+ * node_check 的门槛是 ≥24，于是同一份代码在 runner 上凭空多出两个键，结构比对必然红
+ * （2026-09-28 实测：这是 CI 第 11 步唯一剩下的差异）。
+ *
+ * 这些键的语义（未就绪必须给非空 hint、就绪则整键消失、任何键都不许是 null）由 env.rs 的单测保，
+ * 这里只比**必备键**的集合与类型，不再重复管一遍「可选键在什么情况下该出现」。
+ */
+const CONDITIONAL_KEYS = new Map([
+  ["env:check", new Set(["hint", "installUrl", "warn"])],
+]);
+
+function dropConditionalKeys(channel, node) {
+  const drop = CONDITIONAL_KEYS.get(channel);
+  if (!drop) return node;
+  if (Array.isArray(node)) return node.map((item) => dropConditionalKeys(channel, item));
+  if (node && typeof node === "object") {
+    const out = {};
+    for (const key of Object.keys(node)) {
+      if (drop.has(key)) continue;
+      out[key] = dropConditionalKeys(channel, node[key]);
+    }
+    return out;
+  }
+  return node;
+}
+
 export function normalize(node) {
   if (typeof node === "string") {
     if (ISO.test(node)) return "<timestamp>";
@@ -96,8 +126,8 @@ export function channelDiff(baseline, current) {
  */
 export function compareChannel(channel, baseline, current) {
   if (SHAPE_ONLY_CHANNELS.has(channel)) {
-    const left = shape(normalize(baseline));
-    const right = shape(normalize(current));
+    const left = shape(dropConditionalKeys(channel, normalize(baseline)));
+    const right = shape(dropConditionalKeys(channel, normalize(current)));
     if (JSON.stringify(left) === JSON.stringify(right)) return null;
     return channelDiff(left, right);
   }
