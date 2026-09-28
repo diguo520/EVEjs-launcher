@@ -87,13 +87,14 @@ pwsh -File scripts/package.ps1 -Nsis   # 出包：便携 zip + 安装包 + updat
 ```
 src-tauri/        Rust 外壳（服务管理、IPC、模组、签名、更新器、旧数据接管）
 ui/               React + shadcn/ui 界面（编译期嵌入 exe）；ui/web/ 是随包分发的静态资源
-assets/           界面原型工程（设计归档，不参与 exe 构建）
 vendor/           随包分发的 Node 侧车 CLI 与 Go 自更新器源码
-contract/         IPC 契约与固定向量（82 条通道：invoke 76 + send 6）
+contract/         IPC 契约与固定向量（83 条通道：invoke 77 + send 6）
 tests/            parity / e2e / 契约与安全检查
-docs/             实施记录（S1 … S10：骨架、后端直译、查重、打包、测试、UI、发布、界面重做、仓库替换）
 scripts/          构建、打包、门禁、发布演练脚本
+docs/screenshots/ README 用图
 ```
+
+> 界面原型工程（`assets/`）与各阶段实施记录（`docs/*.md`）是维护者本地资料，**不入库**。
 
 ### 测试与门禁
 
@@ -113,9 +114,6 @@ pwsh -File scripts/smoke-ipc.ps1        # 真实 WebView2 上的通道自检
 > `releases/download/stable/update-manifest.json`，并在发布后把 `stable` tag 指向新 release；
 > 或者给新 release 勾 **Pre-release** / 在 v0.1.28 页面点 **Set as the latest release**。
 > 否则 `releases/latest` 一旦指向 Tauri 的 zip 清单，老用户的主程序会被 zip 字节替换而报废。
-> 详见 `docs/S7-发布与回滚-实施记录.md` §2。
-
-发布清单、灰度与回滚演练：`docs/S7-发布与回滚-实施记录.md`。
 
 ### 许可证
 
@@ -170,7 +168,7 @@ pwsh -File scripts/package.ps1 -Nsis
 The legacy Electron 0.1.28 updater reads `releases/latest/download/update-manifest.json` and verifies
 **sha256 only — it does not understand zip packages**. Publishing a Tauri portable zip manifest to
 `releases/latest` would replace existing users' executables with zip bytes.
-Split the update channels before publishing (see `docs/S7-发布与回滚-实施记录.md` §2).
+Split the update channels before publishing.
 
 ### License
 

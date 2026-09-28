@@ -1,5 +1,5 @@
 {
-  "note": "本启动器在现役版契约之外**新增**的通道。extract-contract.mjs 每次重抽都会把它们并回 contract/ipc-channels.json，所以现役版升级重抽不会把它们冲掉。每条都要在 docs/S2-* 实施记录里写清「为什么现役版没有、我们为什么需要」。",
+  "note": "本启动器在现役版契约之外**新增**的通道。extract-contract.mjs 每次重抽都会把它们并回 contract/ipc-channels.json，所以现役版升级重抽不会把它们冲掉。每条都要在本地 docs/S2-* 实施记录里写清「为什么现役版没有、我们为什么需要」（docs/*.md 不入库）。",
   "invoke": [
     {
       "api": "modsUpdateMeta",
