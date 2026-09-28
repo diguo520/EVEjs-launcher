@@ -69,7 +69,9 @@ $ok = [int]$summary.ok
 $total = [int]$summary.total
 $fails = @($summary.fails)
 
-Write-Host ("覆盖 {0}/{1} 个请求通道（总契约 82，另有 {2} 个写通道不自动执行）" -f $ok, $total, (82 - $total))
+# 请求通道总数从契约现读（此前写死 82，加一条 mods:updateMeta 就对不上了）
+$requestTotal = [int](Get-Content -Raw -LiteralPath (Join-Path $root "contract/ipc-channels.json") | ConvertFrom-Json).counts.requests
+Write-Host ("覆盖 {0}/{1} 个请求通道（总契约 {2}，另有 {3} 个写通道不自动执行）" -f $ok, $total, $requestTotal, ($requestTotal - $total))
 if ($fails.Count -gt 0) {
     Write-Host "失败通道：" -ForegroundColor Red
     $fails | ForEach-Object { Write-Host (("  " + [char]0x2717 + " ") + $_) -ForegroundColor Red }
