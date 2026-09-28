@@ -18,19 +18,29 @@ export interface Character {
   id: string
   name: string
   /**
-   * 种族 / 血统 / 性别是老启动器本地演示数据里的字段；真后端只返回头像、
-   * 舰船、技能点与所在位置，所以这三项是**可选**的：拿不到就不画，不编。
+   * 种族 / 血统 / 性别现在从服务端角色表读（raceID / bloodlineID / gender），
+   * 经 raceFromId / bloodlineFromId / genderFromCode 换算；服务端没记录就不画，不编。
    */
   race?: RaceId
   bloodline?: string
   gender?: Gender
   ship: string
   sp: number
+  /** 角色钱包余额（ISK）；账号卡片底部的合计按它加总 */
+  isk?: number
+  /** 所在地：星系 + 停靠点，给搜索与其它读通用 */
   location: string
+  /** 只取星系名；角色卡片底部那一行要的是「角色所在星系」 */
+  system?: string
   online: boolean
   bornAt: string
   /** 游戏内肖像 data URL（后端 accounts:list 提供），有就优先画这张位图 */
   avatar?: string
+  /** 军团 / 联盟：id 用来拼本地图片服务的徽标地址，名字只做提示 */
+  corporationId?: number
+  corporationName?: string
+  allianceId?: number
+  allianceName?: string
   /** 本次上线的时间戳；在线时长按它算。老存档里没有这个字段，读盘时会补上 */
   onlineSince?: number
 }
@@ -106,6 +116,51 @@ export const RACES: RaceEntry[] = [
 
 export function raceOf(id: RaceId): RaceEntry {
   return RACES.find((r) => r.id === id) ?? RACES[0]
+}
+
+/**
+ * 服务端角色表里的 raceID 是静态数据主键：1 加达里 / 2 米玛塔尔 / 4 艾玛 / 8 盖伦特
+ * （取自服务端 characterCreationRaces 静态表）。别的值一律当没记录，不猜。
+ */
+const RACE_BY_ID: Record<number, RaceId> = {
+  1: "caldari",
+  2: "minmatar",
+  4: "amarr",
+  8: "gallente",
+}
+
+export function raceFromId(id: number | null | undefined): RaceId | undefined {
+  return typeof id === "number" ? RACE_BY_ID[id] : undefined
+}
+
+/** 服务端 characterCreationBloodlines 静态表的 12 条血统，中文名与启动器里已有的一致 */
+const BLOODLINE_BY_ID: Record<number, string> = {
+  1: "德泰斯",
+  2: "西威雷",
+  3: "塞比斯托尔",
+  4: "布鲁特",
+  5: "艾玛",
+  6: "尼-库尼",
+  7: "盖伦特",
+  8: "因塔基",
+  11: "阿楚拉",
+  12: "金梅",
+  13: "卡尼德",
+  14: "维赫罗基尔",
+}
+
+export function bloodlineFromId(id: number | null | undefined): string | undefined {
+  return typeof id === "number" ? BLOODLINE_BY_ID[id] : undefined
+}
+
+/**
+ * 性别服务端只写 0 / 1 / 2（characterIdentity.normalizeCharacterGender）。
+ * 1 在两套约定里都是男性，0 与 2 分别是两套约定里的女性，所以这样换算不会认错。
+ */
+export function genderFromCode(code: number | null | undefined): Gender | undefined {
+  if (code === 1) return "male"
+  if (code === 0 || code === 2) return "female"
+  return undefined
 }
 
 export const ACCOUNT_STATUS_LABEL: Record<AccountStatus, string> = {
@@ -357,6 +412,11 @@ export function accountStats(accounts: Account[]): AccountStats {
   }
 }
 
+/** 账号里各角色钱包余额的合计（没记录的按 0 算） */
+export function totalIsk(account: Account): number {
+  return account.characters.reduce((sum, c) => sum + (c.isk ?? 0), 0)
+}
+
 export type StatusFilter = AccountStatus | "ALL"
 
 export function matchesQuery(account: Account, query: string): boolean {
@@ -388,6 +448,11 @@ export function initialsOf(name: string): string {
   if (parts.length === 0) return "?"
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
   return (parts[0][0] + parts[1][0]).toUpperCase()
+}
+
+/** ISK 合计按千分位原样展示：钱包数字要能一眼对上，不做 K/M/B 缩写 */
+export function formatIsk(isk: number): string {
+  return Math.round(Number.isFinite(isk) ? isk : 0).toLocaleString("en-US")
 }
 
 export function formatSp(sp: number): string {

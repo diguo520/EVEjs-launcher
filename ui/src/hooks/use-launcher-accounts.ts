@@ -2,10 +2,20 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 
 import { callOr, hasIpc } from "@/lib/ipc"
-import type { RawAccount, RawAccountList, RawAccountRunning, RawAck, RawRole } from "@/lib/ipc"
+import type {
+  RawAccount,
+  RawAccountList,
+  RawAccountRunning,
+  RawAck,
+  RawConfigBundle,
+  RawRole,
+} from "@/lib/ipc"
 import {
   MAX_CHARACTERS_PER_ACCOUNT,
   accountStats,
+  bloodlineFromId,
+  genderFromCode,
+  raceFromId,
   seedAccounts,
   type Account,
   type AccountRole,
@@ -15,6 +25,11 @@ import {
   type Guard,
   type InGameCreation,
 } from "@/lib/launcher-logic"
+
+/** 本地图片服务的徽标地址（军团 / 联盟），端口由 config:get 给出 */
+export function logoUrl(base: string, kind: "corporations" | "alliances", id: number): string {
+  return `${base}/${kind}/${id}/logo?size=64`
+}
 
 /** 建号期间轮询账号列表的节拍与上限：客户端捏人慢，给足两分钟 */
 const ROLE_POLL_MS = 5000
@@ -35,12 +50,14 @@ function reasonOf(reply: unknown, fallback: string): string {
 /**
  * 后端 `accounts:list` 的一条 → 页面视图模型。
  *
- * 后端只给到 `characterId / characterName / avatar / shipName / skillPoints /
- * isk / securityStatus / location`；老启动器那份数据里还有种族、血统、性别，
- * 那是本地演示才有的东西，这里**不编**：拿不到就留空，界面上画「未记录」。
+ * 后端给到 `characterId / characterName / avatar / shipName / skillPoints / isk /
+ * securityStatus / location`，以及角色表里的 `raceID / bloodlineID / gender /
+ * corporationID / allianceID`（军团与联盟名字由 CLI 反查）。换算不出来的
+ * 字段就留空、界面画「未记录」，绝不拿演示数据顶替。
  */
 function toCharacter(role: RawRole, online: boolean): Character {
   const where = role.location
+  const system = typeof where?.solarSystemName === "string" ? where.solarSystemName : ""
   const location = [where?.solarSystemName, where?.stationName || where?.label]
     .filter((part): part is string => typeof part === "string" && part.length > 0)
     .join(" · ")
@@ -54,6 +71,24 @@ function toCharacter(role: RawRole, online: boolean): Character {
     bornAt: "—",
   }
   if (role.avatar) character.avatar = role.avatar
+  if (typeof role.isk === "number") character.isk = role.isk
+  if (system) character.system = system
+
+  const race = raceFromId(role.raceID)
+  if (race) character.race = race
+  const bloodline = bloodlineFromId(role.bloodlineID)
+  if (bloodline) character.bloodline = bloodline
+  const gender = genderFromCode(role.gender)
+  if (gender) character.gender = gender
+
+  if (typeof role.corporationID === "number" && role.corporationID > 0) {
+    character.corporationId = role.corporationID
+    if (role.corporationName) character.corporationName = role.corporationName
+  }
+  if (typeof role.allianceID === "number" && role.allianceID > 0) {
+    character.allianceId = role.allianceID
+    if (role.allianceName) character.allianceName = role.allianceName
+  }
   return character
 }
 
@@ -101,6 +136,11 @@ export interface LauncherAccountsState {
   setPassword: (accountId: string, oldPassword: string, newPassword: string) => Promise<Guard>
   /** 重新从后端读一遍账号列表 */
   reload: () => void
+  /**
+   * 本地图片服务地址（形如 http://127.0.0.1:26001）。军团 / 联盟徽标从它上面取；
+   * 端口读不到（浏览器预览 / 配置缺失）时为 null，界面就不画徽标。
+   */
+  imagesBaseUrl: string | null
 }
 
 /**
@@ -118,6 +158,8 @@ export function useLauncherAccounts(): LauncherAccountsState {
   /** 本启动器这轮拉起过的角色：accountId → characterId（后端不报「谁在线」） */
   const [onlineByAccount, setOnlineByAccount] = useState<Record<string, string>>({})
   const [running, setRunning] = useState(false)
+  /** 图片服务地址：徽标 <img> 的根；配置没读到就是 null */
+  const [imagesBaseUrl, setImagesBaseUrl] = useState<string | null>(null)
 
   const accountsRef = useRef(accounts)
   accountsRef.current = accounts
@@ -145,6 +187,20 @@ export function useLauncherAccounts(): LauncherAccountsState {
   useEffect(() => {
     void load()
   }, [load])
+
+  /** 徽标地址只跟配置有关，读一次就够；读不到就让界面不画徽标 */
+  useEffect(() => {
+    if (!ipc) return
+    let alive = true
+    void callOr<RawConfigBundle>("getConfig", null).then((config) => {
+      if (!alive) return
+      const port = config?.server?.ports?.images
+      setImagesBaseUrl(typeof port === "number" && port > 0 ? `http://127.0.0.1:${port}` : null)
+    })
+    return () => {
+      alive = false
+    }
+  }, [ipc])
 
   /** 客户端是否在跑：不在跑就把「在线」标记全清掉（本启动器只认自己拉起的进程） */
   useEffect(() => {
@@ -414,5 +470,6 @@ export function useLauncherAccounts(): LauncherAccountsState {
     verify,
     setPassword,
     reload,
+    imagesBaseUrl,
   }
 }

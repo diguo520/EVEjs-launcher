@@ -20,8 +20,10 @@ import {
   ACCOUNT_STATUS_LABEL,
   MAX_CHARACTERS_PER_ACCOUNT,
   canDeleteAccount,
+  formatIsk,
   freeSlots,
   onlineCharacter,
+  totalIsk,
   type Account,
   type AccountStatus,
   type Character,
@@ -39,6 +41,7 @@ export function AccountCard({
   account,
   creating,
   now,
+  imagesBaseUrl,
   onEnter,
   onExit,
   onDelete,
@@ -48,6 +51,8 @@ export function AccountCard({
   account: Account
   /** 全页共享的建号进度：只有正在建号的那个账号会亮起来 */
   creating: InGameCreation | null
+  /** 本地图片服务地址；角色槽上的军团 / 联盟徽标按它拼地址 */
+  imagesBaseUrl: string | null
   /** 页面统一往下发的当前时间，用来算在线时长 */
   now: number
   onEnter: (accountId: string, character: Character) => void
@@ -59,6 +64,7 @@ export function AccountCard({
   const online = onlineCharacter(account)
   const pending = creating?.accountId === account.id ? creating.step : null
   const free = freeSlots(account)
+  const isk = totalIsk(account)
   const canDelete = canDeleteAccount(account)
   const deleteHint =
     account.characters.length > 0
@@ -119,6 +125,7 @@ export function AccountCard({
             account={account}
             character={slot.character}
             index={slot.index}
+            imagesBaseUrl={imagesBaseUrl}
             /* 客户端在捏的这个角色会落到第一个空槽，也只有它该显示进度 */
             creatingStep={slot.index === account.characters.length ? pending : null}
             now={now}
@@ -131,10 +138,11 @@ export function AccountCard({
       </div>
 
       <footer className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-input px-4 py-2">
+        {/* 老版画的是「上次登录 / 建于」，后端账号接口本来就不返回这两项，
+            一直是「—」；换成三个角色钱包余额的合计，至少是个真读数 */}
         <span className="tabular text-[10px] text-tertiary">
-          上次登录 {account.lastLogin}
+          ISK 合计 <span className="text-telemetry">{formatIsk(isk)}</span>
         </span>
-        <span className="tabular text-[10px] text-tertiary">建于 {account.createdAt}</span>
         <div className="min-w-2 flex-1" />
         <span className="tabular text-[10px] text-muted-foreground">
           {free > 0 ? `空余 ${free} 个槽位` : "槽位已满"}

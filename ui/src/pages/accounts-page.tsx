@@ -169,6 +169,7 @@ export function AccountsPage({ store }: { store: LauncherAccountsState }) {
               account={account}
               creating={store.creating}
               now={now}
+              imagesBaseUrl={store.imagesBaseUrl}
               onEnter={enterGame}
               onExit={exitGame}
               onDelete={deleteCharacter}

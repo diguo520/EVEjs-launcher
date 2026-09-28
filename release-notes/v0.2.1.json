@@ -1,0 +1,73 @@
+{
+  "version": "0.2.1",
+  "changelog": {
+    "zh": [
+      {
+        "type": "new",
+        "text": "启动器自更新的验签公钥落地：更新包必须带维护者私钥签名才认。0.2.0 那版没配公钥、验不了签，自更新从这一版起才真正可用"
+      },
+      {
+        "type": "new",
+        "text": "界面多语言：中文、英语、日语、韩语、法语、德语、荷兰语、俄语共 8 种，默认跟随系统语言（认不出来用英语）；外壳文案七种外语各 61 条，英语为全量目录"
+      },
+      {
+        "type": "new",
+        "text": "账号卡片底部不再画「上次登录 / 建于」（后端账号接口本来就不返回这两项，一直是「—」），改成该账号三个角色钱包余额的 ISK 合计"
+      },
+      {
+        "type": "new",
+        "text": "角色卡片右上角显示军团与联盟徽标，鼠标悬停给出军团 / 联盟名（图来自本地图片服务，端口跟随配置中心）"
+      },
+      {
+        "type": "fix",
+        "text": "修复新建角色一直显示「种族资料未记录」：种族 / 血统 / 性别改从服务端角色表读出（raceID / bloodlineID / gender 换算），服务端确实没记录的才留空"
+      },
+      {
+        "type": "fix",
+        "text": "角色卡片底部把「建于 —」换成角色所在星系，「进入游戏」下面一眼能看到人在哪个星系"
+      },
+      {
+        "type": "fix",
+        "text": "模组发布改为每一版都提审核 PR：首次含 sources.json 收录登记，之后每次更新提 mods/<id>.json 分片；维护者合并后索引 CI 立刻重建，市场才换到新版本（之前只有第一次发布才提 PR）"
+      },
+      {
+        "type": "new",
+        "text": "提交模组后自动复查那条审核 PR（首次提交 / 版本更新 / 审核中再更新都会查）：卡片上显示 PR 编号与「审核中 / 已合并 / PR 已关闭」；同一模组两次提交至少间隔 30 分钟，PR 状态复查同样 30 分钟节流"
+      }
+    ],
+    "en": [
+      {
+        "type": "new",
+        "text": "The launcher's own update signature key is now in place: update packages must be signed with the maintainer key. 0.2.0 shipped without the public key, so self-update only really works from this version on"
+      },
+      {
+        "type": "new",
+        "text": "UI localisation: Chinese, English, Japanese, Korean, French, German, Dutch and Russian - eight languages, defaulting to the system language (English when unrecognised). The shell has 61 strings in each of the seven foreign languages, with English as the full catalogue"
+      },
+      {
+        "type": "new",
+        "text": "The account card footer no longer shows \"Last login / Built\" (the backend never returned either, so both were always \"—\"); it now shows the combined ISK balance of the account's three characters"
+      },
+      {
+        "type": "new",
+        "text": "Character cards show the corporation and alliance logo in the top-right corner, with the name on hover (images come from the local image service; the port follows the config)"
+      },
+      {
+        "type": "fix",
+        "text": "Fixed newly created characters always showing \"Race data not recorded\": race, bloodline and gender are now read from the server's character table (raceID / bloodlineID / gender) and only left blank when the server really has no record"
+      },
+      {
+        "type": "fix",
+        "text": "The character card footer replaced \"Built —\" with the character's solar system, so the system is visible right below \"Enter game\""
+      },
+      {
+        "type": "fix",
+        "text": "Every mod release now opens a review PR: the first one carries the sources.json registration, later ones submit a mods/<id>.json shard; the maintainer merging it rebuilds the index CI and only then does the market move to the new version (previously only a first publish opened a PR)"
+      },
+      {
+        "type": "new",
+        "text": "After submitting a mod the launcher re-checks that review PR (first submission, version update and re-update while in review all get checked): the card shows the PR number plus \"In review / Merged / PR closed\". Two submissions of the same mod must be at least 30 minutes apart, and the PR re-check is throttled to 30 minutes as well"
+      }
+    ]
+  }
+}

@@ -860,5 +860,7 @@
  "，确认 id 没写错；对方还没发布的话可以照实留着。": "; check the id. If the other side has not published yet, you can leave it as is.",
  "，请核对收款人后再转账。": "; verify the payee before transferring.",
  "，这个目录里找不到服务端主程序，模组骨架建过去服务端也加载不到。": "; the server entry point is not in that directory, so a skeleton built there will never load.",
- "，这份骨架建到那里服务端加载不到。": "; a skeleton built there will not load."
+ "，这份骨架建到那里服务端加载不到。": "; a skeleton built there will not load.",
+ "ISK 合计": "ISK total",
+ "客户端运行中": "Client running"
 }

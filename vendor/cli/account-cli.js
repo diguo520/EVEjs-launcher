@@ -130,6 +130,47 @@ function nextAccountId(db) {
   return maxId + 1;
 }
 
+/* ---------------- 军团 / 联盟名称 ---------------- */
+
+/**
+ * corporations / alliances 两张表都是 key→json 的 KV，同一个键能装两种东西：
+ *   "records"            → 整张 id→记录 的映射（NPC 军团就这么存的）
+ *   "records\u001f<id>"  → 单条记录（玩家军团 / 联盟落库后长这样）
+ * 真实数据里映射行**不带** records 外层，本体就是那张映射，所以这里按
+ * 「有没有 id/name 字段」区分是单条还是映射。_meta 之类既没 id 也没 name
+ * 的行会被映射分支遍历到，但值不是对象，add() 会跳过。
+ * 表不存在（老服务端）不算错，返回空表即可。
+ */
+function nameIndex(db, table, idKey, nameKey) {
+  const index = new Map();
+  let rows;
+  try {
+    rows = db.prepare(`SELECT key, json FROM ${table}`).all();
+  } catch {
+    return index;
+  }
+  const add = (record, fallbackKey) => {
+    if (!record || typeof record !== "object") return;
+    const id = record[idKey] != null ? record[idKey] : fallbackKey;
+    const name = record[nameKey];
+    if (id != null && name !== undefined && name !== null && String(name) !== "") {
+      index.set(String(id), String(name));
+    }
+  };
+  for (const row of rows) {
+    let data;
+    try { data = JSON.parse(row.json); } catch { continue; }
+    if (!data || typeof data !== "object") continue;
+    if (data[idKey] != null || data[nameKey] != null) {
+      add(data, null);
+      continue;
+    }
+    const map = data.records && typeof data.records === "object" ? data.records : data;
+    for (const [key, record] of Object.entries(map)) add(record, key);
+  }
+  return index;
+}
+
 /* ---------------- list ---------------- */
 function listAccounts(root) {
   const Database = betterSqlite(root);
@@ -137,6 +178,9 @@ function listAccounts(root) {
   const accounts = db.prepare("SELECT key, json FROM accounts").all();
   const chars = db.prepare("SELECT key, json FROM characters").all();
   const items = db.prepare("SELECT key, json FROM items").all();
+  // 角色行里只有 corporationID / allianceID，名字得从这两张表反查（拿不到就留空）
+  const corporationNames = nameIndex(db, "corporations", "corporationID", "corporationName");
+  const allianceNames = nameIndex(db, "alliances", "allianceID", "allianceName");
   db.close();
   const itemNames = new Map();
   for (const item of items) {
@@ -157,6 +201,9 @@ function listAccounts(root) {
       .map((c) => {
         const d = JSON.parse(c.json);
         const shipName = d.shipName || itemNames.get(String(d.shipID)) || (d.shipTypeID ? `Type ${d.shipTypeID}` : "Unknown");
+        // 军团 / 联盟：0 表示"没有"，统一换成 null，界面按"没记录"处理
+        const corporationID = asNumber(d.corporationID, 0) || null;
+        const allianceID = asNumber(d.allianceID, 0) || null;
         return {
           characterId: c.key,
           characterName: d.characterName || c.key,
@@ -165,7 +212,16 @@ function listAccounts(root) {
           shipName,
           shipTypeID: asNumber(d.shipTypeID, 0) || null,
           location: characterLocation(d),
-          securityStatus: d.securityStatus ?? d.securityRating ?? null
+          securityStatus: d.securityStatus ?? d.securityRating ?? null,
+          // 种族档案：服务端在角色表里就存在，之前没带出来，界面只好画"未记录"
+          raceID: asNumber(d.raceID, 0) || null,
+          bloodlineID: asNumber(d.bloodlineID, 0) || null,
+          // 性别只有 0/1/2 三个合法值（服务端 characterIdentity.normalizeCharacterGender），别的当没记录
+          gender: d.gender === 0 || d.gender === 1 || d.gender === 2 ? d.gender : null,
+          corporationID,
+          corporationName: corporationID ? corporationNames.get(String(corporationID)) || null : null,
+          allianceID,
+          allianceName: allianceID ? allianceNames.get(String(allianceID)) || null : null
         };
       });
     out.push({

@@ -1068,7 +1068,7 @@ dependencies = [
 
 [[package]]
 name = "evejs-launcher"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "ed25519-dalek",
  "getrandom 0.4.3",
