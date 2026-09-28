@@ -724,6 +724,18 @@ fn item_str(item: Option<&Value>, key: &str) -> String {
         .to_string()
 }
 
+/// 台账这一条算不算「已提交审核」。
+///
+/// 三种写法都认：新版发布流程登记收录源后写 `status = "submitted"`；老版提
+/// `mods/<id>.json` PR 时写的是 `prUrl`；**还要认 `sourceReviewUrl`** —— 只认前两者时，
+/// 用「本地签名 + 令牌」新流程发布过的台账（只有 PR 地址、status 还是 draft）会一直显示成
+/// 「草稿」，界面上既看不到「审核中」，也找不到那条收录源 PR（2026-09-28 报障）。
+fn ledger_submitted(submission: &Value) -> bool {
+    item_str(Some(submission), "status") == "submitted"
+        || !item_str(Some(submission), "prUrl").is_empty()
+        || !item_str(Some(submission), "sourceReviewUrl").is_empty()
+}
+
 fn item_u64(item: Option<&Value>, key: &str) -> u64 {
     item.and_then(|value| value.get(key))
         .and_then(Value::as_u64)
@@ -1065,8 +1077,7 @@ pub fn list_my_mods(repo_root: &Path, runtime: &RuntimePaths) -> Value {
             .and_then(Value::as_str)
             .unwrap_or_default();
         let prev = items.get(id).cloned();
-        let submitted = item_str(Some(submission), "status") == "submitted"
-            || !item_str(Some(submission), "prUrl").is_empty();
+        let submitted = ledger_submitted(submission);
         let prev_status = item_str(prev.as_ref(), "status");
         let status = if !prev_status.is_empty() && prev_status != "local" {
             prev_status.clone()
@@ -1239,6 +1250,25 @@ mod tests {
         // 非数字段按 0 处理（对齐 Number.parseInt 的容错）
         assert_eq!(compare_version("1.x.0", "1.0.0"), 0);
         assert_eq!(compare_version("", "0.0.0"), 0);
+    }
+
+    /// 台账里的「已提交审核」三种写法都要认（status=submitted / prUrl / sourceReviewUrl）。
+    /// 最后一条是新流程的台账：只有 PR 地址、status 还是 draft，漏了它就永远显示成草稿。
+    #[test]
+    fn ledger_submitted_accepts_all_three_shapes() {
+        assert!(ledger_submitted(&json!({ "status": "submitted" })));
+        assert!(ledger_submitted(
+            &json!({ "prUrl": "https://example.com/pull/1" })
+        ));
+        assert!(ledger_submitted(&json!({
+            "status": "draft",
+            "sourceRepo": "a/b",
+            "sourceReviewUrl": "https://example.com/pull/8"
+        })));
+        assert!(!ledger_submitted(
+            &json!({ "status": "draft", "sourceReviewUrl": "" })
+        ));
+        assert!(!ledger_submitted(&json!({})));
     }
 
     #[test]

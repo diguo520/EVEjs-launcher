@@ -2,7 +2,7 @@ import { Clock, TriangleAlert } from "lucide-react"
 
 import { StatusDot } from "@/components/common/status-dot"
 import { Button } from "@/components/ui/button"
-import type { ConflictPair, ReviewResult } from "@/lib/mod-logic"
+import type { ConflictPair } from "@/lib/mod-logic"
 import { REVIEW_WINDOW_MINUTES, type ModEntry } from "@/lib/mock"
 
 export type { ConflictPair }
@@ -91,15 +91,15 @@ export function ConflictBanner({
 
 /**
  * 「我创建的」页签顶部的审核状态汇总，把时长口径摆在最显眼的位置。
- * 只陈述状态，不推算进度。
+ * 只陈述状态，不推算进度 —— 审核由索引仓库的 PR 托管，这里给的是那条 PR 的入口。
  */
 export function ReviewBanner({
   mods,
-  onResolve,
+  onOpenReview,
 }: {
   mods: ModEntry[]
-  /** 本地演示：不等人工审核，直接给这条模组一个结果 */
-  onResolve: (mod: ModEntry, result: ReviewResult) => void
+  /** 打开这条模组的收录源 PR（审核结论以那条 PR 的状态为准） */
+  onOpenReview: (mod: ModEntry) => void
 }) {
   if (mods.length === 0) return null
 
@@ -115,8 +115,8 @@ export function ReviewBanner({
             {mods.length} 个模组正在上架审核中
           </div>
           <div className="text-[11px] text-muted-foreground">
-            人工审核通常需要 {REVIEW_WINDOW_MINUTES} 分钟，通过后自动上架到模组市场。
-            本地演示不用等，可以直接出结果。
+            人工审核通常需要 {REVIEW_WINDOW_MINUTES} 分钟，通过后自动上架到模组市场；
+            审核结论以索引仓库那条收录源 PR 的状态为准。
           </div>
         </div>
       </div>
@@ -137,20 +137,8 @@ export function ReviewBanner({
               </span>
             ) : null}
             <span className="text-[11px] font-semibold text-warning">审核中</span>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="hover:text-destructive"
-              onClick={() => onResolve(mod, "rejected")}
-            >
-              模拟驳回
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onResolve(mod, "approved")}
-            >
-              模拟通过
+            <Button variant="outline" size="sm" onClick={() => onOpenReview(mod)}>
+              查看收录源 PR
             </Button>
           </li>
         ))}

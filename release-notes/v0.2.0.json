@@ -68,7 +68,7 @@
       },
       {
         "type": "fix",
-        "text": "修复「发布模组 → 提交审核」的完成提示说反了：首次发布明明往索引仓库提交了收录源 PR，却因为写完台账再取状态而提示「没有 PR」；现在会把真实结果与那条 PR 的地址一并显示出来"
+        "text": "修复「发布模组 → 提交审核」这一趟说反了：首次发布明明往索引仓库提交了收录源 PR，完成提示却说「没有 PR」（收尾时先重载了台账，再拿它判断「是不是第一次」必然是 false），现在提示里直接给出那条 PR 的地址；同时首次发布成功后会把台账记成「已提交审核」，「我创建的」页签因此会显示「审核中」并能一键打开那条 PR —— 之前状态停在草稿，界面上既看不到审核中、也没有任何入口；那对「模拟通过 / 模拟驳回」按钮也换成了「查看收录源 PR」（审核结论以 PR 为准，界面不再假装能就地出结果）"
       }
     ],
     "en": [
@@ -138,7 +138,7 @@
       },
       {
         "type": "fix",
-        "text": "Fixed the submit-for-review completion message being wrong: a first-time publish really does open a source-registration PR, but it reported 'no PR' because the ledger was reloaded before the check; the real outcome and the PR link are now shown"
+        "text": "Fixed the submit-for-review step reporting the wrong thing: a first-time publish really does open a source-registration PR, but the completion message said 'no PR' (the ledger was reloaded before the check, so 'is this the first time' was always false). The message now gives that PR's URL, and a successful first publish marks the ledger as submitted so the 'Created by me' tab actually shows 'In review' with a one-click link to the PR - previously the status stayed at draft, so the review state was invisible and there was no way to reach the PR. The pair of 'Simulate approve / Simulate reject' buttons is now a single 'View source PR' (the PR is the source of truth, and the UI no longer pretends it can produce a verdict locally)"
       }
     ]
   }

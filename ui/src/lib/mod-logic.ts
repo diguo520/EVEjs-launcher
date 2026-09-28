@@ -960,31 +960,6 @@ export function readmeSections(mod: ModEntry): {
   return { features, paragraphs }
 }
 
-/** 审核的两种走向 */
-export type ReviewResult = "approved" | "rejected"
-
-/** 演示用的驳回原因：真实审核里这段由人工填写 */
-export const DEMO_REJECT_NOTE =
-  "功能说明里没有写清权限用途，补充后可以重新提交。"
-
-/** 审核出结果后的新状态：通过就上架，驳回就留下原因等作者改 */
-export function applyReviewResult(mod: ModEntry, result: ReviewResult): ModEntry {
-  if (result === "approved") {
-    return {
-      ...mod,
-      review: "approved",
-      submittedAt: undefined,
-      reviewNote: undefined,
-    }
-  }
-  return {
-    ...mod,
-    review: "rejected",
-    submittedAt: undefined,
-    reviewNote: DEMO_REJECT_NOTE,
-  }
-}
-
 /* ---------------- 列表筛选 ---------------- */
 
 /* ---------------- 评分分档 ---------------- */
