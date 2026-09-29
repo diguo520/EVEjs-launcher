@@ -1,6 +1,7 @@
 import type { ReactNode } from "react"
 import {
   Check,
+  FileText,
   FolderOpen,
   History,
   ListChecks,
@@ -294,7 +295,10 @@ export function ModDetailDialog({
               </Section>
             ) : null}
 
-            <Section title="功能说明">
+            <Section
+              icon={<FileText className="size-3.5 text-tertiary" />}
+              title="功能说明"
+            >
               {paragraphs.length > 0 ? (
                 <div className="space-y-2">
                   {paragraphs.map((paragraph) => (
