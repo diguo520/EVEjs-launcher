@@ -11,6 +11,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { call, callOr, hasIpc, subscribe } from "@/lib/ipc"
 import type {
   RawAuthorState,
+  RawClaimCandidates,
+  RawClaimResult,
   RawMarketList,
   RawMarketMod,
   RawModList,
@@ -88,6 +90,8 @@ export interface ModSourceState {
   tokenStatus: RawTokenStatus | null
   /** 已有源码仓库的模组 id */
   sourceRepos: string[]
+  /** 重装系统后要找回的旧模组（本机由别的身份签名的那些） */
+  claims: RawClaimCandidates | null
   /** 市场索引里的条目数（页头那个「索引 N 条」） */
   marketCount: number
   /** 索引里因「与当前服务端版本不兼容」被隐藏的条目数 */
@@ -141,6 +145,8 @@ export interface ModSourceState {
   saveToken: (token: string) => Promise<RawTokenSave>
   clearToken: () => Promise<RawAck>
   checkToken: () => Promise<RawTokenCheck>
+  /** 认领一个旧模组：核验仓库归属 → 落认领记录 */
+  claimMod: (folder: string) => Promise<RawClaimResult>
   publish: (input: PublishInput) => Promise<PublishOutcome>
   /** 真进度：`mod:publishProgress` 的最后一条 */
   publishProgress: RawPublishProgress | null
@@ -168,6 +174,7 @@ export function useModSource(): ModSourceState {
   const [marketRefreshing, setMarketRefreshing] = useState(false)
   const [mine, setMine] = useState<RawMyMods | null>(null)
   const [submissions, setSubmissions] = useState<RawMySubmissions | null>(null)
+  const [claims, setClaims] = useState<RawClaimCandidates | null>(null)
   const [author, setAuthor] = useState<RawAuthorState | null>(null)
   const [tokenStatus, setTokenStatus] = useState<RawTokenStatus | null>(null)
   const [templates, setTemplates] = useState<RawModTemplate[]>([])
@@ -221,7 +228,7 @@ export function useModSource(): ModSourceState {
   const load = useCallback(async () => {
     if (!ipc) return
     setLoading(true)
-    const [nextList, nextMarket, nextMine, nextSubs, nextAuthor, nextToken, nextTemplates] =
+    const [nextList, nextMarket, nextMine, nextSubs, nextAuthor, nextToken, nextTemplates, nextClaims] =
       await Promise.all([
         callOr<RawModList>("modsList", null),
         callOr<RawMarketList>("modsMarketList", null),
@@ -230,6 +237,7 @@ export function useModSource(): ModSourceState {
         callOr<RawAuthorState>("authorGet", null),
         callOr<RawTokenStatus>("modsGithubTokenStatus", null),
         callOr<{ ok: boolean; templates: RawModTemplate[] }>("modsTemplates", null),
+        callOr<RawClaimCandidates>("modsClaimCandidates", null),
       ])
     setList(nextList)
     applyMarket(nextMarket)
@@ -238,6 +246,7 @@ export function useModSource(): ModSourceState {
     setAuthor(nextAuthor)
     setTokenStatus(nextToken)
     setTemplates(nextTemplates?.templates ?? [])
+    setClaims(nextClaims)
     setLoaded(true)
     setLoading(false)
   }, [ipc, applyMarket])
@@ -370,6 +379,22 @@ export function useModSource(): ModSourceState {
     return (await callOr<RawTokenCheck>("modsGithubTokenCheck", null)) ?? { ok: false }
   }, [])
 
+  /**
+   * 认领一个旧模组：后端核验「这个模组的仓库是不是你的」之后落认领记录。
+   * 核验不过就原样返回原因（界面照实说），成功后重载 —— 「我创建的」与候选列表都会变。
+   */
+  const claimMod = useCallback(
+    async (folder: string): Promise<RawClaimResult> => {
+      const reply = (await callOr<RawClaimResult>("modsClaimMod", null, folder)) ?? {
+        ok: false,
+        reason: "没有回包",
+      }
+      if (reply.ok) await load()
+      return reply
+    },
+    [load]
+  )
+
   const installFromMarket = useCallback(
     async (id: string): Promise<RawAck> => {
       const entry = marketById[id]
@@ -497,6 +522,8 @@ export function useModSource(): ModSourceState {
     privateKeyExists: author?.privateKeyExists === true,
     tokenStatus,
     sourceRepos,
+    claims,
+    claimMod,
     marketCount: market?.mods?.length ?? 0,
     marketBlockedCount: market?.blocked?.length ?? 0,
     marketEvejsVersion: market?.evejsVersion ?? "",

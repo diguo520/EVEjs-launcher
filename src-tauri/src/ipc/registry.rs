@@ -68,6 +68,10 @@ pub const HANDLED: &[&str] = &[
     "mods:uninstall",
     // 本工程扩展通道（现役版没有）：契约见 contract/extensions.json
     "mods:updateMeta",
+    // 重装系统后找回旧模组（本工程扩展，契约见 contract/extensions.json）：
+    // claimCandidates=列出本机由别的身份署名的模组；claimMod=核验仓库归属并落认领记录
+    "mods:claimCandidates",
+    "mods:claimMod",
     "service:restart",
     "service:start",
     "service:stop",

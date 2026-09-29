@@ -1,13 +1,13 @@
 {
   "generatedFrom": "E:\\Games\\EveJS-v0.12.8\\launcher\\launcher",
-  "generatedAt": "2026-09-28T19:04:37.801Z",
+  "generatedAt": "2026-09-29T12:17:11.517Z",
   "counts": {
-    "invoke": 77,
+    "invoke": 79,
     "send": 6,
     "events": 7,
-    "requests": 83,
+    "requests": 85,
     "registered": 82,
-    "apiTotal": 90
+    "apiTotal": 92
   },
   "invoke": [
     {
@@ -307,6 +307,22 @@
       "signature": "lang?: string",
       "params": [
         "lang"
+      ]
+    },
+    {
+      "api": "modsClaimCandidates",
+      "channel": "mods:claimCandidates",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "modsClaimMod",
+      "channel": "mods:claimMod",
+      "kind": "invoke",
+      "signature": "folder: string",
+      "params": [
+        "folder"
       ]
     },
     {
@@ -745,6 +761,8 @@
   "dynamicRegistrations": 0,
   "extensions": {
     "invoke": [
+      "mods:claimCandidates",
+      "mods:claimMod",
       "mods:updateMeta"
     ],
     "send": [],

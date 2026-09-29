@@ -438,6 +438,21 @@ async fn dispatch(
             Ok(blocking(move || mods::submit::check_token(&runtime, token.as_deref())).await?)
         }
 
+        /* ------------------------ 旧模组归属认领 ------------------------ */
+        // 重装系统 / 换电脑之后私钥没了，作者要接着更新自己几年前的模组：先列候选，
+        // 再逐个核验「这个模组的仓库是不是你的」（走 GitHub），见 mods/claim.rs
+        "mods:claimCandidates" => {
+            let repo = root.clone();
+            let runtime = state.runtime.clone();
+            Ok(blocking(move || mods::claim::claim_candidates(&repo, &runtime)).await?)
+        }
+        "mods:claimMod" => {
+            let folder = arg_str(args, 0);
+            let repo = root.clone();
+            let runtime = state.runtime.clone();
+            Ok(blocking(move || mods::claim::claim_mod(&repo, &runtime, &folder)).await?)
+        }
+
         // 兜底：契约里若出现未登记的通道（例如将来新增），统一回 {ok:false, reason}，
         // 保证 G1「82/82 有回包」——渲染层 await 不会挂死
         other => Ok(registry::not_implemented(other)),

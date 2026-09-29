@@ -11,7 +11,7 @@
 //!   - ZIP 由作者自己托管（GitHub / Gitee Releases），索引里只登记 URL + sha256。
 use crate::author;
 use crate::github;
-use crate::mods::{mods_root, pkg, plan, sanitize_folder_name, scan};
+use crate::mods::{claim, mods_root, pkg, plan, sanitize_folder_name, scan};
 use crate::runtime::RuntimePaths;
 use crate::shell;
 use serde_json::{json, Map, Value};
@@ -442,10 +442,17 @@ pub fn prepare_submission(repo_root: &Path, runtime: &RuntimePaths, input: &Valu
         .and_then(Value::as_str)
         .unwrap_or_default()
         .to_string();
-    if !declared_author_id.is_empty() && declared_author_id != author_id {
+    // 认领过的模组放行（见 mods/claim.rs），与 sign_mod_folder 用同一套判据：
+    // 两个入口必须一致，否则会出现「签得动但提交不了」这种半通不通的状态。
+    let claimed = claim::is_claimed(runtime, &record.id);
+    if !declared_author_id.is_empty() && declared_author_id != author_id && !claimed {
         return json!({
             "ok": false,
-            "reason": format!("这个模组的作者标识是 {declared_author_id}，不是本机作者，不能替别人提交"),
+            "reason": format!(
+                "这个模组的作者标识是 {declared_author_id}，不是本机作者，不能替别人提交。\
+                 如果这个模组本来就是你做的（重装过系统 / 换过电脑），先在「找回旧模组」里认领它；\
+                 当年导出过 .eve-key 的话，直接在「令牌配置」里导入就能用回原身份。"
+            ),
         });
     }
 

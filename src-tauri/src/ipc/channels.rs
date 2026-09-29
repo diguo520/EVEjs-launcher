@@ -1,6 +1,6 @@
 //! 由 scripts/gen-contract.mjs 生成 —— 请勿手改。源: contract/ipc-channels.json
 //! 抽取源: E:\Games\EveJS-v0.12.8\launcher\launcher
-//! 生成时间: 2026-09-28T19:04:37.801Z
+//! 生成时间: 2026-09-29T12:17:11.517Z
 
 #![allow(dead_code)]
 
@@ -18,7 +18,7 @@ pub struct ChannelSpec {
     pub kind: ChannelKind,
 }
 
-pub const REQUEST_COUNT: usize = 83;
+pub const REQUEST_COUNT: usize = 85;
 pub const EVENT_COUNT: usize = 7;
 
 #[rustfmt::skip]
@@ -60,6 +60,8 @@ pub const CHANNELS: &[ChannelSpec] = &[
     ChannelSpec { channel: "metrics:get", api: "metricsGet", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "mods:authoringDoc", api: "modsAuthoringDoc", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "mods:authoringDocText", api: "modsAuthoringDocText", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "mods:claimCandidates", api: "modsClaimCandidates", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "mods:claimMod", api: "modsClaimMod", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "mods:create", api: "modsCreate", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "mods:createFolder", api: "modsCreateFolder", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "mods:githubTokenCheck", api: "modsGithubTokenCheck", kind: ChannelKind::Invoke },

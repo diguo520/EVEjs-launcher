@@ -524,6 +524,53 @@ export interface RawMySubmissions {
   items: RawSubmissionItem[]
 }
 
+/** mods:claimCandidates 的一条：本机 mods/ 里由**别的身份**署名的模组 */
+export interface RawClaimItem {
+  id: string
+  folder: string
+  displayName: string
+  version: string
+  /** 清单里声明的作者标识（旧身份的那一个） */
+  declaredAuthorId: string
+  declaredKeyId: string
+  declaredAuthorName: string
+  /** 这个模组的仓库（索引登记 > 本地市场标记 > 发布台账） */
+  repo: string
+  /** 仓库地址是从哪解析出来的：index | source | ledger | 空 */
+  repoSource?: string
+  /** 仓库主人（用于判断「这个像是你的」） */
+  repoOwner?: string
+  /** 已经认领过（认领记录就是结论，离线也认） */
+  claimed: boolean
+  canClaim?: boolean
+  /** 不能认领的原因 */
+  reason?: string
+}
+
+/** mods:claimCandidates */
+export interface RawClaimCandidates {
+  ok: boolean
+  reason?: string
+  /** 可认领 + 已认领 */
+  items: RawClaimItem[]
+  /** 连仓库地址都解析不出来的（暂时无法认领） */
+  skipped: RawClaimItem[]
+}
+
+/** mods:claimMod */
+export interface RawClaimResult {
+  ok: boolean
+  reason?: string
+  /** 没配 GitHub 令牌（或令牌失效）时给界面一个明确的出口 */
+  needsToken?: boolean
+  id?: string
+  repo?: string
+  login?: string
+  /** owner | push */
+  verifiedBy?: string
+  alreadyClaimed?: boolean
+}
+
 /** mods:githubToken* */
 export interface RawTokenStatus {
   hasToken: boolean

@@ -3,6 +3,7 @@ import {
   ArrowUpCircle,
   BadgeCheck,
   BookOpen,
+  History,
   Loader2,
   MessageSquare,
   Plus,
@@ -21,12 +22,14 @@ import { ModDetailDialog } from "@/components/modules/mod-detail-dialog"
 import { ModFormDialog } from "@/components/modules/mod-form-dialog"
 import { ModAuthorDialog } from "@/components/modules/mod-author-dialog"
 import { ModAuthoringDialog } from "@/components/modules/mod-authoring-dialog"
+import { ModClaimDialog } from "@/components/modules/mod-claim-dialog"
 import {
   ModSubmitDialog,
   type ModSubmitDialogProps,
 } from "@/components/modules/mod-submit-dialog"
 import { ConflictBanner, ReviewBanner } from "@/components/modules/mod-banners"
 import { useModDownloads, type DownloadTask } from "@/hooks/use-mod-downloads"
+import { needsRecovery } from "@/lib/mod-claim"
 import { useModSource, type PublishOutcome } from "@/hooks/use-mod-source"
 import {
   ALL_CATEGORY,
@@ -114,6 +117,8 @@ export function ModulesPage({
   const [formOpen, setFormOpen] = useState(false)
   const [formTargetId, setFormTargetId] = useState<string | null>(null)
   const [authorOpen, setAuthorOpen] = useState(false)
+  /** 「找回旧模组」：只在真的有待认领的旧模组时才开这个入口 */
+  const [claimOpen, setClaimOpen] = useState(false)
   const [docOpen, setDocOpen] = useState(false)
   const [submitOpen, setSubmitOpen] = useState(false)
   const [submitTarget, setSubmitTarget] = useState<string | null>(null)
@@ -819,6 +824,13 @@ export function ModulesPage({
               ? t("发布模组 · {seconds}s", { seconds: Math.ceil(publishIntervalMs / 1000) })
               : "发布模组"}
           </Button>
+          {/* 重装系统 / 换电脑后本机换了身份：本机还有旧身份签的自己的模组时才给这个入口 */}
+          {needsRecovery(source.claims) ? (
+            <Button variant="outline" onClick={() => setClaimOpen(true)}>
+              <History />
+              找回旧模组
+            </Button>
+          ) : null}
           {/* 发布前置没补齐时点一个小黄点：别等进了提交弹窗才发现要配东西 */}
           <Button
             variant="outline"
@@ -1061,6 +1073,20 @@ export function ModulesPage({
         open={docOpen}
         onOpenChange={setDocOpen}
         onOpenExternal={source.openAuthoringDoc}
+      />
+
+      <ModClaimDialog
+        open={claimOpen}
+        onOpenChange={setClaimOpen}
+        claims={source.claims}
+        privateKeyExists={source.privateKeyExists}
+        onClaim={source.claimMod}
+        onCheckToken={source.checkToken}
+        onOpenToken={() => {
+          setClaimOpen(false)
+          setAuthorOpen(true)
+        }}
+        onImportKey={() => void source.importKey()}
       />
     </div>
   )
