@@ -28,7 +28,7 @@ import type {
   RawModTemplate,
   RawReadme,
 } from "@/lib/ipc"
-import { CLAIM_PAGE_SIZE, type ClaimQuery } from "@/lib/mod-claim"
+import { CLAIM_PAGE_SIZE, CLAIM_SCOPE_DEFAULT, type ClaimQuery } from "@/lib/mod-claim"
 import { buildMods, latestSubmission, sourceRepoIds } from "@/lib/mod-source"
 import type { PublishCredential } from "@/lib/mod-logic"
 import type { ModEntry } from "@/lib/mock"
@@ -243,6 +243,9 @@ export function useModSource(): ModSourceState {
         callOr<RawClaimCandidates>("modsClaimCandidates", null, {
           offset: 0,
           limit: CLAIM_PAGE_SIZE,
+          // 页头入口的判据是「本机有没有别人署名的模组」：范围用全部，
+          // 免得组织名下仓库的作者（owner 不是登录名）连入口都看不见
+          scope: "all",
         }),
       ])
     setList(nextList)
@@ -405,20 +408,20 @@ export function useModSource(): ModSourceState {
    * 候选列表按页取：候选是「本机装了多少别人的模组」的量级（上万条也常见），
    * 一次全量回给界面等于让 WebView 渲染上万个 DOM 子树。
    *
-   * 只有「第一页且没搜索」才回写页头入口用的那份状态 —— 搜索/翻页的结果不能覆盖它，
-   * 否则搜出 0 条就会把「找回旧模组」的入口一起藏掉。
+   * 这里**不动**页头入口用的那份状态（`claims`）：入口的判据是「本机有没有别人署名的
+   * 模组」，范围是 `all`（见 `load`），而弹窗用的是 `mine`；两边范围不同，谁后写谁赢
+   * 就会让入口忽隐忽现。入口的刷新只由 `load()`（开机、认领成功、手动刷新）负责。
    */
   const loadClaims = useCallback(
     async (opts: ClaimQuery = {}): Promise<RawClaimCandidates | null> => {
       const query = opts.query ?? ""
       const offset = opts.offset ?? 0
-      const reply = await callOr<RawClaimCandidates>("modsClaimCandidates", null, {
+      return await callOr<RawClaimCandidates>("modsClaimCandidates", null, {
         offset,
         limit: opts.limit ?? CLAIM_PAGE_SIZE,
         query,
+        scope: opts.scope ?? CLAIM_SCOPE_DEFAULT,
       })
-      if (reply && offset === 0 && query === "") setClaims(reply)
-      return reply
     },
     []
   )

@@ -266,11 +266,22 @@ pub const CLAIM_PAGE_MAX: usize = 200;
 ///
 /// 为什么必须分页：候选是「本机 `mods/` 里由别的身份署名的模组」，装了上万个模组的人
 /// 候选就是上万条 —— 序列化、跨进程传输、渲染都是上万份，界面会直接卡住。
+///
+/// `scope` 决定列表范围：候选里的绝大部分其实是「从市场装的别人的模组」（仓库在别人
+/// 名下，认领一定被拒）。`Mine` 只留仓库在本令牌账号名下（或已认领）的那些，被藏起来的
+/// 条数用 `foreignCount` 如实报出来，界面据此给一个「查看全部」。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClaimScope {
+    Mine,
+    All,
+}
+
 #[derive(Debug, Clone)]
 pub struct ClaimOptions {
     pub offset: usize,
     pub limit: usize,
     pub query: String,
+    pub scope: ClaimScope,
 }
 
 impl Default for ClaimOptions {
@@ -279,13 +290,14 @@ impl Default for ClaimOptions {
             offset: 0,
             limit: CLAIM_PAGE_DEFAULT,
             query: String::new(),
+            scope: ClaimScope::All,
         }
     }
 }
 
 impl ClaimOptions {
     /// 兼容两种调用：`modsClaimCandidates()`（全用默认）与
-    /// `modsClaimCandidates({ offset, limit, query })`。
+    /// `modsClaimCandidates({ offset, limit, query, scope })`。
     pub fn parse(args: &[Value]) -> Self {
         let object = args.iter().find_map(Value::as_object);
         let number = |key: &str| object.and_then(|map| map.get(key)).and_then(Value::as_u64);
@@ -301,10 +313,19 @@ impl ClaimOptions {
             .unwrap_or_default()
             .trim()
             .to_string();
+        let scope = match object
+            .and_then(|map| map.get("scope"))
+            .and_then(Value::as_str)
+            .unwrap_or("all")
+        {
+            "mine" => ClaimScope::Mine,
+            _ => ClaimScope::All,
+        };
         Self {
             offset,
             limit,
             query,
+            scope,
         }
     }
 }
@@ -334,16 +355,12 @@ fn order_candidates(items: &mut [Value], login: &str) {
             .and_then(Value::as_bool)
             .unwrap_or(false)
         {
-            return 2;
+            2
+        } else if is_mine_candidate(item, login) {
+            0
+        } else {
+            1
         }
-        let owner = item
-            .get("repoOwner")
-            .and_then(Value::as_str)
-            .unwrap_or_default();
-        if !owner.is_empty() && owner.eq_ignore_ascii_case(login.trim()) {
-            return 0;
-        }
-        1
     };
     items.sort_by(|left, right| {
         rank(left).cmp(&rank(right)).then_with(|| {
@@ -358,6 +375,24 @@ fn order_candidates(items: &mut [Value], login: &str) {
             left_name.cmp(right_name)
         })
     });
+}
+
+/// 这条候选的仓库是不是在本令牌账号名下。
+///
+/// 已认领的永远算「我的」（认领记录本身就是核验过归属的结论）。
+fn is_mine_candidate(item: &Value, login: &str) -> bool {
+    if item
+        .get("claimed")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+    {
+        return true;
+    }
+    let owner = item
+        .get("repoOwner")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    !owner.is_empty() && owner.eq_ignore_ascii_case(login.trim())
 }
 
 /// 搜索：id / 显示名 / 原署名 / 仓库地址，任意一处包含关键字即命中（不区分大小写）
@@ -470,6 +505,23 @@ fn claim_candidates_with(
     if !opts.query.is_empty() {
         items.retain(|item| matches_query(item, &opts.query));
     }
+
+    // 只有令牌账号名下的仓库才认领得动 —— 候选里剩下的多半是「从市场装的别人的模组」。
+    // 登录名还没核验出来时判不了归属，这时宁可一条都不筛（组织名下的仓库只能靠
+    // 「查看全部」看见，误筛会把真作者挡在门外）。
+    let login_known = !login.trim().is_empty();
+    let foreign_count = if login_known {
+        items
+            .iter()
+            .filter(|item| !is_mine_candidate(item, login))
+            .count()
+    } else {
+        0
+    };
+    if login_known && opts.scope == ClaimScope::Mine {
+        items.retain(|item| is_mine_candidate(item, login));
+    }
+
     let total = items.len();
     let page: Vec<Value> = items
         .into_iter()
@@ -482,6 +534,12 @@ fn claim_candidates_with(
         "skipped": [],
         "skippedCount": skipped_count,
         "total": total,
+        "foreignCount": foreign_count,
+        "scope": match opts.scope {
+            ClaimScope::Mine => "mine",
+            ClaimScope::All => "all",
+        },
+        "login": login,
         "offset": opts.offset,
         "limit": opts.limit,
         "needsToken": false,
@@ -848,6 +906,17 @@ mod tests {
             ClaimOptions::parse(&[json!({ "limit": -5 })]).limit,
             CLAIM_PAGE_DEFAULT
         );
+
+        // 范围默认「全部」；只有明确写 mine 才收窄（不认识的取值一律退回全部）
+        assert_eq!(ClaimOptions::parse(&[]).scope, ClaimScope::All);
+        assert_eq!(
+            ClaimOptions::parse(&[json!({ "scope": "mine" })]).scope,
+            ClaimScope::Mine
+        );
+        assert_eq!(
+            ClaimOptions::parse(&[json!({ "scope": "nonsense" })]).scope,
+            ClaimScope::All
+        );
     }
 
     #[test]
@@ -884,6 +953,7 @@ mod tests {
                 offset: 0,
                 limit: 10,
                 query: "charlie".to_string(),
+                scope: ClaimScope::All,
             },
             "tok",
         );
@@ -901,6 +971,7 @@ mod tests {
                 offset: 0,
                 limit: 2,
                 query: String::new(),
+                scope: ClaimScope::All,
             },
             "tok",
         );
@@ -916,6 +987,7 @@ mod tests {
                 offset: 2,
                 limit: 2,
                 query: String::new(),
+                scope: ClaimScope::All,
             },
             "tok",
         );
@@ -927,6 +999,79 @@ mod tests {
             .map(|item| item["id"].as_str().unwrap())
             .collect();
         assert_eq!(seen, vec!["bravo", "alpha", "charlie"], "{page2}");
+    }
+
+    #[test]
+    fn mine_scope_hides_repos_that_are_not_on_the_token_account() {
+        let repo = repo_for("scope");
+        let runtime = runtime_for("scope");
+        assert_eq!(crate::author::get_state(&runtime)["ok"], json!(true));
+        write_mod(
+            &repo,
+            "mine",
+            manifest("mine", json!({ "id": "au-mine", "keyId": "key-mine" })),
+        );
+        mark_market_source(&repo, "mine", "https://github.com/diguo520/evejs-mod-mine");
+        write_mod(
+            &repo,
+            "other",
+            manifest("other", json!({ "id": "au-other", "keyId": "key-other" })),
+        );
+        mark_market_source(
+            &repo,
+            "other",
+            "https://github.com/JUZIMandarin/evejs-mod-other",
+        );
+
+        // 令牌账号是 diguo520：别人名下的仓库不该出现在候选里（点了也一定被拒），
+        // 但要说清楚被藏了几条，界面才有机会给一个「查看全部」
+        github::remember_login(&runtime, "tok", "diguo520");
+        let mine = claim_candidates_for(
+            &repo,
+            &runtime,
+            &ClaimOptions {
+                offset: 0,
+                limit: 10,
+                query: String::new(),
+                scope: ClaimScope::Mine,
+            },
+            "tok",
+        );
+        assert_eq!(mine["total"], json!(1), "{mine}");
+        assert_eq!(mine["items"][0]["id"], json!("mine"), "{mine}");
+        assert_eq!(mine["foreignCount"], json!(1), "{mine}");
+        assert_eq!(mine["login"], json!("diguo520"), "{mine}");
+        assert_eq!(mine["scope"], json!("mine"), "{mine}");
+
+        // 登录名还没核验出来（缓存是冷的）时判不了归属：宁可不筛，也不误伤真作者
+        let cold = claim_candidates_for(
+            &repo,
+            &runtime,
+            &ClaimOptions {
+                offset: 0,
+                limit: 10,
+                query: String::new(),
+                scope: ClaimScope::Mine,
+            },
+            "cold-token",
+        );
+        assert_eq!(cold["total"], json!(2), "{cold}");
+        assert_eq!(cold["foreignCount"], json!(0), "{cold}");
+
+        // scope=all：全都列出来（界面上的「查看全部」）
+        let all = claim_candidates_for(
+            &repo,
+            &runtime,
+            &ClaimOptions {
+                offset: 0,
+                limit: 10,
+                query: String::new(),
+                scope: ClaimScope::All,
+            },
+            "tok",
+        );
+        assert_eq!(all["total"], json!(2), "{all}");
+        assert_eq!(all["foreignCount"], json!(1), "{all}");
     }
 
     #[test]

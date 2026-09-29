@@ -14,7 +14,14 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import type { RawClaimCandidates, RawClaimItem, RawClaimResult, RawTokenCheck } from "@/lib/ipc"
-import { CLAIM_PAGE_SIZE, orderClaimItems, type ClaimQuery } from "@/lib/mod-claim"
+import {
+  CLAIM_PAGE_SIZE,
+  CLAIM_SCOPE_DEFAULT,
+  orderClaimItems,
+  repoLooksMine,
+  type ClaimQuery,
+  type ClaimScope,
+} from "@/lib/mod-claim"
 import { cn } from "@/lib/utils"
 
 export interface ModClaimDialogProps {
@@ -60,8 +67,12 @@ export function ModClaimDialog({
   const [total, setTotal] = useState(0)
   const [skippedCount, setSkippedCount] = useState(0)
   const [needsToken, setNeedsToken] = useState(false)
+  const [foreignCount, setForeignCount] = useState(0)
+  const [scope, setScope] = useState<ClaimScope>(CLAIM_SCOPE_DEFAULT)
   const [loading, setLoading] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
+  /** 打开后令牌核验完了没有：候选要等登录名落进后端缓存才筛得准，先查令牌再列 */
+  const [loginChecked, setLoginChecked] = useState(false)
   /** 认领成功后重新拉当前这一页的触发器（那条会挪到「已认领」、总数也会变） */
   const [reload, setReload] = useState(0)
 
@@ -71,34 +82,42 @@ export function ModClaimDialog({
     let cancelled = false
     setBusy("")
     setQuery("")
+    setScope(CLAIM_SCOPE_DEFAULT)
     setChecking(true)
+    setLoginChecked(false)
     void onCheckToken()
       .then((reply) => {
         if (cancelled) return
         setLogin(reply.ok && typeof reply.login === "string" ? reply.login : "")
       })
       .finally(() => {
-        if (!cancelled) setChecking(false)
+        if (cancelled) return
+        setChecking(false)
+        // 核验令牌顺带把登录名写进后端缓存：这之后再列候选才筛得准
+        setLoginChecked(true)
       })
     return () => {
       cancelled = true
     }
   }, [open, onCheckToken])
 
-  // 打开时 / 换关键字后拉第一页；打字防抖 250ms，不必每敲一下都问一次后端
+  // 打开时 / 换关键字 / 换范围后拉第一页；打字防抖 250ms，不必每敲一下都问一次后端。
+  // 必须等令牌核验完（登录名进了后端缓存）再列第一次 —— 否则「只看我的」判不了归属，
+  // 后端只能把别人的仓库一起列出来。
   useEffect(() => {
-    if (!open) return
+    if (!open || !loginChecked) return
     let cancelled = false
     setLoading(true)
     const timer = setTimeout(
       () => {
-        void onLoad({ offset: 0, limit: CLAIM_PAGE_SIZE, query })
+        void onLoad({ offset: 0, limit: CLAIM_PAGE_SIZE, query, scope })
           .then((reply) => {
             if (cancelled || !reply) return
             const next = reply.items ?? []
             setItems(next)
             setTotal(typeof reply.total === "number" ? reply.total : next.length)
             setSkippedCount(reply.skippedCount ?? reply.skipped?.length ?? 0)
+            setForeignCount(reply.foreignCount ?? 0)
             setNeedsToken(reply.needsToken === true)
           })
           .finally(() => {
@@ -111,7 +130,7 @@ export function ModClaimDialog({
       cancelled = true
       clearTimeout(timer)
     }
-  }, [open, query, reload, onLoad])
+  }, [open, loginChecked, query, reload, scope, onLoad])
 
   const ordered = useMemo(() => orderClaimItems(items, login), [items, login])
   /** 还有多少条没取回来（后端给的是搜索命中的总数，不是本页长度） */
@@ -120,7 +139,7 @@ export function ModClaimDialog({
   async function loadMore() {
     setLoadingMore(true)
     try {
-      const reply = await onLoad({ offset: items.length, limit: CLAIM_PAGE_SIZE, query })
+      const reply = await onLoad({ offset: items.length, limit: CLAIM_PAGE_SIZE, query, scope })
       if (!reply) return
       const next = reply.items ?? []
       setItems((prev) => [...prev, ...next])
@@ -214,6 +233,25 @@ export function ModClaimDialog({
           ) : null}
         </div>
 
+        {/* 令牌账号名下的仓库才认领得动：其余的如实报个数量，留一条「查看全部」的出路
+            （作者把仓库放在组织名下时，owner 不等于登录名，只能从这儿看见） */}
+        {foreignCount > 0 ? (
+          <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-background/40 px-3 py-2 text-[10px] leading-relaxed text-tertiary">
+            <span className="min-w-0 flex-1">
+              {t("另有 {count} 条候选的仓库不在令牌账号 {login} 名下", {
+                count: foreignCount,
+                login: login || "—",
+              })}
+            </span>
+            <Button
+              variant="outline"
+              onClick={() => setScope(scope === "mine" ? "all" : "mine")}
+            >
+              {scope === "mine" ? "查看全部" : "只看我的"}
+            </Button>
+          </div>
+        ) : null}
+
         {ordered.length === 0 ? (
           <p className="rounded-md border border-border bg-background/40 px-3 py-4 text-center text-[12px] text-tertiary">
             {loading ? "正在读取…" : query ? "没有匹配的模组" : "没有需要找回的模组"}
@@ -236,6 +274,10 @@ export function ModClaimDialog({
                   {item.claimed ? (
                     <span className="grid h-5 shrink-0 place-items-center rounded-sm border border-success/40 bg-success/10 px-1.5 text-[10px] font-semibold tracking-[0.08em] text-success">
                       已认领
+                    </span>
+                  ) : login && !repoLooksMine(item, login) ? (
+                    <span className="grid h-5 shrink-0 place-items-center rounded-sm border border-border bg-background/60 px-1.5 text-[10px] font-semibold tracking-[0.08em] text-tertiary">
+                      不在你名下
                     </span>
                   ) : (
                     <Button

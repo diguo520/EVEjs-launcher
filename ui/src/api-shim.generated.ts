@@ -1,6 +1,6 @@
 /* 由 scripts/gen-contract.mjs 生成 —— 请勿手改。源: contract/ipc-channels.json */
 /* 抽取源: E:\Games\EveJS-v0.12.8\launcher\launcher */
-/* 生成时间: 2026-09-29T13:25:20.391Z */
+/* 生成时间: 2026-09-29T13:46:56.320Z */
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
@@ -72,7 +72,7 @@ export const api = {
   metricsGet: (): Promise<unknown> => request("metrics:get", []),
   modsAuthoringDoc: (): Promise<unknown> => request("mods:authoringDoc", []),
   modsAuthoringDocText: (lang?: string): Promise<unknown> => request("mods:authoringDocText", [lang]),
-  modsClaimCandidates: (opts?: { offset?: number; limit?: number; query?: string }): Promise<unknown> => request("mods:claimCandidates", [opts]),
+  modsClaimCandidates: (opts?: { offset?: number; limit?: number; query?: string; scope?: "mine" | "all" }): Promise<unknown> => request("mods:claimCandidates", [opts]),
   modsClaimMod: (folder: string): Promise<unknown> => request("mods:claimMod", [folder]),
   modsCreate: (draft: Record<string, unknown>): Promise<unknown> => request("mods:create", [draft]),
   modsCreateFolder: (): Promise<unknown> => request("mods:createFolder", []),
