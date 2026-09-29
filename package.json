@@ -1,7 +1,7 @@
 {
   "name": "evejs-launcher-shell",
   "private": true,
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "EvEJS 启动器 · Tauri 2 外壳（Rust） + legacy 渲染层（原样复用现役版 HTML/JS）",
   "scripts": {
     "contract": "node scripts/extract-contract.mjs && node scripts/gen-contract.mjs",

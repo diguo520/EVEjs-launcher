@@ -1,0 +1,49 @@
+{
+  "version": "0.2.3",
+  "changelog": {
+    "zh": [
+      {
+        "type": "fix",
+        "text": "模组详情的「功能说明 / 详细介绍」与「版本历史」不再空白：mods:list 把本机 README 的正文与功能要点一并回给界面（与上架打包同一套解析），作者改完信息回详情立刻就能看到，不必等索引刷新；版本历史改从提交台账（作者自己的逐版本更新说明）读，索引里的 changelog / history 作兜底；两块都没有内容时显示「还没有填写功能说明。/ 暂无版本历史」，不再留一个空标题。「功能说明」分区也补上了与版本历史一致的分区图标"
+      },
+      {
+        "type": "new",
+        "text": "重装系统 / 换电脑 / 删掉缓存之后还能接着更新几年前的模组：以前私钥一丢，本机换了新身份，归属保护就会把作者自己的旧模组当成别人的拒掉（「不能替别人签名」），作者再也提交不了更新。现在多了一条「找回旧模组」的路 —— 界面列出本机由别的身份署名的模组（附索引里登记的仓库），点「认领」后由后端核验那个仓库是不是你的 GitHub 令牌能写的（仓库在你名下，或 GitHub 明确回了 push 权限），核验通过才落一条本机认领记录；认领过的模组回到「我创建的」里，签名与提交都放行，并用新身份重签（旧私钥已经不可能再有了，索引里的 keyId 随之更新）。核验不过一律拒绝，防止把别人的模组认成自己的；当年导出过 .eve-key 的人不必认领，导入密钥就能用回原身份"
+      },
+      {
+        "type": "fix",
+        "text": "左下角的更新入口以前不会自己亮：Tauri 重写时把老版（Electron 0.1.28）的开机自动检查丢了，只剩「打开更新弹窗时查一次」——而这个入口在没有新版本时什么都不渲染，两边互相锁死（查不到新版就不显示入口，点不到入口就永远不会查）。现在按老版口径把自动检查接回来：开机 5 秒后先查一次、之后每 30 分钟复查、窗口重新获得焦点时补查（5 分钟内不重复）。查到新版本，左下角入口立刻出现，并给更新图标套一圈脉冲光环（侧栏收起时是图标 + 光环 + 右上角小点，展开时是提示卡片 + 光环）；设置 → 关于里的「检查更新」照旧是手动兜底入口。自检 / 冒烟（--self-test）进程不打这个后台请求：那是无人值守的诊断跑，真去联网会把瞬时状态留给 parity 的冻结基线，让门禁随机变红"
+      },
+      {
+        "type": "fix",
+        "text": "「找回旧模组」不再把本机的模组全量扫一遍：装了上万个模组的人一打开就会卡住。现在没配令牌的人直接跳过（他本来就核验不了归属，这份清单对他也没有意义），有令牌的人候选一次只取 50 条，弹窗里能按模组名 / 署名 / 仓库搜索、点「加载更多」继续翻；索引、发布台账与认领记录各只解析一次，清单里的 author.keyId 随扫描一起拿到，不再为每个候选重读一遍。解析不出仓库的条目只报个数量，不再把没有可操作信息的条目也搬过 IPC"
+      },
+      {
+        "type": "fix",
+        "text": "「找回旧模组」的候选按令牌账号过滤：列表默认只留仓库在你 GitHub 令牌账号名下（或已认领）的条目 —— 令牌是 diguo520 时，JUZIMandarin 名下的仓库不再混进来（那种点了也一定被拒）。被挡掉的数量会如实报出来（「另有 N 条候选的仓库不在令牌账号 xxx 名下」），并给一条「查看全部 / 只看我的」的出路，仓库挂在组织名下的作者也找得到自己的模组；登录名还没核验出来时不擅自过滤，判不了归属就不下结论"
+      }
+    ],
+    "en": [
+      {
+        "type": "fix",
+        "text": "Mod details no longer show an empty “Features / About” section or an empty “Version history”: mods:list now hands the README body and feature bullets from disk back to the UI (parsed by the same code that packages an upload), so an author who edits the info sees it in the detail page right away instead of waiting for the index to refresh. Version history is read from the submission ledger (the author's own per-version notes), with the index's changelog/history as a fallback. When neither source has content the page now says “No feature description yet. / No version history yet.” instead of leaving a blank heading, and the Features heading gained the same section icon the other sections use"
+      },
+      {
+        "type": "new",
+        "text": "You can keep updating mods you published years ago after reinstalling Windows, switching machines or clearing your cache: losing the private key used to mean a new local identity, and the ownership guard then rejected your own old mods as someone else's (“cannot sign on behalf of others”), so you could never submit an update again. There is now a “Recover old mods” path — the UI lists mods on this machine that are signed by another identity (with the repository recorded in the index), and clicking “Claim” makes the backend verify that your GitHub token can actually write to that repo (the repo is under your account, or GitHub explicitly reports push permission); only then is a local claim record written. Claimed mods return to “Created by me” and signing and submitting are allowed, re-signed with the new identity (the old private key is gone for good, and the index keyId follows). Anything that fails verification is refused, so nobody can claim someone else's mod. If you exported your .eve-key back then you do not need to claim — importing the key restores the original identity"
+      },
+      {
+        "type": "fix",
+        "text": "The bottom-left update entry never lit up on its own: the Tauri rewrite dropped the old Electron 0.1.28 boot-time check and only queried when the update dialog was opened — and the entry renders nothing at all when there is no new version, so the two deadlocked (no new version means no entry, and with no entry it never checks). Automatic checking is back on the old build's terms: one check 5 seconds after boot, a re-check every 30 minutes, and a catch-up check when the window regains focus (not more often than every 5 minutes). When a new version is found the bottom-left entry appears immediately with a pulse halo around the update icon (collapsed sidebar: icon + halo + a small dot in the corner; expanded: a notice card + halo). Settings → About still has “Check for updates” as the manual fallback. Self-test/smoke runs (--self-test) skip this background request: those are unattended diagnostic runs, and actually going online would leak transient state into the frozen parity baseline and make the gate flaky"
+      },
+      {
+        "type": "fix",
+        "text": "“Recover old mods” no longer scans every mod on the machine: opening it with tens of thousands of mods installed would freeze the launcher. It now skips people who have no token at all (they cannot verify ownership anyway, so the list means nothing to them), and for token holders the candidates come back 50 at a time with search by mod name / signer / repository and a “Load more” button. The index, the publish ledger and the claim records are each parsed once, and each entry's author.keyId arrives with the same scan instead of being re-read for every candidate. Entries whose repository cannot be parsed are reported as a count rather than shipped over IPC with no actionable information"
+      },
+      {
+        "type": "fix",
+        "text": "“Recover old mods” candidates are filtered by token account: the list keeps only entries whose repository is under your GitHub token account (or already claimed) — with token diguo520, repos under JUZIMandarin no longer show up (clicking those would always be refused). The number that was filtered out is reported honestly (“N more candidates have repos outside token account xxx”), with a “Show all / Only mine” way out so authors whose repos live under an organization can still find their mods. Nothing is filtered before the login name has been verified: when ownership cannot be decided, no conclusion is drawn"
+      }
+    ]
+  }
+}
