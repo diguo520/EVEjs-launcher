@@ -561,7 +561,10 @@ mod tests {
         write_mod(
             &repo,
             "foreign",
-            manifest("foreign", json!({ "id": "au-someone", "keyId": "deadbeef" })),
+            manifest(
+                "foreign",
+                json!({ "id": "au-someone", "keyId": "deadbeef" }),
+            ),
         );
         let result = claim_candidates(&repo, &runtime);
         assert_eq!(result["ok"], json!(true), "{result}");

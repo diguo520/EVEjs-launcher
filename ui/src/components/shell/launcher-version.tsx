@@ -12,6 +12,7 @@ import {
 } from "@/lib/ipc"
 import { changelogLanguage, releaseNotesFrom } from "@/lib/release-notes"
 import { LAUNCHER_META, type ReleaseNoteGroup } from "@/lib/mock"
+import { isSelfTestSession, startUpdateWatch } from "@/lib/update-watch"
 
 export interface LauncherVersionValue {
   /** 当前安装的启动器版本（带 v 前缀，用于显示） */
@@ -110,8 +111,11 @@ export function useLauncherVersionState(): LauncherVersionValue {
   }, [live])
 
   /**
-   * 真查一次更新。入口只有「打开更新弹窗」这一处 —— 启动时不主动联网：
-   * 更新通道的内置公钥没配之前查了也只会失败（fail closed），白白多一次请求。
+   * 真查一次更新。两个入口：开机后的自动排班（见下面的 startUpdateWatch），
+   * 以及打开更新弹窗时补查一次 —— 弹窗里要的是此刻的事实。
+   *
+   * 自动检查省不得：左下角的更新入口在「没有新版」时什么都不渲染，
+   * 不主动查它就没有亮起来的机会（设置 → 关于里的「检查更新」是老版就有的兜底入口）。
    */
   const checkForUpdate = React.useCallback(async () => {
     if (!live) return null
@@ -124,6 +128,27 @@ export function useLauncherVersionState(): LauncherVersionValue {
       setChecking(false)
     }
   }, [live])
+
+  /**
+   * 开机 5 秒后查一次、之后每 30 分钟复查、窗口重新聚焦时补查
+   * （节奏与老版 0.1.28 一致，见 lib/update-watch.ts）。
+   * 只负责查：查到新版本会经 update:changed 落到 update 上，底部入口自己就亮了。
+   */
+  React.useEffect(() => {
+    // 自检 / 冒烟进程不排后台检查：那是无人值守的诊断跑，不该真去打 GitHub，
+    // 也不该把瞬时状态留给冻结基线（见 lib/update-watch.ts 的 isSelfTestSession）
+    if (!live || isSelfTestSession()) return
+    return startUpdateWatch({
+      check: () => void checkForUpdate(),
+      now: () => Date.now(),
+      setTimeout: (fn, ms) => window.setTimeout(fn, ms),
+      clearTimeout: (handle) => window.clearTimeout(handle),
+      setInterval: (fn, ms) => window.setInterval(fn, ms),
+      clearInterval: (handle) => window.clearInterval(handle),
+      addFocusListener: (fn) => window.addEventListener("focus", fn),
+      removeFocusListener: (fn) => window.removeEventListener("focus", fn),
+    })
+  }, [live, checkForUpdate])
 
   const version = info ? `v${info.version}` : update?.currentVersion ? `v${update.currentVersion}` : LAUNCHER_META.version
   const latestVersion = update?.latestVersion ? `v${update.latestVersion}` : version
