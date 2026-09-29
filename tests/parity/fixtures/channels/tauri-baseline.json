@@ -27,7 +27,7 @@
       "phase": "3-4",
       "platform": "win32",
       "repoRoot": "<abs-path>",
-      "version": "0.2.3"
+      "version": "0.2.4"
     },
     "config:get": {
       "client": {
@@ -320,7 +320,7 @@
     "terminal:input": null,
     "terminal:resize": null,
     "update:state": {
-      "currentVersion": "0.2.3",
+      "currentVersion": "0.2.4",
       "state": "idle"
     }
   }

@@ -8,6 +8,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
+import { useLocale } from "@/components/shell/locale-provider"
 import { call, callOr, hasIpc, subscribe } from "@/lib/ipc"
 import type {
   RawAuthorState,
@@ -168,6 +169,8 @@ function folderOf(mods: ModEntry[], id: string, list: RawModList | null): string
 
 export function useModSource(): ModSourceState {
   const ipc = hasIpc()
+  /** 当前界面语言：审核原因按它取 zh / en，切语言时要跟着重算（见 mods 的 useMemo 依赖） */
+  const { locale } = useLocale()
   const [list, setList] = useState<RawModList | null>(null)
   const [market, setMarket] = useState<RawMarketList | null>(null)
   /** 「这份索引是不是缓存、什么时候拉的」：页头与提示条都要用它说实话 */
@@ -285,8 +288,8 @@ export function useModSource(): ModSourceState {
 
   const mods = useMemo(
     // 提交台账也带上：详情页的「版本历史」在索引更新前只能靠作者的逐版本记录
-    () => buildMods({ list, market, mine, submissions: submissions?.items }),
-    [list, market, mine, submissions]
+    () => buildMods({ list, market, mine, submissions: submissions?.items, locale }),
+    [list, market, mine, submissions, locale]
   )
 
   const marketById = useMemo(() => {

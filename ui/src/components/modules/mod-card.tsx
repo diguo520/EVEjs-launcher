@@ -156,10 +156,10 @@ export function ModCard({
 
         {reviewing ? <ReviewStrip mod={mod} className="mt-2.5" /> : null}
 
-        {mod.review === "rejected" && mod.reviewNote ? (
+        {(mod.review === "rejected" || mod.review === "delisted") && mod.reviewNote ? (
           <div className="mt-2.5 rounded-md border border-destructive/45 bg-destructive/10 px-2.5 py-2">
             <div className="text-[12px] font-semibold text-destructive">
-              审核未通过
+              {mod.review === "delisted" ? "已下架" : "审核未通过"}
             </div>
             <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
               {mod.reviewNote}

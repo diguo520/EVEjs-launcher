@@ -1,0 +1,25 @@
+{
+  "version": "0.2.4",
+  "changelog": {
+    "zh": [
+      {
+        "type": "fix",
+        "text": "改了审核结论之后启动器里的状态会跟着切：控制台把一条结论改动之后（例如把「已下架」改成「拒绝收录」）没有把它重新标成待同步，索引仓库因此一直停在旧值 —— 启动器里状态不切换、理由也还是旧的；被拒绝收录并随即移出收录名单的来源，索引重建时连一条拒绝记录都不发布，作者既看不到「已驳回」也看不到理由。现在改动结论会重新排队同步，拒绝结论（哪怕来源已不在名单里）照常发布，启动器按仓库名把它落回对应的模组，状态显示「已驳回 / 已下架」，不再多出一条以仓库名命名的空条目"
+      },
+      {
+        "type": "fix",
+        "text": "模组卡片与详情页上的「已下架 / 审核未通过」终于显示得出理由：审核理由在索引里是 { zh, en } 两栏的对象，旧版只认字符串，整个对象被丢掉，所以状态有、理由没有 —— 现在中文界面取中文、其余语言取英文（缺哪边用另一边兜底），「已下架」也像「审核未通过」一样渲染理由"
+      }
+    ],
+    "en": [
+      {
+        "type": "fix",
+        "text": "Moderation decisions now reach the launcher right after they change: when a decision was edited in the console (for example \"delisted\" re-classified as \"rejected\") it was not queued for sync again, so the index kept serving the old verdict — the launcher showed the old status and the old reason. A source that is rejected and then dropped from the sources list produced no rejection record at all when the index was rebuilt, so the author saw neither \"rejected\" nor a reason. Decisions are queued again now, rejection verdicts are published even when the source is no longer listed, and the launcher maps them back to the real mod by repository name, showing \"Rejected / Delisted\" instead of an extra empty entry named after the repository"
+      },
+      {
+        "type": "fix",
+        "text": "The reason behind \"Delisted / Rejected\" now actually shows on mod cards and in mod details: the index stores a moderation reason as a { zh, en } object, but the old code only understood a plain string and dropped the whole object — so the status appeared with no reason. The Chinese UI now takes the Chinese side, other languages take the English side (falling back to the other when one side is missing), and \"Delisted\" renders its reason the same way \"Rejected\" already did"
+      }
+    ]
+  }
+}
