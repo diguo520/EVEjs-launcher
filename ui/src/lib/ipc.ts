@@ -559,6 +559,12 @@ export interface RawClaimCandidates {
   total?: number
   /** 连仓库地址都解析不出来的条数（暂时无法认领） */
   skippedCount?: number
+  /** 仓库不在令牌账号名下、被范围挡掉的条数（界面据此给「查看全部」） */
+  foreignCount?: number
+  /** 后端实际用的范围：mine | all（登录名还没核验出来时不会筛） */
+  scope?: string
+  /** 后端缓存里的令牌登录名（没核验过就是空串） */
+  login?: string
   /** 没配 GitHub 令牌：连归属都核验不了，界面给一条「去配置令牌」的出路 */
   needsToken?: boolean
   /** 本页的起始偏移与页大小（后端原样回显，界面据此核对） */

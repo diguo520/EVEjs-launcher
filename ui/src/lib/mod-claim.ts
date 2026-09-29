@@ -15,10 +15,22 @@ export interface ClaimQuery {
   offset?: number
   limit?: number
   query?: string
+  /** `mine`＝只看令牌账号名下（或已认领）的；`all`＝连别人的一起列 */
+  scope?: ClaimScope
 }
+
+/** 候选列表的范围（后端 `ClaimScope`） */
+export type ClaimScope = "mine" | "all"
 
 /** 一页要多少条：与后端 `CLAIM_PAGE_DEFAULT` 对齐，上万条候选不能一次全要过来 */
 export const CLAIM_PAGE_SIZE = 50
+
+/**
+ * 弹窗默认只看「像我的」：候选里绝大部分其实是「从市场装的别人的模组」，那些仓库在
+ * 别人名下，点认领一定被拒（后端 `ClaimScope::Mine`）。被判不了归属时（登录名还没核验
+ * 出来）后端不会筛，界面也不会误标。
+ */
+export const CLAIM_SCOPE_DEFAULT: ClaimScope = "mine"
 
 /** 仓库主人是不是当前登录名：GitHub 的 owner 与登录名都不区分大小写 */
 export function repoLooksMine(item: RawClaimItem, login: string): boolean {

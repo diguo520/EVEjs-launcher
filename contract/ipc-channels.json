@@ -1,6 +1,6 @@
 {
   "generatedFrom": "E:\\Games\\EveJS-v0.12.8\\launcher\\launcher",
-  "generatedAt": "2026-09-29T13:25:20.391Z",
+  "generatedAt": "2026-09-29T13:46:56.320Z",
   "counts": {
     "invoke": 79,
     "send": 6,
@@ -313,7 +313,7 @@
       "api": "modsClaimCandidates",
       "channel": "mods:claimCandidates",
       "kind": "invoke",
-      "signature": "opts?: { offset?: number; limit?: number; query?: string }",
+      "signature": "opts?: { offset?: number; limit?: number; query?: string; scope?: \"mine\" | \"all\" }",
       "params": [
         "opts"
       ]
