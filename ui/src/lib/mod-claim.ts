@@ -10,6 +10,16 @@
  */
 import type { RawClaimCandidates, RawClaimItem } from "@/lib/ipc"
 
+/** `mods:claimCandidates` 的入参：分页 + 搜索（后端 `ClaimOptions`） */
+export interface ClaimQuery {
+  offset?: number
+  limit?: number
+  query?: string
+}
+
+/** 一页要多少条：与后端 `CLAIM_PAGE_DEFAULT` 对齐，上万条候选不能一次全要过来 */
+export const CLAIM_PAGE_SIZE = 50
+
 /** 仓库主人是不是当前登录名：GitHub 的 owner 与登录名都不区分大小写 */
 export function repoLooksMine(item: RawClaimItem, login: string): boolean {
   if (item.claimed) return false

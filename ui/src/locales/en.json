@@ -798,6 +798,7 @@
  "功能说明": "Feature description",
  "加密失败（{err}），令牌只保存在内存里": "Encryption failed ({err}), token is only stored in memory",
  "加载冲突": "Load conflicts",
+ "加载更多（还有 {count} 个）": "Load more ({count} left)",
  "加载模组后会在游戏本地聊天框看到一条「欢迎回来，飞行员」的信息。": "After mods load you will see a \"Welcome back, pilot\" line in the in-game local chat.",
  "加达里": "Caldari",
  "势力": "Faction",

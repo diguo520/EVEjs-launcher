@@ -798,6 +798,7 @@
  "功能说明": "Description des fonctions",
  "加密失败（{err}），令牌只保存在内存里": "Échec du chiffrement ({err}), le jeton est uniquement stocké en mémoire",
  "加载冲突": "Charger les conflits",
+ "加载更多（还有 {count} 个）": "Charger plus ({count} restants)",
  "加载模组后会在游戏本地聊天框看到一条「欢迎回来，飞行员」的信息。": "Après le chargement, vous verrez « Bon retour, pilote » dans le canal local du jeu.",
  "加达里": "Caldari",
  "势力": "Faction",

@@ -798,6 +798,7 @@
  "功能说明": "Funktionsbeschreibung",
  "加密失败（{err}），令牌只保存在内存里": "Verschlüsselung fehlgeschlagen ({err}), Token wird nur im Speicher gespeichert",
  "加载冲突": "Konflikte laden",
+ "加载更多（还有 {count} 个）": "Mehr laden (noch {count})",
  "加载模组后会在游戏本地聊天框看到一条「欢迎回来，飞行员」的信息。": "Nach dem Laden erscheint „Willkommen zurück, Pilot“ im lokalen Ingame-Chat.",
  "加达里": "Caldari",
  "势力": "Fraktion",

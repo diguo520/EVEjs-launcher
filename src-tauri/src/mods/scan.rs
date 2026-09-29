@@ -216,6 +216,9 @@ pub struct ModRecord {
     pub signature_trusted: bool,
     pub author_id: String,
     pub author_name: String,
+    /// 清单 `author.keyId`：声明的签名密钥指纹。
+    /// 落在记录里是因为「认领候选」要按它分类 —— 以前那一步会把清单再读一遍。
+    pub author_key_id: String,
     pub category: String,
     pub tags: Vec<String>,
     pub source: String,
@@ -305,6 +308,7 @@ fn empty_record(folder: &str, dir: &Path, manifest_path: &Path, error: &str) -> 
         signature_trusted: false,
         author_id: String::new(),
         author_name: String::new(),
+        author_key_id: String::new(),
         category: String::new(),
         tags: Vec::new(),
         source: "local".to_string(),
@@ -575,6 +579,7 @@ pub fn read_mod_dir(folder: &str, dir: &Path) -> ModRecord {
     {
         sign::trust_public_key(&signature_key_id, &author_public_key);
     }
+    record.author_key_id = author_key_id;
 
     let verdict = sign::verify_manifest_signature(&Value::Object(manifest));
     record.signature_state = verdict.state.as_str().to_string();

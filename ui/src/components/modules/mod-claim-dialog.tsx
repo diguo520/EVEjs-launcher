@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { t } from "@/lib/i18n"
 import { toast } from "sonner"
-import { KeyRound, Loader2, ShieldCheck } from "lucide-react"
+import { KeyRound, Loader2, Search, ShieldCheck } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -12,17 +12,21 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
 import type { RawClaimCandidates, RawClaimItem, RawClaimResult, RawTokenCheck } from "@/lib/ipc"
-import { orderClaimItems } from "@/lib/mod-claim"
+import { CLAIM_PAGE_SIZE, orderClaimItems, type ClaimQuery } from "@/lib/mod-claim"
 import { cn } from "@/lib/utils"
 
 export interface ModClaimDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  /** `mods:claimCandidates` 的回包（本机由别的身份署名的模组） */
-  claims: RawClaimCandidates | null
   /** 本机还有没有可用的签名私钥：有的话导入 .eve-key 就能回到原身份，不必认领 */
   privateKeyExists: boolean
+  /**
+   * 取一页候选（分页 + 搜索都在后端做）。
+   * 候选是「本机装过多少别人署名的模组」的量级（上万条也常见），界面一次只要一页。
+   */
+  onLoad: (opts: ClaimQuery) => Promise<RawClaimCandidates | null>
   onClaim: (folder: string) => Promise<RawClaimResult>
   onCheckToken: () => Promise<RawTokenCheck>
   /** 去「令牌配置」（认领要核验仓库归属，没有令牌认不了） */
@@ -36,13 +40,13 @@ export interface ModClaimDialogProps {
  * 认领后就回到「我创建的」里，可以继续打包发布。
  *
  * 认领的判据是**后端**核验 GitHub 写权限，不是界面上这张列表说了算；界面只用登录名
- * 把「看起来是你的」排到前面。
+ * 把「看起来是你的」排到前面。候选可能上万条，所以按页取、按关键字搜，不一次全渲染。
  */
 export function ModClaimDialog({
   open,
   onOpenChange,
-  claims,
   privateKeyExists,
+  onLoad,
   onClaim,
   onCheckToken,
   onOpenToken,
@@ -51,12 +55,22 @@ export function ModClaimDialog({
   const [login, setLogin] = useState("")
   const [checking, setChecking] = useState(false)
   const [busy, setBusy] = useState("")
+  const [query, setQuery] = useState("")
+  const [items, setItems] = useState<RawClaimItem[]>([])
+  const [total, setTotal] = useState(0)
+  const [skippedCount, setSkippedCount] = useState(0)
+  const [needsToken, setNeedsToken] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  /** 认领成功后重新拉当前这一页的触发器（那条会挪到「已认领」、总数也会变） */
+  const [reload, setReload] = useState(0)
 
   // 每次打开都重新问一遍令牌里的登录名：中间可能刚换过令牌
   useEffect(() => {
     if (!open) return
     let cancelled = false
     setBusy("")
+    setQuery("")
     setChecking(true)
     void onCheckToken()
       .then((reply) => {
@@ -71,9 +85,50 @@ export function ModClaimDialog({
     }
   }, [open, onCheckToken])
 
-  const items = useMemo(() => claims?.items ?? [], [claims])
+  // 打开时 / 换关键字后拉第一页；打字防抖 250ms，不必每敲一下都问一次后端
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    setLoading(true)
+    const timer = setTimeout(
+      () => {
+        void onLoad({ offset: 0, limit: CLAIM_PAGE_SIZE, query })
+          .then((reply) => {
+            if (cancelled || !reply) return
+            const next = reply.items ?? []
+            setItems(next)
+            setTotal(typeof reply.total === "number" ? reply.total : next.length)
+            setSkippedCount(reply.skippedCount ?? reply.skipped?.length ?? 0)
+            setNeedsToken(reply.needsToken === true)
+          })
+          .finally(() => {
+            if (!cancelled) setLoading(false)
+          })
+      },
+      query ? 250 : 0,
+    )
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [open, query, reload, onLoad])
+
   const ordered = useMemo(() => orderClaimItems(items, login), [items, login])
-  const skipped = claims?.skipped ?? []
+  /** 还有多少条没取回来（后端给的是搜索命中的总数，不是本页长度） */
+  const remaining = Math.max(total - items.length, 0)
+
+  async function loadMore() {
+    setLoadingMore(true)
+    try {
+      const reply = await onLoad({ offset: items.length, limit: CLAIM_PAGE_SIZE, query })
+      if (!reply) return
+      const next = reply.items ?? []
+      setItems((prev) => [...prev, ...next])
+      setTotal(typeof reply.total === "number" ? reply.total : items.length + next.length)
+    } finally {
+      setLoadingMore(false)
+    }
+  }
 
   async function claim(item: RawClaimItem) {
     setBusy(item.folder)
@@ -83,6 +138,7 @@ export function ModClaimDialog({
       toast.success(t("已认领「{name}」，现在可以打包发布新版本了。", { name: item.displayName }), {
         description: reply.repo,
       })
+      setReload((tick) => tick + 1)
       return
     }
     if (reply.needsToken) {
@@ -114,7 +170,7 @@ export function ModClaimDialog({
         </DialogHeader>
 
         {/* 令牌状态：没有令牌或令牌失效时先给一条出路，别让人在这儿反复点认领 */}
-        {!checking && !login ? (
+        {!checking && (needsToken || !login) ? (
           <div className="flex flex-wrap items-center gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-[11px] text-warning">
             <KeyRound className="size-3.5 shrink-0" />
             <span className="min-w-0 flex-1">
@@ -140,9 +196,27 @@ export function ModClaimDialog({
           </div>
         ) : null}
 
+        {/* 候选可能上万条：搜索与分页都走通道，界面一次只拿一页 */}
+        <div className="flex items-center gap-2">
+          <div className="relative min-w-0 flex-1">
+            <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-tertiary" />
+            <Input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={t("搜索模组名 / ID / 作者 / 标签")}
+              className="h-8 pl-8 text-[12px]"
+            />
+          </div>
+          {total > 0 ? (
+            <span className="tabular shrink-0 text-[10px] text-tertiary">
+              {ordered.length} / {total}
+            </span>
+          ) : null}
+        </div>
+
         {ordered.length === 0 ? (
           <p className="rounded-md border border-border bg-background/40 px-3 py-4 text-center text-[12px] text-tertiary">
-            没有需要找回的模组
+            {loading ? "正在读取…" : query ? "没有匹配的模组" : "没有需要找回的模组"}
           </p>
         ) : (
           <ul className="space-y-2">
@@ -198,10 +272,17 @@ export function ModClaimDialog({
           </ul>
         )}
 
-        {skipped.length > 0 ? (
+        {remaining > 0 ? (
+          <Button variant="outline" onClick={() => void loadMore()} disabled={loadingMore}>
+            {loadingMore ? <Loader2 className="size-3.5 animate-spin" /> : null}
+            {t("加载更多（还有 {count} 个）", { count: remaining })}
+          </Button>
+        ) : null}
+
+        {skippedCount > 0 ? (
           <p className="text-[10px] leading-relaxed text-tertiary">
             {t("另有 {count} 个模组解析不出仓库地址，暂时无法认领。", {
-              count: skipped.length,
+              count: skippedCount,
             })}
           </p>
         ) : null}
