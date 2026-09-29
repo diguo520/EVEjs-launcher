@@ -23,6 +23,7 @@ use crate::github;
 use crate::mods::{join_within, mods_root, pkg, registry, scan, submit};
 use crate::runtime::RuntimePaths;
 use serde_json::{json, Value};
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -134,64 +135,75 @@ pub fn repo_slug(value: &str) -> Option<(String, String)> {
     Some((parts[0].trim().to_string(), parts[1].trim().to_string()))
 }
 
-/// 索引缓存里这条模组登记的仓库地址（认领核验的权威来源）
-fn index_repo(runtime: &RuntimePaths, id: &str) -> String {
+/// 索引缓存里所有登记的仓库：**整份只读一遍**。
+///
+/// 以前是每个候选分别去读一遍（读文件 + JSON 解析 + Ed25519 验签），本机装了一万个
+/// 别人的模组就是一万次验签 —— 这正是「找回旧模组」卡住的根因。
+fn index_repo_map(runtime: &RuntimePaths) -> HashMap<String, String> {
     let Some(index) = registry::read_index_cache(runtime) else {
-        return String::new();
+        return HashMap::new();
     };
-    index
+    let mut map = HashMap::new();
+    for entry in index
         .get("mods")
         .and_then(Value::as_array)
-        .and_then(|items| {
-            items
-                .iter()
-                .filter(|entry| entry.get("id").and_then(Value::as_str) == Some(id))
-                .filter_map(|entry| entry.get("repo").and_then(Value::as_str))
-                .map(str::to_string)
-                .find(|value| !value.trim().is_empty())
-        })
-        .unwrap_or_default()
+        .into_iter()
+        .flatten()
+    {
+        let Some(id) = entry.get("id").and_then(Value::as_str) else {
+            continue;
+        };
+        let repo = entry
+            .get("repo")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .trim();
+        if repo.is_empty() {
+            continue;
+        }
+        map.entry(id.to_string())
+            .or_insert_with(|| repo.to_string());
+    }
+    map
 }
 
-/// 发布台账里这条模组用过的仓库（索引还没更新的兜底）
-fn ledger_repo(runtime: &RuntimePaths, id: &str) -> String {
-    submit::submission_items(runtime)
-        .iter()
-        .filter(|item| item.get("id").and_then(Value::as_str) == Some(id))
-        .filter_map(|item| item.get("sourceRepo").and_then(Value::as_str))
-        .map(str::to_string)
-        .find(|value| !value.trim().is_empty())
-        .unwrap_or_default()
+/// 发布台账里所有用过的仓库：同样只读一遍（台账 JSON 每次重新解析也不便宜）
+fn ledger_repo_map(runtime: &RuntimePaths) -> HashMap<String, String> {
+    let mut map = HashMap::new();
+    for item in submit::submission_items(runtime) {
+        let Some(id) = item.get("id").and_then(Value::as_str) else {
+            continue;
+        };
+        let repo = item
+            .get("sourceRepo")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .trim();
+        if repo.is_empty() {
+            continue;
+        }
+        map.entry(id.to_string())
+            .or_insert_with(|| repo.to_string());
+    }
+    map
 }
 
 /// 这个模组的来源仓库：索引登记 > 本地市场标记（`.evejs-source.json`）> 发布台账
-fn resolve_repo(runtime: &RuntimePaths, record: &scan::ModRecord) -> (String, &'static str) {
-    let from_index = index_repo(runtime, &record.id);
-    if !from_index.is_empty() {
-        return (from_index, "index");
+fn resolve_repo(
+    record: &scan::ModRecord,
+    index: &HashMap<String, String>,
+    ledger: &HashMap<String, String>,
+) -> (String, &'static str) {
+    if let Some(repo) = index.get(&record.id) {
+        return (repo.clone(), "index");
     }
     if !record.source_repo.trim().is_empty() {
         return (record.source_repo.clone(), "source");
     }
-    let from_ledger = ledger_repo(runtime, &record.id);
-    if !from_ledger.is_empty() {
-        return (from_ledger, "ledger");
+    if let Some(repo) = ledger.get(&record.id) {
+        return (repo.clone(), "ledger");
     }
     (String::new(), "")
-}
-
-/// 清单里声明的签名密钥指纹（`author.keyId`）
-fn declared_key_id(record: &scan::ModRecord) -> String {
-    scan::read_manifest(&record.manifest_path)
-        .ok()
-        .and_then(|manifest| manifest.get("author").cloned())
-        .and_then(|author| {
-            author
-                .get("keyId")
-                .and_then(Value::as_str)
-                .map(|value| value.trim().to_string())
-        })
-        .unwrap_or_default()
 }
 
 /// 认领核验（纯函数，好测）：这个仓库得是当前令牌主人自己的。
@@ -245,11 +257,159 @@ fn candidate_json(
 
 /* ------------------------------ 通道实现 ------------------------------ */
 
-/// `mods:claimCandidates`：本机 `mods/` 里由**别的身份**署名的模组（认领候选）。
+/// 一页默认多少条：本机装了上万个别人的模组时，列表不能把上万条一次塞给界面
+pub const CLAIM_PAGE_DEFAULT: usize = 50;
+/// 一页的上限（界面「加载更多」也只能按这个步长要）
+pub const CLAIM_PAGE_MAX: usize = 200;
+
+/// `mods:claimCandidates` 的入参：分页 + 搜索。
 ///
-/// **纯离线**：只读本机文件，不碰网络、不读令牌 —— 归属核验留给 `claim_mod`
-/// （那一步本来就要联网）。列表里给出仓库与仓库主人，界面可以据此标出「这个像是你的」。
-pub fn claim_candidates(repo_root: &Path, runtime: &RuntimePaths) -> Value {
+/// 为什么必须分页：候选是「本机 `mods/` 里由别的身份署名的模组」，装了上万个模组的人
+/// 候选就是上万条 —— 序列化、跨进程传输、渲染都是上万份，界面会直接卡住。
+#[derive(Debug, Clone)]
+pub struct ClaimOptions {
+    pub offset: usize,
+    pub limit: usize,
+    pub query: String,
+}
+
+impl Default for ClaimOptions {
+    fn default() -> Self {
+        Self {
+            offset: 0,
+            limit: CLAIM_PAGE_DEFAULT,
+            query: String::new(),
+        }
+    }
+}
+
+impl ClaimOptions {
+    /// 兼容两种调用：`modsClaimCandidates()`（全用默认）与
+    /// `modsClaimCandidates({ offset, limit, query })`。
+    pub fn parse(args: &[Value]) -> Self {
+        let object = args.iter().find_map(Value::as_object);
+        let number = |key: &str| object.and_then(|map| map.get(key)).and_then(Value::as_u64);
+        let offset = number("offset").unwrap_or(0) as usize;
+        let limit = number("limit")
+            .map(|value| value as usize)
+            .filter(|value| *value > 0)
+            .map(|value| value.min(CLAIM_PAGE_MAX))
+            .unwrap_or(CLAIM_PAGE_DEFAULT);
+        let query = object
+            .and_then(|map| map.get("query"))
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .trim()
+            .to_string();
+        Self {
+            offset,
+            limit,
+            query,
+        }
+    }
+}
+
+/// 没配令牌时给界面的回包：核验不了仓库归属，候选列表对他没有意义。
+///
+/// 这一步同时是**性能闸门** —— 装了上万个市场模组的普通玩家根本用不到这个列表，
+/// 不该为它读一整份索引（含 Ed25519 验签）与一整份发布台账。
+fn needs_token_payload() -> Value {
+    json!({
+        "ok": true,
+        "items": [],
+        "skipped": [],
+        "total": 0,
+        "skippedCount": 0,
+        "needsToken": true,
+        "reason": "找回旧模组要先核验仓库归属：先在「令牌配置」里配好 GitHub 令牌",
+    })
+}
+
+/// 排序口径与界面 `orderClaimItems` 一致：像自己的最前，仓库归属待确认的居中，已认领垫底。
+/// 后端必须先排好再切片，否则「加载更多」翻页会前后矛盾（同一条出现两次或漏掉）。
+fn order_candidates(items: &mut [Value], login: &str) {
+    let rank = |item: &Value| -> u8 {
+        if item
+            .get("claimed")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+        {
+            return 2;
+        }
+        let owner = item
+            .get("repoOwner")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        if !owner.is_empty() && owner.eq_ignore_ascii_case(login.trim()) {
+            return 0;
+        }
+        1
+    };
+    items.sort_by(|left, right| {
+        rank(left).cmp(&rank(right)).then_with(|| {
+            let left_name = left
+                .get("displayName")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            let right_name = right
+                .get("displayName")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            left_name.cmp(right_name)
+        })
+    });
+}
+
+/// 搜索：id / 显示名 / 原署名 / 仓库地址，任意一处包含关键字即命中（不区分大小写）
+fn matches_query(item: &Value, needle: &str) -> bool {
+    if needle.is_empty() {
+        return true;
+    }
+    let needle = needle.to_lowercase();
+    [
+        "id",
+        "displayName",
+        "declaredAuthorId",
+        "declaredAuthorName",
+        "repo",
+    ]
+    .iter()
+    .filter_map(|key| item.get(*key).and_then(Value::as_str))
+    .any(|value| value.to_lowercase().contains(&needle))
+}
+
+/// `mods:claimCandidates`：本机 `mods/` 里由**别的身份**署名的模组（认领候选），按页返回。
+///
+/// **离线**：只读本机文件（外加一份登录名缓存用于排序），不碰网络 —— 归属核验留给
+/// `claim_mod`（那一步本来就要联网）。列表里给出仓库与仓库主人，界面据此标出
+/// 「这个像是你的」。
+pub fn claim_candidates(repo_root: &Path, runtime: &RuntimePaths, opts: &ClaimOptions) -> Value {
+    let token = github::get_token(runtime);
+    claim_candidates_for(repo_root, runtime, opts, &token)
+}
+
+/// 带令牌的候选列表：`token` 单独传进来，单测就能在不碰全局令牌的情况下跑门禁
+pub(crate) fn claim_candidates_for(
+    repo_root: &Path,
+    runtime: &RuntimePaths,
+    opts: &ClaimOptions,
+    token: &str,
+) -> Value {
+    if token.is_empty() {
+        return needs_token_payload();
+    }
+    // 登录名只读本机缓存、**不联网**：这个调用挂在界面加载链路上，不能为它等一次 GitHub
+    let login = github::cached_login(runtime, token);
+    claim_candidates_with(repo_root, runtime, opts, &login)
+}
+
+/// 候选筛选的实体：整份索引与整份台账各读一次，循环里只剩查表。
+fn claim_candidates_with(
+    repo_root: &Path,
+    runtime: &RuntimePaths,
+    opts: &ClaimOptions,
+    login: &str,
+) -> Value {
     let identity = match crate::author::read_identity_at(runtime) {
         Ok(identity) => identity,
         Err(reason) => {
@@ -257,26 +417,42 @@ pub fn claim_candidates(repo_root: &Path, runtime: &RuntimePaths) -> Value {
                 "ok": false,
                 "items": [],
                 "skipped": [],
+                "total": 0,
+                "skippedCount": 0,
                 "reason": format!("读不到本机作者身份：{reason}"),
             })
         }
     };
 
     let scanned = scan::scan_mods(repo_root, runtime).mods;
+    let index_repos = index_repo_map(runtime);
+    let ledger_repos = ledger_repo_map(runtime);
+    // 认领记录同样整份读一次：以前每条候选都要把认领文件重新读一遍
+    let claimed_ids: HashSet<String> = claims(runtime)
+        .iter()
+        .filter_map(|item| item.get("id").and_then(Value::as_str))
+        .map(str::to_string)
+        .collect();
+
     let mut items: Vec<Value> = Vec::new();
-    let mut skipped: Vec<Value> = Vec::new();
+    let mut skipped_count = 0usize;
     for record in &scanned {
         let declared_author_id = record.author_id.trim().to_string();
-        let declared_key_id = declared_key_id(record);
-        let claimed = is_claimed(runtime, &record.id);
+        let declared_key_id = record.author_key_id.trim().to_string();
+        let claimed = claimed_ids.contains(&record.id);
         // 本次身份签的模组不用认领；作者块整个是空的也不用（签名时会自动补上）
         let foreign = (!declared_author_id.is_empty() && declared_author_id != identity.id)
             || (!declared_key_id.is_empty() && declared_key_id != identity.key_id);
         if !foreign && !claimed {
             continue;
         }
-        let (repo, repo_source) = resolve_repo(runtime, record);
+        let (repo, repo_source) = resolve_repo(record, &index_repos, &ledger_repos);
         let has_repo = !repo.trim().is_empty();
+        if !claimed && !has_repo {
+            // 解析不出仓库 = 核验不了归属 = 放哪儿都办不了事，只计数、不回条目
+            skipped_count += 1;
+            continue;
+        }
         let mut item = candidate_json(record, &declared_author_id, &declared_key_id, claimed);
         item["repo"] = json!(repo);
         item["repoSource"] = json!(repo_source);
@@ -287,13 +463,29 @@ pub fn claim_candidates(repo_root: &Path, runtime: &RuntimePaths) -> Value {
         } else {
             "索引与本地记录里都没有这个模组的仓库地址"
         });
-        if claimed || has_repo {
-            items.push(item);
-        } else {
-            skipped.push(item);
-        }
+        items.push(item);
     }
-    json!({ "ok": true, "items": items, "skipped": skipped })
+
+    order_candidates(&mut items, login);
+    if !opts.query.is_empty() {
+        items.retain(|item| matches_query(item, &opts.query));
+    }
+    let total = items.len();
+    let page: Vec<Value> = items
+        .into_iter()
+        .skip(opts.offset)
+        .take(opts.limit)
+        .collect();
+    json!({
+        "ok": true,
+        "items": page,
+        "skipped": [],
+        "skippedCount": skipped_count,
+        "total": total,
+        "offset": opts.offset,
+        "limit": opts.limit,
+        "needsToken": false,
+    })
 }
 
 /// `mods:claimMod`：核实这个模组的仓库归当前令牌主人，通过后落认领记录。
@@ -318,7 +510,7 @@ pub fn claim_mod(repo_root: &Path, runtime: &RuntimePaths, folder: &str) -> Valu
         }
     };
     let declared_author_id = record.author_id.trim().to_string();
-    let declared_key_id = declared_key_id(&record);
+    let declared_key_id = record.author_key_id.trim().to_string();
     if declared_author_id.is_empty() && declared_key_id.is_empty() {
         return json!({
             "ok": false,
@@ -330,7 +522,9 @@ pub fn claim_mod(repo_root: &Path, runtime: &RuntimePaths, folder: &str) -> Valu
     {
         return json!({ "ok": false, "reason": "这个模组本来就是本机身份签的，不需要认领" });
     }
-    let (repo, repo_source) = resolve_repo(runtime, &record);
+    // 单条认领：索引与台账各读一次就够，不必像候选列表那样整份建表
+    let (repo, repo_source) =
+        resolve_repo(&record, &index_repo_map(runtime), &ledger_repo_map(runtime));
     let Some((owner, repo_name)) = repo_slug(&repo) else {
         return json!({
             "ok": false,
@@ -369,6 +563,8 @@ pub fn claim_mod(repo_root: &Path, runtime: &RuntimePaths, folder: &str) -> Valu
                 .unwrap_or("GitHub 令牌无效，先在「令牌配置」里重新授权"),
         });
     }
+    // 令牌有效就把「这个令牌是谁」记下来：候选列表靠这份缓存排序，不必再打一遍 GitHub
+    github::remember_login(runtime, &token, &login);
     let access = github::repo_access(&token, &owner, &repo_name);
     let verified_by = match verify(&repo, &owner, &login, &access) {
         Ok(verified_by) => verified_by,
@@ -401,6 +597,7 @@ pub fn claim_mod(repo_root: &Path, runtime: &RuntimePaths, folder: &str) -> Valu
 mod tests {
     use super::*;
     use crate::mods::scan::MANIFEST_NAME;
+    use crate::mods::MOD_SOURCE_FILE;
     use serde_json::json;
 
     fn runtime_for(label: &str) -> RuntimePaths {
@@ -438,6 +635,15 @@ mod tests {
             "activation": { "strategy": "loader_rename" },
             "author": author,
         })
+    }
+
+    /// 写一份「从市场装的」标记：仓库地址由此解析出来（等价于索引里登记了 repo）
+    fn mark_market_source(repo: &Path, folder: &str, source_repo: &str) {
+        fs::write(
+            repo.join("mods").join(folder).join(MOD_SOURCE_FILE),
+            json!({ "source": "market", "repo": source_repo, "version": "1.0.0" }).to_string(),
+        )
+        .unwrap();
     }
 
     #[test]
@@ -557,7 +763,7 @@ mod tests {
         );
         // 作者块整个空的：签名时自动补，不是候选
         write_mod(&repo, "blank", manifest("blank", json!({})));
-        // 别人署名：是候选（本机没有索引缓存，解析不出仓库 → 只能进 skipped）
+        // 别人署名：是候选（本机没有索引缓存也没有市场标记，解析不出仓库 → 只能计数）
         write_mod(
             &repo,
             "foreign",
@@ -566,14 +772,11 @@ mod tests {
                 json!({ "id": "au-someone", "keyId": "deadbeef" }),
             ),
         );
-        let result = claim_candidates(&repo, &runtime);
+        let result = claim_candidates_for(&repo, &runtime, &ClaimOptions::default(), "tok");
         assert_eq!(result["ok"], json!(true), "{result}");
         assert_eq!(result["items"].as_array().unwrap().len(), 0, "{result}");
-        let skipped = result["skipped"].as_array().unwrap();
-        assert_eq!(skipped.len(), 1, "{result}");
-        assert_eq!(skipped[0]["id"], json!("foreign"));
-        assert_eq!(skipped[0]["canClaim"], json!(false));
-        assert!(!skipped[0]["reason"].as_str().unwrap().is_empty());
+        // 解析不出仓库的只计数：条目本身没有可操作的信息，不必跨进程搬运
+        assert_eq!(result["skippedCount"], json!(1), "{result}");
 
         // 认领过之后即使解析不出仓库也照样回显（认领记录本身就是结论）
         record_claim(
@@ -586,11 +789,144 @@ mod tests {
             "owner",
         )
         .unwrap();
-        let after = claim_candidates(&repo, &runtime);
+        let after = claim_candidates_for(&repo, &runtime, &ClaimOptions::default(), "tok");
         let items = after["items"].as_array().unwrap();
         assert_eq!(items.len(), 1);
         assert_eq!(items[0]["id"], json!("foreign"));
         assert_eq!(items[0]["claimed"], json!(true));
+    }
+
+    #[test]
+    fn missing_token_short_circuits_the_whole_scan() {
+        // 没配令牌 = 核验不了仓库归属：候选列表对他没有意义，连一次全量扫描都不该做
+        let repo = repo_for("no-token");
+        let runtime = runtime_for("no-token");
+        write_mod(
+            &repo,
+            "foreign",
+            manifest(
+                "foreign",
+                json!({ "id": "au-someone", "keyId": "deadbeef" }),
+            ),
+        );
+        mark_market_source(
+            &repo,
+            "foreign",
+            "https://github.com/someone/evejs-mod-foreign",
+        );
+        let result = claim_candidates_for(&repo, &runtime, &ClaimOptions::default(), "");
+        assert_eq!(result["ok"], json!(true), "{result}");
+        assert_eq!(result["needsToken"], json!(true), "{result}");
+        assert_eq!(result["items"].as_array().unwrap().len(), 0, "{result}");
+        assert!(!result["reason"].as_str().unwrap().is_empty());
+    }
+
+    #[test]
+    fn claim_options_parse_defaults_and_clamp() {
+        let parsed = ClaimOptions::parse(&[]);
+        assert_eq!(parsed.offset, 0);
+        assert_eq!(parsed.limit, CLAIM_PAGE_DEFAULT);
+        assert!(parsed.query.is_empty());
+
+        let parsed = ClaimOptions::parse(&[json!({
+            "offset": 20,
+            "limit": 1_000_000,
+            "query": "  eve  ",
+        })]);
+        assert_eq!(parsed.offset, 20);
+        // 界面传多大的页都要封顶：一次回几万条等于没分页
+        assert_eq!(parsed.limit, CLAIM_PAGE_MAX);
+        assert_eq!(parsed.query, "eve");
+
+        // limit 缺失 / 0 / 负数一律退回默认，不会给出一个空页
+        assert_eq!(ClaimOptions::parse(&[json!({})]).limit, CLAIM_PAGE_DEFAULT);
+        assert_eq!(
+            ClaimOptions::parse(&[json!({ "limit": 0 })]).limit,
+            CLAIM_PAGE_DEFAULT
+        );
+        assert_eq!(
+            ClaimOptions::parse(&[json!({ "limit": -5 })]).limit,
+            CLAIM_PAGE_DEFAULT
+        );
+    }
+
+    #[test]
+    fn candidates_page_sort_and_search() {
+        let repo = repo_for("paging");
+        let runtime = runtime_for("paging");
+        // 先造出本机身份：没有身份时整个候选列表都不该有结果
+        assert_eq!(crate::author::get_state(&runtime)["ok"], json!(true));
+        for (folder, owner) in [
+            ("alpha", "someone-a"),
+            ("bravo", "diguo520"),
+            ("charlie", "someone-c"),
+        ] {
+            write_mod(
+                &repo,
+                folder,
+                manifest(
+                    folder,
+                    json!({ "id": format!("au-{folder}"), "keyId": format!("key-{folder}") }),
+                ),
+            );
+            mark_market_source(
+                &repo,
+                folder,
+                &format!("https://github.com/{owner}/evejs-mod-{folder}"),
+            );
+        }
+
+        // 搜索命中（id / 显示名 / 署名 / 仓库任意一处）
+        let hit = claim_candidates_for(
+            &repo,
+            &runtime,
+            &ClaimOptions {
+                offset: 0,
+                limit: 10,
+                query: "charlie".to_string(),
+            },
+            "tok",
+        );
+        assert_eq!(hit["total"], json!(1), "{hit}");
+        assert_eq!(hit["items"][0]["id"], json!("charlie"), "{hit}");
+
+        // 先排序再切片：「像自己的」排最前，翻页不重不漏
+        // 登录名走本机缓存（`checkToken` 与认领成功时写入），候选列表不必再打一遍 GitHub
+        github::remember_login(&runtime, "tok", "diguo520");
+        assert_eq!(github::cached_login(&runtime, "tok"), "diguo520");
+        let page1 = claim_candidates_for(
+            &repo,
+            &runtime,
+            &ClaimOptions {
+                offset: 0,
+                limit: 2,
+                query: String::new(),
+            },
+            "tok",
+        );
+        assert_eq!(page1["total"], json!(3), "{page1}");
+        assert_eq!(page1["items"][0]["id"], json!("bravo"), "{page1}");
+        assert_eq!(page1["items"][1]["id"], json!("alpha"), "{page1}");
+        assert_eq!(page1["limit"], json!(2), "{page1}");
+
+        let page2 = claim_candidates_for(
+            &repo,
+            &runtime,
+            &ClaimOptions {
+                offset: 2,
+                limit: 2,
+                query: String::new(),
+            },
+            "tok",
+        );
+        let seen: Vec<&str> = page1["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .chain(page2["items"].as_array().unwrap().iter())
+            .map(|item| item["id"].as_str().unwrap())
+            .collect();
+        assert_eq!(seen, vec!["bravo", "alpha", "charlie"], "{page2}");
     }
 
     #[test]

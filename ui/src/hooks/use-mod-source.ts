@@ -28,6 +28,7 @@ import type {
   RawModTemplate,
   RawReadme,
 } from "@/lib/ipc"
+import { CLAIM_PAGE_SIZE, type ClaimQuery } from "@/lib/mod-claim"
 import { buildMods, latestSubmission, sourceRepoIds } from "@/lib/mod-source"
 import type { PublishCredential } from "@/lib/mod-logic"
 import type { ModEntry } from "@/lib/mock"
@@ -147,6 +148,8 @@ export interface ModSourceState {
   checkToken: () => Promise<RawTokenCheck>
   /** 认领一个旧模组：核验仓库归属 → 落认领记录 */
   claimMod: (folder: string) => Promise<RawClaimResult>
+  /** 找回旧模组：按页 + 关键字取候选（后端分页，界面不一次要上万条） */
+  loadClaims: (opts?: ClaimQuery) => Promise<RawClaimCandidates | null>
   publish: (input: PublishInput) => Promise<PublishOutcome>
   /** 真进度：`mod:publishProgress` 的最后一条 */
   publishProgress: RawPublishProgress | null
@@ -237,7 +240,10 @@ export function useModSource(): ModSourceState {
         callOr<RawAuthorState>("authorGet", null),
         callOr<RawTokenStatus>("modsGithubTokenStatus", null),
         callOr<{ ok: boolean; templates: RawModTemplate[] }>("modsTemplates", null),
-        callOr<RawClaimCandidates>("modsClaimCandidates", null),
+        callOr<RawClaimCandidates>("modsClaimCandidates", null, {
+          offset: 0,
+          limit: CLAIM_PAGE_SIZE,
+        }),
       ])
     setList(nextList)
     applyMarket(nextMarket)
@@ -395,6 +401,28 @@ export function useModSource(): ModSourceState {
     [load]
   )
 
+  /**
+   * 候选列表按页取：候选是「本机装了多少别人的模组」的量级（上万条也常见），
+   * 一次全量回给界面等于让 WebView 渲染上万个 DOM 子树。
+   *
+   * 只有「第一页且没搜索」才回写页头入口用的那份状态 —— 搜索/翻页的结果不能覆盖它，
+   * 否则搜出 0 条就会把「找回旧模组」的入口一起藏掉。
+   */
+  const loadClaims = useCallback(
+    async (opts: ClaimQuery = {}): Promise<RawClaimCandidates | null> => {
+      const query = opts.query ?? ""
+      const offset = opts.offset ?? 0
+      const reply = await callOr<RawClaimCandidates>("modsClaimCandidates", null, {
+        offset,
+        limit: opts.limit ?? CLAIM_PAGE_SIZE,
+        query,
+      })
+      if (reply && offset === 0 && query === "") setClaims(reply)
+      return reply
+    },
+    []
+  )
+
   const installFromMarket = useCallback(
     async (id: string): Promise<RawAck> => {
       const entry = marketById[id]
@@ -524,6 +552,7 @@ export function useModSource(): ModSourceState {
     sourceRepos,
     claims,
     claimMod,
+    loadClaims,
     marketCount: market?.mods?.length ?? 0,
     marketBlockedCount: market?.blocked?.length ?? 0,
     marketEvejsVersion: market?.evejsVersion ?? "",

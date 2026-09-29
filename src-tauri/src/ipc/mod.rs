@@ -442,9 +442,10 @@ async fn dispatch(
         // 重装系统 / 换电脑之后私钥没了，作者要接着更新自己几年前的模组：先列候选，
         // 再逐个核验「这个模组的仓库是不是你的」（走 GitHub），见 mods/claim.rs
         "mods:claimCandidates" => {
+            let opts = mods::claim::ClaimOptions::parse(args);
             let repo = root.clone();
             let runtime = state.runtime.clone();
-            Ok(blocking(move || mods::claim::claim_candidates(&repo, &runtime)).await?)
+            Ok(blocking(move || mods::claim::claim_candidates(&repo, &runtime, &opts)).await?)
         }
         "mods:claimMod" => {
             let folder = arg_str(args, 0);

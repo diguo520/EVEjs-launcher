@@ -1078,8 +1078,8 @@ export function ModulesPage({
       <ModClaimDialog
         open={claimOpen}
         onOpenChange={setClaimOpen}
-        claims={source.claims}
         privateKeyExists={source.privateKeyExists}
+        onLoad={source.loadClaims}
         onClaim={source.claimMod}
         onCheckToken={source.checkToken}
         onOpenToken={() => {

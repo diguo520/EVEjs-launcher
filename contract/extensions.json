@@ -13,9 +13,9 @@
       "api": "modsClaimCandidates",
       "channel": "mods:claimCandidates",
       "kind": "invoke",
-      "signature": "",
-      "params": [],
-      "why": "重装系统 / 换电脑 / 删掉私钥之后，作者本机换了新身份，`sign_mod_folder` 与 `prepare_submission` 的归属保护就会把他自己的旧模组当成别人的拒掉，他就再也更新不了几年前的模组。这个通道列出本机 mods/ 里「由别的身份署名」的模组（附带索引登记的仓库与仓库主人），作为认领入口的候选清单；纯离线只读，不碰网络。"
+      "signature": "opts?: { offset?: number; limit?: number; query?: string }",
+      "params": ["opts"],
+      "why": "重装系统 / 换电脑 / 删掉私钥之后，作者本机换了新身份，`sign_mod_folder` 与 `prepare_submission` 的归属保护就会把他自己的旧模组当成别人的拒掉，他就再也更新不了几年前的模组。这个通道列出本机 mods/ 里「由别的身份署名」的模组（附带索引登记的仓库与仓库主人），作为认领入口的候选清单；纯离线只读，不碰网络。候选是「本机装了多少别人的模组」的量级（上万条也常见），所以按 `{ offset, limit, query }` 分页 + 搜索，只回一页（默认 50、上限 200）并带上 `total` / `skippedCount`；索引、发布台账与认领记录都只整份读一次再查表，没配 GitHub 令牌的人直接回 `needsToken`（他核验不了归属，也用不到这份清单），不为它白扫一遍上万个模组。"
     },
     {
       "api": "modsClaimMod",

@@ -551,10 +551,19 @@ export interface RawClaimItem {
 export interface RawClaimCandidates {
   ok: boolean
   reason?: string
-  /** 可认领 + 已认领 */
+  /** 本页的可认领 + 已认领条目（后端排好序再切片，翻页不重不漏） */
   items: RawClaimItem[]
-  /** 连仓库地址都解析不出来的（暂时无法认领） */
+  /** 解析不出仓库的条目不再回传（只给数量，见 `skippedCount`）；保留字段兼容旧回包 */
   skipped: RawClaimItem[]
+  /** 搜索命中的总条数（跨页，用来算「加载更多」还剩几条） */
+  total?: number
+  /** 连仓库地址都解析不出来的条数（暂时无法认领） */
+  skippedCount?: number
+  /** 没配 GitHub 令牌：连归属都核验不了，界面给一条「去配置令牌」的出路 */
+  needsToken?: boolean
+  /** 本页的起始偏移与页大小（后端原样回显，界面据此核对） */
+  offset?: number
+  limit?: number
 }
 
 /** mods:claimMod */

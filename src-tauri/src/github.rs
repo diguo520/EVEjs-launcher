@@ -250,8 +250,106 @@ pub fn check_token(paths: &RuntimePaths, token: Option<&str>) -> Value {
     if value.is_empty() {
         return json!({ "ok": false, "reason": "还没填 GitHub 令牌" });
     }
-    validate_token(&value)
+    let reply = validate_token(&value);
+    // 顺手把「这个令牌是谁」记下来：认领候选列表这类只读路径要按登录名排序，
+    // 不能每次都再打一遍 GitHub（离线时还会白等一次 20s 超时）。
+    if let Some(login) = reply.get("login").and_then(Value::as_str) {
+        remember_login(paths, &value, login);
+    }
+    reply
 }
+
+/* --------------------------- 登录名缓存 --------------------------- */
+
+/// 登录名缓存：`GET /user` 是出网动作，而列表刷新是高频只读动作
+const LOGIN_CACHE_FILE: &str = "gh-login.json";
+/// 一条记录能活多久：换令牌 / 换账号都会让旧条目失效，一天足够
+const LOGIN_TTL_MS: u64 = 24 * 60 * 60 * 1000;
+/// 最多留几条（按令牌指纹索引），免得反复换令牌把文件养肥
+const LOGIN_CACHE_MAX: usize = 8;
+
+fn login_cache_path(paths: &RuntimePaths) -> PathBuf {
+    paths.cache.join(LOGIN_CACHE_FILE)
+}
+
+/// 令牌指纹：缓存按它索引，文件里不落令牌明文
+fn login_cache_key(token: &str) -> String {
+    crate::mods::pkg::sha256_hex(token.as_bytes())
+}
+
+fn now_ms() -> u64 {
+    crate::mods::pkg::epoch_ms() as u64
+}
+
+/// 读本机缓存（**绝不联网**）：过期的条目直接丢掉，别把一周前的登录名当现在的
+fn read_login_cache(paths: &RuntimePaths) -> Vec<(String, String, u64)> {
+    let Ok(raw) = std::fs::read_to_string(login_cache_path(paths)) else {
+        return Vec::new();
+    };
+    let Ok(parsed) = serde_json::from_str::<Value>(raw.trim_start_matches('\u{feff}')) else {
+        return Vec::new();
+    };
+    let now = now_ms();
+    parsed
+        .get("items")
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|item| {
+                    let key = item.get("key").and_then(Value::as_str)?;
+                    let login = item.get("login").and_then(Value::as_str)?;
+                    let at_ms = item.get("atMs").and_then(Value::as_u64).unwrap_or(0);
+                    Some((key.to_string(), login.to_string(), at_ms))
+                })
+                .filter(|(_, _, at_ms)| now.saturating_sub(*at_ms) < LOGIN_TTL_MS)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// 记住「这个令牌是哪个账号」：核验过令牌的地方都该调一次。
+pub fn remember_login(paths: &RuntimePaths, token: &str, login: &str) {
+    if token.is_empty() || login.is_empty() {
+        return;
+    }
+    let key = login_cache_key(token);
+    let mut items = read_login_cache(paths);
+    items.retain(|(existing, _, _)| *existing != key);
+    items.push((key, login.to_string(), now_ms()));
+    if items.len() > LOGIN_CACHE_MAX {
+        let drop = items.len() - LOGIN_CACHE_MAX;
+        items.drain(0..drop);
+    }
+    let payload = json!({
+        "schemaVersion": 1,
+        "items": items
+            .iter()
+            .map(|(key, login, at_ms)| json!({ "key": key, "login": login, "atMs": at_ms }))
+            .collect::<Vec<Value>>(),
+    });
+    let path = login_cache_path(paths);
+    if let Some(dir) = path.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    if let Ok(text) = serde_json::to_string_pretty(&payload) {
+        let _ = std::fs::write(path, format!("{text}\n"));
+    }
+}
+
+/// 本机缓存里这个令牌的登录名（**绝不联网**）：没有就回空串
+pub fn cached_login(paths: &RuntimePaths, token: &str) -> String {
+    if token.is_empty() {
+        return String::new();
+    }
+    let key = login_cache_key(token);
+    read_login_cache(paths)
+        .into_iter()
+        .find(|(existing, _, _)| *existing == key)
+        .map(|(_, login, _)| login)
+        .unwrap_or_default()
+}
+
 /* --------------------------- 提交 PR（fork 流程） --------------------------- */
 
 /// 确保 fork 存在并可用（已存在则直接复用，409/422 属正常情况）
