@@ -925,10 +925,7 @@ mod tests {
         // 没认领之前：照旧拒绝（归属保护不能被绕过）
         let refused = sign_mod_folder(&repo, "old", &runtime);
         assert_eq!(refused["ok"], json!(false), "{refused}");
-        assert!(refused["reason"]
-            .as_str()
-            .unwrap()
-            .contains("找回旧模组"));
+        assert!(refused["reason"].as_str().unwrap().contains("找回旧模组"));
 
         // 认领之后：放行，并把署名换成本机身份
         claim::record_claim(
@@ -957,7 +954,11 @@ mod tests {
         assert_eq!(written["signature"]["keyId"], json!(me_key));
         // 换完署名还要签得对：否则模组一进游戏就被判「被篡改」
         let record = scan::read_mod_dir("old", &repo.join("mods").join("old"));
-        assert_eq!(record.signature_state, "valid", "{}", record.signature_error);
+        assert_eq!(
+            record.signature_state, "valid",
+            "{}",
+            record.signature_error
+        );
         assert!(record.valid);
     }
 

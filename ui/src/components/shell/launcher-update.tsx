@@ -46,11 +46,20 @@ export function LauncherUpdate({ compact = false }: { compact?: boolean }) {
                 "text-primary hover:bg-primary/10"
               )}
             >
-              {updating ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <ArrowUpCircle className="size-4" />
-              )}
+              {/* 图标条上没有文字：这一圈脉冲光环 + 右上角小点就是「有新版本」的全部提示 */}
+              <span className="relative inline-flex">
+                {updating ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <ArrowUpCircle className="size-4" />
+                )}
+                {outdated && !updating ? (
+                  <span
+                    aria-hidden="true"
+                    className="update-pulse-ring absolute -inset-1 rounded-full"
+                  />
+                ) : null}
+              </span>
               {/* 图标条上没有文字，用一个小点提示有新版本 */}
               {outdated && !updating ? (
                 <span className="absolute right-2.5 top-1.5 size-1.5 rounded-full bg-primary" />
@@ -71,7 +80,14 @@ export function LauncherUpdate({ compact = false }: { compact?: boolean }) {
       {outdated ? (
         <div className="rounded-md border border-primary/35 bg-primary/10 px-2.5 py-2">
           <div className="flex items-center gap-1.5">
-            <ArrowUpCircle className="size-3.5 shrink-0 text-primary" />
+            {/* 侧栏展开时这行卡片本身就是提示，但图标上也套同一圈光环，两态看起来是一件事 */}
+            <span className="relative inline-flex shrink-0">
+              <ArrowUpCircle className="size-3.5 text-primary" />
+              <span
+                aria-hidden="true"
+                className="update-pulse-ring absolute -inset-1 rounded-full"
+              />
+            </span>
             <span className="text-[11px] font-semibold text-primary">
               启动器有新版本
             </span>

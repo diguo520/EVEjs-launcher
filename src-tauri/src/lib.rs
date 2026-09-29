@@ -41,6 +41,13 @@ use tauri::{Manager, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 /// 渲染层注入脚本：window.api shim（由 scripts/gen-contract.mjs 生成，随源码进仓）。
 const API_SHIM: &str = include_str!("../../ui/src/api-shim.js");
 
+/// 自检进程的渲染层标记：只在 `--self-test` 下注入，生产运行时这个全局根本不存在。
+///
+/// 自检是无值守的诊断进程（parity / L3 / smoke 都靠它跑）。界面里的后台动作会污染 dump：
+/// `update:state` 的瞬时 checking 会被采进冻结基线，还会真去打 GitHub，让同一份二进制
+/// 两次跑给出不同结果。渲染层见到这个标记就不做后台网络动作（见 ui/src/lib/update-watch.ts）。
+const SELF_TEST_SHIM: &str = "window.__EVEJS_SELF_TEST__ = true;";
+
 /// A4：自检模式开关（`--self-test`）。命令白名单据此收窄到「生产集合」。
 fn is_self_test() -> bool {
     std::env::args().any(|arg| arg == "--self-test")
@@ -173,7 +180,7 @@ pub fn run() {
     builder
         .setup(move |app| {
             let page = resolve_ui_page();
-            let window = WebviewWindowBuilder::new(app, "main", WebviewUrl::App(page.into()))
+            let mut shell = WebviewWindowBuilder::new(app, "main", WebviewUrl::App(page.into()))
                 .title("EvEJS 启动器")
                 .inner_size(1360.0, 860.0)
                 .min_inner_size(1024.0, 640.0)
@@ -181,8 +188,11 @@ pub fn run() {
                 .background_color(tauri::window::Color(5, 8, 13, 255))
                 .visible(false)
                 .center()
-                .initialization_script(API_SHIM)
-                .build()?;
+                .initialization_script(API_SHIM);
+            if self_test {
+                shell = shell.initialization_script(SELF_TEST_SHIM);
+            }
+            let window = shell.build()?;
 
             // 恢复上次窗口几何（对齐现役版 savedWindow 逻辑），再 show
             ipc::window::restore(&window);

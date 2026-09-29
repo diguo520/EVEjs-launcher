@@ -206,6 +206,28 @@ body {
   animation: mc-pulse 1.8s ease-in-out infinite;
 }
 
+/* 有新版待处理：图标外圈向外扩散的光环（一次性动作提示，常态不挂） */
+@keyframes update-pulse-ring {
+  0% {
+    transform: scale(0.7);
+    opacity: 0.75;
+  }
+  70% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+.update-pulse-ring {
+  pointer-events: none;
+  border: 1px solid hsl(var(--primary));
+  animation: update-pulse-ring 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
 /* 开机画面：覆盖整屏，等第一次握手回来再淡出（淡出时长跟 App.tsx 的 BOOT_FADE_MS 对齐） */
 .boot-splash {
   position: fixed;
