@@ -8,6 +8,22 @@
       "signature": "folder: string, patch: Record<string, unknown>",
       "params": ["folder", "patch"],
       "why": "现役版的「编辑信息」只存在于渲染层：主进程没有任何改写清单的通道（modManager.ts 里唯一写清单的地方在 signModFolder 里）。新界面按原型提供了编辑弹窗，如果不落一个真通道，保存就只能弹一句「请直接改文件」。"
+    },
+    {
+      "api": "modsClaimCandidates",
+      "channel": "mods:claimCandidates",
+      "kind": "invoke",
+      "signature": "",
+      "params": [],
+      "why": "重装系统 / 换电脑 / 删掉私钥之后，作者本机换了新身份，`sign_mod_folder` 与 `prepare_submission` 的归属保护就会把他自己的旧模组当成别人的拒掉，他就再也更新不了几年前的模组。这个通道列出本机 mods/ 里「由别的身份署名」的模组（附带索引登记的仓库与仓库主人），作为认领入口的候选清单；纯离线只读，不碰网络。"
+    },
+    {
+      "api": "modsClaimMod",
+      "channel": "mods:claimMod",
+      "kind": "invoke",
+      "signature": "folder: string",
+      "params": ["folder"],
+      "why": "认领动作本身：核验这个模组的仓库是不是当前 GitHub 令牌主人自己的（owner 命中 / GitHub 明确回了 push 权限），通过后落一条本机认领记录。归属保护只对认领过的 id 放行，所以离线路径上（签名 / 打包）不需要联网也能照常判断；核验只用公开信息，不接受「我说是我的」。"
     }
   ],
   "send": [],

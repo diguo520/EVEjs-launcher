@@ -83,6 +83,8 @@
     metricsGet: function () { return request("metrics:get", []); },
     modsAuthoringDoc: function () { return request("mods:authoringDoc", []); },
     modsAuthoringDocText: function (lang) { return request("mods:authoringDocText", [lang]); },
+    modsClaimCandidates: function () { return request("mods:claimCandidates", []); },
+    modsClaimMod: function (folder) { return request("mods:claimMod", [folder]); },
     modsCreate: function (draft) { return request("mods:create", [draft]); },
     modsCreateFolder: function () { return request("mods:createFolder", []); },
     modsGithubTokenCheck: function (token) { return request("mods:githubTokenCheck", [token]); },

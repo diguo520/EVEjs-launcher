@@ -10,7 +10,7 @@
 //! 三个来源，其中索引那一路必须走**只读缓存**（见 `read_index_cache` 的注释）。
 use crate::author;
 use crate::config;
-use crate::mods::{mods_root, pkg, scan, sign};
+use crate::mods::{claim, mods_root, pkg, scan, sign};
 use crate::net;
 use crate::runtime::RuntimePaths;
 use crate::shell;
@@ -799,7 +799,10 @@ pub fn list_my_mods(repo_root: &Path, runtime: &RuntimePaths) -> Value {
     // 1) 本地扫到的模组（后面还要用它判断哪些记录已经「没有本地文件」了）
     for record in &scanned {
         let mine = (!record.author_id.is_empty() && record.author_id == author_id)
-            || (!record.signature_key_id.is_empty() && record.signature_key_id == key_id);
+            || (!record.signature_key_id.is_empty() && record.signature_key_id == key_id)
+            // 认领过的旧模组也算「我创建的」：重装系统换了身份之后，他得能在提交弹窗里
+            // 选到自己的模组才谈得上更新（见 mods/claim.rs）
+            || claim::is_claimed(runtime, &record.id);
         if !mine {
             continue;
         }

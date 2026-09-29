@@ -3,8 +3,11 @@
 //!
 //! 两条硬约定：
 //!   - **不改服务端文件**：启用/禁用只是 `loader.js` ↔ `loader.js.disabled` 改名；
-//!   - **不替别人签名**：清单里已声明别的 author.id / keyId 时拒绝签名（归属保护）。
+//!   - **不替别人签名**：清单里已声明别的 author.id / keyId 时拒绝签名（归属保护）；
+//!     唯一的例外是**认领过**的模组（`mods/claim.rs`）：作者重装系统丢了私钥之后，
+//!     只要证明得了「这个模组的仓库是我的」，就允许把归属接回本机身份。
 use crate::author;
+use crate::mods::claim;
 use crate::mods::scan::{self, ModRecord};
 use crate::mods::{safe_folder_name, sanitize_folder_name};
 use crate::runtime::RuntimePaths;
@@ -442,29 +445,40 @@ pub fn sign_mod_folder(repo_root: &Path, folder: &str, runtime: &RuntimePaths) -
         .unwrap_or_default()
         .trim()
         .to_string();
-    if !declared_author_id.is_empty() && declared_author_id != me.id {
+    // 认领过的模组放行（见 mods/claim.rs）：作者重装系统后旧私钥不可能再有了，
+    // 唯一能做的就是改署名为本机身份 —— 但只对**核验过仓库归属**的那一个 id 放行。
+    let foreign_author = !declared_author_id.is_empty() && declared_author_id != me.id;
+    let foreign_key = !declared_key_id.is_empty() && declared_key_id != me.key_id;
+    let reclaimed = (foreign_author || foreign_key) && claim::is_claimed(runtime, &record.id);
+    if foreign_author && !reclaimed {
         return json!({
             "ok": false,
             "reason": format!(
-                "这个模组的作者标识是 {}，不是本机作者（{}），不能替别人签名",
+                "这个模组的作者标识是 {}，不是本机作者（{}），不能替别人签名。\
+                 如果这个模组本来就是你做的（重装过系统 / 换过电脑），先在「找回旧模组」里认领它；\
+                 当年导出过 .eve-key 的话，直接在「令牌配置」里导入就能用回原身份。",
                 declared_author_id, me.id
             ),
         });
     }
-    if !declared_key_id.is_empty() && declared_key_id != me.key_id {
+    if foreign_key && !reclaimed {
         return json!({
             "ok": false,
             "reason": format!(
-                "清单里记的签名密钥（{}）与本机密钥（{}）不一致，拒绝签名",
+                "清单里记的签名密钥（{}）与本机密钥（{}）不一致，拒绝签名。\
+                 如果这个模组本来就是你做的（重装过系统 / 换过电脑），先在「找回旧模组」里认领它；\
+                 当年导出过 .eve-key 的话，直接在「令牌配置」里导入就能用回原身份。",
                 declared_key_id, me.key_id
             ),
         });
     }
     let attached_author = declared.is_none();
+    // 认领过的：署名整块换成本机身份，否则签名里的 keyId 与清单里的对不上
+    let attach_author = attached_author || reclaimed;
 
     let mut draft = manifest.clone();
     draft.remove("signature");
-    if !draft.get("author").map(Value::is_object).unwrap_or(false) {
+    if attach_author {
         draft.insert(
             "author".to_string(),
             json!({
@@ -494,6 +508,9 @@ pub fn sign_mod_folder(repo_root: &Path, folder: &str, runtime: &RuntimePaths) -
             "keyId": me.key_id,
             "manifestPath": manifest_path.to_string_lossy(),
             "attachedAuthor": attached_author,
+            "reclaimed": reclaimed,
+            "previousAuthorId": declared_author_id,
+            "previousKeyId": declared_key_id,
         }),
         Err(err) => json!({ "ok": false, "reason": format!("写入失败: {err}") }),
     }
@@ -885,6 +902,63 @@ mod tests {
             .as_str()
             .unwrap()
             .contains("找不到"));
+    }
+
+    /// 重装系统丢了私钥之后的正路：认领过的模组允许用**新身份**重签，
+    /// 署名整块换成本机身份（旧公钥对应的私钥已经不可能再有了）。
+    #[test]
+    fn sign_folder_allows_a_claimed_mod_and_swaps_the_author_block() {
+        let repo = repo_for("plan-sign-claimed");
+        let runtime = runtime_for("plan-sign-claimed");
+        let state = author::get_state(&runtime);
+        let me_id = state["author"]["id"].as_str().unwrap().to_string();
+        let me_key = state["author"]["keyId"].as_str().unwrap().to_string();
+        write_mod(
+            &repo,
+            "old",
+            manifest(
+                "old",
+                json!({ "author": { "id": "au-old-id", "name": "旧署名", "keyId": "oldkeyid12", "publicKey": "AAAA" } }),
+            ),
+            Some("// old"),
+        );
+        // 没认领之前：照旧拒绝（归属保护不能被绕过）
+        let refused = sign_mod_folder(&repo, "old", &runtime);
+        assert_eq!(refused["ok"], json!(false), "{refused}");
+        assert!(refused["reason"]
+            .as_str()
+            .unwrap()
+            .contains("找回旧模组"));
+
+        // 认领之后：放行，并把署名换成本机身份
+        claim::record_claim(
+            &runtime,
+            "old",
+            "au-old-id",
+            "oldkeyid12",
+            "https://github.com/me/evejs-mod-old",
+            "me",
+            "owner",
+        )
+        .expect("应能落认领记录");
+        let result = sign_mod_folder(&repo, "old", &runtime);
+        assert_eq!(result["ok"], json!(true), "{result}");
+        assert_eq!(result["reclaimed"], json!(true));
+        assert_eq!(result["previousAuthorId"], json!("au-old-id"));
+        // 不是「新挂上作者块」而是「换掉别人的」——两者界面提示不一样
+        assert_eq!(result["attachedAuthor"], json!(false));
+
+        let manifest_path = repo.join("mods").join("old").join(MANIFEST_NAME);
+        let written: Value =
+            serde_json::from_str(&fs::read_to_string(&manifest_path).unwrap()).unwrap();
+        assert_eq!(written["author"]["id"], json!(me_id));
+        assert_eq!(written["author"]["keyId"], json!(me_key));
+        assert_eq!(written["author"]["name"], state["author"]["name"]);
+        assert_eq!(written["signature"]["keyId"], json!(me_key));
+        // 换完署名还要签得对：否则模组一进游戏就被判「被篡改」
+        let record = scan::read_mod_dir("old", &repo.join("mods").join("old"));
+        assert_eq!(record.signature_state, "valid", "{}", record.signature_error);
+        assert!(record.valid);
     }
 
     #[test]

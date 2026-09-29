@@ -10,6 +10,8 @@
 //!   - `desktop.rs`   系统对话框 / 资源管理器集成
 //!   - `registry.rs`  模组市场索引与安装
 //!   - `submit.rs`    提交台账与 GitHub 提交
+//!   - `claim.rs`     作者身份丢失后的归属认领（重装系统后继续更新旧模组）
+pub mod claim;
 pub mod desktop;
 pub mod pkg;
 pub mod plan;

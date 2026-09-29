@@ -692,6 +692,43 @@ pub fn ensure_own_repo(token: &str, owner: &str, repo_name: &str, description: &
     json!({ "ok": true, "repo": repo, "created": true })
 }
 
+/// 只读探一次仓库：存不存在、当前令牌对它有没有写权限。
+///
+/// 与 `ensure_own_repo` 的区别是**绝不建仓库** —— 认领旧模组要靠它核验归属，
+/// 核验这种只读动作不该顺手在 GitHub 上留下一个新仓库。
+pub fn repo_access(token: &str, owner: &str, repo_name: &str) -> Value {
+    let reply = call_publish(token, "GET", &format!("/repos/{owner}/{repo_name}"), None);
+    if reply.status == 404 {
+        return json!({
+            "ok": true,
+            "exists": false,
+            "push": false,
+            "admin": false,
+            "ownerLogin": "",
+            "fullName": "",
+        });
+    }
+    if !reply.ok {
+        return json!({
+            "ok": false,
+            "exists": false,
+            "push": false,
+            "admin": false,
+            "reason": non_empty_or(&reply.reason, "查询仓库失败"),
+        });
+    }
+    let data = reply.data.unwrap_or(Value::Null);
+    let permissions = data.get("permissions").cloned().unwrap_or(Value::Null);
+    json!({
+        "ok": true,
+        "exists": !object_field(&data, "full_name").is_empty(),
+        "push": permissions.get("push").and_then(Value::as_bool).unwrap_or(false),
+        "admin": permissions.get("admin").and_then(Value::as_bool).unwrap_or(false),
+        "ownerLogin": object_field(&data.get("owner").cloned().unwrap_or(Value::Null), "login"),
+        "fullName": object_field(&data, "full_name"),
+    })
+}
+
 /// 写入/更新仓库里的 `evejs-mod.json`（索引 CI 就是靠它聚合）
 pub fn put_listing_manifest(token: &str, owner: &str, repo_name: &str, content: &str) -> Value {
     let file_path = "evejs-mod.json";
