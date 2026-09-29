@@ -658,7 +658,7 @@ pub fn market_list(repo_root: &Path, runtime: &RuntimePaths, force: bool) -> Val
             delisted.push(json!({
                 "id": id,
                 "displayName": display_name,
-                "reason": entry.get("delistReason").cloned().unwrap_or(Value::Null),
+                "reason": moderation_reason(entry.get("delistReason")),
                 "by": entry.get("moderatedBy").and_then(Value::as_str).unwrap_or_default(),
                 "at": entry.get("moderatedAt").and_then(Value::as_str).unwrap_or_default(),
             }));
@@ -763,6 +763,43 @@ fn item_value(item: Option<&Value>, key: &str) -> Value {
         .unwrap_or(Value::Null)
 }
 
+/// 审核原因：索引里既可能是纯字符串（老数据），也可能是 `{ zh, en }`（`build-index.mjs`
+/// 原样发布控制台填的两栏）。这里统一摊平成两种语言都有的对象、交给界面按当前语言挑；
+/// 保持原样的对象会被「是不是字符串」的判定整个丢掉 —— 表现出来就是「说明理由不显示」。
+fn moderation_reason(value: Option<&Value>) -> Value {
+    let text = |map: &Map<String, Value>, key: &str| -> String {
+        map.get(key)
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .trim()
+            .to_string()
+    };
+    match value {
+        Some(Value::String(raw)) => {
+            let raw = raw.trim();
+            if raw.is_empty() {
+                Value::Null
+            } else {
+                json!({ "zh": raw, "en": raw })
+            }
+        }
+        Some(Value::Object(map)) => {
+            let zh = text(map, "zh");
+            let en = text(map, "en");
+            if zh.is_empty() && en.is_empty() {
+                Value::Null
+            } else if zh.is_empty() {
+                json!({ "zh": en.clone(), "en": en })
+            } else if en.is_empty() {
+                json!({ "zh": zh.clone(), "en": zh })
+            } else {
+                json!({ "zh": zh, "en": en })
+            }
+        }
+        _ => Value::Null,
+    }
+}
+
 /// 状态排序权重（越小越靠前）
 fn status_order(status: &str) -> u32 {
     match status {
@@ -779,6 +816,34 @@ fn status_order(status: &str) -> u32 {
 
 fn fork_name(repo: &str) -> String {
     repo.split('/').nth(1).unwrap_or_default().to_string()
+}
+
+/// 投稿台账里与这条审核记录对应的那一条。
+///
+/// 来源级决定（`kind=source`）只带仓库名、没有 mod id，要靠它把真正的 mod id 找回来：
+/// 否则「我创建的」里会多出一条以仓库名命名的重复条目，本地那条反倒还停在旧状态
+/// （2026-09-29 报障：把已下架改成拒绝收录后启动器里的状态没切换）。
+/// 匹配口径从严到宽：记录 id 相同 → 仓库名相同 → 仓库（fork）名相同（作者改过 owner）。
+fn ledger_match_for<'a>(
+    ledger: &'a [Value],
+    record_id: &str,
+    record_source: &str,
+) -> Option<&'a Value> {
+    ledger.iter().find(|entry| {
+        let entry_id = entry.get("id").and_then(Value::as_str).unwrap_or_default();
+        let entry_source = entry
+            .get("sourceRepo")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_ascii_lowercase();
+        if !record_id.is_empty() && !entry_id.is_empty() && entry_id == record_id {
+            return true;
+        }
+        if record_source.is_empty() || entry_source.is_empty() {
+            return false;
+        }
+        entry_source == record_source || fork_name(&entry_source) == fork_name(&record_source)
+    })
 }
 
 /// 「我创建的」：合并三个来源 —— 本地扫到的（author.id / 签名 keyId 是本机）、索引缓存里的、
@@ -900,7 +965,7 @@ pub fn list_my_mods(repo_root: &Path, runtime: &RuntimePaths) -> Value {
                 "category": category,
                 "status": status,
                 "moderationAction": if delisted { "delist" } else { "" },
-                "moderationReason": entry.get("delistReason").cloned().filter(|value| !value.is_null()).unwrap_or(Value::Null),
+                "moderationReason": moderation_reason(entry.get("delistReason")),
                 "moderatedBy": entry.get("moderatedBy").and_then(Value::as_str).unwrap_or_default(),
                 "moderatedAt": entry.get("moderatedAt").and_then(Value::as_str).unwrap_or_default(),
                 "folder": item_str(prev, "folder"),
@@ -934,8 +999,8 @@ pub fn list_my_mods(repo_root: &Path, runtime: &RuntimePaths) -> Value {
         // 「这条拒绝记录是不是我的」按可靠度从高到低判定：
         //   1) 索引里的 authorId 就是本机作者；
         //   2) 该 id 已经在本地列表里（本地文件夹或投稿台账）；
-        //   3) 同一个仓库名在本地台账里（作者删了 mods/<id> 后仍能认领）；
-        //   4) 降级：记录没带 authorId 时，清单里的 source 仓库名与本地台账一致也认领
+        //   3) 同一个仓库名在投稿台账里（作者删了 mods/<id>、或决定只带仓库名时靠它）；
+        //   4) 本地列表里已有条目登记的仓库名与记录一致
         let record_author_id = record
             .get("authorId")
             .and_then(Value::as_str)
@@ -951,8 +1016,10 @@ pub fn list_my_mods(repo_root: &Path, runtime: &RuntimePaths) -> Value {
             .unwrap_or_default()
             .to_string();
 
+        let ledger_match = ledger_match_for(&ledger, &record_id, &record_source);
         let mut mine = (!record_author_id.is_empty() && record_author_id == author_id)
-            || (!record_id.is_empty() && items.contains_key(&record_id));
+            || (!record_id.is_empty() && items.contains_key(&record_id))
+            || ledger_match.is_some();
         if !mine && !record_source.is_empty() {
             mine = items.values().any(|item| {
                 let source = item_str(Some(item), "sourceRepo").to_ascii_lowercase();
@@ -960,34 +1027,20 @@ pub fn list_my_mods(repo_root: &Path, runtime: &RuntimePaths) -> Value {
             });
         }
         if !mine {
-            if let Some(fork) = Some(fork_name(&record_source)).filter(|value| !value.is_empty()) {
-                mine = ledger.iter().any(|entry| {
-                    let entry_id = entry.get("id").and_then(Value::as_str).unwrap_or_default();
-                    let entry_source = entry
-                        .get("sourceRepo")
-                        .and_then(Value::as_str)
-                        .unwrap_or_default()
-                        .to_ascii_lowercase();
-                    if !record_id.is_empty() && !entry_id.is_empty() && entry_id == record_id {
-                        return true;
-                    }
-                    if !record_source.is_empty()
-                        && !entry_source.is_empty()
-                        && entry_source == record_source
-                    {
-                        return true;
-                    }
-                    let entry_fork = fork_name(&entry_source);
-                    !entry_fork.is_empty() && entry_fork == fork
-                });
-            }
-        }
-        if !mine {
             continue;
         }
 
+        // 决定的 target 是仓库名时（来源级），真正的 mod id 从台账里取；取不到才退回仓库名
+        let resolved_id = if !record_id.is_empty() {
+            record_id.clone()
+        } else {
+            ledger_match
+                .and_then(|entry| entry.get("id").and_then(Value::as_str))
+                .unwrap_or_default()
+                .to_string()
+        };
         let prev = items
-            .get(&record_id)
+            .get(&resolved_id)
             .or_else(|| {
                 if record_source.is_empty() {
                     None
@@ -999,7 +1052,9 @@ pub fn list_my_mods(repo_root: &Path, runtime: &RuntimePaths) -> Value {
             })
             .cloned();
         let id = if item_str(prev.as_ref(), "id").is_empty() {
-            if record_id.is_empty() {
+            if !resolved_id.is_empty() {
+                resolved_id
+            } else {
                 let source = record
                     .get("source")
                     .and_then(Value::as_str)
@@ -1009,8 +1064,6 @@ pub fn list_my_mods(repo_root: &Path, runtime: &RuntimePaths) -> Value {
                 } else {
                     source.to_string()
                 }
-            } else {
-                record_id.clone()
             }
         } else {
             item_str(prev.as_ref(), "id")
@@ -1075,7 +1128,7 @@ pub fn list_my_mods(repo_root: &Path, runtime: &RuntimePaths) -> Value {
                 "sizeBytes": item_u64(prev.as_ref(), "sizeBytes"),
                 "updatedAt": updated_at,
                 "moderationAction": action,
-                "moderationReason": record.get("reason").cloned().filter(|value| !value.is_null()).unwrap_or(Value::Null),
+                "moderationReason": moderation_reason(record.get("reason")),
                 "moderatedBy": record.get("by").and_then(Value::as_str).unwrap_or_default(),
                 "moderatedAt": record.get("at").and_then(Value::as_str).unwrap_or_default(),
             }),
@@ -1474,5 +1527,55 @@ mod tests {
         assert_eq!(market["delisted"][0]["reason"]["zh"], "违规");
         assert_eq!(market["indexUrls"].as_array().unwrap().len(), 2);
         let _ = std::fs::remove_dir_all(&runtime.root);
+    }
+
+    /// 索引里的审核原因两种形状都要认：纯字符串（老数据）与 `{ zh, en }`（控制台填的两栏）。
+    /// 只填了一栏时另一边兜底 —— 界面按任意语言挑都不会是空的，理由才不会「不显示」。
+    #[test]
+    fn moderation_reason_flattens_both_shapes() {
+        assert_eq!(
+            moderation_reason(Some(&json!("违规"))),
+            json!({ "zh": "违规", "en": "违规" })
+        );
+        assert_eq!(
+            moderation_reason(Some(
+                &json!({ "zh": "仓库不属于作者", "en": "not the author's repo" })
+            )),
+            json!({ "zh": "仓库不属于作者", "en": "not the author's repo" })
+        );
+        assert_eq!(
+            moderation_reason(Some(&json!({ "zh": "违规" }))),
+            json!({ "zh": "违规", "en": "违规" })
+        );
+        assert_eq!(
+            moderation_reason(Some(&json!({ "en": "nope" }))),
+            json!({ "zh": "nope", "en": "nope" })
+        );
+        assert_eq!(moderation_reason(Some(&json!("   "))), Value::Null);
+        assert_eq!(moderation_reason(Some(&json!({}))), Value::Null);
+        assert_eq!(moderation_reason(None), Value::Null);
+    }
+
+    /// 来源级审核记录（`kind=source`）只带仓库名，没有 mod id：必须能落回投稿台账里的那条，
+    /// 否则「我创建的」会多出一条以仓库名命名的重复条目（2026-09-29 报障的根因之一）。
+    #[test]
+    fn ledger_match_maps_source_only_decisions_back_to_the_mod() {
+        let ledger = vec![
+            json!({ "id": "evejs-automining", "sourceRepo": "diguo520/evejs-mod-evejs-automining" }),
+            json!({ "id": "evejs-modceshi", "sourceRepo": "diguo520/evejs-mod-evejs-modceshi" }),
+        ];
+        let hit = ledger_match_for(&ledger, "", "diguo520/evejs-mod-evejs-modceshi")
+            .expect("应能按仓库名落回台账");
+        assert_eq!(hit["id"], "evejs-modceshi");
+        // 作者换过 owner：仓库（fork）名一致也算
+        let hit = ledger_match_for(&ledger, "", "someone-else/evejs-mod-evejs-modceshi")
+            .expect("fork 名一致也要认");
+        assert_eq!(hit["id"], "evejs-modceshi");
+        // 带 id 的记录（条目级决定）直接按 id 命中
+        let hit = ledger_match_for(&ledger, "evejs-automining", "").expect("有 id 时按 id 命中");
+        assert_eq!(hit["sourceRepo"], "diguo520/evejs-mod-evejs-automining");
+        // 别人的仓库不该被认领
+        assert!(ledger_match_for(&ledger, "", "someone-else/evejs-mod-someone-mod").is_none());
+        assert!(ledger_match_for(&ledger, "", "").is_none());
     }
 }

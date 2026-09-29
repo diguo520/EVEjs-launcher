@@ -8,7 +8,9 @@
  *
  * 后端没有的东西一律留空（评分、评论、权限清单），页面会画「暂无」，不编数字。
  */
+import { getActiveLocale, type LocaleCode } from "./i18n"
 import type {
+  LocalizedReason,
   RawMarketList,
   RawMarketMod,
   RawMod,
@@ -210,8 +212,31 @@ export function applyLocal(entry: ModEntry, mod: RawMod): ModEntry {
   }
 }
 
+/**
+ * 审核原因取当前语言的那一份。
+ *
+ * 索引里的 `moderationReason` / `delistReason` 是 `{ zh, en }`（`build-index.mjs` 原样发布
+ * 控制台填的两栏），早期数据则可能是纯字符串。口径与更新说明一致（见 lib/release-notes.ts）：
+ * 中文取 zh、其余语言取 en，缺哪边就用另一边兜底。**不能只判断是不是字符串** —— 那样整个
+ * 对象会被丢掉，界面上就是「下架 / 拒绝收录的说明理由不显示」。
+ */
+export function localizedReason(
+  value: LocalizedReason | undefined,
+  locale: LocaleCode = getActiveLocale()
+): string {
+  if (typeof value === "string") return value.trim()
+  if (!value || typeof value !== "object") return ""
+  const zh = typeof value.zh === "string" ? value.zh.trim() : ""
+  const en = typeof value.en === "string" ? value.en.trim() : ""
+  return locale === "zh" ? zh || en : en || zh
+}
+
 /** 「我创建的」条目叠加到已有视图模型上 */
-export function applyMine(entry: ModEntry, item: RawMyModItem): ModEntry {
+export function applyMine(
+  entry: ModEntry,
+  item: RawMyModItem,
+  locale: LocaleCode = getActiveLocale()
+): ModEntry {
   const review = reviewStateOf(item.status)
   const next: ModEntry = {
     ...entry,
@@ -222,8 +247,8 @@ export function applyMine(entry: ModEntry, item: RawMyModItem): ModEntry {
     mine: true,
     review,
   }
-  const note = item.moderationReason
-  if (typeof note === "string" && note.length > 0) next.reviewNote = note
+  const note = localizedReason(item.moderationReason, locale)
+  if (note.length > 0) next.reviewNote = note
   if (typeof item.reviewPrState === "string" && item.reviewPrState.length > 0) {
     next.reviewPrState = item.reviewPrState
   }
@@ -240,6 +265,8 @@ export function buildMods(input: {
   mine?: RawMyMods | null
   /** 提交台账：作者自己的逐版本记录，用来补「版本历史」 */
   submissions?: RawSubmissionItem[] | null
+  /** 当前界面语言：审核原因按它取 zh / en（与更新说明同口径） */
+  locale?: LocaleCode
 }): ModEntry[] {
   const byId = new Map<string, ModEntry>()
 
@@ -258,7 +285,7 @@ export function buildMods(input: {
   for (const item of input.mine?.items ?? []) {
     if (!item?.id) continue
     const previous = byId.get(item.id) ?? { ...baseEntry(item.id), inMarket: false }
-    byId.set(item.id, applyMine(previous, item))
+    byId.set(item.id, applyMine(previous, item, input.locale))
   }
 
   // 版本历史：作者自己的逐版本台账最全（本地草稿、审核中、没上架的版本都在里面），

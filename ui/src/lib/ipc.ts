@@ -399,6 +399,12 @@ export interface RawModList {
   stats: { total: number; enabled: number; disabled: number; conflicts: number; bytes: number }
 }
 
+/**
+ * 审核原因：索引里既可能是纯字符串（老数据），也可能是 `{ zh, en }`（`build-index.mjs`
+ * 原样发布控制台填的两栏）。界面按当前语言取一条，见 lib/mod-source.ts 的 `localizedReason`。
+ */
+export type LocalizedReason = string | { zh?: string; en?: string } | null
+
 /** 市场索引里的一条（mods:marketList 的 mods[] / index.mods[]） */
 export interface RawMarketMod {
   id: string
@@ -438,7 +444,7 @@ export interface RawMarketList {
   indexUrls?: string[]
   mods: RawMarketMod[]
   blocked?: { id: string; evejsVersions?: string[] }[]
-  delisted?: { id: string; displayName?: string; reason?: string }[]
+  delisted?: { id: string; displayName?: string; reason?: LocalizedReason }[]
   updates?: { id: string; from?: string; to?: string }[]
 }
 
@@ -475,7 +481,7 @@ export interface RawMyModItem {
   sizeBytes: number
   updatedAt: number
   moderationAction?: string
-  moderationReason?: string | null
+  moderationReason?: LocalizedReason
   moderatedBy?: string
   moderatedAt?: string
   /** 审核 PR 的状态：open（审核中）/ merged（已合并）/ closed（被关闭）；没查过就是空 */

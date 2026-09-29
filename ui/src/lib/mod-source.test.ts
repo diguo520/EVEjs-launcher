@@ -10,6 +10,7 @@ import {
   fromMarket,
   isoDate,
   latestSubmission,
+  localizedReason,
   readmeOf,
   reviewStateOf,
   sourceRepoIds,
@@ -112,6 +113,38 @@ describe("fromMarket / applyLocal / applyMine", () => {
     expect(merged.mine).toBe(true)
     expect(merged.review).toBe("rejected")
     expect(merged.reviewNote).toBe("清单缺少权限声明")
+  })
+
+  /**
+   * 索引里的审核原因是 `{ zh, en }`（控制台填的两栏原样发布）。原先只认字符串，
+   * 整个对象被 typeof 判掉 —— 就是报障里「已下架的说明理由没有显示」。
+   */
+  it("审核原因是 { zh, en } 对象时按当前语言取一份，下架 / 拒绝收录的理由都显示", () => {
+    const item = {
+      id: "demo",
+      displayName: "演示模组",
+      status: "delisted",
+      sourceRepo: "me/demo",
+      moderationReason: { zh: "manifest 字段缺失", en: "manifest field missing" },
+    } as unknown as Record<string, unknown> as never
+    const chinese = applyMine(entry, item, "zh")
+    expect(chinese.review).toBe("delisted")
+    expect(chinese.reviewNote).toBe("manifest 字段缺失")
+    expect(applyMine(entry, item, "en").reviewNote).toBe("manifest field missing")
+  })
+})
+
+describe("localizedReason", () => {
+  it("中文取 zh、其余语言取 en，缺哪边用另一边兜底", () => {
+    const reason = { zh: "仓库不属于作者", en: "repo does not belong to the author" }
+    expect(localizedReason(reason, "zh")).toBe("仓库不属于作者")
+    expect(localizedReason(reason, "en")).toBe("repo does not belong to the author")
+    expect(localizedReason(reason, "ja")).toBe("repo does not belong to the author")
+    expect(localizedReason({ zh: "只有中文" }, "en")).toBe("只有中文")
+    expect(localizedReason({ en: "english only" }, "zh")).toBe("english only")
+    expect(localizedReason("旧数据的纯字符串", "en")).toBe("旧数据的纯字符串")
+    expect(localizedReason(null, "zh")).toBe("")
+    expect(localizedReason(undefined, "zh")).toBe("")
   })
 })
 

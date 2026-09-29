@@ -232,11 +232,11 @@ export function ModDetailDialog({
 
             {mod.review === "reviewing" ? <ReviewStrip mod={mod} /> : null}
 
-            {mod.review === "rejected" && mod.reviewNote ? (
+            {(mod.review === "rejected" || mod.review === "delisted") && mod.reviewNote ? (
               <div className="rounded-md border border-destructive/45 bg-destructive/10 px-2.5 py-2">
                 <div className="flex items-center gap-1.5 text-[12px] font-semibold text-destructive">
                   <TriangleAlert className="size-3.5" />
-                  审核未通过
+                  {mod.review === "delisted" ? "已下架" : "审核未通过"}
                 </div>
                 <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
                   {mod.reviewNote}
