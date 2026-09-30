@@ -29,6 +29,10 @@
       {
         "type": "opt",
         "text": "账号卡片空槽位的按钮文案由「进入游戏建号」改为「进入游戏创建角色」，与槽位上「角色在游戏内创建」的说明一致"
+      },
+      {
+        "type": "fix",
+        "text": "修掉「本地模组版本比市场还高、却提示有新版本」：可更新判定原先只比「两边版本不一样」，作者本机装着 1.0.5、市场还停在 1.0.4 时会挂出「有新版本 1.0.5 → 1.0.4」，点「更新」等于把模组降级。现在按数字段逐个比较，只有市场版本严格更高才算可更新，口径与外壳及现役版一致"
       }
     ],
     "en": [
@@ -59,6 +63,10 @@
       {
         "type": "opt",
         "text": "The empty character slot button now reads “Create character in game” instead of “Create in game”, matching the “characters are created in game” note on the slot"
+      },
+      {
+        "type": "fix",
+        "text": "Fixed “a local mod newer than the marketplace build still showed an update”: update detection compared only for inequality, so an author running 1.0.5 locally while the marketplace still listed 1.0.4 got “update available 1.0.5 → 1.0.4”, and clicking update downgraded the mod. Versions are now compared segment by segment and only a strictly newer marketplace build counts as an update, matching the shell and the legacy launcher"
       }
     ]
   }

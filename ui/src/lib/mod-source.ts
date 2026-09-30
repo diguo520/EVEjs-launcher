@@ -19,7 +19,7 @@ import type {
   RawMyMods,
   RawSubmissionItem,
 } from "./ipc"
-import { FEATURES_HEADING, readmeParagraphs } from "./mod-logic"
+import { FEATURES_HEADING, compareVersions, readmeParagraphs } from "./mod-logic"
 import type { ModChangelog, ModEntry, ModReviewState } from "./mock"
 
 const BYTES_PER_MB = 1024 * 1024
@@ -295,7 +295,8 @@ export function buildMods(input: {
     if (fromLedger.length > 0) byId.set(id, { ...entry, changelog: fromLedger })
   }
 
-  // 市场最新版本：与本地版本不同才挂「可更新」
+  // 市场最新版本：**严格高于**本地版本才挂「可更新」。
+  // 只比「不一样」会把降级当成升级（本地 1.0.5、市场 1.0.4 时挂出 1.0.5 → 1.0.4，2026-09-30 报障）。
   const marketVersion = new Map<string, string>()
   for (const mod of input.market?.mods ?? []) {
     if (mod?.id) marketVersion.set(mod.id, mod.version || "")
@@ -304,7 +305,10 @@ export function buildMods(input: {
     const latest = marketVersion.get(entry.id)
     if (!latest) return entry
     if (!entry.installed) return { ...entry, latest: undefined }
-    return { ...entry, latest: latest !== entry.version ? latest : undefined }
+    return {
+      ...entry,
+      latest: compareVersions(latest, entry.version) > 0 ? latest : undefined,
+    }
   })
 }
 

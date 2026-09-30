@@ -331,3 +331,37 @@ describe("readmeOf / 版本历史", () => {
     ])
   })
 })
+
+describe("buildMods 的可更新判定", () => {
+  it("本地版本比市场新时不挂可更新（不把降级当升级）", () => {
+    const mods = buildMods({
+      market: market([{ id: "demo", displayName: "演示", version: "1.0.4" }]),
+      list: localMods([
+        { id: "demo", folder: "demo", version: "1.0.5", enabled: true, displayName: "演示" },
+      ]),
+      mine: mine([{ id: "demo", displayName: "演示", status: "listed" }]),
+    })
+    expect(mods[0].version).toBe("1.0.5")
+    expect(mods[0].latest).toBeUndefined()
+  })
+
+  it("市场版本更高才挂可更新", () => {
+    const mods = buildMods({
+      market: market([{ id: "demo", displayName: "演示", version: "1.0.10" }]),
+      list: localMods([
+        { id: "demo", folder: "demo", version: "1.0.9", enabled: true, displayName: "演示" },
+      ]),
+    })
+    expect(mods[0].latest).toBe("1.0.10")
+  })
+
+  it("版本字面不同但等价（1.0 vs 1.0.0）不算可更新", () => {
+    const mods = buildMods({
+      market: market([{ id: "demo", displayName: "演示", version: "1.0.0" }]),
+      list: localMods([
+        { id: "demo", folder: "demo", version: "1.0", enabled: true, displayName: "演示" },
+      ]),
+    })
+    expect(mods[0].latest).toBeUndefined()
+  })
+})

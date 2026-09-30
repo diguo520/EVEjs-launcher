@@ -1203,10 +1203,50 @@ export function filterMods({
   })
 }
 
-/** 是否存在可安装的新版本：已安装、市场有更新、且与本地版本不同 */
+/**
+ * 版本号比较：逐段比数字、短的一侧补 0，预发布视为小于正式版。
+ *
+ * 口径与外壳的 `mods::registry::compare_version`、以及现役 Electron 版的 `compareVersion`
+ * 一致，免得渲染层和外壳对「有没有新版」给出互相打架的答案。
+ */
+export function compareVersions(left: string, right: string): number {
+  const parse = (value: string): { nums: number[]; pre: string } => {
+    const trimmed = value.trim().replace(/^[vV]/, "")
+    const dash = trimmed.indexOf("-")
+    const core = dash >= 0 ? trimmed.slice(0, dash) : trimmed
+    const pre = dash >= 0 ? trimmed.slice(dash + 1) : ""
+    // 非数字段取前缀数字（"12abc" → 12），整段没数字按 0，对齐 Number.parseInt 的容错
+    const nums = core.split(".").map((part) => {
+      const parsed = Number.parseInt(/^\d+/.exec(part)?.[0] ?? "", 10)
+      return Number.isNaN(parsed) ? 0 : parsed
+    })
+    return { nums, pre }
+  }
+  const a = parse(left)
+  const b = parse(right)
+  const width = Math.max(a.nums.length, b.nums.length)
+  for (let index = 0; index < width; index += 1) {
+    const lhs = a.nums[index] ?? 0
+    const rhs = b.nums[index] ?? 0
+    if (lhs !== rhs) return lhs < rhs ? -1 : 1
+  }
+  if (a.pre === b.pre) return 0
+  if (!a.pre) return 1
+  if (!b.pre) return -1
+  return a.pre < b.pre ? -1 : 1
+}
+
+/**
+ * 是否存在可安装的新版本：已安装、市场有这一条、且市场版本**严格高于**本地版本。
+ *
+ * 不能只判断「两边版本不一样」（2026-09-30 报障）：本地比市场新时（作者本机是 1.0.5、
+ * 市场还停在 1.0.4），旧写法会挂出「有新版本 1.0.5 → 1.0.4」，还把「更新」按钮接成了降级。
+ */
 export function hasUpdate(mod: ModEntry): boolean {
   return (
-    mod.installed && mod.latest !== undefined && mod.latest !== mod.version
+    mod.installed &&
+    mod.latest !== undefined &&
+    compareVersions(mod.latest, mod.version) > 0
   )
 }
 
