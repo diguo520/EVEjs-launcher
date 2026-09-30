@@ -114,6 +114,30 @@ if (hashOk === fixture.vectors.length) {
   const missing = { ok: true, passCount: 1, sys: { level: "ok" }, checks: [{ key: "node", ok: true }] };
   if (compareChannel("env:check", ready, missing) !== null) pass("env:check：必备键（label / message）缺失仍能被结构比对抓到");
   else fail("env:check：必备键缺失却没被结构比对抓到");
+
+  // 通道私有的运行时读数不该进 golden：维护者本机开着服务端时这几个值会翻（2026-09-30 实测）
+  const idle = { listening: [], ports: [26000], running: false };
+  const busy = { listening: [26000], ports: [26000], running: true };
+  if (compareChannel("accounts:checkRunning", idle, busy) === null) {
+    pass("accounts:checkRunning：本机有没有服务在监听不影响判定（listening / running 是运行时读数）");
+  } else {
+    fail("accounts:checkRunning：本机服务启停把 golden 打红了");
+  }
+
+  const pingDown = { ok: false, port: 26000 };
+  const pingUp = { ok: true, port: 26000 };
+  if (compareChannel("health:ping", pingDown, pingUp) === null) {
+    pass("health:ping：端口此刻通不通不影响判定（ok 是运行时读数）");
+  } else {
+    fail("health:ping：端口探活结果把 golden 打红了");
+  }
+
+  // 反向断言：豁免不能过头 —— 真契约（端口常量）变了必须照样抓到
+  if (compareChannel("health:ping", pingDown, { ok: false, port: 26001 }) !== null) {
+    pass("health:ping：port 常量变化仍然会被抓到（豁免没有过头）");
+  } else {
+    fail("health:ping：port 变了却没人管，豁免过头");
+  }
 }
 
 /* ---------- 汇总 ---------- */

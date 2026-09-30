@@ -8,6 +8,7 @@
  *   node account-cli.js list <repoRoot> [--db <sqlite>]
  *   node account-cli.js create <repoRoot> <账号> <密码> [--gm]
  *   node account-cli.js delete <repoRoot> <账号key或角色名> [--apply]
+ *   node account-cli.js delete-character <repoRoot> <角色名或角色ID> [--apply]  # 只删角色，账号保留
  *   node account-cli.js check-running <repoRoot>   # 检测服务是否在运行(端口探活)
  *   node account-cli.js hash <user> <password>     # 输出客户端同款密码哈希(hex)
  *   node account-cli.js verify <repoRoot> <user> <password>   # 验证账号密码(只读)
@@ -171,6 +172,31 @@ function nameIndex(db, table, idKey, nameKey) {
   return index;
 }
 
+/**
+ * 钱包余额表：key = "character:<角色ID>"，json 里的 balance 是**实时**余额。
+ * 表不存在（老服务端）不算错，返回空表。
+ */
+function walletBalanceIndex(db) {
+  const index = new Map();
+  let rows;
+  try {
+    rows = db.prepare("SELECT key, json FROM walletAuthorityState").all();
+  } catch {
+    return index;
+  }
+  for (const row of rows) {
+    let data;
+    try { data = JSON.parse(row.json); } catch { continue; }
+    if (!data || typeof data !== "object") continue;
+    const id = data.characterID != null
+      ? String(data.characterID)
+      : String(row.key).replace(/^character:/, "");
+    const balance = Number(data.balance);
+    if (id && Number.isFinite(balance)) index.set(id, balance);
+  }
+  return index;
+}
+
 /* ---------------- list ---------------- */
 function listAccounts(root) {
   const Database = betterSqlite(root);
@@ -181,6 +207,12 @@ function listAccounts(root) {
   // 角色行里只有 corporationID / allianceID，名字得从这两张表反查（拿不到就留空）
   const corporationNames = nameIndex(db, "corporations", "corporationID", "corporationName");
   const allianceNames = nameIndex(db, "alliances", "allianceID", "allianceName");
+  // 徽标那枚 20px 小图看不清字，卡片上再给一个短标识（军团 ticker / 联盟简称）
+  const corporationTickers = nameIndex(db, "corporations", "corporationID", "tickerName");
+  const allianceTickers = nameIndex(db, "alliances", "allianceID", "shortName");
+  // 钱包真值在 walletAuthorityState（key = "character:<角色ID>"）；characters.balance 只是
+  // 建号时的初始值，之后在游戏里赚的钱只写钱包表 —— 两个都读，以钱包为准
+  const walletBalances = walletBalanceIndex(db);
   db.close();
   const itemNames = new Map();
   for (const item of items) {
@@ -207,7 +239,10 @@ function listAccounts(root) {
         return {
           characterId: c.key,
           characterName: d.characterName || c.key,
-          isk: asNumber(d.balance ?? d.isk, 0),
+          // 钱包表有记录就用它（实时余额），否则回落到角色表里的建号初始值
+          isk: walletBalances.has(String(c.key))
+            ? walletBalances.get(String(c.key))
+            : asNumber(d.balance ?? d.isk, 0),
           skillPoints: asNumber(d.skillPoints ?? d.sp, 0),
           shipName,
           shipTypeID: asNumber(d.shipTypeID, 0) || null,
@@ -220,8 +255,10 @@ function listAccounts(root) {
           gender: d.gender === 0 || d.gender === 1 || d.gender === 2 ? d.gender : null,
           corporationID,
           corporationName: corporationID ? corporationNames.get(String(corporationID)) || null : null,
+          corporationTicker: corporationID ? corporationTickers.get(String(corporationID)) || null : null,
           allianceID,
-          allianceName: allianceID ? allianceNames.get(String(allianceID)) || null : null
+          allianceName: allianceID ? allianceNames.get(String(allianceID)) || null : null,
+          allianceTicker: allianceID ? allianceTickers.get(String(allianceID)) || null : null
         };
       });
     out.push({
@@ -293,49 +330,19 @@ function idVariants(v) {
   return new Set([s, `"${s}"`]);
 }
 
-function deleteAccount(root, target, apply) {
-  const Database = betterSqlite(root);
-  const dbPath = dbOf(root);
-  if (!fs.existsSync(dbPath)) throw new Error("未找到 gamestore.sqlite: " + dbPath);
-  const db = new Database(dbPath, { readonly: true });
-
-  // 1) 找账号(账号key 或 角色名反查)
-  let accRow = db.prepare("SELECT key, json FROM accounts WHERE key=?").get(target);
-  let accKey = accRow ? accRow.key : null;
-  if (!accRow) {
-    const chars = db.prepare("SELECT key, json FROM characters").all();
-    for (const c of chars) {
-      let d; try { d = JSON.parse(c.json); } catch { continue; }
-      if (d.characterName === target) {
-        for (const a of db.prepare("SELECT key, json FROM accounts").all()) {
-          let ad; try { ad = JSON.parse(a.json); } catch { continue; }
-          if (String(ad.id) === String(d.accountId)) { accRow = a; accKey = a.key; break; }
-        }
-        if (accRow) break;
-      }
-    }
-    if (!accRow) throw new Error("账号/角色不存在: " + target);
-    console.log(`[提示] 已按角色名 '${target}' 反查到账号 key='${accKey}'`);
-  }
-  const acc = JSON.parse(accRow.json);
-  const accId = acc.id;
-  console.log(`账号: ${accKey}  id=${accId}  isGM=${acc.isGM ? "true" : "false"}`);
-
-  // 2) 角色
-  const charsAll = db.prepare("SELECT key, json FROM characters").all();
-  const charRows = charsAll.filter((c) => {
-    try { return String(JSON.parse(c.json).accountId) === String(accId); } catch { return false; }
-  });
-  const charIds = charRows.map((c) => c.key);
-  console.log(`关联角色 ${charIds.length} 个: ${charIds.join(", ")}`);
-  const variants = idVariants(accId);
+/**
+ * 收集「归属这些角色」的所有行（只读）：
+ *   plan       整行删除清单（行级 / key 精确 / key 命名空间 / json 含归属字段）
+ *   arrayPlan  数组内过滤清单（structures 这类集合表只摘掉元素，不删整行）
+ *   variants   误伤判定用的 ID 变体（裸数字与 JSON 串里的数字）
+ * extraVariants 给删账号用：账号 ID 也要算进去（有些行挂的是 accountId）。
+ */
+function collectCharacterRows(db, charIds, extraVariants) {
+  const variants = new Set(extraVariants || []);
   for (const c of charIds) for (const v of idVariants(c)) variants.add(v);
 
-  // 3) 计划
   const plan = [];
   const countRow = (label, n) => { if (n > 0) { plan.push([label, n, null]); } };
-  countRow("accounts", 1);
-  countRow("characters", charRows.length);
   for (const t of ROW_TABLES) {
     try {
       const n = db.prepare(`SELECT COUNT(*) AS n FROM "${t}" WHERE key IN (${charIds.map(() => "?").join(",")})`).get(...charIds).n;
@@ -384,8 +391,43 @@ function deleteAccount(root, target, apply) {
       }
     } catch { }
   }
+  return { variants, plan, arrayPlan };
+}
+
+/** 把 collectCharacterRows 的清单落到库上（调用方负责开事务、删账号行） */
+function deleteCharacterRows(wdb, charIds, arrayPlan, variants) {
+  for (const c of charIds) wdb.prepare("DELETE FROM characters WHERE key=?").run(c);
+  for (const t of ROW_TABLES) {
+    try {
+      wdb.prepare(`DELETE FROM "${t}" WHERE key IN (${charIds.map(() => "?").join(",")})`).run(...charIds);
+    } catch { }
+  }
+  for (const t of KEY_EXACT_TABLES) {
+    try { for (const c of charIds) wdb.prepare(`DELETE FROM "${t}" WHERE key=?`).run("character:" + c); } catch { }
+  }
+  for (const t of KEY_NS_TABLES) {
+    try { for (const c of charIds) wdb.prepare(`DELETE FROM "${t}" WHERE key LIKE ?`).run("%\x1f" + c); } catch { }
+  }
+  for (const t of JSON_ROW_TABLES) {
+    try {
+      for (const row of wdb.prepare(`SELECT key, json FROM "${t}"`).all()) {
+        let del = false;
+        for (const f of OWNER_FIELDS) {
+          const m = row.json.match(new RegExp(`"${f}"\\s*:\\s*"?([0-9]+)"?`));
+          if (m && variants.has(m[1])) { del = true; break; }
+        }
+        if (del) wdb.prepare(`DELETE FROM "${t}" WHERE key=?`).run(row.key);
+      }
+    } catch { }
+  }
+  for (const p of arrayPlan) {
+    try { wdb.prepare(`UPDATE "${p.table}" SET json=? WHERE key=?`).run(p.json, p.key); } catch { }
+  }
+}
+
+/** 删除计划（删账号与删角色共用同一套口径与打印格式） */
+function printDeletionPlan(plan, arrayPlan, portraitFiles) {
   let total = 0;
-  const portraitFiles = collectPortraitFiles(root, charIds);
   console.log("\n================ 删除计划 ================");
   for (const [label, n] of plan) { console.log(`  ${label.padEnd(26)} ${n} 行`); total += n; }
   for (const p of arrayPlan) { console.log(`  ${p.table.padEnd(26)} ${p.n} 条(集合内过滤)`); total += p.n; }
@@ -395,6 +437,66 @@ function deleteAccount(root, target, apply) {
   }
   console.log("==========================================");
   console.log(`合计: ${total} 条`);
+}
+
+/** 写库前先备份，返回备份路径 */
+function backupDatabase(dbPath) {
+  const bak = dbPath + ".bak-" + new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+  fs.copyFileSync(dbPath, bak);
+  return bak;
+}
+
+/** 删除角色肖像文件（游戏内头像） */
+function removePortraitFiles(files) {
+  for (const f of files) {
+    try { fs.unlinkSync(f); console.log(`  [已删头像] ${f}`); }
+    catch (e) { console.log(`  [头像删除失败] ${f}: ${e.message}`); }
+  }
+}
+
+function deleteAccount(root, target, apply) {
+  const Database = betterSqlite(root);
+  const dbPath = dbOf(root);
+  if (!fs.existsSync(dbPath)) throw new Error("未找到 gamestore.sqlite: " + dbPath);
+  const db = new Database(dbPath, { readonly: true });
+
+  // 1) 找账号(账号key 或 角色名反查)
+  let accRow = db.prepare("SELECT key, json FROM accounts WHERE key=?").get(target);
+  let accKey = accRow ? accRow.key : null;
+  if (!accRow) {
+    const chars = db.prepare("SELECT key, json FROM characters").all();
+    for (const c of chars) {
+      let d; try { d = JSON.parse(c.json); } catch { continue; }
+      if (d.characterName === target) {
+        for (const a of db.prepare("SELECT key, json FROM accounts").all()) {
+          let ad; try { ad = JSON.parse(a.json); } catch { continue; }
+          if (String(ad.id) === String(d.accountId)) { accRow = a; accKey = a.key; break; }
+        }
+        if (accRow) break;
+      }
+    }
+    if (!accRow) throw new Error("账号/角色不存在: " + target);
+    console.log(`[提示] 已按角色名 '${target}' 反查到账号 key='${accKey}'`);
+  }
+  const acc = JSON.parse(accRow.json);
+  const accId = acc.id;
+  console.log(`账号: ${accKey}  id=${accId}  isGM=${acc.isGM ? "true" : "false"}`);
+
+  // 2) 角色
+  const charsAll = db.prepare("SELECT key, json FROM characters").all();
+  const charRows = charsAll.filter((c) => {
+    try { return String(JSON.parse(c.json).accountId) === String(accId); } catch { return false; }
+  });
+  const charIds = charRows.map((c) => c.key);
+  console.log(`关联角色 ${charIds.length} 个: ${charIds.join(", ")}`);
+
+  // 3) 计划（账号 ID 一并算进误伤判定：有些行挂的是 accountId）
+  const { plan, arrayPlan, variants } = collectCharacterRows(db, charIds, idVariants(accId));
+  const fullPlan = [["accounts", 1, null]];
+  if (charRows.length > 0) fullPlan.push(["characters", charRows.length, null]);
+  fullPlan.push(...plan);
+  const portraitFiles = collectPortraitFiles(root, charIds);
+  printDeletionPlan(fullPlan, arrayPlan, portraitFiles);
   db.close();
 
   if (!apply) {
@@ -403,48 +505,85 @@ function deleteAccount(root, target, apply) {
   }
 
   // 4) 备份 + 执行
-  const bak = dbPath + ".bak-" + new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-  fs.copyFileSync(dbPath, bak);
+  const bak = backupDatabase(dbPath);
   console.log(`\n[备份] ${bak}`);
 
   const wdb = new Database(dbPath);
   const tx = wdb.transaction(() => {
     wdb.prepare("DELETE FROM accounts WHERE key=?").run(accKey);
-    for (const c of charIds) wdb.prepare("DELETE FROM characters WHERE key=?").run(c);
-    for (const t of ROW_TABLES) {
-      try {
-        wdb.prepare(`DELETE FROM "${t}" WHERE key IN (${charIds.map(() => "?").join(",")})`).run(...charIds);
-      } catch { }
-    }
-    for (const t of KEY_EXACT_TABLES) {
-      try { for (const c of charIds) wdb.prepare(`DELETE FROM "${t}" WHERE key=?`).run("character:" + c); } catch { }
-    }
-    for (const t of KEY_NS_TABLES) {
-      try { for (const c of charIds) wdb.prepare(`DELETE FROM "${t}" WHERE key LIKE ?`).run("%\x1f" + c); } catch { }
-    }
-    for (const t of JSON_ROW_TABLES) {
-      try {
-        for (const row of wdb.prepare(`SELECT key, json FROM "${t}"`).all()) {
-          let del = false;
-          for (const f of OWNER_FIELDS) {
-            const m = row.json.match(new RegExp(`"${f}"\\s*:\\s*"?([0-9]+)"?`));
-            if (m && variants.has(m[1])) { del = true; break; }
-          }
-          if (del) wdb.prepare(`DELETE FROM "${t}" WHERE key=?`).run(row.key);
-        }
-      } catch { }
-    }
-    for (const p of arrayPlan) {
-      try { wdb.prepare(`UPDATE "${p.table}" SET json=? WHERE key=?`).run(p.json, p.key); } catch { }
-    }
+    deleteCharacterRows(wdb, charIds, arrayPlan, variants);
   });
   tx();
   wdb.close();
   // 4b) 删除角色肖像文件（游戏内头像一并清除）
-  for (const f of portraitFiles) {
-    try { fs.unlinkSync(f); console.log(`  [已删头像] ${f}`); } catch (e) { console.log(`  [头像删除失败] ${f}: ${e.message}`); }
-  }
+  removePortraitFiles(portraitFiles);
   console.log(`\n[完成] 账号 '${accKey}' 已删除（含 ${portraitFiles.length} 个头像文件）。请重启服务器生效。`);
+}
+
+/**
+ * 只删一个角色，账号与账号下其他角色原样保留。
+ * target = 角色 ID（characters.key）或角色名。
+ * 老版 delete 是「按角色名反查账号 → 连账号一起删」，那是数据破坏级的行为；
+ * 界面上的「删除角色」必须走这条独立路径。
+ */
+function deleteCharacter(root, target, apply) {
+  const Database = betterSqlite(root);
+  const dbPath = dbOf(root);
+  if (!fs.existsSync(dbPath)) throw new Error("未找到 gamestore.sqlite: " + dbPath);
+  const db = new Database(dbPath, { readonly: true });
+
+  const want = String(target || "").trim();
+  if (!want) throw new Error("delete-character 需要角色名或角色 ID");
+
+  // 1) 找角色：先当角色 ID，再当角色名
+  let charRow = db.prepare("SELECT key, json FROM characters WHERE key=?").get(want);
+  if (!charRow) {
+    for (const row of db.prepare("SELECT key, json FROM characters").all()) {
+      let d; try { d = JSON.parse(row.json); } catch { continue; }
+      if (d.characterName === want) { charRow = row; break; }
+    }
+  }
+  if (!charRow) throw new Error("角色不存在: " + want);
+  let charData; try { charData = JSON.parse(charRow.json); } catch { throw new Error("角色数据损坏: " + want); }
+  const charId = String(charRow.key);
+  const accId = charData.accountId;
+
+  const allChars = db.prepare("SELECT key, json FROM characters").all();
+  const accRow = db.prepare("SELECT key, json FROM accounts").all().find((a) => {
+    try { return String(JSON.parse(a.json).id) === String(accId); } catch { return false; }
+  });
+  const accKey = accRow ? accRow.key : String(accId);
+  console.log(`角色: ${charData.characterName || charId}  id=${charId}`);
+  console.log(`所属账号: ${accKey}  id=${accId}（本操作只删角色，账号保留）`);
+  const siblings = allChars.filter((c) => {
+    if (String(c.key) === charId) return false;
+    try { return String(JSON.parse(c.json).accountId) === String(accId); } catch { return false; }
+  }).length;
+  console.log(`账号下其余角色 ${siblings} 个，不会被动到`);
+
+  // 2) 计划（只按角色 ID 判定，不把账号 ID 算进来）
+  const charIds = [charId];
+  const { plan, arrayPlan, variants } = collectCharacterRows(db, charIds);
+  const portraitFiles = collectPortraitFiles(root, charIds);
+  printDeletionPlan(plan, arrayPlan, portraitFiles);
+  db.close();
+
+  if (!apply) {
+    console.log("\n[预览模式] 未修改任何数据。确认无误后加 --apply 执行。");
+    return;
+  }
+
+  const bak = backupDatabase(dbPath);
+  console.log(`\n[备份] ${bak}`);
+
+  const wdb = new Database(dbPath);
+  const tx = wdb.transaction(() => {
+    deleteCharacterRows(wdb, charIds, arrayPlan, variants);
+  });
+  tx();
+  wdb.close();
+  removePortraitFiles(portraitFiles);
+  console.log(`\n[完成] 角色 '${charData.characterName || charId}' 已删除（含 ${portraitFiles.length} 个头像文件），账号 '${accKey}' 与其他角色保留。请重启服务器生效。`);
 }
 
 /* ---------------- 密码哈希 / 验证 / 修改 ---------------- */
@@ -523,6 +662,9 @@ try {
 } else if (cmd === "delete") {
     if (!arg1) throw new Error("delete 需要账号key或角色名");
     deleteAccount(repoOf(repoRoot), arg1, APPLY);
+  } else if (cmd === "delete-character") {
+    if (!arg1) throw new Error("delete-character 需要角色名或角色 ID");
+    deleteCharacter(repoOf(repoRoot), arg1, APPLY);
   } else if (cmd === "create") {
     if (!arg1 || (!arg2 && !PW_STDIN)) throw new Error("create 需要 <repoRoot> <账号> <密码|--password-stdin> [--gm]");
     createAccount(repoOf(repoRoot), arg1, resolvePassword(arg2), process.argv.includes("--gm"));

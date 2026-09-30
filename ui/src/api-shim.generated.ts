@@ -1,6 +1,6 @@
 /* 由 scripts/gen-contract.mjs 生成 —— 请勿手改。源: contract/ipc-channels.json */
 /* 抽取源: E:\Games\EveJS-v0.12.8\launcher\launcher */
-/* 生成时间: 2026-09-29T15:00:02.345Z */
+/* 生成时间: 2026-09-30T12:13:48.969Z */
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
@@ -39,8 +39,10 @@ export const api = {
   accountsCheckRunning: (): Promise<unknown> => request("accounts:checkRunning", []),
   accountsCreate: (user: string, password: string, isGM: boolean): Promise<unknown> => request("accounts:create", [user, password, isGM]),
   accountsDelete: (target: string, apply: boolean): Promise<unknown> => request("accounts:delete", [target, apply]),
+  accountsDeleteCharacter: (target: string, apply?: boolean): Promise<unknown> => request("accounts:deleteCharacter", [target, apply]),
   accountsLaunch: (user: string, characterId?: string | number): Promise<unknown> => request("accounts:launch", [user, characterId]),
   accountsList: (): Promise<unknown> => request("accounts:list", []),
+  accountsLogotypes: (requests: Array<{ kind: "corporations" | "alliances"; id: number }>): Promise<unknown> => request("accounts:logotypes", [requests]),
   accountsSetPassword: (user: string, oldPw: string, newPw: string): Promise<unknown> => request("accounts:setPassword", [user, oldPw, newPw]),
   accountsVerify: (user: string, password: string): Promise<unknown> => request("accounts:verify", [user, password]),
   appInfo: (): Promise<unknown> => request("app:info", []),

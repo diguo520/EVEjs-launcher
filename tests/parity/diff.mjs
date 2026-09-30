@@ -13,7 +13,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { SHAPE_ONLY_CHANNELS, compareChannel, normalize, readDump } from "./normalize.mjs";
+import { SHAPE_ONLY_CHANNELS, compareChannel, normalizeChannel, readDump } from "./normalize.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "..", "..");
 const args = process.argv.slice(2);
@@ -33,7 +33,7 @@ if (!fs.existsSync(CURRENT)) {
 if (UPDATE) {
   const current = readDump(CURRENT, fs);
   const normalized = {};
-  for (const channel of Object.keys(current).sort()) normalized[channel] = normalize(current[channel]);
+  for (const channel of Object.keys(current).sort()) normalized[channel] = normalizeChannel(channel, current[channel]);
   fs.mkdirSync(path.dirname(BASELINE), { recursive: true });
   fs.writeFileSync(BASELINE, JSON.stringify({ channels: normalized }, null, 2) + "\n", "utf8");
   console.log(`已更新基线：${path.relative(ROOT, BASELINE)}（${Object.keys(normalized).length} 个通道）`);

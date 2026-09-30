@@ -63,19 +63,46 @@ const CONDITIONAL_KEYS = new Map([
   ["env:check", new Set(["hint", "installUrl", "warn"])],
 ]);
 
-function dropConditionalKeys(channel, node) {
-  const drop = CONDITIONAL_KEYS.get(channel);
-  if (!drop) return node;
-  if (Array.isArray(node)) return node.map((item) => dropConditionalKeys(channel, item));
+/**
+ * 通道私有的 volatile 键：只在**某一个**通道里才是运行时读数。
+ *
+ * 为什么不能塞进全局 VOLATILE_KEYS：`ok` 在几乎所有通道里都表示「命令本身成功」，是必须冻结的
+ * 契约；只有 `health:ping` 的 `ok` 是「26000 端口此刻通不通」。一刀切会把别处的真契约也抹掉。
+ *
+ * 为什么必须修（2026-09-30 实测）：这些值跟「本机有没有服务在监听」联动 —— 开着服务端打包时
+ * `listening` 从 [] 变 [26000]、`running`/`ok` 从 false 变 true，golden 于是每开关一次服务
+ * 就红一次，正是 SHAPE_ONLY_CHANNELS 注释里说的「基线退化成人人点忽略的红灯」。
+ * 端口映射与探活语义仍由 accounts.rs / health.rs 的单测保。
+ */
+const VOLATILE_CHANNEL_KEYS = new Map([
+  // netstat 扫描 + 端口探活：值随本机服务启停变化
+  ["accounts:checkRunning", new Set(["listening", "running"])],
+  // `port` 是常量（DEFAULT_GAME_PORT），不抹，仍然照比
+  ["health:ping", new Set(["ok"])],
+]);
+
+/** 按通道剔除两类键：条件键（只在特定取值下出现）与运行时读数。 */
+function dropKeys(channel, node) {
+  const drop = new Set([
+    ...(CONDITIONAL_KEYS.get(channel) ?? []),
+    ...(VOLATILE_CHANNEL_KEYS.get(channel) ?? []),
+  ]);
+  if (drop.size === 0) return node;
+  if (Array.isArray(node)) return node.map((item) => dropKeys(channel, item));
   if (node && typeof node === "object") {
     const out = {};
     for (const key of Object.keys(node)) {
       if (drop.has(key)) continue;
-      out[key] = dropConditionalKeys(channel, node[key]);
+      out[key] = dropKeys(channel, node[key]);
     }
     return out;
   }
   return node;
+}
+
+/** 通道级规范化：normalize 之后再按通道剔除条件键 / 运行时读数。写基线也要走这条，别把读数冻进去。 */
+export function normalizeChannel(channel, node) {
+  return dropKeys(channel, normalize(node));
 }
 
 export function normalize(node) {
@@ -126,12 +153,12 @@ export function channelDiff(baseline, current) {
  */
 export function compareChannel(channel, baseline, current) {
   if (SHAPE_ONLY_CHANNELS.has(channel)) {
-    const left = shape(dropConditionalKeys(channel, normalize(baseline)));
-    const right = shape(dropConditionalKeys(channel, normalize(current)));
+    const left = shape(normalizeChannel(channel, baseline));
+    const right = shape(normalizeChannel(channel, current));
     if (JSON.stringify(left) === JSON.stringify(right)) return null;
     return channelDiff(left, right);
   }
-  return channelDiff(baseline, current);
+  return channelDiff(normalizeChannel(channel, baseline), normalizeChannel(channel, current));
 }
 
 /**

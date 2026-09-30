@@ -40,8 +40,12 @@ export interface Character {
   /** 军团 / 联盟：id 用来拼本地图片服务的徽标地址，名字只做提示 */
   corporationId?: number
   corporationName?: string
+  /** 军团短标识（tickerName）；没有专属徽标时卡片画它 */
+  corporationTicker?: string
   allianceId?: number
   allianceName?: string
+  /** 联盟简称（shortName）；没有专属徽标时卡片画它 */
+  allianceTicker?: string
   /** 本次上线的时间戳；在线时长按它算。老存档里没有这个字段，读盘时会补上 */
   onlineSince?: number
 }
@@ -449,6 +453,26 @@ export function initialsOf(name: string): string {
   if (parts.length === 0) return "?"
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
   return (parts[0][0] + parts[1][0]).toUpperCase()
+}
+
+/**
+ * 徽标映射的键：`kind:id`（与外壳 accounts:logotypes 的 kind 同名）。
+ * 军团与联盟的 id 空间是分开的，所以键里必须带 kind。
+ */
+export function logotypeKey(kind: "corporations" | "alliances", id: number): string {
+  return `${kind}:${id}`
+}
+
+/**
+ * 徽标位上的短标识（军团 ticker / 联盟简称）。
+ *
+ * 服务端对「没有专属徽标」的军团与联盟回的是同一张兜底图，画出来军团和联盟一模一样，
+ * 所以那种情况改画短标识。徽标位只有 20px 高，截 4 个字符；拿不到就回 "?"，
+ * 不留一个空方块。
+ */
+export function logotypeTick(short: string | null | undefined): string {
+  const text = (short ?? "").trim()
+  return text ? text.slice(0, 4).toUpperCase() : "?"
 }
 
 /** ISK 合计按千分位原样展示：钱包数字要能一眼对上，不做 K/M/B 缩写 */

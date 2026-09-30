@@ -1,4 +1,3 @@
-import { useState } from "react"
 import { Gamepad2, Globe, Loader2, Play, Square, Trash2 } from "lucide-react"
 
 import { CharacterAvatar } from "@/components/accounts/character-avatar"
@@ -27,6 +26,8 @@ import {
   canCreateInGame,
   canLogin,
   formatSp,
+  logotypeKey,
+  logotypeTick,
   onlineDuration,
   raceOf,
   type Account,
@@ -37,31 +38,48 @@ import {
 /**
  * 军团 / 联盟徽标。
  *
- * 本地图片服务的路由与 images.evetech.net 一致（`/corporations/<id>/logo`、
- * `/alliances/<id>/logo`），端口取自 config:get。图片服务没起、或这个 id 没有
- * 专属徽标时会让 <img> 报错，这里直接把徽标摘掉——不留破图占位。
+ * 专属徽标由外壳直接从服务端图片目录读盘（服务端关着也画得出来）。url 为空时
+ * **不画服务端那张兜底图**：军团兜底（evejscorp.png）与联盟兜底（alliance-default.png）
+ * 是同一张画，只差底部一行小字，缩到 20px 就是两个一模一样的图标 —— 用户一眼就看出来了。
+ * 这时改画短标识（军团 ticker / 联盟简称），形状与配色也分开，军团和联盟不会再混淆。
  */
 function LogoBadge({
-  base,
   kind,
-  id,
   label,
+  short,
+  url,
 }: {
-  base: string
   kind: "corporations" | "alliances"
-  id: number
   label: string
+  /** 短标识：军团 ticker / 联盟简称；超过 4 个字符截断，完整名字在 title 里 */
+  short: string
+  /** 专属徽标 data URL；null / undefined 表示服务端没有这个实体的专属徽标 */
+  url: string | null | undefined
 }) {
-  const [failed, setFailed] = useState(false)
-  if (failed) return null
+  if (url) {
+    return (
+      <img
+        src={url}
+        alt={label}
+        title={label}
+        className="size-5 shrink-0 rounded-[3px] border border-input bg-background/40 object-cover"
+      />
+    )
+  }
+  const tick = logotypeTick(short)
   return (
-    <img
-      src={`${base}/${kind}/${id}/logo?size=64`}
-      alt={label}
+    <span
       title={label}
-      onError={() => setFailed(true)}
-      className="size-5 shrink-0 rounded-[3px] border border-input bg-background/40 object-cover"
-    />
+      aria-label={label}
+      className={cn(
+        "tabular flex h-5 min-w-5 shrink-0 items-center justify-center border px-1 text-[8px] font-semibold leading-none",
+        kind === "corporations"
+          ? "rounded-[3px] border-primary/35 bg-primary/10 text-primary"
+          : "rounded-full border-warning/40 bg-warning/10 text-warning"
+      )}
+    >
+      {tick}
+    </span>
   )
 }
 
@@ -75,7 +93,7 @@ export function CharacterSlot({
   index,
   creatingStep,
   now,
-  imagesBaseUrl,
+  logotypes,
   onEnter,
   onExit,
   onDelete,
@@ -86,8 +104,8 @@ export function CharacterSlot({
   index: number
   /** 建号走到哪一步了；null 表示这个槽位没在等待 */
   creatingStep: InGameStep | null
-  /** 本地图片服务地址；没有就不画军团 / 联盟徽标 */
-  imagesBaseUrl: string | null
+  /** 军团 / 联盟专属徽标（`kind:id` → data URL）；没有专属徽标的画短标识 */
+  logotypes: Record<string, string | null>
   /** 页面统一往下发的当前时间，在线时长按它算，避免每个槽位各起一个定时器 */
   now: number
   onEnter: (accountId: string, character: Character) => void
@@ -120,7 +138,7 @@ export function CharacterSlot({
           onClick={() => onCreate(account.id)}
         >
           {creatingStep ? <Loader2 className="animate-spin" /> : <Gamepad2 />}
-          {creatingStep ? IN_GAME_STEP_LABEL[creatingStep] : "进入游戏建号"}
+          {creatingStep ? IN_GAME_STEP_LABEL[creatingStep] : "进入游戏创建角色"}
         </Button>
 
         {creatingStep ? (
@@ -208,25 +226,25 @@ export function CharacterSlot({
           </div>
         </div>
 
-        {/* 右上角：军团 / 联盟徽标（有哪个画哪个，都没有就整块不出现） */}
-        {imagesBaseUrl ? (
+        {/* 右上角：军团 / 联盟徽标（有哪个画哪个，没有专属徽标就画短标识） */}
+        {character.corporationId || character.allianceId ? (
           <div className="flex shrink-0 items-center gap-1">
             {character.corporationId ? (
               <LogoBadge
                 key={`corp-${character.corporationId}`}
-                base={imagesBaseUrl}
                 kind="corporations"
-                id={character.corporationId}
                 label={character.corporationName ?? t("军团 {id}", { id: character.corporationId })}
+                short={character.corporationTicker ?? character.corporationName ?? ""}
+                url={logotypes[logotypeKey("corporations", character.corporationId)]}
               />
             ) : null}
             {character.allianceId ? (
               <LogoBadge
                 key={`alliance-${character.allianceId}`}
-                base={imagesBaseUrl}
                 kind="alliances"
-                id={character.allianceId}
                 label={character.allianceName ?? t("联盟 {id}", { id: character.allianceId })}
+                short={character.allianceTicker ?? character.allianceName ?? ""}
+                url={logotypes[logotypeKey("alliances", character.allianceId)]}
               />
             ) : null}
           </div>

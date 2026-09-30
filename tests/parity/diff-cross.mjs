@@ -15,7 +15,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { compareChannel, isEmptyPayload, normalize, readDump } from "./normalize.mjs";
+import { compareChannel, isEmptyPayload, normalizeChannel, readDump } from "./normalize.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "..", "..");
 const args = process.argv.slice(2);
@@ -112,7 +112,7 @@ if (!fs.existsSync(ELECTRON)) {
 if (UPDATE) {
   const raw = readDump(ELECTRON, fs);
   const normalized = {};
-  for (const channel of Object.keys(raw).sort()) normalized[channel] = normalize(raw[channel]);
+  for (const channel of Object.keys(raw).sort()) normalized[channel] = normalizeChannel(channel, raw[channel]);
   fs.mkdirSync(path.dirname(ELECTRON_BASELINE), { recursive: true });
   fs.writeFileSync(ELECTRON_BASELINE, JSON.stringify({ channels: normalized }, null, 2) + "\n", "utf8");
   console.log(`已更新 Electron 基线：${path.relative(ROOT, ELECTRON_BASELINE)}（${Object.keys(normalized).length} 个通道）`);

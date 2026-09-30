@@ -1,13 +1,13 @@
 {
   "generatedFrom": "E:\\Games\\EveJS-v0.12.8\\launcher\\launcher",
-  "generatedAt": "2026-09-29T15:00:02.345Z",
+  "generatedAt": "2026-09-30T12:13:48.969Z",
   "counts": {
-    "invoke": 79,
+    "invoke": 81,
     "send": 6,
     "events": 7,
-    "requests": 85,
+    "requests": 87,
     "registered": 82,
-    "apiTotal": 92
+    "apiTotal": 94
   },
   "invoke": [
     {
@@ -39,6 +39,16 @@
       ]
     },
     {
+      "api": "accountsDeleteCharacter",
+      "channel": "accounts:deleteCharacter",
+      "kind": "invoke",
+      "signature": "target: string, apply?: boolean",
+      "params": [
+        "target",
+        "apply"
+      ]
+    },
+    {
       "api": "accountsLaunch",
       "channel": "accounts:launch",
       "kind": "invoke",
@@ -54,6 +64,15 @@
       "kind": "invoke",
       "signature": "",
       "params": []
+    },
+    {
+      "api": "accountsLogotypes",
+      "channel": "accounts:logotypes",
+      "kind": "invoke",
+      "signature": "requests: Array<{ kind: \"corporations\" | \"alliances\"; id: number }>",
+      "params": [
+        "requests"
+      ]
     },
     {
       "api": "accountsSetPassword",
@@ -763,6 +782,8 @@
   "dynamicRegistrations": 0,
   "extensions": {
     "invoke": [
+      "accounts:deleteCharacter",
+      "accounts:logotypes",
       "mods:claimCandidates",
       "mods:claimMod",
       "mods:updateMeta"

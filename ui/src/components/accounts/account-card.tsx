@@ -42,7 +42,7 @@ export function AccountCard({
   account,
   creating,
   now,
-  imagesBaseUrl,
+  logotypes,
   onEnter,
   onExit,
   onDelete,
@@ -52,8 +52,8 @@ export function AccountCard({
   account: Account
   /** 全页共享的建号进度：只有正在建号的那个账号会亮起来 */
   creating: InGameCreation | null
-  /** 本地图片服务地址；角色槽上的军团 / 联盟徽标按它拼地址 */
-  imagesBaseUrl: string | null
+  /** 军团 / 联盟专属徽标（`kind:id` → data URL）；角色槽按它画徽标或短标识 */
+  logotypes: Record<string, string | null>
   /** 页面统一往下发的当前时间，用来算在线时长 */
   now: number
   onEnter: (accountId: string, character: Character) => void
@@ -133,7 +133,7 @@ export function AccountCard({
             account={account}
             character={slot.character}
             index={slot.index}
-            imagesBaseUrl={imagesBaseUrl}
+            logotypes={logotypes}
             /* 客户端在捏的这个角色会落到第一个空槽，也只有它该显示进度 */
             creatingStep={slot.index === account.characters.length ? pending : null}
             now={now}

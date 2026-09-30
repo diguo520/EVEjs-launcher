@@ -1,0 +1,65 @@
+{
+  "version": "0.2.6",
+  "changelog": {
+    "zh": [
+      {
+        "type": "fix",
+        "text": "更新通道与旧版 Electron 彻底分开：新旧两个启动器过去读的是同一个 releases/latest 清单，而老更新器只核 sha256、不认 zip —— 一旦最新版是 Tauri 产物，老用户点了「更新」就会被替换成打不开的文件（静默报废）。现在新框架固定读独立的 stable 通道，releases/latest 钉回旧 Electron；两边再也碰不到对方。注意：还在 0.2.0–0.2.5 的请手动换一次 0.2.6 的 exe（那些版本读的是旧地址，且「立即更新」在它们上面本来就装不上）"
+      },
+      {
+        "type": "opt",
+        "text": "配套护栏，防止通道被改回去：打包后跑 node scripts/release-channel.mjs publish/verify 会把新清单推到 stable 通道并核对「releases/latest 不再下发我们签名的清单」，不通过就报错；scripts/audit-security.mjs 与一条 Rust 单测也盯着内置清单地址，谁把它改回 releases/latest，npm run check 与 CI 立刻红"
+      },
+      {
+        "type": "fix",
+        "text": "账号管理里点「删除角色」不再连账号一起删掉：过去这条路径会按角色名反查到所属账号，然后把整个账号（连着里面另外两个角色）一起删除。现在走独立的删角色通道，只删你选中的那一个角色，账号与其余角色原样保留"
+      },
+      {
+        "type": "fix",
+        "text": "角色的在线状态改为跟随客户端进程：之前判断依据是服务端端口，只要服务端开着就恒为在线，关掉游戏窗口后角色还停在「在线」。现在客户端一退出就立即回落为离线，账号卡片的在线统计随之更新"
+      },
+      {
+        "type": "fix",
+        "text": "账号卡片底部的 ISK 合计改读实时钱包余额：之前读的是建号时写入的初始余额，与角色实际资产对不上（真机上同一个角色由 100,000 修正为 8,010,279,191）"
+      },
+      {
+        "type": "fix",
+        "text": "军团与联盟徽标不再画成同一张图：服务端对没有专属徽标的军团和联盟会回同一张默认画，20px 下完全分不出来。现在有专属徽标就画徽标，没有就画军团 ticker / 联盟简称的短标识，形状与配色分开，并且直接读盘、不依赖主服务是否启动"
+      },
+      {
+        "type": "opt",
+        "text": "账号卡片空槽位的按钮文案由「进入游戏建号」改为「进入游戏创建角色」，与槽位上「角色在游戏内创建」的说明一致"
+      }
+    ],
+    "en": [
+      {
+        "type": "fix",
+        "text": "Update channels are now fully separated from the legacy Electron build: both launchers used to read the same releases/latest manifest, while the old updater verifies sha256 only and cannot handle zips — as soon as the newest release was a Tauri artifact, a legacy user clicking update had their launcher replaced with a file it could not run (silent breakage). The new shell now reads its own dedicated stable channel and releases/latest is pinned back to the legacy Electron line, so the two never touch. Note: if you are on 0.2.0-0.2.5, install the 0.2.6 exe manually once — those builds read the old address, and their install step was already broken"
+      },
+      {
+        "type": "opt",
+        "text": "Guardrails so the channels cannot drift back: after packaging, node scripts/release-channel.mjs publish/verify pushes the new manifest to the stable channel and asserts that releases/latest no longer serves a manifest we signed, failing loudly otherwise; scripts/audit-security.mjs and a Rust unit test also watch the built-in manifest URL, so any commit pointing it back at releases/latest turns npm run check and CI red immediately"
+      },
+      {
+        "type": "fix",
+        "text": "Deleting a character in account management no longer takes the whole account with it: that path used to reverse-look-up the owning account from the character name and delete the entire account, including its other two characters. It now uses a dedicated delete-character channel that removes only the character you picked, leaving the account and its other characters untouched"
+      },
+      {
+        "type": "fix",
+        "text": "A character's online state now follows the client process: it used to be derived from the server port, so it stayed online as long as the server ran, and a character still showed as online after you closed the game window. It now drops to offline the moment the client exits, and the account card's online count follows"
+      },
+      {
+        "type": "fix",
+        "text": "The account card's ISK total now reads the live wallet balance: it used to read the initial balance written at character creation, which did not match the character's actual assets (on a real install one character went from 100,000 to 8,010,279,191)"
+      },
+      {
+        "type": "fix",
+        "text": "Corporation and alliance logos no longer render as the same image: the server returns one shared default picture for corporations and alliances that have no dedicated logo, which is impossible to tell apart at 20px. A dedicated logo is drawn when one exists; otherwise a short badge shows the corporation ticker or alliance short name, with distinct shape and colour, read straight from disk so it no longer depends on the main server being up"
+      },
+      {
+        "type": "opt",
+        "text": "The empty character slot button now reads “Create character in game” instead of “Create in game”, matching the “characters are created in game” note on the slot"
+      }
+    ]
+  }
+}

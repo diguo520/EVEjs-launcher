@@ -4,6 +4,8 @@ import {
   bloodlineFromId,
   formatIsk,
   genderFromCode,
+  logotypeKey,
+  logotypeTick,
   raceFromId,
   totalIsk,
   type Account,
@@ -43,6 +45,19 @@ describe("角色档案换算", () => {
     expect(genderFromCode(2)).toBe("female")
     expect(genderFromCode(3)).toBeUndefined()
     expect(genderFromCode(null)).toBeUndefined()
+  })
+
+  it("徽标键带上 kind，军团与联盟的 id 不会撞在一起", () => {
+    expect(logotypeKey("corporations", 98000001)).toBe("corporations:98000001")
+    expect(logotypeKey("alliances", 98000001)).toBe("alliances:98000001")
+  })
+
+  it("徽标短标识：截 4 个字符、大写，空值回 ?", () => {
+    expect(logotypeTick("ELFQ")).toBe("ELFQ")
+    expect(logotypeTick("elysi")).toBe("ELYS")
+    expect(logotypeTick("   ")).toBe("?")
+    expect(logotypeTick(null)).toBe("?")
+    expect(logotypeTick(undefined)).toBe("?")
   })
 
   it("ISK 合计按千分位原样展示，不缩写", () => {

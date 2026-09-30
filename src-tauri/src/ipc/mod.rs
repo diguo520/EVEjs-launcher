@@ -209,6 +209,13 @@ async fn dispatch(
             accounts::bool_arg(args, 1),
         )
         .await),
+        "accounts:deleteCharacter" => Ok(accounts::delete_character(
+            app,
+            &accounts::text_arg(args, 0),
+            accounts::bool_arg(args, 1),
+        )
+        .await),
+        "accounts:logotypes" => Ok(accounts::logotypes(app, &accounts::array_arg(args, 0))),
         "accounts:checkRunning" => Ok(accounts::check_running(app).await),
         "accounts:verify" => Ok(accounts::verify(
             app,

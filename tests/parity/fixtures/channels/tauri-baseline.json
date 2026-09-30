@@ -1,11 +1,9 @@
 {
   "channels": {
     "accounts:checkRunning": {
-      "listening": [],
       "ports": [
         26000
-      ],
-      "running": false
+      ]
     },
     "accounts:list": {
       "ok": false,
@@ -27,7 +25,7 @@
       "phase": "3-4",
       "platform": "win32",
       "repoRoot": "<abs-path>",
-      "version": "0.2.5"
+      "version": "0.2.6"
     },
     "config:get": {
       "client": {
@@ -73,8 +71,7 @@
           "key": "rust",
           "label": "Rust / Cargo 工具链",
           "message": "rustc 1.98.1 (48a229cea 2026-09-01) · cargo 1.98.1 (797e8a9bc 2026-08-05)",
-          "ok": true,
-          "warn": false
+          "ok": true
         },
         {
           "key": "vsBuildTools",
@@ -83,41 +80,34 @@
           "ok": true
         },
         {
-          "hint": "在 server 目录执行 npm ci 安装依赖",
           "key": "serverDeps",
           "label": "主服务器依赖",
           "message": "缺少 server/node_modules（express 未安装）",
           "ok": false
         },
         {
-          "hint": "运行 tools\\DatabaseCreator\\CreateDatabase.bat 初始化数据库",
           "key": "localDb",
           "label": "本地数据库",
           "message": "本地数据库缺失（manifest/sqlite 不存在）",
           "ok": false
         },
         {
-          "hint": "按 StartMarketServer.bat 使用 VS Build Tools 构建一次（cargo build --release）",
           "key": "market",
           "label": "市场服务二进制",
           "message": "未找到 target/release/market-server.exe",
           "ok": false
         },
         {
-          "hint": "在 EvEJSConfig.bat / 配置面板中填写客户端安装路径",
           "key": "clientPath",
           "label": "客户端路径",
           "message": "路径不存在: <abs-path>",
-          "ok": false,
-          "warn": true
+          "ok": false
         },
         {
-          "hint": "运行 SetupEveJS.bat 或检查 EVEJS_CA_PEM 指向",
           "key": "caCert",
           "label": "客户端证书 CA",
           "message": "CA 证书缺失",
-          "ok": false,
-          "warn": true
+          "ok": false
         }
       ],
       "node": {
@@ -136,13 +126,12 @@
       "totalCount": 8
     },
     "health:check": {
-      "game": false,
-      "gateway": false,
-      "images": false,
-      "market": false
+      "game": true,
+      "gateway": true,
+      "images": true,
+      "market": true
     },
     "health:ping": {
-      "ok": false,
       "port": 26000
     },
     "init:state": {
@@ -161,10 +150,10 @@
       "size": 0
     },
     "metrics:get": {
-      "cpuPercent": 40.30806350708008,
+      "cpuPercent": 44.69881439208984,
       "diskRoot": "<abs-path>",
       "diskTotalGB": 976.5624961853028,
-      "diskUsedGB": 875.9583587646484,
+      "diskUsedGB": 878.2929992675781,
       "gpuDedicatedTotalGB": null,
       "gpuDedicatedUsedGB": null,
       "gpuMemoryTotalGB": null,
@@ -172,31 +161,31 @@
       "gpuPercent": null,
       "gpuSharedUsedGB": null,
       "memTotalGB": 31.855934143066406,
-      "memUsedGB": 12.220695495605469,
+      "memUsedGB": 15.753013610839844,
       "netBytesPerSec": 0,
       "virtualMemTotalGB": 35.355934143066406,
-      "virtualMemUsedGB": 16.776439666748047,
+      "virtualMemUsedGB": 20.044322967529297,
       "volumes": [
         {
-          "freeGB": 55.87103271484375,
-          "percent": 74.88148533543256,
+          "freeGB": 54.611228942871094,
+          "percent": 75.44786827097413,
           "root": "<abs-path>",
           "totalGB": 222.4296836853027,
-          "usedGB": 166.55865097045898
+          "usedGB": 167.81845474243164
         },
         {
-          "freeGB": 145.4842987060547,
-          "percent": 50.34135872840311,
+          "freeGB": 145.47916793823242,
+          "percent": 50.34311003050925,
           "root": "<abs-path>",
           "totalGB": 292.96874618530273,
-          "usedGB": 147.48444747924805
+          "usedGB": 147.4895782470703
         },
         {
-          "freeGB": 100.6041374206543,
-          "percent": 89.69813628788334,
+          "freeGB": 98.2694969177246,
+          "percent": 89.9372034763172,
           "root": "<abs-path>",
           "totalGB": 976.5624961853028,
-          "usedGB": 875.9583587646484
+          "usedGB": 878.2929992675781
         },
         {
           "freeGB": 362.27014923095703,
@@ -320,7 +309,7 @@
     "terminal:input": null,
     "terminal:resize": null,
     "update:state": {
-      "currentVersion": "0.2.5",
+      "currentVersion": "0.2.6",
       "state": "idle"
     }
   }

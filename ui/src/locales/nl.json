@@ -2318,7 +2318,7 @@
  "这份草稿还没提交过审核，删掉后本地目录里的清单一并移除。此操作不可撤销。": "Dit concept is nooit ingediend; verwijderen haalt ook het manifest uit de lokale map. Deze actie kan niet ongedaan worden gemaakt.",
  "这次没搬 GitHub 令牌：老启动器当时没有保存过。 如果它存过（github-token.bin），会在这一步一并带过来，不用重填。": "Deze keer is er geen GitHub-token overgezet: de oude launcher had er nooit een opgeslagen. Als dat wel zo was (github-token.bin), zou het hier worden meegenomen, zonder opnieuw in te voeren.",
  "进入游戏": "Spel starten",
- "进入游戏建号": "In het spel aanmaken",
+ "进入游戏创建角色": "Spel starten om een personage aan te maken",
  "进阶": "Geavanceerd",
  "远程维修舰队测试指令": "Testopdracht voor externe reparatie van de vloot",
  "退增强倒计时推到通知栏之后，再也没错过加固窗口。": "Na het pushen van de aftelling voor de-debuff naar de notificatiebalk, mis je nooit meer een versterkingsvenster.",

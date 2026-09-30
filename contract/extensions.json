@@ -2,19 +2,34 @@
   "note": "本启动器在现役版契约之外**新增**的通道。extract-contract.mjs 每次重抽都会把它们并回 contract/ipc-channels.json，所以现役版升级重抽不会把它们冲掉。每条都要在本地 docs/S2-* 实施记录里写清「为什么现役版没有、我们为什么需要」（docs/*.md 不入库）。",
   "invoke": [
     {
-      "api": "modsUpdateMeta",
-      "channel": "mods:updateMeta",
+      "api": "accountsDeleteCharacter",
+      "channel": "accounts:deleteCharacter",
       "kind": "invoke",
-      "signature": "folder: string, patch: Record<string, unknown>",
-      "params": ["folder", "patch"],
-      "why": "现役版的「编辑信息」只存在于渲染层：主进程没有任何改写清单的通道（modManager.ts 里唯一写清单的地方在 signModFolder 里）。新界面按原型提供了编辑弹窗，如果不落一个真通道，保存就只能弹一句「请直接改文件」。"
+      "signature": "target: string, apply?: boolean",
+      "params": [
+        "target",
+        "apply"
+      ],
+      "why": "现役版删除账号的通道（accounts:delete → account-cli.js delete）文档写的是「账号key 或 角色名」：传角色名会**反查出账号，再把账号连同其中所有角色一起删**。新界面按原型提供了「删除角色」入口，必须有只删角色、账号保留的独立路径，否则点一次「删除角色」= 删整个账号（数据破坏级，用户已实测踩到）。"
+    },
+    {
+      "api": "accountsLogotypes",
+      "channel": "accounts:logotypes",
+      "kind": "invoke",
+      "signature": "requests: Array<{ kind: \"corporations\" | \"alliances\"; id: number }>",
+      "params": [
+        "requests"
+      ],
+      "why": "军团 / 联盟徽标此前只能走本地图片服务（HTTP 26001）：服务端没起就整块不画；而服务端对「没有专属徽标」的军团与联盟回的是同一张兜底图（evejscorp.png 与 alliance-default.png 是同一张画，只差底部一行小字），缩到 20px 就是两个一模一样的图标。这条通道直接从服务端图片目录读专属徽标（`<id>_<size>.png`，运行时目录优先、legacy 次之），拿不到就回 null，界面改画军团 ticker / 联盟简称，服务关着也能看见。"
     },
     {
       "api": "modsClaimCandidates",
       "channel": "mods:claimCandidates",
       "kind": "invoke",
       "signature": "opts?: { offset?: number; limit?: number; query?: string; scope?: \"mine\" | \"all\" }",
-      "params": ["opts"],
+      "params": [
+        "opts"
+      ],
       "why": "重装系统 / 换电脑 / 删掉私钥之后，作者本机换了新身份，`sign_mod_folder` 与 `prepare_submission` 的归属保护就会把他自己的旧模组当成别人的拒掉，他就再也更新不了几年前的模组。这个通道列出本机 mods/ 里「由别的身份署名」的模组（附带索引登记的仓库与仓库主人），作为认领入口的候选清单；纯离线只读，不碰网络。候选是「本机装了多少别人的模组」的量级（上万条也常见），所以按 `{ offset, limit, query }` 分页 + 搜索，只回一页（默认 50、上限 200）并带上 `total` / `skippedCount`；索引、发布台账与认领记录都只整份读一次再查表，没配 GitHub 令牌的人直接回 `needsToken`（他核验不了归属，也用不到这份清单），不为它白扫一遍上万个模组。"
     },
     {
@@ -22,8 +37,21 @@
       "channel": "mods:claimMod",
       "kind": "invoke",
       "signature": "folder: string",
-      "params": ["folder"],
+      "params": [
+        "folder"
+      ],
       "why": "认领动作本身：核验这个模组的仓库是不是当前 GitHub 令牌主人自己的（owner 命中 / GitHub 明确回了 push 权限），通过后落一条本机认领记录。归属保护只对认领过的 id 放行，所以离线路径上（签名 / 打包）不需要联网也能照常判断；核验只用公开信息，不接受「我说是我的」。"
+    },
+    {
+      "api": "modsUpdateMeta",
+      "channel": "mods:updateMeta",
+      "kind": "invoke",
+      "signature": "folder: string, patch: Record<string, unknown>",
+      "params": [
+        "folder",
+        "patch"
+      ],
+      "why": "现役版的「编辑信息」只存在于渲染层：主进程没有任何改写清单的通道（modManager.ts 里唯一写清单的地方在 signModFolder 里）。新界面按原型提供了编辑弹窗，如果不落一个真通道，保存就只能弹一句「请直接改文件」。"
     }
   ],
   "send": [],
