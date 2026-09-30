@@ -42,7 +42,7 @@ export interface LauncherVersionValue {
   releaseDate: string
   /** 更新通道名（清单里的 channel）；拿不到时退回构建声明的通道 */
   channel: string
-  /** 实际去读的清单地址（update:state.manifestUrl）：更新失败时先看它指向哪儿 */
+  /** 实际去读的清单地址（update:check.manifestUrl）：更新失败时先看它指向哪儿 */
   manifestUrl: string
   /** 真去查一次更新：更新说明与是否有新版都从这次结果来 */
   checkForUpdate: () => Promise<RawUpdateCheck | null>
