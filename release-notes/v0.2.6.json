@@ -110,7 +110,7 @@
       },
       {
         "type": "fix",
-        "text": "Fixed the environment self-check showing raw placeholders such as “已安装：{path}” and “客户端: {path}”: variable readings were mapped to placeholder names by capture-group index, which only happened to be right for the first rule, so the later ones (VS build tools, client path, Rust toolchain) filled nothing in. Placeholder names are now read straight from the template, so paths and versions display properly in every language"
+        "text": "Fixed the environment self-check showing raw placeholders such as “{path}” and “{version}” instead of real values: variable readings were mapped to placeholder names by capture-group index, which only happened to be right for the first rule, so the later ones (VS build tools, client path, Rust toolchain) filled nothing in. Placeholder names are now read straight from the template, so paths and versions display properly in every language"
       },
       {
         "type": "new",
