@@ -2457,5 +2457,8 @@
  "，这份骨架建到那里服务端加载不到。": ", ein dort erstelltes Gerüst wird vom Server nicht geladen.",
  "：{detail}": "：{detail}",
  "：{reason}": ": {reason}",
- "；": ";"
+ "；": ";",
+ "更新包已下载，点开安装 {to}": "Update heruntergeladen – zum Installieren von {to} öffnen",
+ "正在安装启动器更新…": "Launcher-Update wird installiert…",
+ "候选来自本机服务端 mods/ 里由别的身份署名的模组。目录被清过的话，先从模组市场装回自己的模组再来认领，或者导入当年导出的 .eve-key 直接用回原身份。": "Kandidaten sind die Mods in mods/ im Serverordner dieses Rechners, die von einer anderen Identität signiert wurden. Wurde der Ordner geleert, installieren Sie Ihre eigenen Mods zuerst wieder über den Mod-Marktplatz oder importieren Sie den damals exportierten .eve-key, um zur ursprünglichen Identität zurückzukehren."
 }

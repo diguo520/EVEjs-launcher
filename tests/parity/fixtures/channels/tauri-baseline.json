@@ -27,7 +27,7 @@
       "phase": "3-4",
       "platform": "win32",
       "repoRoot": "<abs-path>",
-      "version": "0.2.4"
+      "version": "0.2.5"
     },
     "config:get": {
       "client": {
@@ -161,10 +161,10 @@
       "size": 0
     },
     "metrics:get": {
-      "cpuPercent": 18.597885131835938,
+      "cpuPercent": 40.30806350708008,
       "diskRoot": "<abs-path>",
       "diskTotalGB": 976.5624961853028,
-      "diskUsedGB": 872.5388984680176,
+      "diskUsedGB": 875.9583587646484,
       "gpuDedicatedTotalGB": null,
       "gpuDedicatedUsedGB": null,
       "gpuMemoryTotalGB": null,
@@ -172,38 +172,38 @@
       "gpuPercent": null,
       "gpuSharedUsedGB": null,
       "memTotalGB": 31.855934143066406,
-      "memUsedGB": 15.41080093383789,
+      "memUsedGB": 12.220695495605469,
       "netBytesPerSec": 0,
       "virtualMemTotalGB": 35.355934143066406,
-      "virtualMemUsedGB": 25.225444793701172,
+      "virtualMemUsedGB": 16.776439666748047,
       "volumes": [
         {
-          "freeGB": 47.90055084228515,
-          "percent": 78.4648568263687,
+          "freeGB": 55.87103271484375,
+          "percent": 74.88148533543256,
           "root": "<abs-path>",
           "totalGB": 222.4296836853027,
-          "usedGB": 174.52913284301758
+          "usedGB": 166.55865097045898
         },
         {
-          "freeGB": 144.75257873535156,
-          "percent": 50.59111914832186,
+          "freeGB": 145.4842987060547,
+          "percent": 50.34135872840311,
           "root": "<abs-path>",
           "totalGB": 292.96874618530273,
-          "usedGB": 148.21616744995117
+          "usedGB": 147.48444747924805
         },
         {
-          "freeGB": 104.02359771728516,
-          "percent": 89.34798355214056,
+          "freeGB": 100.6041374206543,
+          "percent": 89.69813628788334,
           "root": "<abs-path>",
           "totalGB": 976.5624961853028,
-          "usedGB": 872.5388984680176
+          "usedGB": 875.9583587646484
         },
         {
-          "freeGB": 447.3101768493652,
-          "percent": 81.79056376822031,
+          "freeGB": 362.27014923095703,
+          "percent": 85.2524366256037,
           "root": "<abs-path>",
           "totalGB": 2456.4746055603027,
-          "usedGB": 2009.1644287109375
+          "usedGB": 2094.2044563293457
         }
       ]
     },
@@ -320,7 +320,7 @@
     "terminal:input": null,
     "terminal:resize": null,
     "update:state": {
-      "currentVersion": "0.2.4",
+      "currentVersion": "0.2.5",
       "state": "idle"
     }
   }

@@ -29,7 +29,7 @@ import {
   startupBannerLines,
   type LogDraft,
 } from "@/lib/live"
-import { lineKey, overlapTail, renderSegments } from "@/lib/log-logic"
+import { lineKey, overlapTail, pruneLogs, renderSegments } from "@/lib/log-logic"
 import { t } from "@/lib/i18n"
 import type { LogLevel, LogLine, LogSegment, Metric, Service } from "@/lib/mock"
 
@@ -39,9 +39,6 @@ const POLL_MS = 2000
 const LOG_POLL_MS = 4000
 /** 模组目录的变化（装了/卸了/启停）：本地读盘，不用太勤 */
 const MODS_POLL_MS = 6000
-/** 日志面板保留的最大行数（与现役版一致） */
-const MAX_LOGS = 400
-
 /**
  * 功能启停日志用的服务名与动作名。
  *
@@ -162,7 +159,8 @@ export function useLauncher(): LauncherState {
     setLogs((prev) => {
       let id = prev.at(-1)?.id ?? 0
       const fresh = incoming.map((line) => ({ ...line, id: (id += 1) }))
-      return [...prev, ...fresh].slice(-MAX_LOGS)
+      // 按页签各自截断：主服务器刷屏不该把系统 / 市场 / 客户端的记录挤没（2026-09-30 报障）
+      return pruneLogs([...prev, ...fresh])
     })
   }, [])
 

@@ -1,0 +1,57 @@
+{
+  "version": "0.2.5",
+  "changelog": {
+    "zh": [
+      {
+        "type": "fix",
+        "text": "「立即更新」下了包却什么都没发生：Tauri 重写时把老版（Electron 0.1.28）自更新的最后一步丢了 —— 界面只调 update:download，全仓没有任何地方调 update:apply，于是包下完既不替换也不重启，弹窗还停在「立即更新」上一直催更新。现在下载完成会进「已下载」态并给出「重启并安装」，按下才拉起 Go 更新器替换 exe 并自动重开；安装阶段显示「正在启动更新器…」，这一态不再给按钮"
+      },
+      {
+        "type": "fix",
+        "text": "自更新失败不再是「静默重来」：还有服务在跑、更新器缺失、SHA256 对不上这类原因以前只写进后端状态、界面看不见，用户只看到「继续提示要更新」。现在弹窗直接把后端的原因显示出来（例如「更新失败：请先停止主服务器和市场服务」），并留一个「重试」"
+      },
+      {
+        "type": "fix",
+        "text": "侧栏更新入口按阶段说人话：下载中 / 已下载（点开安装）/ 安装中，不再是下载完之后还写着「下载中 100%」"
+      },
+      {
+        "type": "new",
+        "text": "「找回旧模组」入口不再只看本机扫到的候选：重装系统顺手清掉服务端目录（mods/ 是空的）、或者身份还没建起来的那一次扫描，候选都是 0 条，按钮就跟着消失 —— 用户在新版启动器里根本找不到它（维护者本机装着一堆旧身份的模组，所以有）。现在只要本机配了 GitHub 令牌就一直显示入口（认领本来就要令牌核验仓库写权限），列表为空时给出下一步：先从模组市场装回自己的模组，或导入当年导出的 .eve-key"
+      },
+      {
+        "type": "fix",
+        "text": "本机还没有作者身份时（重装后还没进过作者面板），候选扫描会先像「作者身份」页那样现建一套再判归属，不再回一句「读不到本机作者身份」把整条找回链路掐掉；真建不出来才报失败"
+      },
+      {
+        "type": "fix",
+        "text": "系统日志 / 市场日志 / 客户端日志不再「会消失」：日志面板原本只有一个 400 行的窗口，主服务器一刷屏就把开机横幅（系统页签唯一的内容）和另外两个服务的启动行挤了出去。现在按页签各自保留 400 行，谁吵谁自己的老行先走"
+      }
+    ],
+    "en": [
+      {
+        "type": "fix",
+        "text": "\"Install now\" downloaded the package and then did nothing: the Tauri rewrite dropped the last step of the old Electron 0.1.28 updater — the UI only ever called update:download, and nothing in the repository called update:apply, so the package was never swapped in, the launcher never restarted, and the dialog stayed on \"Install now\" nagging forever. Downloading now lands in a \"Downloaded\" state with a \"Restart and install\" button; pressing it starts the Go updater, replaces the exe and reopens the launcher. The install phase shows \"Starting the updater…\" and offers no buttons"
+      },
+      {
+        "type": "fix",
+        "text": "A failed self-update is no longer silent: reasons such as running services, a missing updater or a SHA256 mismatch used to be written only into the backend state, invisible to the UI, so all the user saw was the update prompt coming back. The dialog now shows the backend reason (for example \"Update failed: stop the main server and the market service first\") and offers a \"Retry\""
+      },
+      {
+        "type": "fix",
+        "text": "The sidebar update entry speaks per phase — downloading / downloaded (open to install) / installing — instead of still saying \"downloading 100%\" after the package is already on disk"
+      },
+      {
+        "type": "new",
+        "text": "The \"Recover old mods\" entry no longer depends on candidates found on this machine: reinstalling Windows usually wipes the server folder (mods/ is empty), and a scan that runs before the local identity exists returns zero candidates, so the button simply vanished — users could not find it at all in the new launcher, while the maintainer (whose machine is full of mods signed by old identities) always had it. The entry is now always shown once a GitHub token is configured (claiming requires a token anyway, to verify repo write access), and an empty list explains the next step: install your mods back from the mod marketplace, or import the .eve-key you exported back then"
+      },
+      {
+        "type": "fix",
+        "text": "When the machine has no author identity yet (right after a reinstall, before the author panel has ever been opened), the candidate scan now mints one the same way the author panel does before judging ownership, instead of answering \"cannot read the local author identity\" and cutting the whole recovery path; only a real failure to create one is reported"
+      },
+      {
+        "type": "fix",
+        "text": "System / market / client logs no longer \"disappear\": the panel kept a single 400-line window, so one chatty main server pushed the boot banner (the only content of the system tab) and the startup lines of the other two services out of view. Each tab now keeps its own 400 lines, so the loudest tab drops its own oldest lines first"
+      }
+    ]
+  }
+}

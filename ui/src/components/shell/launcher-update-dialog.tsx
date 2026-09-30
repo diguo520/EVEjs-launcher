@@ -7,6 +7,7 @@ import {
   Gauge,
   Loader2,
   Plus,
+  RotateCw,
   TriangleAlert,
   Wrench,
   type LucideIcon,
@@ -27,6 +28,7 @@ import { Progress } from "@/components/ui/progress"
 import { t } from "@/lib/i18n"
 import { hasIpc } from "@/lib/ipc"
 import { LAUNCHER_RELEASE } from "@/lib/mock"
+import { updateDialogMode } from "@/lib/update-phase"
 
 /** 更新说明的分组图标，认不出的分组退回一个圆点 */
 const GROUP_ICON: Record<string, LucideIcon> = {
@@ -59,7 +61,6 @@ export function LauncherUpdateDialog({
     version,
     latestVersion,
     outdated,
-    updating,
     progress,
     check,
     checking,
@@ -69,6 +70,9 @@ export function LauncherUpdateDialog({
     channel,
     checkForUpdate,
     startUpdate,
+    installUpdate,
+    phase,
+    updateMessage,
   } = useLauncherVersion()
   const live = hasIpc()
 
@@ -77,15 +81,30 @@ export function LauncherUpdateDialog({
     if (open && live) void checkForUpdate()
   }, [open, live, checkForUpdate])
 
-  /** 还没拿到结果（首次打开的那一瞬）：先别急着说「已是最新」 */
-  const pending = live && checking && !check
+  /**
+   * 弹窗要画哪一态：下载 / 待安装 / 安装中 / 失败都交给 lib/update-phase.ts 的纯逻辑判
+   * （与老版 0.1.28 的 renderUpdateModal 同口径）。
+   *
+   * 2026-09-30 报障：以前这里只有 outdated / pending 两个判据，下载完成后既不显示
+   * 「重启并安装」，也没有任何一处调 update:apply —— 用户下完包界面还是那句「立即更新」。
+   */
+  const mode = updateDialogMode({
+    phase,
+    outdated,
+    pending: live && checking && !check,
+    checkFailed: Boolean(check && !check.ok),
+  })
+  /** 还在向更新通道要这一版说明（首次打开的那一瞬）：先别急着说「已是最新」 */
+  const pending = mode === "checking"
   /** 已经是最新版本：弹窗变成「更新内容回顾」，动作只剩关闭 */
-  const done = !outdated && !updating && !pending
-  /** 可以装：真查到了新版本 */
-  const canInstall = outdated && !pending && !updating
+  const done = mode === "uptodate"
+  const downloading = mode === "downloading"
+  /** 包已经在本地了，就等用户点一下「重启并安装」 */
+  const ready = mode === "ready"
+  /** 已经拉起更新器，本进程马上退出 */
+  const applying = mode === "applying"
   /** 说明来源：优先真清单；浏览器里跑原型（没有桥）才用原型自带示例 */
   const groups = notes.length > 0 ? notes : live ? [] : LAUNCHER_RELEASE.notes
-  const failed = check && !check.ok
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -97,9 +116,13 @@ export function LauncherUpdateDialog({
               ? "正在检查更新通道…"
               : done
                 ? `当前已是最新版本，下面是这一版带来的改动。`
-                : t("安装包 {size}，装完后替换旧版本，配置与世界存档不受影响。", {
-                    size: sizeText,
-                  })}
+                : ready
+                  ? "新版本已经下载好了，点「重启并安装」后启动器会退出、替换旧版本并自动重新打开。"
+                  : applying
+                    ? "正在启动更新器，启动器马上退出并自动重新打开。"
+                    : t("安装包 {size}，装完后替换旧版本，配置与世界存档不受影响。", {
+                        size: sizeText,
+                      })}
           </DialogDescription>
         </DialogHeader>
 
@@ -110,6 +133,12 @@ export function LauncherUpdateDialog({
             <span className="tabular text-[12px] text-muted-foreground">{version}</span>
             {done ? (
               <Badge variant="success">已是最新</Badge>
+            ) : ready ? (
+              <Badge variant="success">已下载</Badge>
+            ) : applying ? (
+              <Badge variant="secondary">安装中</Badge>
+            ) : downloading ? (
+              <Badge variant="secondary">下载中</Badge>
             ) : pending ? (
               <Badge variant="secondary">检查中</Badge>
             ) : (
@@ -161,17 +190,22 @@ export function LauncherUpdateDialog({
                   <Loader2 className="size-3.5 shrink-0 animate-spin" />
                   正在向更新通道取这一版的说明…
                 </>
-              ) : failed ? null : (
+              ) : mode === "failed" ? null : (
                 "这一版没有单独的更新说明。"
               )}
             </p>
           ) : null}
         </div>
 
-        {failed ? (
+        {mode === "failed" ? (
           <p className="flex items-start gap-1.5 rounded-md border border-warning/45 bg-warning/10 px-2.5 py-2 text-[11px] leading-relaxed text-warning">
             <TriangleAlert className="mt-px size-3.5 shrink-0" />
-            <span>没查到更新信息：{check.reason ?? "更新通道没有给出原因"}</span>
+            {/* 下载 / 安装失败的原因由后端 update:state 的 message 带回来，优先显示它 */}
+            <span>
+              {updateMessage
+                ? `更新失败：${updateMessage}`
+                : `没查到更新信息：${check?.reason ?? "更新通道没有给出原因"}`}
+            </span>
           </p>
         ) : null}
 
@@ -180,31 +214,50 @@ export function LauncherUpdateDialog({
             <CircleCheck className="size-4 shrink-0" />
             已是最新的 {latestVersion}，上面这些改动已经生效。
           </div>
-        ) : updating ? (
+        ) : ready ? (
+          <div className="flex items-center gap-2 rounded-md border border-success/35 bg-success/10 px-3 py-2 text-[12px] text-success">
+            <CircleCheck className="size-4 shrink-0" />
+            新版本已下载完成，点「重启并安装」后替换旧版本。
+          </div>
+        ) : downloading || applying ? (
           <div className="space-y-1.5">
-            <Progress value={progress} />
+            <Progress value={applying ? 100 : progress} />
             <div className="tabular flex items-center justify-between text-[10px] text-tertiary">
-              <span>正在下载更新包</span>
-              <span>{Math.floor(progress)}%</span>
+              <span>{applying ? "正在启动更新器…" : "正在下载更新包"}</span>
+              <span>{Math.floor(applying ? 100 : progress)}%</span>
             </div>
           </div>
         ) : null}
 
         <DialogFooter>
-          {done ? (
+          {/* 安装阶段不给按钮：老版这一态也是空的，进程马上就被更新器接管 */}
+          {applying ? null : done ? (
             <Button onClick={() => onOpenChange(false)}>完成</Button>
-          ) : updating ? (
+          ) : downloading ? (
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               后台下载
             </Button>
-          ) : canInstall ? (
+          ) : ready ? (
+            <>
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                稍后
+              </Button>
+              {/* 下载完成后的这一步以前整个丢了：不点它，包下了也不会装（2026-09-30 报障） */}
+              <Button onClick={installUpdate}>
+                <RotateCw />
+                重启并安装
+              </Button>
+            </>
+          ) : mode === "download" || (mode === "failed" && outdated) ? (
             <>
               <Button variant="outline" onClick={() => onOpenChange(false)}>
                 稍后再说
               </Button>
+              {/* 失败也要留一条重试的路：下载 / 安装失败后状态会落回 error，
+                  这里再点一次会重新检查并下载（安装阶段的前置由后端再拦一次） */}
               <Button onClick={startUpdate}>
                 <Download />
-                立即更新
+                {mode === "failed" ? "重试" : "立即更新"}
               </Button>
             </>
           ) : (

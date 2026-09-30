@@ -54,7 +54,25 @@ export function orderClaimItems(items: RawClaimItem[], login: string): RawClaimI
   })
 }
 
-/** 有没有值得给用户看的候选（列表为空时页面上不出现「找回旧模组」这个入口） */
+/** 本机真的扫到了可认领的候选（列表为空时，页头那个入口没有「有东西可看」的意思） */
 export function needsRecovery(claims: RawClaimCandidates | null): boolean {
   return claims?.ok === true && claims.items.length > 0
+}
+
+/**
+ * 页头要不要出现「找回旧模组」这个入口。
+ *
+ * 只看「本机扫到候选」会把最需要它的人挡在门外：重装系统顺手清掉服务端目录（mods/ 是空的）、
+ * 或者身份还没建起来的那一次扫描，候选就是 0 条 —— 2026-09-30 报障：用户在新版启动器上
+ * 根本找不到这个按钮，而维护者本机装着一堆旧身份的模组，所以有。
+ *
+ * 认领本来就必须持有 GitHub 令牌（后端要拿它核验仓库写权限，没令牌一律拒绝，见
+ * `mods/claim.rs` 的 `needs_token_payload`），所以「配了令牌的人」＝「办得动这件事的人」：
+ * 对他一直开着入口；没令牌的纯玩家不会平白多出一个按钮。
+ */
+export function shouldOfferClaim(
+  claims: RawClaimCandidates | null,
+  hasToken: boolean
+): boolean {
+  return hasToken || needsRecovery(claims)
 }

@@ -32,6 +32,50 @@ export function matchLogTab(src: string, tab: LogTab): boolean {
   return TAB_SOURCES[tab].includes(src)
 }
 
+/** 一行日志归哪个页签；认不出的来源回 null（不归任何页签，也不参与截断） */
+export function logTabOf(src: string): LogTab | null {
+  return LOG_TABS.find((tab) => TAB_SOURCES[tab].includes(src)) ?? null
+}
+
+/** 每个页签各留多少行：一个页签被刷爆不该把另外几个页签的记录挤掉 */
+export const MAX_LINES_PER_TAB = 400
+
+/**
+ * 按页签各留各的历史（纯函数，返回新数组）。
+ *
+ * 2026-09-30 报障：系统日志、市场日志、客户端日志会「消失」—— 面板只有**一个**
+ * 400 行的环形窗口，主服务器的输出几秒就能填满它，把开机横幅（系统页签唯一的内容）、
+ * 市场服务与客户端的启动行一路挤出去。这里改成按页签各自截断：谁吵谁自己的老行先走，
+ * 安静的页签留得住。顺序（时间先后）保持不变，只是从头开始丢掉「本页签已超额」的那些行。
+ */
+export function pruneLogs<T extends { src: string }>(
+  lines: T[],
+  capPerTab: number = MAX_LINES_PER_TAB
+): T[] {
+  if (capPerTab <= 0) return []
+  const counts = new Map<LogTab, number>()
+  for (const line of lines) {
+    const tab = logTabOf(line.src)
+    if (tab) counts.set(tab, (counts.get(tab) ?? 0) + 1)
+  }
+  const excess = new Map<LogTab, number>()
+  for (const [tab, count] of counts) {
+    if (count > capPerTab) excess.set(tab, count - capPerTab)
+  }
+  if (excess.size === 0) return lines
+  const kept: T[] = []
+  for (const line of lines) {
+    const tab = logTabOf(line.src)
+    const left = tab ? excess.get(tab) ?? 0 : 0
+    if (tab && left > 0) {
+      excess.set(tab, left - 1)
+      continue
+    }
+    kept.push(line)
+  }
+  return kept
+}
+
 /** 级别档位：all 之外与日志级别一一对应 */
 export type LevelFilter = "all" | LogLevel
 
