@@ -2457,5 +2457,8 @@
  "，这份骨架建到那里服务端加载不到。": ", un squelette créé à cet endroit ne sera pas chargé par le serveur.",
  "：{detail}": ":{detail}",
  "：{reason}": ": {reason}",
- "；": ";"
+ "；": ";",
+ "更新包已下载，点开安装 {to}": "Mise à jour téléchargée — ouvrez pour installer {to}",
+ "正在安装启动器更新…": "Installation de la mise à jour du lanceur…",
+ "候选来自本机服务端 mods/ 里由别的身份署名的模组。目录被清过的话，先从模组市场装回自己的模组再来认领，或者导入当年导出的 .eve-key 直接用回原身份。": "Les candidats sont les mods de mods/ dans le dossier serveur de cette machine signés par une autre identité. Si ce dossier a été vidé, réinstallez d’abord vos mods depuis le marché des mods, ou importez le .eve-key exporté à l’époque pour retrouver votre identité d’origine."
 }

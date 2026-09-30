@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 
 import type { RawClaimCandidates, RawClaimItem } from "@/lib/ipc"
-import { needsRecovery, orderClaimItems, repoLooksMine } from "@/lib/mod-claim"
+import { needsRecovery, orderClaimItems, repoLooksMine, shouldOfferClaim } from "@/lib/mod-claim"
 
 function item(patch: Partial<RawClaimItem>): RawClaimItem {
   return {
@@ -48,11 +48,29 @@ describe("mod-claim", () => {
     expect(list.map((entry) => entry.id)).toEqual(["b", "c", "a", "d"])
   })
 
-  it("候选为空时不给「找回旧模组」入口", () => {
+  it("候选为空时 needsRecovery 是假（本机确实没什么可认领的）", () => {
     expect(needsRecovery(null)).toBe(false)
     expect(needsRecovery({ ok: false, items: [], skipped: [] })).toBe(false)
     expect(needsRecovery({ ok: true, items: [], skipped: [] })).toBe(false)
     const withItem: RawClaimCandidates = { ok: true, items: [item({})], skipped: [] }
     expect(needsRecovery(withItem)).toBe(true)
+  })
+
+  /**
+   * 2026-09-30 报障：用户在 0.2.4 上找不到「找回旧模组」这个按钮，维护者本机却有。
+   * 差别就在这条判据上：候选来自本机 mods/ 的扫描，重装后目录一空就没有候选了。
+   */
+  it("配了令牌的人一直能看到入口：没有候选也看得见（认领本来就要令牌）", () => {
+    expect(shouldOfferClaim(null, true)).toBe(true)
+    expect(shouldOfferClaim({ ok: false, items: [], skipped: [] }, true)).toBe(true)
+    expect(shouldOfferClaim({ ok: true, items: [], skipped: [] }, true)).toBe(true)
+  })
+
+  it("没配令牌的人只有真扫到候选才给入口（纯玩家不多一个按钮）", () => {
+    expect(shouldOfferClaim(null, false)).toBe(false)
+    expect(shouldOfferClaim({ ok: true, items: [], skipped: [] }, false)).toBe(false)
+    expect(
+      shouldOfferClaim({ ok: true, items: [item({})], skipped: [] }, false)
+    ).toBe(true)
   })
 })

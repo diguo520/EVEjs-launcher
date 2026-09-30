@@ -13,6 +13,7 @@ import {
 import { changelogLanguage, releaseNotesFrom } from "@/lib/release-notes"
 import { LAUNCHER_META, type ReleaseNoteGroup } from "@/lib/mock"
 import { isSelfTestSession, startUpdateWatch } from "@/lib/update-watch"
+import { updatePhaseView, type UpdatePhase } from "@/lib/update-phase"
 
 export interface LauncherVersionValue {
   /** 当前安装的启动器版本（带 v 前缀，用于显示） */
@@ -43,8 +44,14 @@ export interface LauncherVersionValue {
   channel: string
   /** 真去查一次更新：更新说明与是否有新版都从这次结果来 */
   checkForUpdate: () => Promise<RawUpdateCheck | null>
-  /** 开始自更新：真去下载并安装 */
+  /** 开始自更新：先把更新包下载下来（下载完还要再点一次「重启并安装」） */
   startUpdate: () => void
+  /** 下载完成后真的去替换：拉起 Go 更新器并重启（老版 0.1.28 的「重启并安装」） */
+  installUpdate: () => void
+  /** 后端 update:state 认出来的阶段：idle / downloading / ready / applying / … */
+  phase: UpdatePhase
+  /** 后端给更新状态配的说明：下载提示与失败原因都在这里 */
+  updateMessage: string
 }
 
 /** 字节数 → 可读体积：与现役版「安装包 18.4 MB」同一口径，拿不到写「—」 */
@@ -71,6 +78,9 @@ const FALLBACK: LauncherVersionValue = {
   channel: LAUNCHER_META.channel,
   checkForUpdate: async () => null,
   startUpdate: () => {},
+  installUpdate: () => {},
+  phase: "idle",
+  updateMessage: "",
 }
 
 const LauncherVersionContext = React.createContext<LauncherVersionValue>(FALLBACK)
@@ -153,9 +163,18 @@ export function useLauncherVersionState(): LauncherVersionValue {
   const version = info ? `v${info.version}` : update?.currentVersion ? `v${update.currentVersion}` : LAUNCHER_META.version
   const latestVersion = update?.latestVersion ? `v${update.latestVersion}` : version
   const outdated = latestVersion !== version
-  const updating = update?.state === "downloading" || update?.state === "verifying" ||
-    update?.state === "installing"
-  const progress = Math.max(0, Math.min(100, Number(update?.percent ?? 0)))
+
+  /**
+   * 阶段与进度都从后端那一个状态收出来（见 lib/update-phase.ts）。
+   * 「下载完成」也算忙：这时界面要给的是「重启并安装」，而不是再点一次「立即更新」——
+   * 2026-09-30 报障：以前只有下载那一步，包下完了却从来没调过 update:apply。
+   */
+  const phaseView = React.useMemo(
+    () => updatePhaseView(update?.state, update?.percent, update?.message),
+    [update?.state, update?.percent, update?.message]
+  )
+  const updating = phaseView.busy
+  const progress = phaseView.progress
 
   // 更新说明按界面语言取：中文看 changelog.zh，其余语言看 changelog.en
   const notes = React.useMemo(
@@ -171,6 +190,17 @@ export function useLauncherVersionState(): LauncherVersionValue {
     if (!live) return
     void call("updateDownload").catch(() => {
       /* 后端不可用/更新源没配：状态栏会显示 update:state 的 message，这里不弹二次错误 */
+    })
+  }, [live])
+
+  /**
+   * 下载完成后才走的那一步：把包交给 Go 更新器替换 exe 并重启，本进程随即退出。
+   * 前置（还有服务在跑、更新器不存在…）由后端自己拦，原因经 update:changed 落回 updateMessage。
+   */
+  const installUpdate = React.useCallback(() => {
+    if (!live) return
+    void call("updateApply").catch(() => {
+      /* 同上：失败原因走后端状态，界面照 updateMessage 显示 */
     })
   }, [live])
 
@@ -191,6 +221,9 @@ export function useLauncherVersionState(): LauncherVersionValue {
       channel,
       checkForUpdate,
       startUpdate,
+      installUpdate,
+      phase: phaseView.phase,
+      updateMessage: phaseView.message,
     }),
     [
       version,
@@ -207,6 +240,8 @@ export function useLauncherVersionState(): LauncherVersionValue {
       channel,
       checkForUpdate,
       startUpdate,
+      installUpdate,
+      phaseView,
     ]
   )
 }

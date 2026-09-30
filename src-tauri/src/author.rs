@@ -586,6 +586,21 @@ pub fn read_identity() -> Result<AuthorIdentity, String> {
     read_identity_at(crate::runtime::active())
 }
 
+/// 读身份，没有就现建一套再读（与 `author:get` 同一个动作，只是不回给界面）。
+///
+/// 给「找回旧模组」的候选扫描用：归属保护要知道「哪些模组不是我签的」，
+/// 而身份**还不存在**的时候恰恰最需要找回（重装系统后还没进过作者面板）：
+/// 那时回一个「读不到身份」等于把入口藏起来，见 `mods/claim.rs`（2026-09-30 报障）。
+pub fn ensure_identity_at(paths: &RuntimePaths) -> Result<AuthorIdentity, String> {
+    let (profile, _) = ensure_profile(paths).ok_or_else(|| "无法建立本机作者身份".to_string())?;
+    Ok(AuthorIdentity {
+        id: profile.id,
+        name: profile.name,
+        key_id: profile.key_id,
+        public_key: profile.public_key,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -253,9 +253,17 @@ export function ModClaimDialog({
         ) : null}
 
         {ordered.length === 0 ? (
-          <p className="rounded-md border border-border bg-background/40 px-3 py-4 text-center text-[12px] text-tertiary">
-            {loading ? "正在读取…" : query ? "没有匹配的模组" : "没有需要找回的模组"}
-          </p>
+          <div className="space-y-1.5 rounded-md border border-border bg-background/40 px-3 py-4 text-center text-[12px] text-tertiary">
+            <p>{loading ? "正在读取…" : query ? "没有匹配的模组" : "本机没有需要找回的模组"}</p>
+            {/* 入口现在对配了令牌的人一直开着，所以「列表空」也得说清下一步怎么办 */}
+            {!loading && !query ? (
+              <p className="text-[11px] leading-relaxed">
+                {t(
+                  "候选来自本机服务端 mods/ 里由别的身份署名的模组。目录被清过的话，先从模组市场装回自己的模组再来认领，或者导入当年导出的 .eve-key 直接用回原身份。"
+                )}
+              </p>
+            ) : null}
+          </div>
         ) : (
           <ul className="space-y-2">
             {ordered.map((item) => (

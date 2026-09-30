@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils"
  * 窄窗侧栏只有一条图标的位置，给 compact：同一个弹窗、同一份状态，只换个入口长相。
  */
 export function LauncherUpdate({ compact = false }: { compact?: boolean }) {
-  const { version, latestVersion, outdated, updating, progress, sizeText } =
+  const { version, latestVersion, outdated, updating, progress, sizeText, phase } =
     useLauncherVersion()
   const [open, setOpen] = useState(false)
 
@@ -27,9 +27,13 @@ export function LauncherUpdate({ compact = false }: { compact?: boolean }) {
     // 没有新版本、也没在更新就什么都不显示：底部不该常驻一个「已是最新」的勾
     if (!outdated && !updating) return null
 
-    /** 图标条上放不下版本号，悬停提示里把两个版本都写出来 */
+    /** 图标条上放不下版本号，悬停提示里把这一步到底在干什么写清楚 */
     const hint = updating
-      ? t("正在更新启动器 {percent}%", { percent: Math.floor(progress) })
+      ? phase === "ready"
+        ? t("更新包已下载，点开安装 {to}", { to: latestVersion })
+        : phase === "applying"
+          ? t("正在安装启动器更新…")
+          : t("正在更新启动器 {percent}%", { percent: Math.floor(progress) })
       : t("启动器有新版本 {from} → {to}", { from: version, to: latestVersion })
 
     return (
@@ -103,7 +107,10 @@ export function LauncherUpdate({ compact = false }: { compact?: boolean }) {
             <>
               <Progress value={progress} className="mt-2" />
               <div className="tabular mt-1 flex items-center justify-between text-[10px] text-tertiary">
-                <span>下载中</span>
+                {/* 进度条走完之后是「等用户点重启并安装」这一步，别一直写「下载中」 */}
+                <span>
+                  {phase === "ready" ? "已下载" : phase === "applying" ? "安装中" : "下载中"}
+                </span>
                 <span>{Math.floor(progress)}%</span>
               </div>
             </>

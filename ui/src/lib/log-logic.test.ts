@@ -5,9 +5,11 @@ import {
   filterLogs,
   levelCounts,
   lineKey,
+  logTabOf,
   matchKeyword,
   matchLogTab,
   overlapTail,
+  pruneLogs,
   renderLogLines,
   renderSegments,
   splitHits,
@@ -199,5 +201,69 @@ describe("renderLogLines", () => {
     } finally {
       setActiveLocale(previous)
     }
+  })
+})
+
+/**
+ * 2026-09-30 报障：系统 / 市场 / 客户端三个页签的记录会「消失」—— 面板原本只有一个
+ * 400 行的环形窗口，主服务器刷屏就会把它们挤出去。这一组钉住「按页签各留各的」。
+ */
+describe("logTabOf / pruneLogs", () => {
+  it("来源归页签：主服务器名下的四种来源都算一页，认不出的不算", () => {
+    expect(logTabOf("sys")).toBe("sys")
+    expect(logTabOf("node")).toBe("node")
+    expect(logTabOf("server")).toBe("node")
+    expect(logTabOf("gateway")).toBe("node")
+    expect(logTabOf("images")).toBe("node")
+    expect(logTabOf("market")).toBe("market")
+    expect(logTabOf("client")).toBe("client")
+    expect(logTabOf("whatever")).toBeNull()
+  })
+
+  it("主服务器刷屏时，系统横幅与市场 / 客户端的记录一条都不掉", () => {
+    const logs = [
+      line({ src: "sys", msg: "[启动器] EvEJS Launcher v0.2.5" }),
+      line({ src: "market", msg: "市场服务已就绪" }),
+      line({ src: "client", msg: "客户端已就绪" }),
+      ...Array.from({ length: 50 }, (_, index) => line({ src: "node", msg: `刷屏 ${index}` })),
+    ]
+    const kept = pruneLogs(logs, 10)
+    expect(kept.filter((item) => item.src === "sys").map((item) => item.msg)).toEqual([
+      "[启动器] EvEJS Launcher v0.2.5",
+    ])
+    expect(kept.filter((item) => item.src === "market")).toHaveLength(1)
+    expect(kept.filter((item) => item.src === "client")).toHaveLength(1)
+    // 超额的那一页签自己从最旧的开始丢，留下的正好是最后 10 条
+    expect(kept.filter((item) => item.src === "node").map((item) => item.msg)).toEqual(
+      Array.from({ length: 10 }, (_, index) => `刷屏 ${40 + index}`)
+    )
+    // 时间先后不能被重排：留下来的行仍是原来的相对次序
+    expect(kept.map((item) => item.msg)).toEqual([
+      "[启动器] EvEJS Launcher v0.2.5",
+      "市场服务已就绪",
+      "客户端已就绪",
+      ...Array.from({ length: 10 }, (_, index) => `刷屏 ${40 + index}`),
+    ])
+  })
+
+  it("没超额就原样返回（不复制、不动顺序）", () => {
+    const logs = [line({ src: "sys", msg: "a" }), line({ src: "node", msg: "b" })]
+    expect(pruneLogs(logs, 10)).toBe(logs)
+  })
+
+  it("认不出来源的行不参与截断：宁可留着，也别把没分类的记录悄悄丢掉", () => {
+    const logs = Array.from({ length: 20 }, (_, index) => line({ src: "mystery", msg: `x${index}` }))
+    expect(pruneLogs(logs, 5)).toHaveLength(20)
+  })
+
+  it("默认每页签 400 行：主服务器灌 1000 行也不会碰别的页签", () => {
+    const logs = [
+      line({ src: "sys", msg: "banner" }),
+      ...Array.from({ length: 1000 }, (_, index) => line({ src: "node", msg: `n${index}` })),
+    ]
+    const kept = pruneLogs(logs)
+    expect(kept.filter((item) => item.src === "sys")).toHaveLength(1)
+    expect(kept.filter((item) => item.src === "node")).toHaveLength(400)
+    expect(kept.filter((item) => item.src === "node")[0].msg).toBe("n600")
   })
 })

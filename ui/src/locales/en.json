@@ -2457,5 +2457,8 @@
  "，这份骨架建到那里服务端加载不到。": "; a skeleton built there will not load.",
  "：{detail}": ": {detail}",
  "：{reason}": ": {reason}",
- "；": ";"
+ "；": ";",
+ "更新包已下载，点开安装 {to}": "Update downloaded — open to install {to}",
+ "正在安装启动器更新…": "Installing the launcher update…",
+ "候选来自本机服务端 mods/ 里由别的身份署名的模组。目录被清过的话，先从模组市场装回自己的模组再来认领，或者导入当年导出的 .eve-key 直接用回原身份。": "Candidates are the mods in mods/ of this machine’s server folder that were signed by another identity. If that folder was wiped, install your own mods back from the mod marketplace first, or import the .eve-key you exported back then to return to your original identity."
 }

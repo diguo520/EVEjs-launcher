@@ -445,7 +445,11 @@ fn claim_candidates_with(
     opts: &ClaimOptions,
     login: &str,
 ) -> Value {
-    let identity = match crate::author::read_identity_at(runtime) {
+    // 身份缺失时先现建一套再判归属（与 `author:get` 同一个动作）：本机没有身份恰恰是
+    // 最需要找回旧模组的时候（重装系统后还没进过作者面板），那时若直接回 ok:false，
+    // 界面连「找回旧模组」的入口都不会出现 —— 2026-09-30 报障。
+    // 真建不出来（系统随机数 / 磁盘不可用）才照实回失败。
+    let identity = match crate::author::ensure_identity_at(runtime) {
         Ok(identity) => identity,
         Err(reason) => {
             return json!({
@@ -852,6 +856,30 @@ mod tests {
         assert_eq!(items.len(), 1);
         assert_eq!(items[0]["id"], json!("foreign"));
         assert_eq!(items[0]["claimed"], json!(true));
+    }
+
+    #[test]
+    fn candidates_build_the_missing_identity_instead_of_hiding_the_entry() {
+        // 重装系统后还没进过作者面板：本机连 author.json 都没有。
+        // 这一幕恰恰是最需要找回旧模组的时候，所以不能回 ok:false（那会让界面上的入口直接消失）
+        // —— 2026-09-30 报障：用户在新版启动器上找不到「找回旧模组」。
+        let repo = repo_for("no-identity");
+        let runtime = runtime_for("no-identity");
+        assert!(crate::author::read_identity_at(&runtime).is_err());
+        write_mod(
+            &repo,
+            "old",
+            manifest("old", json!({ "id": "au-old", "keyId": "deadbeef" })),
+        );
+        mark_market_source(&repo, "old", "https://github.com/diguo520/evejs-mod-old");
+        let result = claim_candidates_for(&repo, &runtime, &ClaimOptions::default(), "tok");
+        assert_eq!(result["ok"], json!(true), "{result}");
+        // 现建的那套身份跟旧模组的署名必然不同 → 旧模组就是候选
+        let items = result["items"].as_array().unwrap();
+        assert_eq!(items.len(), 1, "{result}");
+        assert_eq!(items[0]["id"], json!("old"));
+        // 身份顺带落了盘：作者面板打开时看到的是同一套，不会「换一张脸」
+        assert!(crate::author::read_identity_at(&runtime).is_ok());
     }
 
     #[test]

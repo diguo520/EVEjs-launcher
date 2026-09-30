@@ -2457,5 +2457,8 @@
  "，这份骨架建到那里服务端加载不到。": ", een daar gemaakt skelet wordt niet door de server geladen.",
  "：{detail}": "：{detail}",
  "：{reason}": ":{reason}",
- "；": ";"
+ "；": ";",
+ "更新包已下载，点开安装 {to}": "Update gedownload — open om {to} te installeren",
+ "正在安装启动器更新…": "Launcher-update wordt geïnstalleerd…",
+ "候选来自本机服务端 mods/ 里由别的身份署名的模组。目录被清过的话，先从模组市场装回自己的模组再来认领，或者导入当年导出的 .eve-key 直接用回原身份。": "Kandidaten zijn de mods in mods/ van de servermap van deze machine die door een andere identiteit zijn ondertekend. Is die map gewist, installeer je eigen mods dan eerst opnieuw via de modmarkt, of importeer de toen geëxporteerde .eve-key om terug te gaan naar je oorspronkelijke identiteit."
 }

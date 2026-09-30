@@ -29,7 +29,7 @@ import {
 } from "@/components/modules/mod-submit-dialog"
 import { ConflictBanner, ReviewBanner } from "@/components/modules/mod-banners"
 import { useModDownloads, type DownloadTask } from "@/hooks/use-mod-downloads"
-import { needsRecovery } from "@/lib/mod-claim"
+import { shouldOfferClaim } from "@/lib/mod-claim"
 import { useModSource, type PublishOutcome } from "@/hooks/use-mod-source"
 import {
   ALL_CATEGORY,
@@ -824,8 +824,11 @@ export function ModulesPage({
               ? t("发布模组 · {seconds}s", { seconds: Math.ceil(publishIntervalMs / 1000) })
               : "发布模组"}
           </Button>
-          {/* 重装系统 / 换电脑后本机换了身份：本机还有旧身份签的自己的模组时才给这个入口 */}
-          {needsRecovery(source.claims) ? (
+          {/*
+            重装系统 / 换电脑后本机换了身份：配了令牌的人一直能看到这个入口（认领本来就要令牌，
+            核验仓库写权限），本机还扫到候选的话，没配令牌的人也能看到 —— 见 lib/mod-claim.ts。
+          */}
+          {shouldOfferClaim(source.claims, source.tokenStatus?.hasToken === true) ? (
             <Button variant="outline" onClick={() => setClaimOpen(true)}>
               <History />
               找回旧模组
