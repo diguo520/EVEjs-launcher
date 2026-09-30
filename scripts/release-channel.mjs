@@ -5,18 +5,21 @@
  * 背景（S7 §2.1 实测）：现役 Electron 0.1.28 的默认清单地址
  *   https://github.com/<repo>/releases/latest/download/update-manifest.json
  * 与本外壳原本**完全相同**，而旧更新器只核 sha256、**不认 zip**：`releases/latest`
- * 一旦指向 Tauri 的便携 zip 清单，老更新器会把 zip 当 exe 替换主程序 → 用户启动器报废。
+ * 一旦把 Tauri 清单交给它，老更新器会把新包当成自己的 exe 替换主程序 → 用户启动器报废。
  *
  * 双轨因此定成：
  *   · Tauri 侧读 `.../releases/download/stable/update-manifest.json`（见 updater.rs 的
  *     DEFAULT_MANIFEST_URL，本脚本负责把新清单推到这个滚动 `stable` release）；
- *   · `releases/latest` 由本脚本钉在旧 Electron 通道（默认 `v0.1.28`），永远不再指向 Tauri。
+ *   · `releases/latest` 下发的东西必须是**旧通道那份未签名清单**。2026-10-01 起 Latest
+ *     指向最新版本（GitHub 的 Release 列表显示新版本号，不再显示 v0.1.28），但最新版
+ *     release 上的 `update-manifest.json` 放的是从 `v0.1.28` 原样搬来的旧清单：
+ *     旧 Electron 读到自家清单照旧「已是最新」，新外壳从不读这个地址。
  *
  * 用法：
  *   node scripts/release-channel.mjs status                       # 看当前双轨状态
- *   node scripts/release-channel.mjs publish --version 0.2.6      # 发版后推 stable 清单
+ *   node scripts/release-channel.mjs publish --version 0.2.6      # 推 stable 清单 + 把 Latest 挪到新版本
  *   node scripts/release-channel.mjs verify  --version 0.2.6      # 核对 stable 与 latest 隔离
- *   node scripts/release-channel.mjs pin-legacy --tag v0.1.28     # 把 releases/latest 钉到旧通道
+ *   node scripts/release-channel.mjs pin-legacy --tag v0.1.28     # 回滚：Latest 标签还给旧通道
  *
  * 令牌：`--token` → `GH_TOKEN` / `GITHUB_TOKEN` → `git credential fill`（github.com）。
  * 提示：本机 Node 若有 TLS 代理，跑之前加 `--use-system-ca`（例 `node --use-system-ca ...`）。
@@ -109,8 +112,7 @@ async function downloadAssetBuffer(apiAssetUrl) {
   return Buffer.from(await response.arrayBuffer());
 }
 
-async function uploadAsset(releaseId, name, filePath) {
-  const buffer = fs.readFileSync(filePath);
+async function uploadAssetBuffer(releaseId, name, buffer) {
   const response = await fetch(
     `https://uploads.github.com/repos/${REPO}/releases/${releaseId}/assets?name=${encodeURIComponent(name)}`,
     {
@@ -127,6 +129,10 @@ async function uploadAsset(releaseId, name, filePath) {
   const text = await response.text();
   if (!response.ok) throw new Error(`上传 ${name} 失败：${response.status} ${text.slice(0, 300)}`);
   return JSON.parse(text);
+}
+
+async function uploadAsset(releaseId, name, filePath) {
+  return uploadAssetBuffer(releaseId, name, fs.readFileSync(filePath));
 }
 
 /** 用内置维护者公钥验签（复用发版签名工具，避免在这里重写一套规范化逻辑）。 */
@@ -180,6 +186,9 @@ async function fetchChannelManifest() {
  * 隔离的核心断言：`releases/latest` 下发的东西**不能**是我们签名过的清单。
  * 旧 Electron 只核 sha256，所以它读到自家清单最安全；而新外壳 fail closed，
  * 读到旧清单只会「检查更新失败」，绝不会把 Electron 的 exe 装到自己身上。
+ *
+ * Latest 挂在哪个 tag 上无所谓（2026-10-01 起就是最新版本号那个 release），
+ * 关键是这个地址**下发的那份清单**不能是我们签的 —— 由 serveLegacyManifestOnNewest 保证。
  */
 async function assertLatestIsNotOurs() {
   const latest = await gh("GET", `/repos/${REPO}/releases/latest`);
@@ -257,6 +266,52 @@ async function moveStableTag(version) {
   info(`${STABLE_TAG} tag -> ${sha.slice(0, 7)}（跟随 v${version}）`);
 }
 
+/**
+ * 把 Releases 的 Latest 让给最新版本，同时保证 `releases/latest` 下发的仍是旧通道那份清单。
+ *
+ * 为什么不是「Latest 直接指向最新版、清单也换成我们签的那份」：老 Electron 会读到我们的
+ * 清单，把新版 exe 当成自己的更新包装上去（用户没点之前不会发生，但那是把一条停止维护的
+ * 通道接到一条随时会变的新通道上）。所以这里做的是「标签跟随新版本、内容仍旧通道」。
+ *
+ * 旧清单从 `--legacy-tag`（默认 v0.1.28）的 release 上原样取字节，不做任何改写；
+ * 取到的清单必须**不是**我们签的，否则中止。
+ */
+async function serveLegacyManifestOnNewest(version) {
+  const tag = `v${version}`;
+  const target = await gh("GET", `/repos/${REPO}/releases/tags/${tag}`);
+  if (!target) {
+    warn(`远端还没有 ${tag} release，跳过「Latest 跟随新版本」这一步`);
+    return;
+  }
+
+  const legacyTag = value("--legacy-tag", DEFAULT_LEGACY_TAG);
+  const legacy = await gh("GET", `/repos/${REPO}/releases/tags/${legacyTag}`);
+  if (!legacy) fail(`找不到旧通道 release：${legacyTag}`);
+  const legacyAsset = (legacy.assets || []).find((item) => item.name === CHANNEL_ASSET);
+  if (!legacyAsset) fail(`${legacyTag} 上没有 ${CHANNEL_ASSET} —— 旧通道没有可下发的清单`);
+
+  const buffer = await downloadAssetBuffer(legacyAsset.url);
+  const tmpPath = path.join(ROOT, ".parity-out", "legacy-manifest.json");
+  fs.mkdirSync(path.dirname(tmpPath), { recursive: true });
+  fs.writeFileSync(tmpPath, buffer);
+  if (isSignedByUs(tmpPath)) {
+    fail(`${legacyTag} 的 ${CHANNEL_ASSET} 是我们签的清单 —— Latest 会把 Tauri 清单发给旧 Electron，拒绝`);
+  }
+
+  const assets = await gh("GET", `/repos/${REPO}/releases/${target.id}/assets`);
+  for (const asset of (assets || []).filter((item) => item.name === CHANNEL_ASSET)) {
+    await gh("DELETE", `/repos/${REPO}/releases/assets/${asset.id}`);
+    info(`已删除 ${tag} 上原有的 ${CHANNEL_ASSET}（${asset.size} 字节）`);
+  }
+  const uploaded = await uploadAssetBuffer(target.id, CHANNEL_ASSET, buffer);
+  info(`已把 ${legacyTag} 的清单挂到 ${tag}（${uploaded.size} 字节）`);
+
+  // Latest 挪到新版本；旧通道 release 主动取消 Latest，避免两个都挂着
+  await gh("PATCH", `/repos/${REPO}/releases/${target.id}`, { make_latest: "true" });
+  await gh("PATCH", `/repos/${REPO}/releases/${legacy.id}`, { make_latest: "false" });
+  ok(`Releases 的 Latest -> ${tag}（该地址下发的仍是 ${legacyTag} 那份未签名清单）`);
+}
+
 async function publish() {
   const manifestPath = path.resolve(value("--manifest", path.join(ROOT, "artifacts/update-manifest.json")));
   const local = localManifest(manifestPath);
@@ -276,6 +331,7 @@ async function publish() {
   const release = await ensureStableRelease();
   await replaceChannelAsset(release.id, manifestPath);
   await moveStableTag(version);
+  await serveLegacyManifestOnNewest(version);
 
   console.log("");
   await assertLatestIsNotOurs();
@@ -299,6 +355,11 @@ async function verify() {
   ok("通道隔离核对通过：stable 通道 = 新外壳，releases/latest = 旧 Electron 通道");
 }
 
+/**
+ * 回滚路径：把 Releases 的 Latest 标签还给旧通道。
+ * 正常情况下 publish 已经让 Latest 跟随新版本（且下发的是旧通道清单），只有 Latest
+ * 被别的 release 抢走、或需要临时把列表打回旧样子时才用它。
+ */
 async function pinLegacy() {
   const tag = value("--tag", DEFAULT_LEGACY_TAG);
   const release = await gh("GET", `/repos/${REPO}/releases/tags/${tag}`);
@@ -340,7 +401,15 @@ async function status() {
 }
 
 /** 取出位置参数（跳过选项与它们的值），只认白名单子命令：否则 `--version 0.2.6` 的值会被当成子命令。 */
-const VALUE_OPTIONS = new Set(["--version", "--manifest", "--token", "--tag", "--repo", "--target"]);
+const VALUE_OPTIONS = new Set([
+  "--version",
+  "--manifest",
+  "--token",
+  "--tag",
+  "--legacy-tag",
+  "--repo",
+  "--target",
+]);
 function positionals(list) {
   const out = [];
   for (let index = 0; index < list.length; index += 1) {

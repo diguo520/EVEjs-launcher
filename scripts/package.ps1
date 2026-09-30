@@ -174,12 +174,12 @@ EvEJS 启动器（Tauri 2 便携版）v$version
     }
 
     Write-Host ""
-    # 发布护栏（S7 §2.1 实测结论）：现役 Electron 0.1.28 的默认清单地址与新外壳**完全相同**
+    # 发布护栏（S7 §2.1 实测结论 + §2.4 调整）：现役 Electron 0.1.28 的默认清单地址与新外壳**完全相同**
     # （都是 <repo>/releases/latest/download/update-manifest.json），而旧版更新器只核 sha256、不认 zip，
-    # 它会把下载到的包当成 exe 去替换 —— 把这个 zip 发到 releases/latest 等于静默毁掉现役用户的启动器。
-    Write-Host "⚠️ 发布护栏：不要把 update-manifest.json + 便携 zip 发到 releases/latest。" -ForegroundColor Yellow
-    Write-Host "   旧版 Electron（0.1.28）读的是同一个 latest 地址且不认 zip，会把 zip 当 exe 替换。" -ForegroundColor Yellow
-    Write-Host "   双轨方案（stable tag / 第二仓库）与一次性动作清单见 docs/S7-发布与回滚-实施记录.md §2。" -ForegroundColor Yellow
+    # 它会把下载到的包当成 exe 去替换 —— 把新版清单发到 releases/latest 等于静默毁掉现役用户的启动器。
+    Write-Host "⚠️ 发布护栏：releases/latest 下发的必须是旧通道那份未签名清单（publish 会自己搬）。" -ForegroundColor Yellow
+    Write-Host "   新版自己的清单只进 stable 通道；Latest 标签跟着最新版本走，内容不跟着走。" -ForegroundColor Yellow
+    Write-Host "   双轨方案与动作清单见 docs/S7-发布与回滚-实施记录.md §2（含 §2.4 调整）。" -ForegroundColor Yellow
 
     Write-Host ""
     Write-Host "打包完成，产物清单：" -ForegroundColor Green
