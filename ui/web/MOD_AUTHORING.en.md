@@ -148,7 +148,7 @@ Mod / Plugin -> **Create mod**:
 | Description | 🟩 | One sentence; shown on the market card |
 | Long description / Highlights | ⭕ | Written into your mod README |
 | Conflicting mod ids | ⭕ | Comma separated |
-| Build options | — | ☑ Restart the server (on by default), ☐ Enable right after creation, ☑ Sign right after creation |
+| Build options | — | ☑ Restart the server (on by default), ☑ Enable right after creation (on by default), ☑ Sign right after creation (on by default) |
 
 After clicking **Create** you get:
 
@@ -156,10 +156,11 @@ After clicking **Create** you get:
 mods/<your mod id>/
 ├─ evejs-launcher.mod.json    <- manifest (identity, version, category, dependencies)
 ├─ loader.js                  <- your logic
-├─ loader.js.disabled         <- name while disabled (renamed to loader.js when enabled)
 ├─ README.md                  <- generated from the long description
 └─ CHANGELOG.md               <- version history
 ```
+
+🟨 `loader.js` only lands as `loader.js.disabled` when you **untick** "Enable right after creation" (it is ticked by default, so the default output is a loadable `loader.js`). To switch later, use the switch on the **Installed** page — that switch is exactly this rename.
 
 🟨 **Required manifest fields** (the launcher validates them; missing ones give "manifest validation failed"):
 
@@ -176,27 +177,29 @@ The folder must contain loader.js or loader.js.disabled
 
 ## Step 5 ✅ Write your logic (`loader.js`)
 
-Open `mods/<your mod id>/loader.js` — a skeleton is already there. The idea is simple: **hook into modules the server already has**.
+Open `mods/<your mod id>/loader.js` — the skeleton is already there and 🟩 **the skeleton itself is a runnable minimal example** (it sends a local chat message 10 seconds after a pilot logs in). Just edit it.
+
+🟥 **Four hard rules** (the skeleton already follows all of them; dropping any one of them breaks things):
+
+| Rule | Why |
+| --- | --- |
+| `setImmediate` + entry check (`process.env.EVEJS_GAMESTORE_OWNER_ROLE === "world"`, or the entry is `index.js`) | `NODE_OPTIONS` is inherited down npm -> server, so every wrapper process loads your file too; without the check you run in the wrong process |
+| **Never `require` huge server modules** (`chatHub` pulls in about 456MB / 645 modules) | Wait until it shows up in `require.cache`, then take the reference: cache hit, zero extra memory |
+| `timer.unref()` | So timers do not keep the process alive |
+| Guard with `globalThis.__xxx` so you install **once** | The loader runs more than once, otherwise messages repeat and listeners pile up |
+
+🟨 **Path rule (the one people get wrong)**: `require("./src/...")` inside a loader resolves relative to **your own mod folder**, **not** the server root — written like that it throws `MODULE_NOT_FOUND`. Compute the server root first:
 
 ```js
-// 🧩 Minimal example: send a local chat message when a player logs in
-const chatHub = require('./src/services/chat/chatHub');        // path is resolved from the server root
-const sessionRegistry = require('./src/services/chat/sessionRegistry');
-
-// 🟨 Always guard: the loader runs more than once, without the guard you register twice
-if (!globalThis.__myModInstalled) {
-  globalThis.__myModInstalled = true;
-  // hook your logic here
-}
+const path = require("path");
+const serverRoot = path.resolve(__dirname, "..", "..", "server");
+const hubPath = path.join(serverRoot, "src", "services", "chat", "chatHub.js");
+// 🟨 do not require it here — wait until the server has loaded it, full form in Appendix B
 ```
 
-🟥 **Three traps you will hit**:
+🟨 **Session properties**: custom properties on chat sessions are **not synced automatically**; read/write through the APIs `chatHub` / `sessionRegistry` export or it can fail silently.
 
-1. **It runs more than once** -> guard with `globalThis.__xxx` so you only install once, otherwise messages repeat and listeners pile up.
-2. **Never `require` huge server modules** (the whole `server`, world models, ...) -> Node memory blows up (measured).
-3. **Session properties**: custom properties on chat sessions are **not synced automatically**; read/write through the `chatHub` API or it can fail silently.
-
-🟨 **Path rule**: `require('./src/...')` inside a loader resolves relative to the **server root**, not to your mod folder.
+🟩 Mods that **patch server source** (rather than just calling APIs) go to **Appendix G** — do not hook `Module.prototype._compile` yourself.
 
 ---
 
@@ -208,6 +211,13 @@ if (!globalThis.__myModInstalled) {
 4. Reading logs when something is wrong:
    - Launcher -> **Server logs** (filter by System / Main server / Market service / Client and INFO/WARN/ERROR)
    - The server console output (visible in the launcher)
+5. 🟩 **Check whether it loaded, and how long it took**: search the server output for `[EveJS-MOD]`:
+   - `loader 就绪 <your mod> 3ms` -> your loader was loaded; `loader 失败 ... :: <reason>` means it failed
+   - `loaders-done total=14 failed=0 ms=1086` -> total time to load every mod
+   - `<file> 注入 N 层（A -> B 字节）` -> a bus patch applied
+   - `<id> 补丁失败，保留上一层结果：<reason>` -> that layer was skipped (**without** affecting other mods)
+
+   🟨 Per-process details and every layer outcome are written to `_launcher/logs/mod-load-report.json` — use it when you need to know who changed a file.
 
 ### 🔧 Troubleshooting
 
@@ -216,6 +226,7 @@ if (!globalThis.__myModInstalled) {
 | Card says "loader.js missing" | The file was deleted or renamed |
 | The switch turns itself back off | Manifest validation failed / signature was tampered with -> see the red note on the card |
 | No "loading mod" line in the log | The mod is **disabled**, or a conflict skipped it |
+| The log shows `MODULE_NOT_FOUND` | `require("./src/...")` was treated as relative to the server root — it is actually relative to your mod folder (see Step 5) |
 | Nothing happens in game and no error | Your guard returns early, or a `require` path is wrong |
 | Node memory explodes | You `require`d a huge server module (trap 2 above) |
 
@@ -321,6 +332,7 @@ Click **`3) Request listing`** -> the launcher opens a PR against the index repo
 | ZIP location | In **your own Release** (the index repo stores no binaries) |
 | Category | One of Gameplay / Economy / AI / Visuals / Tools |
 | Ownership rules | `id` is first-come-first-served; `author.id` is bound to the key (a changed key is rejected) |
+| Server source patches | Mods that change server files must use `__evejsMods.register` (Appendix G); hooking `Module.prototype._compile` yourself will be sent back — several mods hooking it cancel each other out |
 
 ## Where you see the result
 
@@ -376,37 +388,101 @@ Launcher -> Mod / Plugin -> **My mods**:
 
 # Appendix B: a runnable loader skeleton
 
+This is a **condensed version of the skeleton** the launcher's "create mod" dialog generates — all four hard rules kept, ready to edit (the fully commented version lives in `mods/<your mod id>/loader.js`):
+
 ```js
-/**
- * Runs more than once: always install only once.
- * require paths resolve from the SERVER ROOT; never require huge server modules.
- */
-if (!globalThis.__myFirstMod) {
-  globalThis.__myFirstMod = true;
+"use strict";
+const path = require("path");
 
-  const sessionRegistry = require('./src/services/chat/sessionRegistry');
-  const chatHub = require('./src/services/chat/chatHub');
+const TAG = "[my-mod]";
+const POLL_MS = 3000;
+const GRACE_MS = 10000;                      // wait this long after login: the session has to be ready
+const MESSAGE = "Welcome back, pilot!";
 
-  // 🟨 There is a grace period after login: the session may not be ready yet, so wait a bit
+console.log(TAG + " preload ran · pid=" + process.pid);
+
+/** Only continue in the real server process (skip npm / wrapper processes) */
+function isRealServerProcess() {
+  if (process.env.EVEJS_GAMESTORE_OWNER_ROLE === "world") return true;
+  const entry = (require.main && require.main.filename) || process.argv[1] || "";
+  return /(^|[\\/])index\.js$/i.test(entry);
+}
+
+setImmediate(() => {
+  if (!isRealServerProcess()) return;
+  if (globalThis.__myModStarted) return;      // 🟨 loaded more than once: install once
+  globalThis.__myModStarted = true;
+  start();
+});
+
+function start() {
+  // 🟥 require("./src/...") is relative to YOUR MOD FOLDER, not the server root
+  const serverRoot = path.resolve(__dirname, "..", "..", "server");
+  const hubPath = path.join(serverRoot, "src", "services", "chat", "chatHub.js");
+  const registryPath = path.join(serverRoot, "src", "services", "chat", "sessionRegistry.js");
+
+  // 🟨 Wait until the server itself has these two in require.cache, then take the
+  //    reference: cache hit, zero extra memory, no 456MB module graph pulled in early
   const timer = setInterval(() => {
+    if (!require.cache[require.resolve(hubPath)]) return;
+    if (!require.cache[require.resolve(registryPath)]) return;
+    clearInterval(timer);
+    run(require(require.resolve(hubPath)), require(require.resolve(registryPath)));
+  }, 500);
+  timer.unref();
+}
+
+function run(chatHub, sessionRegistry) {
+  const seen = new Set();
+  const firstSeenAt = new Map();
+
+  const timer = setInterval(() => {
+    let sessions;
     try {
-      const online = sessionRegistry.list ? sessionRegistry.list() : [];
-      for (const s of online) {
-        if (s && s.characterId && !globalThis.__greeted?.[s.characterId]) {
-          globalThis.__greeted = globalThis.__greeted || {};
-          globalThis.__greeted[s.characterId] = true;
-          chatHub.sendSystemMessage(s, 'Welcome back, pilot');
-        }
-      }
-    } catch (e) {
-      // failing silently beats taking the whole server down
+      sessions = sessionRegistry.getSessions() || [];
+    } catch {
+      return;
     }
-  }, 5000);
-  timer.unref?.();
+
+    const now = Date.now();
+    const online = new Set();
+
+    for (const session of sessions) {
+      const characterID = sessionRegistry.resolveSessionCharacterID(session);
+      if (!characterID) continue;              // not actually in game yet, wait for the next round
+      online.add(characterID);
+      if (!firstSeenAt.has(characterID)) firstSeenAt.set(characterID, now);
+      if (seen.has(characterID)) continue;
+      if (now - firstSeenAt.get(characterID) < GRACE_MS) continue;
+
+      try {
+        // some session objects only carry a lowercase charid; set it once so the send is not silent
+        if (!Number(session.characterID || 0)) session.characterID = characterID;
+        chatHub.sendSystemMessage(session, MESSAGE);
+        seen.add(characterID);
+        console.log(TAG + " sent to character " + characterID);
+      } catch (error) {
+        console.log(TAG + " character " + characterID + " not ready, retrying: " + error.message);
+      }
+    }
+
+    // forget characters that went offline so the next login triggers again
+    for (const id of Array.from(seen)) if (!online.has(id)) seen.delete(id);
+    for (const id of Array.from(firstSeenAt.keys())) if (!online.has(id)) firstSeenAt.delete(id);
+  }, POLL_MS);
+  timer.unref();
 }
 ```
 
-🟨 The server APIs used above are **verified working**: `src/services/chat/sessionRegistry` (online sessions) and `src/services/chat/chatHub` (system messages). Interfaces can change between EveJS versions — check what your version exports.
+🟨 The server APIs used above are **verified working**:
+
+| API | Purpose |
+| --- | --- |
+| `sessionRegistry.getSessions()` | Online sessions (🟥 **not** `list()` — that method does not exist) |
+| `sessionRegistry.resolveSessionCharacterID(session)` | The character ID (0 until the pilot is actually in game) |
+| `chatHub.sendSystemMessage(session, "message")` | Send a system message to that character's local channel |
+
+Interfaces can change between EveJS versions — check what your version exports.
 
 # Appendix C: conflicts and load order
 
@@ -418,6 +494,16 @@ if (!globalThis.__myFirstMod) {
 | Missing dependency | A mod listed in `requires` is not installed | That mod is not loaded |
 
 🟦 Load order: drag cards in **Installed** to reorder; the order is stored in `_launcher/mods/mod-order.json`. `loadAfter` / `loadBefore` in the manifest take priority.
+
+## 🟥 Several mods patching the same server file (solved by the new launcher)
+
+When a mod **hooks `Module.prototype._compile` itself** to patch server source, two mods touching one file break each other:
+
+- who sees the original file first depends purely on load order;
+- if one of them verifies a whole-file sha256, it **fails verification** because the other one already appended content;
+- observed on this setup: `自动挖矿` and `自动锁定自动集火` both append to the end of `server/src/network/tcp/handshake.js`; once the first one writes, the second sees a mismatching hash and **silently gives up** (no error, no effect).
+
+🟩 The new launcher ships an **injection bus**: mods stop hooking anything and instead declare "which file, what to add" through `__evejsMods.register`. The bus chains them by `(slot, registration order)`, so every layer sees the **already-patched** content of the layer before it. See **Appendix G**.
 
 # Appendix D: ZIP layout and import rules
 
@@ -447,9 +533,11 @@ The launcher finds the package root automatically; a ZIP containing **several** 
 
 The mod page computes each mod's **recursive disk usage**. Ship only what is needed at runtime — 🟥 never include your source repo, `node_modules`, screenshots or `.git`.
 
-# Appendix E: how the loader is injected (the NODE_OPTIONS trap)
+# Appendix E: how the loader is injected
 
-The launcher injects your `loader.js` through Node's `NODE_OPTIONS=--require ...`, therefore:
+🟩 **As of the injection bus**: the launcher puts exactly **one** `--require "<the launcher's own mod-host.js>"` into `NODE_OPTIONS`, and the bus `require`s your `loader.js` in the order listed in `_launcher/mods/mod-plan.json`. So mod folders with non-ASCII names or spaces are fine, and the launcher log line `[EveJS-MOD] loaders-done total=N failed=0 ms=X` is how long loading every mod took.
+
+🟨 **The rest of this appendix describes the legacy "one `--require` per loader" form** (now used only as a fallback when the bus cannot be written to disk): the launcher injects your `loader.js` through Node's `NODE_OPTIONS=--require ...`, therefore:
 
 - 🟥 **Backslashes are swallowed as escape characters** -> `C:\mods\x\loader.js` becomes `C:modsxloader.js`
 - 🟨 `NODE_OPTIONS` splits on spaces, so **paths containing spaces must be quoted**
@@ -465,12 +553,46 @@ const requireArgs = paths.map((p) => '--require "' + p.replace(/\\/g, "/") + '"'
 # Appendix F: pre-release checklist
 
 - [ ] The mod enables and works locally (tested in step 6)
+- [ ] Mods that patch server source use `__evejsMods.register` (Appendix G) instead of hooking `_compile`
 - [ ] `evejs-launcher.mod.json` has the right `id` / `version` / `category`
 - [ ] The version is **higher than the previous one**
 - [ ] `.eve-key` is backed up (needed when changing machines)
 - [ ] `mods/<id>/` contains no private keys and no personal local paths
 - [ ] You ran `1) Generate and pack` -> `2) Publish to my repo` (the ZIP is downloadable from the Release page)
 - [ ] First release: you ran `3) Request listing` and saw the maintainer's reply in the PR
+
+
+# Appendix G: patching server source - the `__evejsMods.register` bus
+
+🟨 Only mods that **must change server source** need this. A mod like the login greeting, which only calls server APIs, is fine with the Appendix B skeleton.
+
+The launcher injects the bus, so you just declare your patch at the end of your loader:
+
+```js
+const bus = globalThis.__evejsMods;
+if (bus && bus.api >= 1) {
+  bus.register({
+    id: "your-mod-id",                              // same as the manifest id; used to tag the report
+    target: "server/src/network/tcp/handshake.js",  // relative to the EveJS root, forward slashes
+    marker: "MY_MOD_MARK",                          // unique marker: skipped when already present
+    slot: 10,                                       // order among layers on one file, lower goes first
+    apply: (source) => source + "\n// MY_MOD_MARK\n// your appended code goes here\n",
+  });
+} else {
+  // no bus (legacy launcher): fall back to your own hook, or skip patching
+}
+```
+
+Four rules (🟥 breaking any of them makes other mods fail for no visible reason):
+
+| Rule | Why |
+| --- | --- |
+| Use `register` only - do **not** hook `Module.prototype._compile` yourself | Hooking again brings back the race for the injection point, and the bus cannot see your change |
+| `apply` must **append only** - never rewrite or delete existing content | Later layers need to build on the content you produced |
+| Give `marker` a unique string nobody else uses | The bus uses it to tell whether the patch is already in place, so restarts never stack |
+| To verify, check the **prefix** you patched (or a length), never a whole-file sha256 | A whole-file hash can never match once layers are chained - that locks you out |
+
+🟩 Reading the result: a log line `[EveJS-MOD] <file> 注入 N 层（A -> B 字节）` means that layer applied; `[EveJS-MOD] <id> 补丁失败，保留上一层结果：<reason>` means it was skipped, **without** affecting the other mods.
 
 ---
 

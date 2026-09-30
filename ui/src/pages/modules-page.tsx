@@ -574,17 +574,6 @@ export function ModulesPage({
     })
   }
 
-  /** 审核由索引仓库的 PR 流程托管：这里把作者带到那条 PR 上 */
-  function openReview(mod: ModEntry) {
-    const submission = source.lastSubmissionOf(mod.id)
-    if (submission?.sourceReviewUrl) {
-      void source.openExternal(submission.sourceReviewUrl)
-      toast("已打开版本审核 PR", { description: "审核结论以索引仓库那条 PR 的状态为准。" })
-      return
-    }
-    notWired("审核")
-  }
-
   function openSubmit(id: string | null) {
     // 从卡片或创建成功的提示进来时目标已经确定，只有工具栏那个入口需要先看看有没有可提交的
     if (id === null) {
@@ -868,9 +857,7 @@ export function ModulesPage({
         />
       )}
 
-      {tab === "mine" ? (
-        <ReviewBanner mods={reviewing} onOpenReview={openReview} />
-      ) : null}
+      {tab === "mine" ? <ReviewBanner mods={reviewing} /> : null}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <StatTile
