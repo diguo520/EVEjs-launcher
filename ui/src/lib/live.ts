@@ -507,6 +507,89 @@ export function modLines(mods: RawModList | null, at: number): LogDraft[] {
   return out
 }
 
+/**
+ * 启动进度文案里的模组数：`启动中 45s / 120s · 正在加载 20 个模组…` → 20。
+ *
+ * 界面那张卡上的这句是后端每 5 秒推一次的，日志要留住的正是它的读数；
+ * 文案里没有这句（没模组、或第一条还没带上读数）就返回 null。
+ */
+export function loadersFromMessage(message: string): number | null {
+  const hit = /正在加载 (\d+) 个模组/.exec(message)
+  if (!hit) return null
+  const count = Number.parseInt(hit[1], 10)
+  return Number.isFinite(count) ? count : null
+}
+
+/** 主服务器启动阶段的记录（挂在 ref 上，跨事件轮次累积） */
+export interface MainStartTrack {
+  /** 上一次看到的状态（idle / starting / running …） */
+  state: string
+  /** 这一轮启动要加载几个模组（0 = 不知道 / 没有） */
+  loaders: number
+  /** 这一轮的「正在加载 N 个模组」写没写过，避免每 5 秒刷一行 */
+  announced: boolean
+}
+
+export const MAIN_START_TRACK: MainStartTrack = { state: "idle", loaders: 0, announced: false }
+
+/**
+ * 主服务器启动也写进**系统**页签（2026-09-30 用户要求）。
+ *
+ * 卡片上「启动中 45s / 120s · 正在加载 20 个模组…」一闪而过，日志里要留得住才有意义：
+ * 起手一行写「在加载几个模组」，就绪一行写「用了多少秒」，中间每 5 秒的走字不重复写。
+ * 状态从哪里来（首次轮询 / 事件推送）不影响结论，纯函数便于单测。
+ */
+export function trackMainStart(
+  track: MainStartTrack,
+  card: { state: string; startedAt?: number | null; message?: string | null },
+  now: number
+): { track: MainStartTrack; lines: LogSegment[][] } {
+  const next: MainStartTrack = { ...track }
+  const previous = track.state
+  const parsed = loadersFromMessage(card.message ?? "")
+  if (parsed !== null) next.loaders = parsed
+  const lines: LogSegment[][] = []
+
+  if (card.state === "starting") {
+    if (previous !== "starting") {
+      next.announced = false
+      next.loaders = parsed ?? 0
+    }
+    if (!next.announced && next.loaders > 0) {
+      next.announced = true
+      lines.push([
+        {
+          key: "[启动器] 主服务器启动中 · 正在加载 {count} 个模组…",
+          vars: { count: next.loaders },
+        },
+      ])
+    }
+  } else if (previous === "starting" && card.state === "running") {
+    // 启动耗时按进程被记录的那一刻算（后端 startedAt），拿不到就只写「已就绪」
+    const seconds =
+      typeof card.startedAt === "number" && card.startedAt > 0
+        ? Math.max(0, Math.round((now - card.startedAt) / 1000))
+        : null
+    if (seconds === null) {
+      lines.push(["[启动器] 主服务器已就绪"])
+    } else if (next.loaders > 0) {
+      lines.push([
+        {
+          key: "[启动器] 主服务器已就绪 · 用时 {seconds}s · 加载 {count} 个模组",
+          vars: { seconds, count: next.loaders },
+        },
+      ])
+    } else {
+      lines.push([
+        { key: "[启动器] 主服务器已就绪 · 用时 {seconds}s", vars: { seconds } },
+      ])
+    }
+  }
+
+  next.state = card.state
+  return { track: next, lines }
+}
+
 /** 单个模组 → 一行（供全量清单与增量变化共用） */
 function modLogOf(mod: RawMod, at: number): LogDraft {
   // 分类是固定词汇（游戏性 / 界面 / 平衡…）：当**原文段**给，跟着目录翻；

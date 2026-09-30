@@ -22,6 +22,7 @@ import type { DownloadTask } from "@/hooks/use-mod-downloads"
 import {
   hasUpdate,
   isPublished,
+  marketVersionDiff,
   pendingReplies,
   ratingOf,
   reasonOf,
@@ -107,6 +108,8 @@ export function ModCard({
   const published = isPublished(mod)
   const canInstall = published && !mod.installed
   const updatable = hasUpdate(mod)
+  /** 本地与市场不一样时的市场那一版；两边一致 / 没装 / 市场没这条就是 undefined */
+  const marketDiff = marketVersionDiff(mod)
   const rating = ratingOf(mod)
   const pending = pendingReplies(mod)
 
@@ -136,9 +139,15 @@ export function ModCard({
             <span className="truncate text-[14px] font-semibold text-foreground">
               {mod.name}
             </span>
-            <span className="tabular shrink-0 text-[11px] text-tertiary">
-              {mod.version}
-            </span>
+            {marketDiff ? (
+              /* 两个都写出来：只靠「可更新」那一条，本地更高时界面上一个数字都不变，
+                 作者看不出市场收没收到自己刚发的那一版（2026-09-30 报障） */
+              <span className="tabular shrink-0 text-[10px] text-tertiary">
+                {t("本地 {local} · 市场 {market}", { local: mod.version, market: marketDiff })}
+              </span>
+            ) : (
+              <span className="tabular shrink-0 text-[11px] text-tertiary">{mod.version}</span>
+            )}
           </div>
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
             {conflicts.length ? (

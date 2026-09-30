@@ -9,6 +9,7 @@ import {
 } from "@/components/shell/launcher-version"
 import { TopBar } from "@/components/shell/top-bar"
 import { SideNav } from "@/components/shell/side-nav"
+import { AppContextMenu } from "@/components/shell/app-menu"
 import { BootSplash } from "@/components/shell/boot-splash"
 import { useLocale } from "@/components/shell/locale-provider"
 import { StatusBar } from "@/components/shell/status-bar"
@@ -169,6 +170,9 @@ export function App() {
             className="mission-grid pointer-events-none fixed inset-0 z-0"
             aria-hidden="true"
           />
+
+          {/* 右键只留 刷新 / 复制 / 粘贴：原生那套 WebView2 菜单在启动器里全是噪音 */}
+          <AppContextMenu />
 
           <div className="relative z-10 flex min-h-0 flex-1 flex-col">
             <TopBar onInspectService={inspectService} services={launcher.services} />

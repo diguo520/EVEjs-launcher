@@ -4,6 +4,7 @@ import { Copy, FolderOpen, RefreshCw, ScrollText } from "lucide-react"
 
 import { cn, copyText } from "@/lib/utils"
 import { t } from "@/lib/i18n"
+import { GithubMark } from "@/components/common/github-mark"
 import { Panel } from "@/components/common/panel"
 import { Button } from "@/components/ui/button"
 import { LauncherUpdateDialog } from "@/components/shell/launcher-update-dialog"
@@ -32,7 +33,7 @@ export function AboutPanel() {
       value: latestVersion,
       tone: outdated ? "warning" : undefined,
     },
-    { label: "EveJS 服务端版本", value: evejsVersion || "—" },
+    { label: "EVEJS版本", value: evejsVersion || "—" },
     { label: "通道", value: LAUNCHER_META.channel },
     { label: "平台", value: "Windows" },
     { label: "服务端根目录", value: repoRoot || "—" },
@@ -42,6 +43,11 @@ export function AboutPanel() {
     const ok = await copyText(repoRoot || "")
     if (ok) toast.success("服务端根目录已复制")
     else toast.error("复制失败，请手动选择文本")
+  }
+
+  async function openRepo() {
+    const reply = await callOr<boolean>("shellOpenExternal", null, LAUNCHER_META.repoUrl)
+    if (reply !== true) toast.error("没能打开仓库地址")
   }
 
   async function openRoot() {
@@ -94,6 +100,17 @@ export function AboutPanel() {
         <Button variant="ghost" size="sm" onClick={() => setUpdateOpen(true)}>
           <ScrollText />
           更新内容
+        </Button>
+        {/* 仓库入口：「更新内容」右侧，图标颜色与这一块其他图标一致（ghost 的 currentColor） */}
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="ml-auto"
+          title={t("打开 GitHub 仓库")}
+          aria-label={t("打开 GitHub 仓库")}
+          onClick={() => void openRepo()}
+        >
+          <GithubMark />
         </Button>
       </div>
 

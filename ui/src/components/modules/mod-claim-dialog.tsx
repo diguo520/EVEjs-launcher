@@ -279,11 +279,7 @@ export function ModClaimDialog({
                     {item.id} · v{item.version}
                   </span>
                   <div className="min-w-2 flex-1" />
-                  {item.claimed ? (
-                    <span className="grid h-5 shrink-0 place-items-center rounded-sm border border-success/40 bg-success/10 px-1.5 text-[10px] font-semibold tracking-[0.08em] text-success">
-                      已认领
-                    </span>
-                  ) : login && !repoLooksMine(item, login) ? (
+                  {login && !repoLooksMine(item, login) ? (
                     <span className="grid h-5 shrink-0 place-items-center rounded-sm border border-border bg-background/60 px-1.5 text-[10px] font-semibold tracking-[0.08em] text-tertiary">
                       不在你名下
                     </span>

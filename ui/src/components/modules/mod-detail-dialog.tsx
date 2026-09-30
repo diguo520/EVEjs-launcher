@@ -42,6 +42,7 @@ import type { DownloadTask } from "@/hooks/use-mod-downloads"
 import {
   hasUpdate,
   isPublished,
+  marketVersionDiff,
   readmeSections,
   reasonOf as conflictReasonOf,
 } from "@/lib/mod-logic"
@@ -160,6 +161,8 @@ export function ModDetailDialog({
   const published = isPublished(mod)
   const canInstall = published && !mod.installed
   const updatable = hasUpdate(mod)
+  /** 本地与市场不一样时的市场那一版（概览里并列两行，作者一眼看出市场收没收到） */
+  const marketDiff = marketVersionDiff(mod)
   const reasonOf = (other: ModEntry) => conflictReasonOf(mod, other)
   // 正文按约定拆成要点与正文两块，拆不动就整段照原样显示
   const { features, paragraphs } = readmeSections(mod)
@@ -258,7 +261,8 @@ export function ModDetailDialog({
             <Section title="概览">
               <div className="grid gap-2 sm:grid-cols-2">
                 <Readout label="模组 ID" value={mod.id} />
-                <Readout label="版本" value={mod.version} />
+                <Readout label={marketDiff ? "本地版本" : "版本"} value={mod.version} />
+                {marketDiff ? <Readout label="市场版本" value={marketDiff} /> : null}
                 <Readout label="作者" value={mod.author} />
                 <Readout label="分类" value={mod.cat} />
                 <Readout

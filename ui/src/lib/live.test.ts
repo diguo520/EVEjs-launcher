@@ -6,6 +6,7 @@ import {
   diskVolumesFrom,
   envItemsFrom,
   initKeyOf,
+  loadersFromMessage,
   metricsFrom,
   modDiffLines,
   modLines,
@@ -14,7 +15,9 @@ import {
   portsOf,
   serviceCards,
   startupBannerLines,
+  trackMainStart,
   uptimeText,
+  MAIN_START_TRACK,
 } from "@/lib/live"
 import type {
   RawAppInfo,
@@ -471,6 +474,81 @@ describe("startupBannerLines", () => {
     } finally {
       setActiveLocale(previous)
     }
+  })
+})
+
+
+/**
+ * 2026-09-30 用户要求：启动主服务器时卡片上「正在加载 N 个模组」与耗时，
+ * 也要落进系统页签的实时日志，别一闪而过（过去只有卡片上的走字）。
+ */
+describe("trackMainStart（主服务器启动写进系统日志）", () => {
+  const card = (over: Partial<RawService>): RawService => ({
+    id: "mainServer",
+    name: "主服务器",
+    state: "idle",
+    ...over,
+  })
+
+  it("读得出进度文案里的模组数", () => {
+    expect(loadersFromMessage("启动中 45s / 120s · 正在加载 20 个模组…")).toBe(20)
+    expect(loadersFromMessage("启动中 45s / 120s · 正在启动服务端…")).toBeNull()
+    expect(loadersFromMessage("")).toBeNull()
+  })
+
+  it("起手一行写「在加载几个模组」，就绪一行写「用了多少秒」", () => {
+    const first = trackMainStart(
+      { ...MAIN_START_TRACK },
+      card({ state: "starting", message: "启动中 0s / 120s · 正在加载 20 个模组…" }),
+      1_000_000
+    )
+    expect(first.lines).toHaveLength(1)
+    expect(JSON.stringify(first.lines[0])).toContain("正在加载 {count} 个模组")
+    expect(first.track.loaders).toBe(20)
+
+    // 中间每 5 秒的走字不再重复写行
+    const mid = trackMainStart(
+      first.track,
+      card({ state: "starting", message: "启动中 10s / 120s · 正在加载 20 个模组…" }),
+      1_010_000
+    )
+    expect(mid.lines).toHaveLength(0)
+
+    // 就绪：按进程被记录的时刻算耗时
+    const ready = trackMainStart(
+      mid.track,
+      card({ state: "running", startedAt: 1_000_000, message: null }),
+      1_012_400
+    )
+    expect(ready.lines).toHaveLength(1)
+    const seg = ready.lines[0][0] as { key: string; vars: Record<string, unknown> }
+    expect(seg.key).toBe("[启动器] 主服务器已就绪 · 用时 {seconds}s · 加载 {count} 个模组")
+    expect(seg.vars).toEqual({ seconds: 12, count: 20 })
+    expect(ready.track.state).toBe("running")
+  })
+
+  it("没模组时是纯耗时一行；拿不到 startedAt 就只写「已就绪」", () => {
+    const plain = trackMainStart(
+      { ...MAIN_START_TRACK },
+      card({ state: "starting", message: "启动中 0s / 60s · 正在启动服务端…" }),
+      0
+    )
+    expect(plain.lines).toHaveLength(0)
+
+    const ready = trackMainStart(plain.track, card({ state: "running", startedAt: 5_000 }), 9_000)
+    expect((ready.lines[0][0] as { key: string }).key).toBe("[启动器] 主服务器已就绪 · 用时 {seconds}s")
+
+    const noClock = trackMainStart(
+      { ...MAIN_START_TRACK, state: "starting" },
+      card({ state: "running", startedAt: null }),
+      0
+    )
+    expect(noClock.lines[0][0]).toBe("[启动器] 主服务器已就绪")
+  })
+
+  it("启动器打开前就在跑的服务不补写「已就绪」", () => {
+    const already = trackMainStart({ ...MAIN_START_TRACK }, card({ state: "running", startedAt: 1 }), 2)
+    expect(already.lines).toHaveLength(0)
   })
 })
 

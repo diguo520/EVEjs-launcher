@@ -11,7 +11,7 @@
 //!   - ZIP 由作者自己托管（GitHub / Gitee Releases），索引里只登记 URL + sha256。
 use crate::author;
 use crate::github;
-use crate::mods::{claim, mods_root, pkg, plan, sanitize_folder_name, scan};
+use crate::mods::{claim, mods_root, pkg, plan, sanitize_folder_name, scaffold, scan};
 use crate::runtime::RuntimePaths;
 use crate::shell;
 use serde_json::{json, Map, Value};
@@ -409,8 +409,46 @@ fn normalize_download_urls(input: &Value, key: &str) -> Vec<Value> {
     out
 }
 
-/// 生成待提交包：重签 → 打包 → sha256 → 组装索引分片 → 写入 `my-submissions.json`。
-/// 前四步完全离线，不碰网络。
+/// 解析本次要发布的版本号，必要时**先把它写回模组清单**。
+///
+/// 详情页的「发布新版本」会在弹窗里预填递增后的版本号，而清单里还停在上一版，这一步负责把
+/// 两者对齐。必须赶在重签与打包之前落盘：ZIP 里的 `evejs-launcher.mod.json`、索引分片、台账
+/// 与 Release tag 只能共用一个版本号。只改一边的话，装回去的包版本比市场旧，别人的启动器会
+/// 永远提示更新；而完全不管它，后面按新版本号回查台账就会失败，报成一句看不懂的
+/// 「找不到待提交记录」（2026-09-30 报障：弹窗里填 1.0.8、清单里还是 1.0.7）。
+fn resolve_submit_version(
+    manifest: &Map<String, Value>,
+    manifest_path: &Path,
+    record_version: &str,
+    requested: &str,
+) -> Result<String, String> {
+    let requested = requested.trim();
+    if requested.is_empty() {
+        return Ok(if record_version.is_empty() {
+            "0.0.0".to_string()
+        } else {
+            record_version.to_string()
+        });
+    }
+    if !scaffold::is_semver_like(requested) {
+        // 复用「创建模组」那条已翻好的固定文案：界面按整段文本节点查多语言目录，
+        // 带上用户输入的值（如「版本号格式不对：v1」）就永远查不中，只能一直显示中文
+        return Err("版本号格式必须像 1.0.0".to_string());
+    }
+    if requested != record_version {
+        let mut next = manifest.clone();
+        next.insert("version".to_string(), json!(requested));
+        // 清单内容变了 → 旧签名失效，先摘掉（紧接着的重签会补回来）
+        next.remove("signature");
+        let text = serde_json::to_string_pretty(&Value::Object(next)).unwrap_or_default() + "\n";
+        std::fs::write(manifest_path, text)
+            .map_err(|error| format!("版本号写入清单失败：{error}"))?;
+    }
+    Ok(requested.to_string())
+}
+
+/// 生成待提交包：版本号对齐 → 重签 → 打包 → sha256 → 组装索引分片 → 写入 `my-submissions.json`。
+/// 除最后一步外完全离线，不碰网络。
 pub fn prepare_submission(repo_root: &Path, runtime: &RuntimePaths, input: &Value) -> Value {
     let folder = text_field(input, "folder").trim().to_string();
     if folder.is_empty() {
@@ -482,18 +520,24 @@ pub fn prepare_submission(repo_root: &Path, runtime: &RuntimePaths, input: &Valu
         });
     }
 
-    // 1) 重签（内容变了签名就失效；这里统一重签一次）
+    // 1) 版本号：以弹窗里填的为准（详情页「发布新版本」会预填递增后的号），必要时写回清单。
+    let version = match resolve_submit_version(
+        &manifest,
+        &record.manifest_path,
+        &record.version,
+        &text_field(input, "version"),
+    ) {
+        Ok(version) => version,
+        Err(reason) => return json!({ "ok": false, "reason": reason }),
+    };
+
+    // 2) 重签（内容变了签名就失效；这里统一重签一次）
     let signed = plan::sign_mod_folder(repo_root, &folder, runtime);
     if !signed.get("ok").and_then(Value::as_bool).unwrap_or(false) {
         return json!({ "ok": false, "reason": format!("签名失败：{}", text_field(&signed, "reason")) });
     }
 
-    // 2) 打包（.NET ZipFile，避免 Compress-Archive 的分隔符坑）
-    let version = if record.version.is_empty() {
-        "0.0.0".to_string()
-    } else {
-        record.version.clone()
-    };
+    // 3) 打包（.NET ZipFile，避免 Compress-Archive 的分隔符坑）
     let zip_path = runtime
         .temp
         .join(format!("export-{}-{version}.zip", record.id));
@@ -519,7 +563,7 @@ pub fn prepare_submission(repo_root: &Path, runtime: &RuntimePaths, input: &Valu
         }
     };
 
-    // 3) 组装索引分片
+    // 4) 组装索引分片
     let compat_versions: Vec<String> = manifest
         .get("compatibility")
         .and_then(Value::as_object)
@@ -1578,5 +1622,48 @@ mod tests {
         let result = reveal_submission_zip("E:\\definitely\\not\\here.zip");
         assert_eq!(result["ok"], false);
         assert!(result["reason"].as_str().unwrap().contains("ZIP 不存在"));
+    }
+
+    /// 2026-09-30 报障：弹窗里填 1.0.8、清单里还是 1.0.7，打包仍按 1.0.7 走，
+    /// 后面按 1.0.8 回查台账必然落空 → 报「找不到待提交记录」。
+    #[test]
+    fn resolve_submit_version_writes_the_requested_version_back_to_the_manifest() {
+        let runtime = temp_runtime("submit-version");
+        let manifest_path = runtime.root.join("evejs-launcher.mod.json");
+        let mut manifest = Map::new();
+        manifest.insert("id".to_string(), json!("demo"));
+        manifest.insert("version".to_string(), json!("1.0.7"));
+        manifest.insert("signature".to_string(), json!({ "sig": "old" }));
+        std::fs::write(&manifest_path, serde_json::to_string(&manifest).unwrap()).unwrap();
+
+        // 填了 1.0.8：返回 1.0.8，并把清单改成 1.0.8（旧签名必须摘掉，重签会补回来）
+        let version =
+            resolve_submit_version(&manifest, &manifest_path, "1.0.7", " 1.0.8 ").unwrap();
+        assert_eq!(version, "1.0.8");
+        let written = scan::read_manifest(&manifest_path).unwrap();
+        assert_eq!(
+            written.get("version").and_then(Value::as_str),
+            Some("1.0.8")
+        );
+        assert!(written.get("signature").is_none(), "清单变了旧签名必须摘掉");
+
+        // 没填、或跟清单一致：原样返回，且一个字节都不动
+        let before = std::fs::read_to_string(&manifest_path).unwrap();
+        assert_eq!(
+            resolve_submit_version(&written, &manifest_path, "1.0.8", "").unwrap(),
+            "1.0.8"
+        );
+        assert_eq!(
+            resolve_submit_version(&written, &manifest_path, "1.0.8", "1.0.8").unwrap(),
+            "1.0.8"
+        );
+        assert_eq!(std::fs::read_to_string(&manifest_path).unwrap(), before);
+
+        // 格式不合法：直接拒绝，不落盘；文案是固定键，界面才能按它查多语言目录
+        assert_eq!(
+            resolve_submit_version(&written, &manifest_path, "1.0.8", "v1").unwrap_err(),
+            "版本号格式必须像 1.0.0"
+        );
+        assert_eq!(std::fs::read_to_string(&manifest_path).unwrap(), before);
     }
 }

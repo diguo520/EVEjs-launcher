@@ -421,19 +421,19 @@ pub fn check_for_updates(app: &AppHandle, runtime: &RuntimePaths) -> Value {
 
     let manifest_url = resolve_manifest_url(runtime);
     if manifest_url.is_empty() {
-        return check_failure(app, &current, "未配置 updateManifestUrl");
+        return check_failure(app, &current, "未配置 updateManifestUrl", &manifest_url);
     }
     let remote = match read_manifest(&manifest_url, local_manifest_allowed()) {
         Ok(value) => value,
-        Err(reason) => return check_failure(app, &current, &reason),
+        Err(reason) => return check_failure(app, &current, &reason, &manifest_url),
     };
     // A1：验签先行 —— 签名不过，清单里的任何字段（版本号、URL、哈希）都不看
     if let Err(reason) = verify_update_manifest(&remote) {
         let reason = format!("更新清单校验失败：{reason}");
-        return check_failure(app, &current, &reason);
+        return check_failure(app, &current, &reason, &manifest_url);
     }
     let Some(asset) = platform_asset(&remote) else {
-        return check_failure(app, &current, "更新清单中没有当前平台");
+        return check_failure(app, &current, "更新清单中没有当前平台", &manifest_url);
     };
     let minimum = remote
         .get("minimumVersion")
@@ -441,7 +441,7 @@ pub fn check_for_updates(app: &AppHandle, runtime: &RuntimePaths) -> Value {
         .unwrap_or("");
     if !minimum.is_empty() && compare_version(&current, minimum) < 0 {
         let reason = format!("当前版本过低，最低要求 {minimum}");
-        return check_failure(app, &current, &reason);
+        return check_failure(app, &current, &reason, &manifest_url);
     }
 
     let latest = remote
@@ -506,13 +506,23 @@ pub fn check_for_updates(app: &AppHandle, runtime: &RuntimePaths) -> Value {
     Value::Object(result)
 }
 
-/// 检查失败的统一回包：状态进 `error`，形状与现役版 catch 分支一致
-fn check_failure(app: &AppHandle, current: &str, reason: &str) -> Value {
+/// 检查失败的统一回包：状态进 `error`，形状与现役版 catch 分支一致。
+///
+/// 2026-09-30 追加 `manifestUrl`：报障是「更新失败：更新服务器返回 HTTP 404」，
+/// 只看 reason 不知道它在请求哪个地址，界面上的「更新地址」一行就取这一项。
+/// 只加在 `update:check`；`update:state` 的跨实现固定向量（tests/parity/fixtures）保持原样。
+fn check_failure(app: &AppHandle, current: &str, reason: &str, manifest_url: &str) -> Value {
     patch(app, |store| {
         store.state = "error".to_string();
         store.message = Some(reason.to_string());
     });
-    json!({ "ok": false, "available": false, "currentVersion": current, "reason": reason })
+    json!({
+        "ok": false,
+        "available": false,
+        "currentVersion": current,
+        "manifestUrl": manifest_url,
+        "reason": reason,
+    })
 }
 
 /* -------------------------------- 下载更新 -------------------------------- */

@@ -37,6 +37,7 @@ import {
   hasOwnSignature,
   intervalText,
   isCredentialLive,
+  isSemverLike,
   packageFileName,
   publishBlockers,
   publishStages,
@@ -293,6 +294,11 @@ export function ModSubmitDialog({
       toast.error("请填写提交的版本号")
       return
     }
+    // 与外壳同规则的形状校验：版本号要一路写进清单、索引与 Release tag，先挡在弹窗里
+    if (!isSemverLike(version.trim())) {
+      toast.error("版本号格式必须像 1.0.0")
+      return
+    }
     setStep("form")
   }
 
@@ -304,6 +310,10 @@ export function ModSubmitDialog({
     }
     if (!version.trim()) {
       toast.error("请填写提交的版本号")
+      return
+    }
+    if (!isSemverLike(version.trim())) {
+      toast.error("版本号格式必须像 1.0.0")
       return
     }
     if (agreed.some((item) => !item)) {

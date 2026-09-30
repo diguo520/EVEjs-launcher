@@ -13,7 +13,6 @@ function item(patch: Partial<RawClaimItem>): RawClaimItem {
     declaredKeyId: "oldkey",
     declaredAuthorName: "旧名",
     repo: "",
-    claimed: false,
     ...patch,
   }
 }
@@ -27,13 +26,11 @@ describe("mod-claim", () => {
     expect(repoLooksMine(item({}), "diguo520")).toBe(false)
     expect(repoLooksMine(item({ repoOwner: "diguo520" }), "")).toBe(false)
     expect(repoLooksMine(item({ repoOwner: "diguo520" }), "   ")).toBe(false)
-    // 已认领的不再提示「像是你的」
-    expect(repoLooksMine(item({ repoOwner: "diguo520", claimed: true }), "diguo520")).toBe(false)
   })
 
-  it("排序：像自己的最前，待确认居中，已认领垫底", () => {
+  it("排序：像自己的最前，待确认居中", () => {
     const list = [
-      item({ id: "b", displayName: "B", claimed: true }),
+      item({ id: "b", displayName: "B", repoOwner: "someone-b" }),
       item({ id: "c", displayName: "C", repoOwner: "someone" }),
       item({ id: "a", displayName: "A", repoOwner: "diguo520" }),
       item({ id: "d", displayName: "D", repoOwner: "diguo520" }),
@@ -41,8 +38,8 @@ describe("mod-claim", () => {
     expect(orderClaimItems(list, "diguo520").map((entry) => entry.id)).toEqual([
       "a",
       "d",
-      "c",
       "b",
+      "c",
     ])
     // 原数组不动（纯函数）
     expect(list.map((entry) => entry.id)).toEqual(["b", "c", "a", "d"])

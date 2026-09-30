@@ -7,7 +7,9 @@ import {
   compareVersions,
   hasUpdate,
   isPublished,
+  isSemverLike,
   intervalText,
+  marketVersionDiff,
   publishBlockers,
   publishIntervalRemaining,
   reviewPrStateLabel,
@@ -166,6 +168,17 @@ describe("compareVersions", () => {
   })
 })
 
+describe("isSemverLike（与外壳 is_semver_like 同一组向量）", () => {
+  it("点分数字段 + 可选预发布/构建尾巴", () => {
+    for (const good of ["1", "1.0.0", "0.1", "10.20.30", "1.0.0-beta.1", "1.0.0+build-7"]) {
+      expect(isSemverLike(good), good).toBe(true)
+    }
+    for (const bad of ["", "v1.0.0", "1.0.0-", "1.0.0+", "1.0.0_beta", "1..0"]) {
+      expect(isSemverLike(bad), bad).toBe(false)
+    }
+  })
+})
+
 describe("hasUpdate（市场版本严格更高才算）", () => {
   const mod = (over: Partial<ModEntry>): ModEntry => ({ ...({} as ModEntry), ...over })
 
@@ -182,5 +195,37 @@ describe("hasUpdate（市场版本严格更高才算）", () => {
     expect(hasUpdate(mod({ installed: true, version: "1.0.0", latest: "1.0.0" }))).toBe(false)
     expect(hasUpdate(mod({ installed: false, version: "1.0.0", latest: "2.0.0" }))).toBe(false)
     expect(hasUpdate(mod({ installed: true, version: "1.0.0" }))).toBe(false)
+  })
+})
+
+describe("marketVersionDiff（本地与市场不一致时并列显示）", () => {
+  const mod = (over: Partial<ModEntry>): ModEntry => ({ ...({} as ModEntry), ...over })
+
+  it("本地更高：市场停在那一版照样给出来（2026-09-30 报障：作者看不出市场收没收到）", () => {
+    expect(
+      marketVersionDiff(mod({ installed: true, version: "1.0.10", marketVersion: "1.0.7" }))
+    ).toBe("1.0.7")
+  })
+
+  it("市场更高：也给出来（详情页两行并列，卡片另有「可更新」提示条）", () => {
+    expect(
+      marketVersionDiff(mod({ installed: true, version: "1.0.0", marketVersion: "1.1.0" }))
+    ).toBe("1.1.0")
+  })
+
+  it("版本写不一样但等价（1.0 vs 1.0.0）不算不一致", () => {
+    expect(
+      marketVersionDiff(mod({ installed: true, version: "1.0", marketVersion: "1.0.0" }))
+    ).toBeUndefined()
+  })
+
+  it("没装 / 市场没这条 / 本地版本空：都不给", () => {
+    expect(
+      marketVersionDiff(mod({ installed: false, version: "1.0.0", marketVersion: "1.1.0" }))
+    ).toBeUndefined()
+    expect(marketVersionDiff(mod({ installed: true, version: "1.0.0" }))).toBeUndefined()
+    expect(
+      marketVersionDiff(mod({ installed: true, version: "", marketVersion: "1.0.0" }))
+    ).toBeUndefined()
   })
 })

@@ -236,12 +236,13 @@ fn verify(repo: &str, owner: &str, login: &str, access: &Value) -> Result<&'stat
     ))
 }
 
-/// 一条候选的形状（认领列表与「已认领」回显共用）
+/// 一条候选的形状：本机 mods/ 里由**别的身份**署名、且仓库地址解析得出来的模组。
+///
+/// 已认领过的不再进候选（它已经回到「我创建的」里了），所以形状里不再带 claimed 字段。
 fn candidate_json(
     record: &scan::ModRecord,
     declared_author_id: &str,
     declared_key_id: &str,
-    claimed: bool,
 ) -> Value {
     json!({
         "id": record.id,
@@ -251,7 +252,6 @@ fn candidate_json(
         "declaredAuthorId": declared_author_id,
         "declaredKeyId": declared_key_id,
         "declaredAuthorName": record.author_name,
-        "claimed": claimed,
     })
 }
 
@@ -268,7 +268,7 @@ pub const CLAIM_PAGE_MAX: usize = 200;
 /// 候选就是上万条 —— 序列化、跨进程传输、渲染都是上万份，界面会直接卡住。
 ///
 /// `scope` 决定列表范围：候选里的绝大部分其实是「从市场装的别人的模组」（仓库在别人
-/// 名下，认领一定被拒）。`Mine` 只留仓库在本令牌账号名下（或已认领）的那些，被藏起来的
+/// 名下，认领一定被拒）。`Mine` 只留仓库在本令牌账号名下的那些，被藏起来的
 /// 条数用 `foreignCount` 如实报出来，界面据此给一个「查看全部」。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ClaimScope {
@@ -346,17 +346,11 @@ fn needs_token_payload() -> Value {
     })
 }
 
-/// 排序口径与界面 `orderClaimItems` 一致：像自己的最前，仓库归属待确认的居中，已认领垫底。
+/// 排序口径与界面 `orderClaimItems` 一致：像自己的最前，仓库归属待确认的居中。
 /// 后端必须先排好再切片，否则「加载更多」翻页会前后矛盾（同一条出现两次或漏掉）。
 fn order_candidates(items: &mut [Value], login: &str) {
     let rank = |item: &Value| -> u8 {
-        if item
-            .get("claimed")
-            .and_then(Value::as_bool)
-            .unwrap_or(false)
-        {
-            2
-        } else if is_mine_candidate(item, login) {
+        if is_mine_candidate(item, login) {
             0
         } else {
             1
@@ -378,16 +372,7 @@ fn order_candidates(items: &mut [Value], login: &str) {
 }
 
 /// 这条候选的仓库是不是在本令牌账号名下。
-///
-/// 已认领的永远算「我的」（认领记录本身就是核验过归属的结论）。
 fn is_mine_candidate(item: &Value, login: &str) -> bool {
-    if item
-        .get("claimed")
-        .and_then(Value::as_bool)
-        .unwrap_or(false)
-    {
-        return true;
-    }
     let owner = item
         .get("repoOwner")
         .and_then(Value::as_str)
@@ -478,30 +463,28 @@ fn claim_candidates_with(
     for record in &scanned {
         let declared_author_id = record.author_id.trim().to_string();
         let declared_key_id = record.author_key_id.trim().to_string();
-        let claimed = claimed_ids.contains(&record.id);
+        // 已经认领过的不再是候选：认领成功那一刻它就回到「我创建的」了，留在找回列表里
+        // 只会让人以为没认领上（2026-09-30 报障：绿标写着「已认领」，条目还赖着不走）。
+        if claimed_ids.contains(&record.id) {
+            continue;
+        }
         // 本次身份签的模组不用认领；作者块整个是空的也不用（签名时会自动补上）
         let foreign = (!declared_author_id.is_empty() && declared_author_id != identity.id)
             || (!declared_key_id.is_empty() && declared_key_id != identity.key_id);
-        if !foreign && !claimed {
+        if !foreign {
             continue;
         }
         let (repo, repo_source) = resolve_repo(record, &index_repos, &ledger_repos);
         let has_repo = !repo.trim().is_empty();
-        if !claimed && !has_repo {
+        if !has_repo {
             // 解析不出仓库 = 核验不了归属 = 放哪儿都办不了事，只计数、不回条目
             skipped_count += 1;
             continue;
         }
-        let mut item = candidate_json(record, &declared_author_id, &declared_key_id, claimed);
+        let mut item = candidate_json(record, &declared_author_id, &declared_key_id);
         item["repo"] = json!(repo);
         item["repoSource"] = json!(repo_source);
         item["repoOwner"] = json!(repo_slug(&repo).map(|(owner, _)| owner).unwrap_or_default());
-        item["canClaim"] = json!(claimed || has_repo);
-        item["reason"] = json!(if has_repo {
-            ""
-        } else {
-            "索引与本地记录里都没有这个模组的仓库地址"
-        });
         items.push(item);
     }
 
@@ -840,7 +823,8 @@ mod tests {
         // 解析不出仓库的只计数：条目本身没有可操作的信息，不必跨进程搬运
         assert_eq!(result["skippedCount"], json!(1), "{result}");
 
-        // 认领过之后即使解析不出仓库也照样回显（认领记录本身就是结论）
+        // 认领过之后就从候选里消失（它已经回到「我创建的」了）—— 2026-09-30 报障：
+        // 绿标都写着「已认领」了，条目还赖在找回列表里
         record_claim(
             &runtime,
             "foreign",
@@ -853,9 +837,7 @@ mod tests {
         .unwrap();
         let after = claim_candidates_for(&repo, &runtime, &ClaimOptions::default(), "tok");
         let items = after["items"].as_array().unwrap();
-        assert_eq!(items.len(), 1);
-        assert_eq!(items[0]["id"], json!("foreign"));
-        assert_eq!(items[0]["claimed"], json!(true));
+        assert_eq!(items.len(), 0, "{after}");
     }
 
     #[test]
