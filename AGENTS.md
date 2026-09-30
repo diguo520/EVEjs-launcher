@@ -58,25 +58,31 @@ release-notes/vX.Y.Z.json
 并且**只校验 sha256、不认 zip**：`releases/latest` 一旦指向 Tauri 的 zip 清单，
 老用户的主程序就会被 zip 字节替换而报废（`docs/S7-发布与回滚-实施记录.md` §2 有实测表）。
 
-双轨现在是（采用 §2.2 方案 #2「固定 tag」）：
+双轨现在是（§2.2 方案 #2「固定 tag」+ 2026-10-01 调整）：
 
 | 通道 | 地址 | 谁在读 |
 | --- | --- | --- |
 | Tauri（本外壳） | `releases/download/stable/update-manifest.json` | 编译进 `updater.rs` 的 `DEFAULT_MANIFEST_URL` |
-| 旧 Electron | `releases/latest/download/update-manifest.json` | 仅 Electron 0.1.x；由 `make_latest` 钉在 `v0.1.28` |
+| 旧 Electron | `releases/latest/download/update-manifest.json` | 仅 Electron 0.1.x；内容是**旧通道那份未签名清单**（从 `v0.1.28` 原样搬来） |
+
+`releases/latest` 的 **tag 跟着最新版本走**（Release 列表显示新版本号，别再把 Latest 钉回 v0.1.28），
+但 `publish` 会把最新版 release 上的 `update-manifest.json` 换成旧通道那份字节 —— 旧 Electron 读到自家
+清单照旧「已是最新」，永远不会被塞进一个跑不起来的包。**不能**把最新版自己的清单放到这个地址。
 
 发完版本后（`scripts/package.ps1` 打完包）：
 
 ```bash
-node scripts/release-channel.mjs publish --version X.Y.Z   # 把新清单推到滚动 `stable` release（自动 make_latest=false）
+node scripts/release-channel.mjs publish --version X.Y.Z   # 推 stable 清单 + 把 Latest 挪到 vX.Y.Z
 node scripts/release-channel.mjs verify  --version X.Y.Z   # 核对 stable 清单与 latest 隔离
-node scripts/release-channel.mjs pin-legacy --tag v0.1.28  # 只在 latest 被别的东西抢走时才需要
+node scripts/release-channel.mjs pin-legacy --tag v0.1.28  # 回滚：把 Latest 标签还给旧通道
 ```
 
-两条硬护栏，改坏了 CI 直接红：
+硬护栏，改坏了 CI 直接红：
 
 - `scripts/audit-security.mjs`：内置清单地址必须是 `/releases/download/stable/`，出现 `/releases/latest/` 即失败。
 - `src-tauri/src/updater.rs` 的 `manifest_url_points_at_the_stable_channel_not_latest` 单测。
+- `release-channel.mjs` 的 `assertLatestIsNotOurs`：`releases/latest/download/update-manifest.json`
+  下发的那份清单**不能**是我们签的（`publish` / `verify` / `status` 都会当场核）。
 - 打包脚本尾部还会打印一次人工提醒。
 
 其余发布检查单、灰度与回滚演练同样在该文档 §5 / §4。
