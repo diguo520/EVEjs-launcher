@@ -842,7 +842,7 @@ fn ledger_match_for<'a>(
         if record_source.is_empty() || entry_source.is_empty() {
             return false;
         }
-        entry_source == record_source || fork_name(&entry_source) == fork_name(&record_source)
+        entry_source == record_source || fork_name(&entry_source) == fork_name(record_source)
     })
 }
 
