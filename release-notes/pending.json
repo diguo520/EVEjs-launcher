@@ -1,27 +1,6 @@
 {
   "target": 8,
-  "completed": 5,
-  "nextVersion": "0.2.8",
-  "changes": [
-    {
-      "type": "new",
-      "text": "模组不再互相顶掉：以前每个模组各自 hook Module.prototype._compile 去改服务端源码，多个模组改同一个文件就只剩一个能生效 —— 先注入的改完内容，后注入的按「整份文件 sha256」校验发现对不上，就安静地放弃注入（不报错也没效果），实测过的那一对是自动挖矿与自动锁定自动集火抢 server/src/network/tcp/handshake.js。现在启动器自带一条注入总线，只注入一条 --require，模组改成向 globalThis.__evejsMods 声明「改哪个文件、加什么、用什么标记」，由总线按 (slot, 注册先后) 串成一条链，每一层看到的是前一层改过之后的内容，带 marker 自动幂等；某一层抛错只跳过它自己，保留上一层结果。顺带解决两件旧毛病：模组清单改走 JSON 文件，模组目录带中文或空格不再让 --require 失效；NODE_OPTIONS 从 N 条缩成 1 条，装再多模组也不会把它撑爆。老式模组（自己挂钩子）照旧能跑，但只有改成用总线的模组才真正彼此共存。"
-    },
-    {
-      "type": "new",
-      "text": "能看见模组到底加载了没有、花了多久：启动主服务器时，服务端输出里会给出每个 loader 的就绪/失败与毫秒数（[EveJS-MOD] loader 就绪 <模组> 3ms）、全部模组加载完的总耗时（loaders-done total=14 failed=0 ms=1086）、总线补丁的应用情况（<文件> 注入 N 层（A -> B 字节）、<id> 补丁失败，保留上一层结果：<原因>）；每个进程的明细与每一层的成功/失败还会写成 _launcher/logs/mod-load-report.json（真服务端进程写总报告，worker / fork 出来的进程各写一份带 pid 的），排查「谁把那个文件改了」时直接看它。另外修掉一个会让报告根本没人写的缺陷：--require 预加载进来的模块里 require.main 永远是空的（Node 在预加载阶段就快照了主模块，那时还没加载），入口判定改成回退 process.argv[1]，node . 这种写法会按 package.json 的 main 补成 server/index.js。"
-    },
-    {
-      "type": "fix",
-      "text": "模组制作规范（中英双份）里有两处会让人直接踩坑的错：一是写着 require(\"./src/...\") 相对服务端根目录解析，实际相对的是 loader.js 自己的目录，照抄必然 MODULE_NOT_FOUND，现在改成先算 serverRoot = path.resolve(__dirname, \"..\", \"..\", \"server\")；二是附录的骨架用了根本不存在的接口（sessionRegistry.list()、s.characterId），已换成实测可用的 getSessions() / resolveSessionCharacterID() / chatHub.sendSystemMessage()。另外把「三个必踩的坑」补成四条硬约定（补上 setImmediate + 入口校验、timer.unref()，并去掉「教你 require 大模块」与「别 require 大模块」的自相矛盾）、步骤 4 的「构建选项」默认值改正（三项默认都是勾上的，不勾「立即启用」才生成 loader.js.disabled）、生成文件树与界面预览对齐、排错速查补上 MODULE_NOT_FOUND、维护者审核表补上「改服务端源码的模组要用总线」；新增附录 G 讲 __evejsMods.register 的四条约定（只用 register、只 apply 追加、marker 唯一、校验用改动前的前缀哈希）。"
-    },
-    {
-      "type": "fix",
-      "text": "模组审核的状态说明不再给固定时长：原先写「人工审核通常需要 30 分钟，通过后自动上架到模组市场」，改口径又改成「模组代码查询 30 分钟，查询后自动上架到模组市场」，最后按实际流程定稿为「模组代码审查中，审查时间与模组大小有关，通过后自动上架到模组市场」—— 审查时间本来就随模组体积变化，写死一个 30 分钟只会让人以为超时了。模组审核条与上架审核横幅两处都换，含 7 种语言；界面里那个「官方 30 分钟」的常量也一并删掉。"
-    },
-    {
-      "type": "fix",
-      "text": "「我创建的」页签里那批上架审核中的模组，每行右侧的「查看版本审核 PR」按钮去掉：那条 PR 由索引仓库托管，审核结论由维护者合并决定，作者盯着 PR 状态没有意义（要查仓库可以直接去 GitHub）。去掉按钮后不再需要回传 PR 状态的入口，连带把只服务于它的 openReview 与 onOpenReview 一并清掉。"
-    }
-  ]
+  "completed": 0,
+  "nextVersion": "0.2.9",
+  "changes": []
 }
