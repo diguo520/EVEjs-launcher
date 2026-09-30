@@ -1,0 +1,41 @@
+{
+  "version": "0.2.7",
+  "changelog": {
+    "zh": [
+      {
+        "type": "fix",
+        "text": "修掉「关于面板的 GitHub 图标点了打不开仓库」：渲染层把 IPC 的入口名写成了通道名（shellOpenExternal），桥上根本没有这个键，点下去只会弹一句「没能打开仓库地址」。现在改用契约里的入口名 openExternal —— 关于面板的仓库图标、服务端根目录的「打开」，以及模组详情里的仓库 / 审核链接都能正常调起系统浏览器（地址照旧先过外壳的 http/https 白名单）。"
+      },
+      {
+        "type": "fix",
+        "text": "数据库页的「新增行 / 删除行」是同一个毛病：入口名写成了 databaseInsert / databaseDelete，而契约里叫 databaseInsertRow / databaseDeleteRow，两个按钮点了永远失败。现在改对；顺带把删除成功时弹的红色「已删除 1 行」换成绿色成功提示。"
+      },
+      {
+        "type": "fix",
+        "text": "去掉更新弹窗里多出来的「更新地址」一行 —— 那一行不是需求，更新失败时的报错文案本身已经够定位问题，不必常驻在弹窗里。"
+      },
+      {
+        "type": "opt",
+        "text": "加一道静态门禁（scripts/check-bridge-calls.mjs，已并入 npm run check 与 CI）：渲染层里所有 call / callOr / subscribe / act 的入口名都会拿去和 ui/src/api-shim.js 对一遍，对不上直接红。像「点了没反应」这种只有用户点下去才会暴露的毛病，就不会再进到版本里了。"
+      }
+    ],
+    "en": [
+      {
+        "type": "fix",
+        "text": "Fixed the About panel GitHub icon not opening the repository: the renderer passed the IPC channel name (shellOpenExternal) where the bridge expects the contract api name, so the key did not exist and a click only raised a toast. All three call sites now use openExternal, so the repository icon in About, the Open button for the server root, and the repository / review links in mod details all reach the system browser again (addresses still go through the shell http/https allow-list)."
+      },
+      {
+        "type": "fix",
+        "text": "The database page had the same defect: Insert row / Delete row were calling databaseInsert and databaseDelete, while the contract exposes databaseInsertRow and databaseDeleteRow, so both buttons always failed. They are fixed, and a successful deletion now shows a green confirmation instead of a red \"deleted 1 row\" toast."
+      },
+      {
+        "type": "fix",
+        "text": "Removed the extra update-URL line from the update dialog. It was never requested, and the failure message already tells you enough to locate the problem, so it does not need to sit in the dialog."
+      },
+      {
+        "type": "opt",
+        "text": "Added a static gate (scripts/check-bridge-calls.mjs, wired into npm run check and CI): every call / callOr / subscribe / act name in the renderer is checked against ui/src/api-shim.js and fails the build on a mismatch. Silent dead buttons should no longer be able to ship."
+      }
+    ]
+  }
+}

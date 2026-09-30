@@ -136,13 +136,14 @@ export function DatabasePage() {
       toast.error("没有连接后端，无法删除行")
       return
     }
-    const reply = await callOr<RawAck>("databaseDelete", null, activeTable.name, row.values)
+    // 入口名是契约里的 api 名：通道 database:delete → databaseDeleteRow（写成通道名时 api[name] 是 undefined，这一行永远失败）
+    const reply = await callOr<RawAck>("databaseDeleteRow", null, activeTable.name, row.values)
     if (!reply?.ok) {
       toast.error("删除失败", { description: reply?.reason ?? "后端没说明原因" })
       return
     }
     setSelectedKey(null)
-    toast.error("已删除 1 行")
+    toast.success("已删除 1 行")
     await loadTable(activeTable.name)
     await loadOverview()
   }
@@ -199,7 +200,7 @@ export function DatabasePage() {
     }
     const skeleton: Record<string, DbValue> = {}
     for (const column of activeTable.columns) skeleton[column.name] = null
-    const reply = await callOr<RawAck>("databaseInsert", null, activeTable.name, skeleton)
+    const reply = await callOr<RawAck>("databaseInsertRow", null, activeTable.name, skeleton)
     if (!reply?.ok) {
       toast.error("新增行失败", { description: reply?.reason ?? "后端会拒绝空行或必填列" })
       return
