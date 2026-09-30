@@ -306,9 +306,6 @@ export const MOD_REVIEW_LABEL: Record<ModReviewState, string> = {
   delisted: "已下架",
 }
 
-/** 人工审核的官方时长口径（分钟） */
-export const REVIEW_WINDOW_MINUTES = 30
-
 /** 模组可申请的权限：id 与平台清单一致，label 给不熟清单的人看 */
 export interface ModPermSpec {
   id: string

@@ -528,6 +528,27 @@ async fn start_main_server(app: &AppHandle) -> Result<Value, String> {
     if let Some(options) = &loader.node_options {
         env_vars.push(("NODE_OPTIONS".to_string(), options.clone()));
     }
+    // 方案 D：清单与报告都走文件；`EVEJS_MODS_ROOT` 让总线把相对 target 解析到仓库根
+    if let Some(plan_file) = &loader.plan_file {
+        let _ = std::fs::create_dir_all(&state.runtime.logs);
+        env_vars.push((
+            "EVEJS_MODS_PLAN".to_string(),
+            plan_file.to_string_lossy().to_string(),
+        ));
+        env_vars.push((
+            "EVEJS_MODS_ROOT".to_string(),
+            root.to_string_lossy().to_string(),
+        ));
+        env_vars.push((
+            "EVEJS_MODS_REPORT".to_string(),
+            state
+                .runtime
+                .logs
+                .join(MOD_REPORT_FILE)
+                .to_string_lossy()
+                .to_string(),
+        ));
+    }
 
     set_state(
         app,
@@ -613,9 +634,52 @@ struct LoaderInjection {
     node_options: Option<String>,
     /// 实际注入的 loader 个数
     count: usize,
+    /// 模组清单文件（`EVEJS_MODS_PLAN`）。
+    /// 只有走方案 D 的总线注入时才有；退回「每个 loader 一条 --require」时是 None。
+    plan_file: Option<PathBuf>,
 }
 
-/// 计算要注入主服务器的 `NODE_OPTIONS`：`--require "<正斜杠路径>"` 逐个拼接。
+/// 启动器自带的注入总线（方案 D）：独占唯一的 `Module.prototype._compile` 钩子，
+/// 模组改成向 `globalThis.__evejsMods` 声明「改哪个文件、加什么」，不再各自挂钩子。
+/// 源文件在编译期嵌进二进制，随包分发，不落在模组目录里。
+const MOD_HOST_JS: &str = include_str!("mods/mod_host.js");
+/// 总线与清单落在 `_launcher/mods/` 下的文件名
+const MOD_HOST_FILE: &str = "mod-host.js";
+const MOD_PLAN_FILE: &str = "mod-plan.json";
+/// 总线写出的加载报告（落在 `_launcher/logs/`）
+pub const MOD_REPORT_FILE: &str = "mod-load-report.json";
+
+/// 把「注入总线」与「模组清单」写进 `_launcher/mods/`，返回 `(host, 清单)`。
+///
+/// 清单走文件而不是 `NODE_OPTIONS`：那边的分词/转义规则连中文目录名都过不去
+/// （模组目录叫「自动挖矿」时 `--require` 直接失效），70 个模组还会变成 70 条 `--require`。
+fn write_mod_bus(
+    root: &Path,
+    runtime: &crate::runtime::RuntimePaths,
+    paths: &[String],
+) -> std::io::Result<(PathBuf, PathBuf)> {
+    let dir = runtime.root.join("mods");
+    std::fs::create_dir_all(&dir)?;
+    let host = dir.join(MOD_HOST_FILE);
+    std::fs::write(&host, MOD_HOST_JS)?;
+    let plan = dir.join(MOD_PLAN_FILE);
+    let payload = json!({
+        "schemaVersion": 1,
+        "api": 1,
+        "root": root.to_string_lossy().replace('\\', "/"),
+        "loaders": paths,
+        "generatedAt": crate::mods::pkg::epoch_ms() as u64,
+    });
+    let text = serde_json::to_string_pretty(&payload).unwrap_or_default();
+    std::fs::write(&plan, format!("{text}\n"))?;
+    Ok((host, plan))
+}
+
+/// 计算要注入主服务器的 `NODE_OPTIONS`。
+///
+/// 现在只注入一条 `--require "<host.js>"`（方案 D），模组清单交给 `EVEJS_MODS_PLAN`；
+/// 写盘失败就退回「每个 loader 一条 `--require`」的老写法 —— 注入不能因为临时目录
+/// 写不进去就整个失效。
 ///
 /// 现役版还会把「注入了几个 loader / 跳过了哪个模组」写进启动器日志，
 /// Rust 侧暂时只做注入（没有启动器日志写入通道），跳过理由仍可从 `mods:plan` 读到。
@@ -636,6 +700,26 @@ fn mods_loader_injection(root: &Path, runtime: &crate::runtime::RuntimePaths) ->
         return LoaderInjection {
             node_options: None,
             count: 0,
+            plan_file: None,
+        };
+    }
+    let inherited = std::env::var("NODE_OPTIONS").unwrap_or_default();
+    let join = |args: &str| {
+        [inherited.as_str(), args]
+            .into_iter()
+            .filter(|part| !part.trim().is_empty())
+            .collect::<Vec<_>>()
+            .join(" ")
+    };
+    if let Ok((host, plan_file)) = write_mod_bus(root, runtime, &paths) {
+        let host_arg = format!(
+            "--require \"{}\"",
+            host.to_string_lossy().replace('\\', "/")
+        );
+        return LoaderInjection {
+            node_options: Some(join(&host_arg)),
+            count: paths.len(),
+            plan_file: Some(plan_file),
         };
     }
     let require_args = paths
@@ -643,15 +727,10 @@ fn mods_loader_injection(root: &Path, runtime: &crate::runtime::RuntimePaths) ->
         .map(|path| format!("--require \"{path}\""))
         .collect::<Vec<_>>()
         .join(" ");
-    let inherited = std::env::var("NODE_OPTIONS").unwrap_or_default();
-    let combined = [inherited, require_args]
-        .into_iter()
-        .filter(|part| !part.trim().is_empty())
-        .collect::<Vec<_>>()
-        .join(" ");
     LoaderInjection {
-        node_options: Some(combined),
+        node_options: Some(join(&require_args)),
         count: paths.len(),
+        plan_file: None,
     }
 }
 async fn start_market_server(app: &AppHandle) -> Result<Value, String> {
@@ -1499,12 +1578,25 @@ mod tests {
         let single = mods_loader_injection(&repo, &runtime);
         assert_eq!(single.count, 1, "注入个数要跟着 paths 走：预算靠它放大");
         let options = single.node_options.expect("应注入一个 loader");
+        // 方案 D：NODE_OPTIONS 里只有启动器自带的总线一条，模组清单走文件
         assert!(options.contains("--require \""), "{options}");
-        assert!(options.contains("/mods/demo/loader.js\""), "{options}");
+        assert!(options.contains("/mods/mod-host.js\""), "{options}");
         assert!(
             !options.contains('\\'),
             "NODE_OPTIONS 里不能出现反斜杠：{options}"
         );
+        assert!(
+            !options.contains("loader.js\""),
+            "loader 不该再进 NODE_OPTIONS：{options}"
+        );
+
+        let plan_file = single.plan_file.expect("应写出模组清单");
+        let plan: Value =
+            serde_json::from_str(&std::fs::read_to_string(&plan_file).unwrap()).unwrap();
+        assert_eq!(plan["api"], 1);
+        let listed = plan["loaders"][0].as_str().unwrap();
+        assert!(listed.ends_with("/mods/demo/loader.js"), "{listed}");
+        assert!(!listed.contains('\\'), "清单里的路径也要是正斜杠：{listed}");
 
         let _ = std::fs::remove_dir_all(&root);
     }

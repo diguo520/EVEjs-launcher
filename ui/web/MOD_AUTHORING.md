@@ -149,7 +149,7 @@ GitHub 右上角头像 → Settings → 左栏最底部 Developer settings
 | 简介 | 🟩 | 一句话，会显示在市场上的卡片里 |
 | 详细介绍 / 功能要点 | ⭕ | 会写进你模组的 README |
 | 冲突模组 id | ⭕ | 与哪些模组互斥，逗号分隔 |
-| 构建选项 | — | ☑ 需要重启服务端（默认开）、☐ 建好后立即启用、☑ 建好后立即签名 |
+| 构建选项 | — | ☑ 需要重启服务端（默认开）、☑ 建好后立即启用（默认开）、☑ 建好后立即签名（默认开） |
 
 点 **创建** 后，你的 `mods/` 目录里会多出：
 
@@ -157,10 +157,11 @@ GitHub 右上角头像 → Settings → 左栏最底部 Developer settings
 mods/<你的模组 id>/
 ├─ evejs-launcher.mod.json    ← 清单（身份、版本、分类、依赖都在这）
 ├─ loader.js                  ← 你要写的逻辑
-├─ loader.js.disabled         ← 未启用时的名字（启用后变成 loader.js）
 ├─ README.md                  ← 从「详细介绍」生成
 └─ CHANGELOG.md               ← 版本变更记录
 ```
+
+🟨 只有把「建好后立即启用」**取消勾选**，`loader.js` 才会落成 `loader.js.disabled`（默认勾着，所以默认就是能加载的 `loader.js`）。之后想切换，在**已安装**页开关一下就行 —— 开关做的就是改名。
 
 🟨 **清单里的必填字段**（启动器会校验，缺了会报"清单校验失败"）：
 
@@ -177,27 +178,29 @@ activation.strategy: "loader_rename"   ← 必须是这个
 
 ## 步骤 5 ✅ 写你的逻辑（`loader.js`）
 
-打开 `mods/<你的模组 id>/loader.js`，里面已经有骨架。核心就一件事：**往服务端已有的模块上挂东西**。
+打开 `mods/<你的模组 id>/loader.js`，里面已经有骨架 —— 🟩 **骨架本身就是能跑的最小示例**（玩家上线 10 秒后在本地聊天框收到一条消息），照着改就行。
+
+🟥 **四条硬约定**（骨架里都写好了，删掉任何一条都会出问题）：
+
+| 约定 | 为什么 |
+| --- | --- |
+| `setImmediate` + 入口校验（`process.env.EVEJS_GAMESTORE_OWNER_ROLE === "world"`，或入口是 `index.js`） | `NODE_OPTIONS` 会被 npm → 服务端逐层继承，每个包装进程都会加载你的文件；不校验就会在错的进程里干活 |
+| **不要直接 `require` 服务端大模块**（`chatHub` 会拉起约 456MB / 645 个模块） | 等 `require.cache` 里出现它之后再取引用：缓存命中、零额外内存 |
+| `timer.unref()` | 不让定时器拖住进程退出 |
+| 用 `globalThis.__xxx` 做「只装一次」判断 | loader 会被加载多次，否则消息重复发送、监听器越堆越多 |
+
+🟨 **路径规则（最容易踩的一个）**：loader 里 `require("./src/...")` 是相对**你自己的模组目录**解析的，**不是**服务端根目录 —— 直接这么写会 `MODULE_NOT_FOUND`。正确写法是先算出服务端根目录：
 
 ```js
-// 🧩 最小示例：玩家上线后发一条本地聊天消息
-const chatHub = require('./src/services/chat/chatHub');        // 路径从服务端根目录算
-const sessionRegistry = require('./src/services/chat/sessionRegistry');
-
-// 🟨 必须做身份校验：loader 会被加载多次，不做校验会重复注册
-if (!globalThis.__myModInstalled) {
-  globalThis.__myModInstalled = true;
-  // 在这里挂你的逻辑
-}
+const path = require("path");
+const serverRoot = path.resolve(__dirname, "..", "..", "server");
+const hubPath = path.join(serverRoot, "src", "services", "chat", "chatHub.js");
+// 🟨 不要在这里直接 require —— 等服务端自己加载过它再取引用，完整写法见附录 B
 ```
 
-🟥 **三个必踩的坑**：
+🟨 **会话属性**：聊天会话上的自定义属性**不会自动同步**，直接读写可能"静默失败"，要走 `chatHub` / `sessionRegistry` 提供的接口。
 
-1. **会被加载多次** → 一定要用 `globalThis.__xxx` 之类做**只装一次**的判断，否则消息会重复发送、监听器越堆越多。
-2. **不要 `require` 服务端大模块**（比如整个 `server` / 庞大的世界模型）→ 会把 Node 内存吃满（实测过内存暴涨）。
-3. **会话属性**：聊天会话上的自定义属性**不会自动同步**，直接读写可能"静默失败"，要走 `chatHub` 提供的接口。
-
-🟨 **路径规则**：loader 里 `require('./src/...')` 是相对**服务端根目录**解析的，不是相对你的模组目录。
+🟩 需要**改服务端源码**（而不只是调接口）的模组看**附录 G** —— 不要自己 hook `Module.prototype._compile`。
 
 ---
 
@@ -209,6 +212,13 @@ if (!globalThis.__myModInstalled) {
 4. 出问题看两处日志：
    - 启动器 → **服务器日志**（可以按 系统 / 主服务器 / 市场服务 / 客户端 和 INFO/WARN/ERROR 筛选）
    - 服务端控制台输出（启动器里能看到）
+5. 🟩 **确认「到底加载了没、花了多久」**：在服务端输出里搜 `[EveJS-MOD]`：
+   - `loader 就绪 <你的模组> 3ms` —— 你的 loader 被加载了；`loader 失败 ... :: <原因>` 则是没加载成功
+   - `loaders-done total=14 failed=0 ms=1086` —— 全部模组加载完的总耗时
+   - `<文件> 注入 N 层（A -> B 字节）` —— 总线补丁生效了
+   - `<id> 补丁失败，保留上一层结果：<原因>` —— 这一层被跳过（**不影响**其它模组）
+
+   🟨 每个进程的明细与每一层的结果还会写成 `_launcher/logs/mod-load-report.json`，排查「谁把文件改了」时直接看它。
 
 ### 🔧 排错速查
 
@@ -217,6 +227,7 @@ if (!globalThis.__myModInstalled) {
 | 模组列表里显示"缺少 loader.js" | 文件被删了，或改成了别的名字 |
 | 打开开关后又自己关掉 | 清单校验失败 / 签名被改过 → 看卡片上的红色提示 |
 | 日志里看不到"加载模组" | 模组在**已停用**状态，或与别的模组冲突被跳过 |
+| 日志里报 `MODULE_NOT_FOUND` | `require("./src/...")` 被当成相对服务端根目录了 —— 实际相对你的模组目录（见步骤 5） |
 | 游戏里没效果、日志也没报错 | 逻辑里没做"只装一次"判断前就 return 了；或路径 `require` 写错 |
 | Node 内存暴涨 | `require` 了服务端大模块（见步骤 5 的坑 2） |
 
@@ -336,6 +347,7 @@ if (!globalThis.__myModInstalled) {
 | ZIP 位置 | 放在**你自己的 Release**（索引仓库不存二进制） |
 | 分类 | 玩法 / 经济 / AI / 画面 / 工具 五选一 |
 | 归属硬规则 | `id` 先到先得；`author.id` 与密钥绑定（换钥匙会被拒） |
+| 服务端源码补丁 | 改了服务端文件的模组要用 `__evejsMods.register`（附录 G）；自己 hook `Module.prototype._compile` 的会被要求改 —— 多个模组各自挂钩子会互相顶掉 |
 
 ## 你会在哪里看到审核结果
 
@@ -391,37 +403,101 @@ if (!globalThis.__myModInstalled) {
 
 # 附录 B：一个能跑的 loader 骨架
 
+这是启动器「创建模组」生成的骨架的**精简版** —— 四条硬约定一条不少，改吧改吧就能用（完整的注释版直接看 `mods/<你的模组 id>/loader.js`）：
+
 ```js
-/**
- * 载入时会执行多次：务必只装一次。
- * require 路径相对【服务端根目录】，不要 require 服务端大模块。
- */
-if (!globalThis.__myFirstMod) {
-  globalThis.__myFirstMod = true;
+"use strict";
+const path = require("path");
 
-  const sessionRegistry = require('./src/services/chat/sessionRegistry');
-  const chatHub = require('./src/services/chat/chatHub');
+const TAG = "[我的模组]";
+const POLL_MS = 3000;
+const GRACE_MS = 10000;                      // 上线后等这么久再发：会话要先就绪
+const MESSAGE = "欢迎回来，飞行员！";
 
-  // 🟨 上线有宽限期：玩家登录后不一定会话立刻可用，稍等一下再发
+console.log(TAG + " preload 已执行 · pid=" + process.pid);
+
+/** 只在真正的服务端进程里继续（排除 npm / 包装进程） */
+function isRealServerProcess() {
+  if (process.env.EVEJS_GAMESTORE_OWNER_ROLE === "world") return true;
+  const entry = (require.main && require.main.filename) || process.argv[1] || "";
+  return /(^|[\\/])index\.js$/i.test(entry);
+}
+
+setImmediate(() => {
+  if (!isRealServerProcess()) return;
+  if (globalThis.__myModStarted) return;      // 🟨 会被加载多次：只装一次
+  globalThis.__myModStarted = true;
+  start();
+});
+
+function start() {
+  // 🟥 require("./src/...") 是相对**你的模组目录**，不是服务端根目录 —— 必须先算出根目录
+  const serverRoot = path.resolve(__dirname, "..", "..", "server");
+  const hubPath = path.join(serverRoot, "src", "services", "chat", "chatHub.js");
+  const registryPath = path.join(serverRoot, "src", "services", "chat", "sessionRegistry.js");
+
+  // 🟨 等服务端自己把这两个模块加载进 require.cache 再取引用：
+  //    缓存命中、零额外内存，也不会把 456MB 的模块图提前拉起来
   const timer = setInterval(() => {
+    if (!require.cache[require.resolve(hubPath)]) return;
+    if (!require.cache[require.resolve(registryPath)]) return;
+    clearInterval(timer);
+    run(require(require.resolve(hubPath)), require(require.resolve(registryPath)));
+  }, 500);
+  timer.unref();
+}
+
+function run(chatHub, sessionRegistry) {
+  const seen = new Set();
+  const firstSeenAt = new Map();
+
+  const timer = setInterval(() => {
+    let sessions;
     try {
-      const online = sessionRegistry.list ? sessionRegistry.list() : [];
-      for (const s of online) {
-        if (s && s.characterId && !globalThis.__greeted?.[s.characterId]) {
-          globalThis.__greeted = globalThis.__greeted || {};
-          globalThis.__greeted[s.characterId] = true;
-          chatHub.sendSystemMessage(s, '欢迎回来，飞行员');
-        }
-      }
-    } catch (e) {
-      // 静默失败比抛错好：不要把整个服务端带崩
+      sessions = sessionRegistry.getSessions() || [];
+    } catch {
+      return;
     }
-  }, 5000);
-  timer.unref?.();
+
+    const now = Date.now();
+    const online = new Set();
+
+    for (const session of sessions) {
+      const characterID = sessionRegistry.resolveSessionCharacterID(session);
+      if (!characterID) continue;              // 还没真正进游戏，等下一轮
+      online.add(characterID);
+      if (!firstSeenAt.has(characterID)) firstSeenAt.set(characterID, now);
+      if (seen.has(characterID)) continue;
+      if (now - firstSeenAt.get(characterID) < GRACE_MS) continue;
+
+      try {
+        // 有的会话对象只带小写 charid，补一次，避免"静默不发送"
+        if (!Number(session.characterID || 0)) session.characterID = characterID;
+        chatHub.sendSystemMessage(session, MESSAGE);
+        seen.add(characterID);
+        console.log(TAG + " 已向角色 " + characterID + " 发送消息");
+      } catch (error) {
+        console.log(TAG + " 角色 " + characterID + " 尚未就绪，稍后重试：" + error.message);
+      }
+    }
+
+    // 下线的角色清掉，下次登录会重新触发
+    for (const id of Array.from(seen)) if (!online.has(id)) seen.delete(id);
+    for (const id of Array.from(firstSeenAt.keys())) if (!online.has(id)) firstSeenAt.delete(id);
+  }, POLL_MS);
+  timer.unref();
 }
 ```
 
-🟨 上面用到的是**实测可用**的服务端接口：`src/services/chat/sessionRegistry`（在线会话）、`src/services/chat/chatHub`（发系统消息）。不同 EveJS 版本接口可能变化，以你版本里的实际导出为准。
+🟨 上面用到的是**实测可用**的服务端接口：
+
+| 接口 | 用途 |
+| --- | --- |
+| `sessionRegistry.getSessions()` | 在线会话数组（🟥 **不是** `list()`，那个方法不存在） |
+| `sessionRegistry.resolveSessionCharacterID(session)` | 取角色 ID（未进入游戏时为 0） |
+| `chatHub.sendSystemMessage(session, "消息")` | 在该角色本地频道发系统消息 |
+
+不同 EveJS 版本接口可能变化，以你版本里的实际导出为准。
 
 # 附录 C：冲突与加载顺序
 
@@ -433,6 +509,16 @@ if (!globalThis.__myFirstMod) {
 | 依赖缺失 | `requires` 里的模组没装 | 该模组不会加载 |
 
 🟦 加载顺序：在**已安装**页可以**拖拽**卡片排序，顺序保存在 `_launcher/mods/mod-order.json`；清单里的 `loadAfter` / `loadBefore` 优先级更高。
+
+## 🟥 多个模组改同一个服务端文件（新启动器有解）
+
+如果模组是**自己 hook `Module.prototype._compile`** 去改服务端源码，两个模组改同一个文件就会出事：
+
+- 谁先看到原始文件完全取决于加载顺序；
+- 其中一个模组按「整份文件的 sha256」校验时，会因为另一个模组已经追加过内容而**校验失败**；
+- 实测过的那一幕：`自动挖矿` 与 `自动锁定自动集火` 都往 `server/src/network/tcp/handshake.js` 末尾追加代码，先注入的把内容写进去之后，后注入的看到哈希对不上就**安静地放弃**（不报错，也不生效）。
+
+🟩 新启动器为此提供了**注入总线**：模组不再各自挂钩子，而是用 `__evejsMods.register` 声明「改哪个文件、加什么」，由总线按 `(slot, 注册先后)` 串成一条链 —— 每一层看到的是**前一层改过之后**的内容。用法见**附录 G**。
 
 # 附录 D：ZIP 结构与被导入的规则
 
@@ -462,9 +548,11 @@ my-mod.zip                          my-mod.zip
 
 模组页会**递归统计每个模组的占用空间**。只打包运行必需的文件 —— 🟥 不要把源码仓库、`node_modules`、截图、`.git` 塞进 ZIP。
 
-# 附录 E：loader 是怎么被注入的（NODE_OPTIONS 的坑）
+# 附录 E：loader 是怎么被注入的
 
-启动器是通过 Node 的 `NODE_OPTIONS=--require ...` 把你的 `loader.js` 注入服务端进程的。因此：
+🟩 **现在（走注入总线时）**：启动器只往 `NODE_OPTIONS` 里放**一条** `--require "<启动器自带的 mod-host.js>"`，你的 `loader.js` 由总线按 `_launcher/mods/mod-plan.json` 的顺序 `require` 进来。所以模组目录名带中文或空格都没问题；启动器日志里 `[EveJS-MOD] loaders-done total=N failed=0 ms=X` 就是「全部模组加载完花了多少毫秒」。
+
+🟨 **下面这段是「每个 loader 一条 `--require`」的旧写法**（现在只在总线写盘失败时当保底用）：启动器是通过 Node 的 `NODE_OPTIONS=--require ...` 把你的 `loader.js` 注入服务端进程的。因此：
 
 - 🟥 **反斜杠会被当作转义符吞掉** → `C:\mods\x\loader.js` 会变成 `C:modsxloader.js`
 - 🟨 `NODE_OPTIONS` 按空格分词，**含空格的路径必须加引号**
@@ -480,12 +568,46 @@ const requireArgs = paths.map((p) => '--require "' + p.replace(/\\/g, "/") + '"'
 # 附录 F：发布前检查表
 
 - [ ] 模组在本地能启用、能生效（步骤 6 测过）
+- [ ] 需要改服务端源码的模组走了 `__evejsMods.register`（附录 G），没有自己 hook `_compile`
 - [ ] `evejs-launcher.mod.json` 里 `id` / `version` / `category` 都对
 - [ ] 版本号**比上一版大**
 - [ ] `.eve-key` 已备份（换电脑要用）
 - [ ] `mods/<id>/` 里没有私钥、没有你的本机路径等隐私内容
 - [ ] 走了 `1) 生成并打包` → `2) 发布到我的仓库`（ZIP 能在 Release 页面点到）
 - [ ] 走过 `3) 提交审核`，并且这条 PR 已经被合并（没合并＝市场还停在上一版）
+
+
+# 附录 G：改服务端源码 —— 注入总线 `__evejsMods.register`
+
+🟨 只有**必须改服务端源码**的模组才需要这段。像「登录问候」那样只调用服务端 API 的模组，用附录 B 的写法就够了。
+
+总线由启动器注入，模组侧在文件末尾声明就行：
+
+```js
+const bus = globalThis.__evejsMods;
+if (bus && bus.api >= 1) {
+  bus.register({
+    id: "你的模组 id",                              // 与清单里的 id 一致，报告里用它标记
+    target: "server/src/network/tcp/handshake.js",  // 相对 EveJS 根目录，正斜杠
+    marker: "MY_MOD_MARK",                         // 唯一标记：已经注入过就自动跳过（幂等）
+    slot: 10,                                      // 同一个文件有多层时的先后，越小越前
+    apply: (source) => source + "\n// MY_MOD_MARK\n// 这里写你要追加的代码\n",
+  });
+} else {
+  // 老启动器没有总线：可以回退成自己 hook，或者干脆不注入
+}
+```
+
+四条约定（🟥 违反任何一条都会让别的模组莫名失效）：
+
+| 约定 | 为什么 |
+| --- | --- |
+| 只用 `register`，**不要**再自己 hook `Module.prototype._compile` | 自己挂钩子又会回到「抢注入点」，总线也看不见你的改动 |
+| `apply` **只追加**，不要整段重写或删除原有内容 | 后面的层要拿到你改完的结果继续追加 |
+| `marker` 用一个别人不会用到的唯一串 | 总线靠它判断这次是不是已经注入过，重复启动不会叠加 |
+| 要校验就校验**改动前的前缀**（或长度），别拿整份文件 sha256 | 整份哈希在多层串链下必然对不上，等于把自己锁死 |
+
+🟩 怎么看结果：日志里 `[EveJS-MOD] <文件> 注入 N 层（A -> B 字节）` 是这一层生效了；`[EveJS-MOD] <id> 补丁失败，保留上一层结果：<原因>` 是这一层被跳过（**不会**影响其它模组）。
 
 ---
 

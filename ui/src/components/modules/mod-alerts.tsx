@@ -3,11 +3,11 @@ import { ArrowUpCircle, ShieldAlert, TriangleAlert } from "lucide-react"
 import { StatusDot } from "@/components/common/status-dot"
 import { Button } from "@/components/ui/button"
 import { hasUpdate } from "@/lib/mod-logic"
-import { REVIEW_WINDOW_MINUTES, type ModEntry } from "@/lib/mock"
+import { type ModEntry } from "@/lib/mock"
 import { cn } from "@/lib/utils"
 
 /**
- * 上架审核中的状态条：只说明状态与时长口径，不做进度推算。
+ * 上架审核中的状态条：只说明状态，不做进度推算。
  * 卡片与详情弹窗共用，compact 版本去掉说明行。
  */
 export function ReviewStrip({
@@ -39,7 +39,7 @@ export function ReviewStrip({
 
       {compact ? null : (
         <p className="mt-1.5 text-[11px] leading-relaxed text-tertiary">
-          人工审核通常需要 {REVIEW_WINDOW_MINUTES} 分钟，通过后自动上架到模组市场。
+          模组代码审查中，审查时间与模组大小有关，通过后自动上架到模组市场。
         </p>
       )}
     </div>

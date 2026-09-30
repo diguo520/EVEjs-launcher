@@ -3,7 +3,7 @@ import { Clock, TriangleAlert } from "lucide-react"
 import { StatusDot } from "@/components/common/status-dot"
 import { Button } from "@/components/ui/button"
 import { reviewPrStateLabel, type ConflictPair } from "@/lib/mod-logic"
-import { REVIEW_WINDOW_MINUTES, type ModEntry } from "@/lib/mock"
+import { type ModEntry } from "@/lib/mock"
 
 export type { ConflictPair }
 
@@ -90,17 +90,10 @@ export function ConflictBanner({
 }
 
 /**
- * 「我创建的」页签顶部的审核状态汇总，把时长口径摆在最显眼的位置。
- * 只陈述状态，不推算进度 —— 审核由索引仓库的 PR 托管，这里给的是那条 PR 的入口。
+ * 「我创建的」页签顶部的审核状态汇总，把审核状态摆在最显眼的位置。
+ * 只陈述状态，不推算进度 —— 审核由索引仓库的 PR 托管。
  */
-export function ReviewBanner({
-  mods,
-  onOpenReview,
-}: {
-  mods: ModEntry[]
-  /** 打开这条模组的版本审核 PR（审核结论以那条 PR 的状态为准） */
-  onOpenReview: (mod: ModEntry) => void
-}) {
+export function ReviewBanner({ mods }: { mods: ModEntry[] }) {
   if (mods.length === 0) return null
 
   return (
@@ -115,7 +108,7 @@ export function ReviewBanner({
             {mods.length} 个模组正在上架审核中
           </div>
           <div className="text-[11px] text-muted-foreground">
-            人工审核通常需要 {REVIEW_WINDOW_MINUTES} 分钟，通过后自动上架到模组市场；
+            模组代码审查中，审查时间与模组大小有关，通过后自动上架到模组市场；
             审核结论以索引仓库那条版本审核 PR 的状态为准。
           </div>
         </div>
@@ -140,9 +133,6 @@ export function ReviewBanner({
               {reviewPrStateLabel(mod.reviewPrState)}
               {mod.reviewPrNumber ? ` #${mod.reviewPrNumber}` : ""}
             </span>
-            <Button variant="outline" size="sm" onClick={() => onOpenReview(mod)}>
-              查看版本审核 PR
-            </Button>
           </li>
         ))}
       </ul>
