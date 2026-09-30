@@ -42,8 +42,6 @@ export interface LauncherVersionValue {
   releaseDate: string
   /** 更新通道名（清单里的 channel）；拿不到时退回构建声明的通道 */
   channel: string
-  /** 实际去读的清单地址（update:check.manifestUrl）：更新失败时先看它指向哪儿 */
-  manifestUrl: string
   /** 真去查一次更新：更新说明与是否有新版都从这次结果来 */
   checkForUpdate: () => Promise<RawUpdateCheck | null>
   /** 开始自更新：先把更新包下载下来（下载完还要再点一次「重启并安装」） */
@@ -78,7 +76,6 @@ const FALLBACK: LauncherVersionValue = {
   sizeText: "—",
   releaseDate: "",
   channel: LAUNCHER_META.channel,
-  manifestUrl: "",
   checkForUpdate: async () => null,
   startUpdate: () => {},
   installUpdate: () => {},
@@ -188,12 +185,6 @@ export function useLauncherVersionState(): LauncherVersionValue {
   const sizeText = formatSize(Number(check?.size ?? 0))
   const releaseDate = typeof check?.date === "string" ? check.date : ""
   const channel = check?.channel ?? update?.channel ?? LAUNCHER_META.channel
-  /**
-   * 清单地址由外壳决定（内置 stable 通道 / 环境变量 / 配置覆盖），界面只照实显示。
-   * 取 `update:check` 这一份：失败回包也带它，404 这类报障才能一眼看出请求的是哪个地址。
-   */
-  const manifestUrl = typeof check?.manifestUrl === "string" ? check.manifestUrl : ""
-
   const startUpdate = React.useCallback(() => {
     if (!live) return
     void call("updateDownload").catch(() => {
@@ -227,7 +218,6 @@ export function useLauncherVersionState(): LauncherVersionValue {
       sizeText,
       releaseDate,
       channel,
-      manifestUrl,
       checkForUpdate,
       startUpdate,
       installUpdate,
@@ -247,7 +237,6 @@ export function useLauncherVersionState(): LauncherVersionValue {
       sizeText,
       releaseDate,
       channel,
-      manifestUrl,
       checkForUpdate,
       startUpdate,
       installUpdate,

@@ -364,7 +364,7 @@ export function useModSource(): ModSourceState {
     async (url: string): Promise<RawAck> => {
       if (!url) return { ok: false, reason: "没有可打开的地址" }
       try {
-        const reply = (await call<boolean>("shellOpenExternal", url)) ?? false
+        const reply = (await call<boolean>("openExternal", url)) ?? false
         return { ok: reply === true, reason: reply === true ? undefined : "系统拒绝了这次打开" }
       } catch (error) {
         return { ok: false, reason: error instanceof Error ? error.message : String(error) }
