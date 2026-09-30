@@ -46,7 +46,9 @@ export function AboutPanel() {
   }
 
   async function openRepo() {
-    const reply = await callOr<boolean>("shellOpenExternal", null, LAUNCHER_META.repoUrl)
+    // 桥上的入口名是契约里的 api 名（openExternal），不是通道名（shell:openExternal）：
+    // 写成通道名 api[name] 是 undefined，call 直接抛错，按钮永远打不开
+    const reply = await callOr<boolean>("openExternal", null, LAUNCHER_META.repoUrl)
     if (reply !== true) toast.error("没能打开仓库地址")
   }
 
@@ -55,7 +57,7 @@ export function AboutPanel() {
       toast.error("还没读到服务端根目录")
       return
     }
-    const reply = await callOr<boolean>("shellOpenExternal", null, repoRoot)
+    const reply = await callOr<boolean>("openExternal", null, repoRoot)
     if (reply !== true) {
       toast.error("没能打开目录", {
         description: "启动器只允许打开已校验的地址，可先复制路径再手动打开。",
