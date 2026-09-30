@@ -160,6 +160,8 @@ describe("buildMods", () => {
     expect(mods).toHaveLength(1)
     expect(mods[0].installed).toBe(true)
     expect(mods[0].version).toBe("1.0.0")
+    // 市场那一版单独留一个字段，不随本地扫描覆盖
+    expect(mods[0].marketVersion).toBe("1.2.0")
     expect(mods[0].latest).toBe("1.2.0")
     expect(mods[0].mine).toBe(true)
     expect(mods[0].review).toBe("approved")
@@ -353,6 +355,27 @@ describe("buildMods 的可更新判定", () => {
       ]),
     })
     expect(mods[0].latest).toBe("1.0.10")
+  })
+
+  it("本地更高时 marketVersion 留住市场那一版（2026-09-30 报障：两边看不出差别）", () => {
+    const mods = buildMods({
+      market: market([{ id: "demo", displayName: "演示", version: "1.0.7" }]),
+      list: localMods([
+        { id: "demo", folder: "demo", version: "1.0.10", enabled: true, displayName: "演示" },
+      ]),
+    })
+    // version 是本地那一版、marketVersion 是市场登记的那一版，互不覆盖
+    expect(mods[0].version).toBe("1.0.10")
+    expect(mods[0].marketVersion).toBe("1.0.7")
+    expect(mods[0].latest).toBeUndefined()
+  })
+
+  it("只装了本地草稿（市场没这条）时不给 marketVersion", () => {
+    const mods = buildMods({
+      market: market([]),
+      list: localMods([{ id: "solo", folder: "solo", version: "0.1.0" }]),
+    })
+    expect(mods[0].marketVersion).toBeUndefined()
   })
 
   it("版本字面不同但等价（1.0 vs 1.0.0）不算可更新", () => {

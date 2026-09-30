@@ -18,12 +18,15 @@ import {
   type RawTokenStatus,
 } from "@/lib/ipc"
 import {
+  MAIN_START_TRACK,
   backendServiceId,
   diskVolumesFrom,
   metricsFrom,
   modDiffLines,
   modLines,
   modsSignature,
+  trackMainStart,
+  type MainStartTrack,
   parseServerLog,
   serviceCards,
   startupBannerLines,
@@ -127,6 +130,9 @@ export function useLauncher(): LauncherState {
 
   /** 上一次 mods:list 的回包：用来比出「新加载 / 卸下 / 启停」 */
   const modsSnapshotRef = useRef<RawModList | null>(null)
+
+  /** 主服务器这一轮启动的阶段记录（见 trackMainStart）：把卡片上那行进度也落进系统日志 */
+  const mainStartRef = useRef<MainStartTrack>({ ...MAIN_START_TRACK })
 
   /** 启动横幅只发一次（首屏） */
   const bannerSentRef = useRef(false)
@@ -239,10 +245,36 @@ export function useLauncher(): LauncherState {
     appendLines([...startupBannerLines({ app, token, market, at }), ...modLines(mods, at)])
   }, [appendLines])
 
+  /**
+   * 主服务器这一轮启动的阶段 → 系统日志。
+   *
+   * 卡片上「启动中 45s / 120s · 正在加载 20 个模组…」是后端每 5 秒推一次的走字，
+   * 一闪就过去了；判定交给纯函数 trackMainStart（可单测），这里只负责盖章写行。
+   */
+  const reportMainStart = useCallback(
+    (list: RawService[]) => {
+      const card = list.find((item) => item.id === "mainServer")
+      if (!card) return
+      const next = trackMainStart(mainStartRef.current, card, Date.now())
+      mainStartRef.current = next.track
+      for (const parts of next.lines) appendParts("INFO", "sys", parts)
+    },
+    [appendParts]
+  )
+
+  /** 服务表的唯一入口：写状态 + 记启动阶段，别让某条路径漏掉日志 */
+  const applyServices = useCallback(
+    (list: RawService[]) => {
+      setRawServices(list)
+      reportMainStart(list)
+    },
+    [reportMainStart]
+  )
+
   const refreshServices = useCallback(async () => {
     const list = await callOr<RawService[]>("servicesList", [])
-    if (Array.isArray(list)) setRawServices(list)
-  }, [])
+    if (Array.isArray(list)) applyServices(list)
+  }, [applyServices])
 
   useEffect(() => {
     if (!live) return
@@ -259,14 +291,14 @@ export function useLauncher(): LauncherState {
       if (!alive) return
       setPorts(config?.server.ports ?? null)
       setHealth(healthReply)
-      setRawServices(Array.isArray(list) ? list : [])
+      if (Array.isArray(list)) applyServices(list)
       mergeServerLog(log)
       void emitStartup()
     })()
 
     const pollTimer = window.setInterval(() => {
       void callOr<RawService[]>("servicesList", []).then((list) => {
-        if (alive && Array.isArray(list)) setRawServices(list)
+        if (alive && Array.isArray(list)) applyServices(list)
       })
       void callOr<RawHealth>("healthCheck", null).then((reply) => {
         if (alive && reply) setHealth(reply)
@@ -306,7 +338,7 @@ export function useLauncher(): LauncherState {
     /* ---- 事件：服务状态变化、服务端进程 stdout、进程退出 ---- */
     const offServices = subscribe("onServicesChanged", (payload) => {
       const list = Array.isArray(payload) ? (payload as RawService[]) : null
-      if (list) setRawServices(list)
+      if (list) applyServices(list)
     })
 
     const offTerminal = subscribe("onTerminalData", (tabId, data) => {
@@ -335,7 +367,7 @@ export function useLauncher(): LauncherState {
       offTerminal()
       offExit()
     }
-  }, [live, applyMetrics, appendLog, appendLines, mergeServerLog, emitStartup])
+  }, [live, applyMetrics, appendLog, appendLines, applyServices, mergeServerLog, emitStartup])
 
   /**
    * 单卡启动/停止/重启。

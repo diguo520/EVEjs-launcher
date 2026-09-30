@@ -451,7 +451,7 @@ fn is_version_like(value: &str) -> bool {
 }
 
 /// 现役版 `/^[0-9]+(\.[0-9]+)*([-+][0-9A-Za-z.\-]+)?$/`
-fn is_semver_like(value: &str) -> bool {
+pub(crate) fn is_semver_like(value: &str) -> bool {
     let (head, tail) = match value.find(['-', '+']) {
         Some(index) => (&value[..index], Some(&value[index + 1..])),
         None => (value, None),

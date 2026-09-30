@@ -68,6 +68,7 @@ export function LauncherUpdateDialog({
     sizeText,
     releaseDate,
     channel,
+    manifestUrl,
     checkForUpdate,
     startUpdate,
     installUpdate,
@@ -157,6 +158,11 @@ export function LauncherUpdateDialog({
           </span>
           <span className="tabular text-[10px] text-tertiary">安装包 {sizeText}</span>
         </div>
+
+        {/* 更新地址：404 这类「读不到清单」的报障，先看这一行到底在请求哪儿 */}
+        <p className="tabular truncate text-[10px] text-tertiary" title={manifestUrl}>
+          {t("更新地址")}：{manifestUrl || "—"}
+        </p>
 
         {/* 更新内容：分组列条，长了就滚，别把弹窗撑出屏幕 */}
         <div className="max-h-[44vh] space-y-3.5 overflow-y-auto pr-1">

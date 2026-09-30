@@ -15,7 +15,7 @@ export interface ClaimQuery {
   offset?: number
   limit?: number
   query?: string
-  /** `mine`＝只看令牌账号名下（或已认领）的；`all`＝连别人的一起列 */
+  /** `mine`＝只看令牌账号名下的；`all`＝连别人的一起列 */
   scope?: ClaimScope
 }
 
@@ -34,7 +34,6 @@ export const CLAIM_SCOPE_DEFAULT: ClaimScope = "mine"
 
 /** 仓库主人是不是当前登录名：GitHub 的 owner 与登录名都不区分大小写 */
 export function repoLooksMine(item: RawClaimItem, login: string): boolean {
-  if (item.claimed) return false
   const owner = (item.repoOwner ?? "").trim().toLowerCase()
   const me = login.trim().toLowerCase()
   if (!owner || !me) return false
@@ -42,11 +41,14 @@ export function repoLooksMine(item: RawClaimItem, login: string): boolean {
 }
 
 /**
- * 列表顺序：像自己的最前，其次是仓库归属待确认的，已认领的垫底。
+ * 列表顺序：像自己的最前，其次是仓库归属待确认的。
  * 认领一次只能认一个，先让人看到最有把握的那些。
+ *
+ * 没有「已认领」那一档：认领成功的条目后端就不再回传了（见 mods/claim.rs），
+ * 列表里它会直接消失。
  */
 export function orderClaimItems(items: RawClaimItem[], login: string): RawClaimItem[] {
-  const rank = (item: RawClaimItem) => (item.claimed ? 2 : repoLooksMine(item, login) ? 0 : 1)
+  const rank = (item: RawClaimItem) => (repoLooksMine(item, login) ? 0 : 1)
   return [...items].sort((left, right) => {
     const diff = rank(left) - rank(right)
     if (diff !== 0) return diff

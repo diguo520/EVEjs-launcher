@@ -460,6 +460,9 @@ export function useModSource(): ModSourceState {
         null,
         {
           folder,
+          // 版本号以这里填的为准：外壳会先把它写回模组清单，再重签、打包，
+          // 否则 ZIP 内的清单、索引分片和 Release tag 会各说各的版本（2026-09-30 报障）
+          version: input.version,
           changelog: input.note,
           repo: input.repo,
           // 高亮与正文留空：README 里已经写好了，后端会自己从 README 抽

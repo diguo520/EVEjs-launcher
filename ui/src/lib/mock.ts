@@ -428,6 +428,14 @@ export interface ModEntry {
   changelog: ModChangelog[]
   /** 市场最新版本；**严格高于** version 才表示可更新（只比「不一样」会把降级当升级） */
   latest?: string
+  /**
+   * 市场索引里登记的版本，**不随本地扫描覆盖**。
+   *
+   * version 在「已安装」时是本地那一版，于是「本机 1.0.10、市场还停在 1.0.7」这种最常见的
+   * 作者场景在界面上只剩一个数字，作者无从判断市场到底收没收到新版本（2026-09-30 报障）。
+   * 两边不一致时界面并列显示（见 mod-logic.marketVersionDiff）。
+   */
+  marketVersion?: string
   /** 与之存在加载冲突的模组 id（互为对方的 id） */
   conflicts?: string[]
   /** 冲突原因，按对方 id 索引 */
@@ -1185,6 +1193,8 @@ export const LAUNCHER_META = {
   author: "波坤太叔",
   /** 右上角赞助入口的标题：这里写赞助项目名，个人昵称留给 author / sponsor */
   sponsorTitle: "托肯赞助",
+  /** 仓库地址：关于面板里的 GitHub 入口用它（打开前仍走外壳的白名单校验） */
+  repoUrl: "https://github.com/diguo520/EVEjs-launcher",
 }
 
 /* ---------------- 启动器更新说明 ---------------- */

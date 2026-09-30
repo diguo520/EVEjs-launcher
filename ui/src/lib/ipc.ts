@@ -550,7 +550,12 @@ export interface RawMySubmissions {
   items: RawSubmissionItem[]
 }
 
-/** mods:claimCandidates 的一条：本机 mods/ 里由**别的身份**署名的模组 */
+/**
+ * mods:claimCandidates 的一条：本机 mods/ 里由**别的身份**署名、仓库地址还解析得出来的模组。
+ *
+ * 已经认领过的不在这里：认领成功那一刻它就回到「我创建的」了，继续留在找回列表里
+ * 只会让人以为没认领上（2026-09-30 报障）。
+ */
 export interface RawClaimItem {
   id: string
   folder: string
@@ -566,9 +571,6 @@ export interface RawClaimItem {
   repoSource?: string
   /** 仓库主人（用于判断「这个像是你的」） */
   repoOwner?: string
-  /** 已经认领过（认领记录就是结论，离线也认） */
-  claimed: boolean
-  canClaim?: boolean
   /** 不能认领的原因 */
   reason?: string
 }
@@ -577,7 +579,7 @@ export interface RawClaimItem {
 export interface RawClaimCandidates {
   ok: boolean
   reason?: string
-  /** 本页的可认领 + 已认领条目（后端排好序再切片，翻页不重不漏） */
+  /** 本页的可认领条目（后端排好序再切片，翻页不重不漏）；已认领的不再回传 */
   items: RawClaimItem[]
   /** 解析不出仓库的条目不再回传（只给数量，见 `skippedCount`）；保留字段兼容旧回包 */
   skipped: RawClaimItem[]

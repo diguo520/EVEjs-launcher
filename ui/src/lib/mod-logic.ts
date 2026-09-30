@@ -1255,7 +1255,33 @@ export function targetVersionOf(mod: ModEntry): string {
   return mod.latest ?? mod.version
 }
 
+/**
+ * 已安装、且市场登记的那一版与本地不一致时，返回市场那一版；一致 / 未安装 / 市场没有这条 → undefined。
+ *
+ * version 在已安装时是本地那一版（见 mod-source.buildMods），市场那一版另存在 marketVersion。
+ * 不并列显示的话，「本机 1.0.10、市场还停在 1.0.7」在界面上只剩一个数字，作者没法判断市场
+ * 到底收没收到新版本（2026-09-30 报障）。
+ */
+export function marketVersionDiff(mod: ModEntry): string | undefined {
+  if (!mod.installed || !mod.marketVersion || !mod.version) return undefined
+  return compareVersions(mod.marketVersion, mod.version) === 0 ? undefined : mod.marketVersion
+}
+
 /* ---------------- 版本号 ---------------- */
+
+/**
+ * 版本号形状校验，与外壳 `mods::scaffold::is_semver_like` 同一套规则：
+ * 点分数字段 + 可选的 `-预发布` / `+构建` 尾巴。弹窗先挡一道，免得白跑一次打包。
+ */
+export function isSemverLike(version: string): boolean {
+  const separator = version.search(/[-+]/)
+  const head = separator === -1 ? version : version.slice(0, separator)
+  const tail = separator === -1 ? null : version.slice(separator + 1)
+  if (!head) return false
+  if (!head.split(".").every((part) => /^[0-9]+$/.test(part))) return false
+  if (tail === null) return true
+  return tail.length > 0 && /^[0-9A-Za-z.-]+$/.test(tail)
+}
 
 /** 1.4.2 → 1.5.0；0.9.0 → 0.10.0 */
 export function bumpVersion(version: string): string {

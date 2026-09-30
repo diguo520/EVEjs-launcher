@@ -167,6 +167,7 @@ export function fromMarket(mod: RawMarketMod): ModEntry {
     ...baseEntry(mod.id),
     name: mod.displayName || mod.id,
     version: mod.version || "",
+    marketVersion: mod.version || "",
     author: mod.author?.name || "",
     cat: mod.category || "玩法",
     desc: mod.description || "",
@@ -295,19 +296,22 @@ export function buildMods(input: {
     if (fromLedger.length > 0) byId.set(id, { ...entry, changelog: fromLedger })
   }
 
-  // 市场最新版本：**严格高于**本地版本才挂「可更新」。
-  // 只比「不一样」会把降级当成升级（本地 1.0.5、市场 1.0.4 时挂出 1.0.5 → 1.0.4，2026-09-30 报障）。
+  // 市场版本单独留一个字段：version 已被本地扫描覆盖，只留它的话「本机比市场新」这种最常见的
+  // 作者场景在界面上只剩一个数字，看不出市场收没收到（2026-09-30 报障）。
   const marketVersion = new Map<string, string>()
   for (const mod of input.market?.mods ?? []) {
     if (mod?.id) marketVersion.set(mod.id, mod.version || "")
   }
   return [...byId.values()].map((entry) => {
-    const latest = marketVersion.get(entry.id)
-    if (!latest) return entry
-    if (!entry.installed) return { ...entry, latest: undefined }
+    const published = marketVersion.get(entry.id)
+    if (!published) return entry
+    const merged: ModEntry = { ...entry, marketVersion: published }
+    // 可更新：**严格高于**本地版本才挂。
+    // 只比「不一样」会把降级当成升级（本地 1.0.5、市场 1.0.4 时挂出 1.0.5 → 1.0.4，2026-09-30 报障）。
     return {
-      ...entry,
-      latest: compareVersions(latest, entry.version) > 0 ? latest : undefined,
+      ...merged,
+      latest:
+        merged.installed && compareVersions(published, merged.version) > 0 ? published : undefined,
     }
   })
 }

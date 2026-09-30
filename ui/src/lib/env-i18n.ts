@@ -33,9 +33,14 @@ function localizeDetail(detail: string): string {
   for (const rule of DETAIL_RULES) {
     const hit = rule.re.exec(detail)
     if (!hit) continue
+    // 占位符名字**从模板里现取**（`已安装：{path}` → path）。不能按捕获组下标去猜：
+    // 每条规则的组含义都不一样，早先那份 `["version","part","path"][index]` 的表只在第一条
+    // 上凑巧对，后面几条变量名全对不上，界面就把 `{part}` / `{path}` 原样显示出来了
+    // （2026-09-30 报障：环境自检里 VS 构建工具与客户端路径两行）。
+    const names = Array.from(rule.key.matchAll(/\{(\w+)\}/g), (hit) => hit[1])
     const vars: Record<string, string> = {}
     hit.slice(1).forEach((group, index) => {
-      vars[["version", "part", "path"][index] ?? `v${index}`] = group ?? ""
+      vars[names[index] ?? `v${index}`] = group ?? ""
     })
     return t(rule.key, vars)
   }

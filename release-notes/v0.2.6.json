@@ -33,6 +33,42 @@
       {
         "type": "fix",
         "text": "修掉「本地模组版本比市场还高、却提示有新版本」：可更新判定原先只比「两边版本不一样」，作者本机装着 1.0.5、市场还停在 1.0.4 时会挂出「有新版本 1.0.5 → 1.0.4」，点「更新」等于把模组降级。现在按数字段逐个比较，只有市场版本严格更高才算可更新，口径与外壳及现役版一致"
+      },
+      {
+        "type": "fix",
+        "text": "修掉「发布新版本」第二步报「找不到待提交记录」：弹窗里填的版本号过去只用于显示，打包与台账读的是模组清单里的旧版本，两边一对不上，PR 就永远开不出来（作者填 1.0.8、清单还停在 1.0.7 时必现）。现在填写的版本号会先写回模组清单并摘掉失效的旧签名，重签、打包、索引分片与 Release tag 全部共用同一个版本号；弹窗也补了版本号格式校验，填成 v1 这类会当场提示「版本号格式必须像 1.0.0」，不再白跑一次打包"
+      },
+      {
+        "type": "fix",
+        "text": "修掉环境自检里「已安装：{path}」「客户端: {path}」这种把占位符原样显示的毛病：带变量的读数按捕获组下标去套变量名，只有第一条凑巧对得上，后面几条（VS 构建工具、客户端路径、Rust 工具链）变量名全错位，值就没填进去。现在变量名直接从模板里取，路径与版本号都能正常显示，中英文一致"
+      },
+      {
+        "type": "new",
+        "text": "启动主服务器时那行进度也写进「系统」实时日志：过去只有卡片上「启动中 45s / 120s · 正在加载 20 个模组…」一闪而过，现在起手记一行「正在加载 N 个模组」，就绪时记一行「用时 Xs · 加载 N 个模组」（中间每 5 秒的走字不重复刷屏），服务端加载慢的时候翻日志能对上时间"
+      },
+      {
+        "type": "new",
+        "text": "启动器窗口的右键菜单只留「刷新 / 复制 / 粘贴」三项：WebView2 自带那套（另存为、打印、重新加载、检查元素…）对启动器来说是纯噪音，现在右键干干净净，选中的文字可以直接复制、输入框里可以直接粘贴（粘贴走的是原生输入，撤销栈与输入框状态都正常）"
+      },
+      {
+        "type": "fix",
+        "text": "修掉「市场上的版本看着跟本机一模一样、判断不了市场收没收到新版本」：本地扫描会把卡片上的版本直接覆盖成本机那一版，市场登记的版本只有严格更高时才另挂一条，于是作者本机 1.0.10、市场还停在 1.0.7 的时候界面上只剩一个 1.0.10。现在市场那一版单独留一个字段，两边不一致时模组卡片与详情页并列显示「本地 1.0.10 · 市场 1.0.7」，一眼就能看出市场同步到哪一版"
+      },
+      {
+        "type": "fix",
+        "text": "修掉「找回旧模组里已认领的条目还赖着不走」：认领成功后条目仍留在候选列表里（只是排到最后、挂个绿标「已认领」），看上去倒像是没认领上。现在认领成功的模组立刻从找回列表消失，回到「我创建的」里继续更新版本"
+      },
+      {
+        "type": "fix",
+        "text": "修掉「更新失败：更新服务器返回 HTTP 404」：清单地址早就改成独立的 stable 通道了，但发版时漏了「把清单推到 stable 通道」这一步 —— 那个 release 从来没建起来，内置地址指向的是空气，检查更新必然 404。现在 stable 通道已经就位并跑过核对（releases/latest 仍钉在旧 Electron 启动器上，两边互不干扰）。同时更新弹窗多了一行「更新地址」，报错时能直接看出它在请求哪个地址，不用再靠猜。"
+      },
+      {
+        "type": "new",
+        "text": "关于面板「更新内容」右边加了 GitHub 图标入口，点一下直达仓库；地址先过外壳的白名单校验（只放行 http/https），图标颜色跟这一块其他图标一致。"
+      },
+      {
+        "type": "opt",
+        "text": "关于面板里的「EveJS 服务端版本」改叫「EVEJS版本」，与顶栏、状态栏的叫法统一；七种外文目录同步改好，切语言不会再漏回中文。"
       }
     ],
     "en": [
@@ -67,6 +103,42 @@
       {
         "type": "fix",
         "text": "Fixed “a local mod newer than the marketplace build still showed an update”: update detection compared only for inequality, so an author running 1.0.5 locally while the marketplace still listed 1.0.4 got “update available 1.0.5 → 1.0.4”, and clicking update downgraded the mod. Versions are now compared segment by segment and only a strictly newer marketplace build counts as an update, matching the shell and the legacy launcher"
+      },
+      {
+        "type": "fix",
+        "text": "Fixed “pending submission record not found” on step 2 of Publish a new version: the version typed in the dialog was only ever displayed, while packaging and the submission ledger read the older version from the mod manifest, so the two never matched and the PR could never be opened (guaranteed to happen when the author typed 1.0.8 while the manifest still said 1.0.7). The typed version is now written back into the mod manifest first (which also clears the now-stale signature), so the re-sign, the package, the index shard and the release tag all share one version; the dialog also validates the version shape up front, so something like v1 is rejected with “version number format must be like 1.0.0” instead of failing after a full packaging run"
+      },
+      {
+        "type": "fix",
+        "text": "Fixed the environment self-check showing raw placeholders such as “已安装：{path}” and “客户端: {path}”: variable readings were mapped to placeholder names by capture-group index, which only happened to be right for the first rule, so the later ones (VS build tools, client path, Rust toolchain) filled nothing in. Placeholder names are now read straight from the template, so paths and versions display properly in every language"
+      },
+      {
+        "type": "new",
+        "text": "The main-server start progress now also lands in the System live log: previously “starting 45s / 120s · loading 20 mods…” only flashed by on the service card. It now logs one line when mod loading starts and one when the server is ready (“took Xs · loaded N mods”), without repeating the 5-second ticks, so a slow server start can be traced in the log"
+      },
+      {
+        "type": "new",
+        "text": "The launcher window context menu now keeps only Refresh / Copy / Paste: the WebView2 default menu (Save as, Print, Reload, Inspect…) is noise for a game launcher. Selected text can be copied and text fields can be pasted into directly, with paste going through the native insert path so the undo stack and field state stay correct"
+      },
+      {
+        "type": "fix",
+        "text": "Fixed “the marketplace version looks identical to the local one, so there is no way to tell whether the marketplace picked up the new build”: the local scan overwrote the version shown on the card, and the marketplace version was only surfaced when it was strictly higher, so an author running 1.0.10 locally while the marketplace still listed 1.0.7 saw a single 1.0.10. The marketplace version now lives in its own field, and when the two differ the mod card and the detail view show “Local 1.0.10 · Market 1.0.7” side by side"
+      },
+      {
+        "type": "fix",
+        "text": "Fixed “a claimed mod kept lingering in Recover old mods”: after a successful claim the entry stayed in the candidate list (merely sorted last with a green Claimed badge), which made the claim look like it had failed. A claimed mod now disappears from the recovery list immediately and keeps being updated from Created by me"
+      },
+      {
+        "type": "fix",
+        "text": "Fixed “Update failed: the update server returned HTTP 404”. The manifest URL had already moved to the dedicated stable channel, but the release step that pushes the manifest there was never run, so that release did not exist and the built-in URL pointed at nothing. The stable channel is now in place and verified (releases/latest stays pinned to the legacy Electron launcher, so the two channels never touch each other). The update dialog also shows an “Update URL” line now, so a failure tells you exactly which address was requested instead of just a 404."
+      },
+      {
+        "type": "new",
+        "text": "The About panel now has a GitHub icon button next to “What's new” that opens the repository directly. The address still goes through the shell allow-list check (http/https only), and the icon uses the same colour as the other icons in that panel."
+      },
+      {
+        "type": "opt",
+        "text": "The About panel label “EveJS server version” is now “EVEJS version”, matching the wording used in the top bar and the status bar. All seven translated catalogues were updated too, so switching language no longer falls back to Chinese for it."
       }
     ]
   }
