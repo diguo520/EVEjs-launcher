@@ -214,14 +214,16 @@ async function ensureStableRelease() {
   const created = await gh("POST", `/repos/${REPO}/releases`, {
     tag_name: STABLE_TAG,
     target_commitish: value("--target", "main"),
-    name: "stable 通道清单 / stable channel manifest",
+    // 名称与说明一律英文：Release 列表是英文界面，混进中文会显得半成品（2026-09-30 报障）
+    name: "stable channel manifest",
     body:
-      "这个 release 只承载**滚动的新框架自更新清单**（`update-manifest.json`），不提供二进制下载。\n\n" +
-      "· 新框架启动器固定读 `releases/download/stable/update-manifest.json`；\n" +
-      "· 真正的下载包请到对应版本号（`v0.2.x`）的 release 取，清单里的链接也指向那里；\n" +
-      "· `releases/latest` 被刻意钉在旧 Electron 通道，**不指向这里**（否则老用户会被误伤）。\n\n" +
-      "This release only carries the rolling manifest for the new (Tauri) launcher channel. " +
-      "Grab the actual downloads from the versioned `v0.2.x` releases.",
+      "This release only carries the rolling self-update manifest (`update-manifest.json`) for the new\n" +
+      "(Tauri) launcher channel. It offers no binaries.\n\n" +
+      "- The new launcher always reads `releases/download/stable/update-manifest.json`.\n" +
+      "- Grab the actual downloads from the matching versioned release (`v0.2.x`); the URLs inside the\n" +
+      "  manifest point there as well.\n" +
+      "- `releases/latest` is deliberately pinned to the legacy Electron channel and never points here\n" +
+      "  (otherwise old installs would be replaced with a file they cannot run).",
     draft: false,
     prerelease: false,
     make_latest: "false",
