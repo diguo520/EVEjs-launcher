@@ -4,6 +4,8 @@ import {
   PUBLISH_INTERVAL_MS,
   SUBMIT_COOLDOWN_MS,
   cooldownText,
+  compareVersions,
+  hasUpdate,
   isPublished,
   intervalText,
   publishBlockers,
@@ -139,5 +141,46 @@ describe("isPublished（市场页签准入）", () => {
     expect(isPublished(entry({ id: "demo", review: "approved" }))).toBe(true)
     expect(isPublished(entry({ id: "demo", review: "draft" }))).toBe(false)
     expect(isPublished(entry({ id: "demo" }))).toBe(true)
+  })
+})
+
+describe("compareVersions", () => {
+  it("逐段比数字，短的一侧补 0", () => {
+    expect(compareVersions("1.0.0", "1.0.0")).toBe(0)
+    expect(compareVersions("v1.2.0", "1.1.9")).toBe(1)
+    expect(compareVersions("1.0", "1.0.1")).toBe(-1)
+    // 字符串排序会把 1.0.10 排在 1.0.9 前面，这里必须按数字段比
+    expect(compareVersions("1.0.9", "1.0.10")).toBe(-1)
+    expect(compareVersions("2.0.0", "1.99.99")).toBe(1)
+  })
+
+  it("预发布小于正式版，预发布之间按字符串比（与外壳 compare_version 同口径）", () => {
+    expect(compareVersions("1.0.0-beta", "1.0.0")).toBe(-1)
+    expect(compareVersions("1.0.0", "1.0.0-beta")).toBe(1)
+    expect(compareVersions("1.0.0-beta.2", "1.0.0-beta.10")).toBe(1)
+  })
+
+  it("非数字段取前缀数字，整段没数字按 0", () => {
+    expect(compareVersions("1.x.0", "1.0.0")).toBe(0)
+    expect(compareVersions("", "0.0.0")).toBe(0)
+  })
+})
+
+describe("hasUpdate（市场版本严格更高才算）", () => {
+  const mod = (over: Partial<ModEntry>): ModEntry => ({ ...({} as ModEntry), ...over })
+
+  it("市场更高就是可更新", () => {
+    expect(hasUpdate(mod({ installed: true, version: "1.0.0", latest: "1.1.0" }))).toBe(true)
+    expect(hasUpdate(mod({ installed: true, version: "1.0.9", latest: "1.0.10" }))).toBe(true)
+  })
+
+  it("本地比市场新时不算可更新（2026-09-30 报障：1.0.5 被提示更新到 1.0.4）", () => {
+    expect(hasUpdate(mod({ installed: true, version: "1.0.5", latest: "1.0.4" }))).toBe(false)
+  })
+
+  it("版本一样不算，未安装不算，市场没有这条也不算", () => {
+    expect(hasUpdate(mod({ installed: true, version: "1.0.0", latest: "1.0.0" }))).toBe(false)
+    expect(hasUpdate(mod({ installed: false, version: "1.0.0", latest: "2.0.0" }))).toBe(false)
+    expect(hasUpdate(mod({ installed: true, version: "1.0.0" }))).toBe(false)
   })
 })

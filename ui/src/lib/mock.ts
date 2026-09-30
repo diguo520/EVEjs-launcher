@@ -426,7 +426,7 @@ export interface ModEntry {
   readme: string[]
   /** 版本历史，最新的在前 */
   changelog: ModChangelog[]
-  /** 市场最新版本，与 version 不同即表示可更新 */
+  /** 市场最新版本；**严格高于** version 才表示可更新（只比「不一样」会把降级当升级） */
   latest?: string
   /** 与之存在加载冲突的模组 id（互为对方的 id） */
   conflicts?: string[]
