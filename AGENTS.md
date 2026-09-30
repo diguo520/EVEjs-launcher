@@ -52,18 +52,32 @@ release-notes/vX.Y.Z.json
   启动器自更新弹窗读的就是它（按 `type` 分组渲染成 新增 / 优化 / 修复）。少了这个键，
   用户只看到「有新版本」却不知道改了什么。
 
-## 发布红线（务必先读）
+## 发布通道隔离（v0.2.6 已落地，**不要退回**）
 
 现役 **Electron 0.1.28** 的自动更新器读的是 `releases/latest/download/update-manifest.json`，
-并且**只校验 sha256、不认 zip**。
+并且**只校验 sha256、不认 zip**：`releases/latest` 一旦指向 Tauri 的 zip 清单，
+老用户的主程序就会被 zip 字节替换而报废（`docs/S7-发布与回滚-实施记录.md` §2 有实测表）。
 
-> ⚠️ 发布新框架版本前必须先做通道隔离，三选一：
-> ① 把 `src-tauri/src/updater.rs` 的默认清单地址切到 `releases/download/stable/update-manifest.json`
-> 并在发布后移动 `stable` tag；② 给新 release 勾 **Pre-release**；
-> ③ 在 v0.1.28 页面点 **Set as the latest release** 把 `latest` 钉死。
->
-> 否则 `releases/latest` 指向 Tauri 的 zip 清单后，老用户的主程序会被 zip 字节替换而报废。
-> 完整分析见本地 `docs/S7-发布与回滚-实施记录.md` §2（`docs/*.md` 不入库，只在维护者本机）。
+双轨现在是（采用 §2.2 方案 #2「固定 tag」）：
+
+| 通道 | 地址 | 谁在读 |
+| --- | --- | --- |
+| Tauri（本外壳） | `releases/download/stable/update-manifest.json` | 编译进 `updater.rs` 的 `DEFAULT_MANIFEST_URL` |
+| 旧 Electron | `releases/latest/download/update-manifest.json` | 仅 Electron 0.1.x；由 `make_latest` 钉在 `v0.1.28` |
+
+发完版本后（`scripts/package.ps1` 打完包）：
+
+```bash
+node scripts/release-channel.mjs publish --version X.Y.Z   # 把新清单推到滚动 `stable` release（自动 make_latest=false）
+node scripts/release-channel.mjs verify  --version X.Y.Z   # 核对 stable 清单与 latest 隔离
+node scripts/release-channel.mjs pin-legacy --tag v0.1.28  # 只在 latest 被别的东西抢走时才需要
+```
+
+两条硬护栏，改坏了 CI 直接红：
+
+- `scripts/audit-security.mjs`：内置清单地址必须是 `/releases/download/stable/`，出现 `/releases/latest/` 即失败。
+- `src-tauri/src/updater.rs` 的 `manifest_url_points_at_the_stable_channel_not_latest` 单测。
+- 打包脚本尾部还会打印一次人工提醒。
 
 其余发布检查单、灰度与回滚演练同样在该文档 §5 / §4。
 

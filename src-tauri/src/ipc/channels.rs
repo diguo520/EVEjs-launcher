@@ -1,6 +1,6 @@
 //! 由 scripts/gen-contract.mjs 生成 —— 请勿手改。源: contract/ipc-channels.json
 //! 抽取源: E:\Games\EveJS-v0.12.8\launcher\launcher
-//! 生成时间: 2026-09-29T15:00:02.345Z
+//! 生成时间: 2026-09-30T12:13:48.969Z
 
 #![allow(dead_code)]
 
@@ -18,7 +18,7 @@ pub struct ChannelSpec {
     pub kind: ChannelKind,
 }
 
-pub const REQUEST_COUNT: usize = 85;
+pub const REQUEST_COUNT: usize = 87;
 pub const EVENT_COUNT: usize = 7;
 
 #[rustfmt::skip]
@@ -26,8 +26,10 @@ pub const CHANNELS: &[ChannelSpec] = &[
     ChannelSpec { channel: "accounts:checkRunning", api: "accountsCheckRunning", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "accounts:create", api: "accountsCreate", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "accounts:delete", api: "accountsDelete", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "accounts:deleteCharacter", api: "accountsDeleteCharacter", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "accounts:launch", api: "accountsLaunch", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "accounts:list", api: "accountsList", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "accounts:logotypes", api: "accountsLogotypes", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "accounts:setPassword", api: "accountsSetPassword", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "accounts:verify", api: "accountsVerify", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "app:info", api: "appInfo", kind: ChannelKind::Invoke },

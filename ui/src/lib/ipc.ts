@@ -257,8 +257,12 @@ export interface RawRole {
   gender?: number | null
   corporationID?: number | null
   corporationName?: string | null
+  /** 军团短标识（tickerName）；服务端没有专属徽标时界面画它 */
+  corporationTicker?: string | null
   allianceID?: number | null
   allianceName?: string | null
+  /** 联盟简称（shortName）；服务端没有专属徽标时界面画它 */
+  allianceTicker?: string | null
 }
 
 export interface RawAccount {
@@ -274,6 +278,22 @@ export interface RawAccountList {
   ok: boolean
   reason?: string
   data?: RawAccount[]
+}
+
+/**
+ * accounts:logotypes 的一条：军团 / 联盟的**专属**徽标。
+ * dataUrl 为 null = 服务端没有这个实体的专属徽标（界面画短标识，不画兜底图）。
+ */
+export interface RawLogotype {
+  kind: string
+  id: number | string
+  dataUrl: string | null
+}
+
+export interface RawLogotypeList {
+  ok: boolean
+  reason?: string
+  data?: RawLogotype[]
 }
 
 /** accounts:checkRunning：客户端进程是否在跑（端口扫描） */

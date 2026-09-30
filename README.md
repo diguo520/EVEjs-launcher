@@ -2,13 +2,13 @@
 
 ![license](https://img.shields.io/badge/license-GPL--3.0-blue)
 ![platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20x64-0078D6)
-![version](https://img.shields.io/badge/version-0.2.5-22d3ee)
+![version](https://img.shields.io/badge/version-0.2.6-22d3ee)
 
 EvEJS Server Launcher 。
 
 ![启动动画](docs/screenshots/01-boot.png)
 
-> This repository's `main` is the **0.2.5 brand-new framework version**: the shell has been changed from Electron to **Tauri 2 (Rust + system WebView2)**，
+> This repository's `main` is the **0.2.6 brand-new framework version**: the shell has been changed from Electron to **Tauri 2 (Rust + system WebView2)**，
 > Redo the interface using **React + shadcn/ui**。
 > The old Electron version source code has been removed from `main`, but it can still be accessed via tags `v0.1.6` … `v0.1.28` and
 > [Releases](https://github.com/diguo520/EVEjs-launcher/releases) 取得。
@@ -60,9 +60,26 @@ pwsh -File scripts/package.ps1 -Nsis
 ### ⚠️ Release guardrail
 
 The legacy Electron 0.1.28 updater reads `releases/latest/download/update-manifest.json` and verifies
-**sha256 only — it does not understand zip packages**. Publishing a Tauri portable zip manifest to
-`releases/latest` would replace existing users' executables with zip bytes.
-Split the update channels before publishing.
+**sha256 only — it does not understand zip packages**. If `releases/latest` ever served a Tauri
+manifest, it would replace existing users' executables with zip bytes.
+
+The two channels are separated, and must stay that way:
+
+| Channel | Address | Who reads it |
+| --- | --- | --- |
+| Tauri (this shell) | `releases/download/stable/update-manifest.json` | built into `DEFAULT_MANIFEST_URL` |
+| legacy Electron | `releases/latest/download/update-manifest.json` | Electron 0.1.x only, pinned to `v0.1.28` |
+
+After packaging a release:
+
+```bash
+node scripts/release-channel.mjs publish --version X.Y.Z   # push the new manifest to the rolling `stable` release
+node scripts/release-channel.mjs verify  --version X.Y.Z   # fail loudly if `latest` ever serves our manifest
+node scripts/release-channel.mjs status                    # channel status at any time
+```
+
+`scripts/audit-security.mjs` (part of `npm run check`) rejects any commit that points the built-in
+manifest URL back at `releases/latest`.
 
 ### License
 
@@ -160,15 +177,29 @@ pwsh -File scripts/build.ps1            # 全量门禁（含真机 IPC 冒烟、
 pwsh -File scripts/smoke-ipc.ps1        # 真实 WebView2 上的通道自检
 ```
 
-### 维护者须知：发布红线
+### 维护者须知：发布通道隔离
 
 现役 **Electron 0.1.28** 的自动更新器读的是 `releases/latest/download/update-manifest.json`，
-而且**只校验 sha256、不认 zip**。
+而且**只校验 sha256、不认 zip** —— `releases/latest` 一旦指向 Tauri 的 zip 清单，
+老用户的主程序就会被 zip 字节替换而报废。
 
-> ⚠️ **发布新版前必须先把更新通道分开**：把 `src-tauri/src/updater.rs` 的默认清单地址切到
-> `releases/download/stable/update-manifest.json`，并在发布后把 `stable` tag 指向新 release；
-> 或者给新 release 勾 **Pre-release** / 在 v0.1.28 页面点 **Set as the latest release**。
-> 否则 `releases/latest` 一旦指向 Tauri 的 zip 清单，老用户的主程序会被 zip 字节替换而报废。
+双轨**已经落地，不要退回**：
+
+| 通道 | 地址 | 谁在读 |
+| --- | --- | --- |
+| Tauri（本外壳） | `releases/download/stable/update-manifest.json` | 编译进 `DEFAULT_MANIFEST_URL` |
+| 旧 Electron | `releases/latest/download/update-manifest.json` | 仅 Electron 0.1.x，由 `make_latest` 钉在 `v0.1.28` |
+
+发完版本后执行：
+
+```bash
+node scripts/release-channel.mjs publish --version X.Y.Z   # 把新清单推到滚动 `stable` release
+node scripts/release-channel.mjs verify  --version X.Y.Z   # 核对双轨；latest 一旦下发我们的签名清单就报错
+node scripts/release-channel.mjs status                    # 随时查看通道状态
+```
+
+护栏：`scripts/audit-security.mjs` 会拒绝任何把内置清单地址改回 `releases/latest` 的提交
+（`npm run check` / CI 直接红）。
 
 ### 许可证
 

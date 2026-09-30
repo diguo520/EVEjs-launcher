@@ -4,6 +4,7 @@
 产物（全部落在 artifacts/，已 gitignore）：
   1) EvEJSLauncher-Tauri-<version>/            便携版目录（exe + _launcher/cli + _launcher/updater + 说明）
   2) EvEJSLauncher-Tauri-<version>-portable.zip  绿色版压缩包（给想要「目录版」的人）
+  2b) EvEJSLauncher.exe                        单文件 exe 副本（与清单 asset 同名，直接分发用）
   3) update-manifest.json                        自更新清单（指向单文件 exe，可 -SignKey 签名）
   4) EvEJSLauncher-Tauri-<version>-setup.exe     NSIS 安装包（-Nsis 时；由 tauri CLI 产出后改名）
 
@@ -61,6 +62,10 @@ try {
     New-Item -ItemType Directory -Force -Path $stage | Out-Null
 
     Copy-Item -LiteralPath $exe -Destination (Join-Path $stage "EvEJSLauncher.exe")
+    # 根目录再放一份单文件 exe：清单里的 asset 名就是 EvEJSLauncher.exe，手工从这里抓包的人
+    # 会直接拿这一份。它必须与 $stage 里那份**字节一致**，否则会拿到上一版遗留的旧二进制
+    # （2026-09-30 修：0.2.6 打包后根目录仍留着 0.2.5 的 exe，sha256 与清单对不上）。
+    Copy-Item -LiteralPath (Join-Path $stage "EvEJSLauncher.exe") -Destination (Join-Path $artifacts "EvEJSLauncher.exe") -Force
     # 只搬「构建产物」，**不搬运行态**（2026-09-26 修）。
     # `target/release/_launcher` 在跑过自检/parity/e2e/演练之后会多出这些东西：
     #   data/author.json + data/mod-keys/*.key  —— 模组作者身份与本机私钥（DPAPI 密文）；

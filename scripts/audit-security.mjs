@@ -149,6 +149,20 @@ if (keyId === "" || pubKey === "") {
   else warn("A1 " + detail, "发布前用 scripts/gen-update-key.mjs 生成并写入常量");
 }
 
+// A1 通道隔离（S7 §2.2 方案 #2）：新外壳读 stable 通道，**绝不能**读 releases/latest ——
+// 现役 Electron 0.1.28 读的是同一个 latest，且只核 sha256、不认 zip；一旦 latest 指向
+// Tauri 的便携 zip 清单，老更新器会把 zip 当 exe 替换主程序，用户启动器直接报废。
+// 这条守卫只认代码常量，不联网：真正「GitHub 上的 latest 到底指向谁」由
+// scripts/release-channel.mjs verify 在发版时核对。
+const defaultManifestUrl =
+  (updaterRs.match(/pub const DEFAULT_MANIFEST_URL: &str =\s*"([^"]*)"/) ?? [])[1] ?? "";
+check(
+  "A1 内置清单地址走 stable 通道、不碰 releases/latest",
+  defaultManifestUrl.includes("/releases/download/stable/") &&
+    !defaultManifestUrl.includes("/releases/latest/"),
+  defaultManifestUrl || "解析不到 DEFAULT_MANIFEST_URL"
+);
+
 /* ---------- 5) B5 sidecar：node 绝对路径 + 密码不走 argv ---------- */
 const sidecarRs = read("src-tauri/src/sidecar.rs");
 check(

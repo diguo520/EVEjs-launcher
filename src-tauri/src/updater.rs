@@ -22,9 +22,18 @@ use std::sync::{LazyLock, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager};
 
-/// 与现役版 updater.ts 保持一致，避免迁移期双轨指向不同清单
+/// **通道隔离（S7 §2.2 方案 #2）**：新外壳读 `stable` 通道，**故意**不再与现役 Electron 的
+/// `releases/latest` 相同。
+///
+/// 现役 Electron 0.1.28 的默认清单地址与新外壳原本一模一样，而它只核 sha256、**不认 zip**：
+/// `releases/latest` 一旦指向 Tauri 的便携 zip 清单，老更新器会把下载到的 zip 当成 exe
+/// 替换掉主程序 —— 用户启动器直接报废（S7 §2.1 实测结论）。
+///
+/// 所以 Tauri 一侧固定走 `.../releases/download/stable/update-manifest.json`：
+/// 发布后用 `node scripts/release-channel.mjs publish` 把新清单推到 `stable` release，
+/// 而 `releases/latest` 由 `node scripts/release-channel.mjs pin-legacy` 钉在旧 Electron 通道。
 pub const DEFAULT_MANIFEST_URL: &str =
-    "https://github.com/diguo520/EVEjs-launcher/releases/latest/download/update-manifest.json";
+    "https://github.com/diguo520/EVEjs-launcher/releases/download/stable/update-manifest.json";
 
 /// 清单很小，超时按 API 口径给 30s
 const MANIFEST_TIMEOUT: Duration = Duration::from_secs(30);
@@ -851,9 +860,52 @@ mod tests {
     }
 
     #[test]
-    fn manifest_url_matches_electron_build() {
+    fn manifest_url_points_at_the_stable_channel_not_latest() {
         assert!(DEFAULT_MANIFEST_URL.ends_with("update-manifest.json"));
         assert!(DEFAULT_MANIFEST_URL.starts_with("https://"));
+        // 通道隔离（S7 §2.2 方案 #2）：新外壳绝不能读 releases/latest —— 现役 Electron 0.1.28
+        // 读的是同一个地址，且它只核 sha256、不认 zip，相遇就会把老用户的主程序换成 zip 字节。
+        assert!(
+            DEFAULT_MANIFEST_URL.contains("/releases/download/stable/"),
+            "内置清单地址必须指向 stable 通道：{DEFAULT_MANIFEST_URL}"
+        );
+        assert!(
+            !DEFAULT_MANIFEST_URL.contains("/releases/latest/"),
+            "内置清单地址绝不能指向 releases/latest：{DEFAULT_MANIFEST_URL}"
+        );
+    }
+
+    /// 通道隔离的安全前提（S7 §2.1）：现役 Electron 0.1.28 发的清单**没有 signature 字段**，
+    /// 而 Tauri 侧 fail closed —— 缺签名一律拒绝。正因为有这条性质，才敢把 `releases/latest`
+    /// 钉回旧 Electron 通道：即便还在读 `latest` 的 0.2.x 外壳拿到旧清单，也只会
+    /// 「检查更新失败」，**绝不会**把 Electron 的 exe 装到自己身上。
+    #[test]
+    fn legacy_unsigned_manifest_is_rejected_by_the_tauri_updater() {
+        // 形状取自 releases/tags/v0.1.28 的 update-manifest.json（真实抓取，略去长文案）
+        let legacy: Value = serde_json::json!({
+            "schemaVersion": 1,
+            "channel": "stable",
+            "version": "0.1.28",
+            "minimumVersion": "0.1.0",
+            "publishedAt": "2026-09-23T20:02:37Z",
+            "platforms": {
+                "win32-x64": {
+                    "type": "portable-exe",
+                    "url": "https://github.com/diguo520/EVEjs-launcher/releases/download/v0.1.28/EvEJS-Launcher-Portable-0.1.28.exe",
+                    "sha256": "a4b456ba2190cbc1cb3ebfa6fedd89b0555f0c135915692f7dbb789adcb2faee",
+                    "size": 76587267
+                }
+            }
+        });
+        assert!(
+            verify_update_manifest(&legacy).is_err(),
+            "旧 Electron 通道的清单没有 signature 字段，Tauri 更新器必须拒绝"
+        );
+        assert!(
+            crate::mods::sign::verify_signature_with_key(&legacy, UPDATE_KEY_ID, UPDATE_PUBKEY)
+                .is_err(),
+            "无签名清单必须被拒绝（fail closed）"
+        );
     }
 
     #[test]

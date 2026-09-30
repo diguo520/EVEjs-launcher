@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 
-import { callOr, hasIpc } from "@/lib/ipc"
+import { callOr, hasIpc, subscribe } from "@/lib/ipc"
 import { t } from "@/lib/i18n"
 import type {
   RawAccount,
   RawAccountList,
-  RawAccountRunning,
   RawAck,
-  RawConfigBundle,
+  RawLogotypeList,
   RawRole,
+  RawService,
 } from "@/lib/ipc"
 import {
   MAX_CHARACTERS_PER_ACCOUNT,
@@ -26,11 +26,6 @@ import {
   type Guard,
   type InGameCreation,
 } from "@/lib/launcher-logic"
-
-/** 本地图片服务的徽标地址（军团 / 联盟），端口由 config:get 给出 */
-export function logoUrl(base: string, kind: "corporations" | "alliances", id: number): string {
-  return `${base}/${kind}/${id}/logo?size=64`
-}
 
 /** 建号期间轮询账号列表的节拍与上限：客户端捏人慢，给足两分钟 */
 const ROLE_POLL_MS = 5000
@@ -85,10 +80,12 @@ function toCharacter(role: RawRole, online: boolean): Character {
   if (typeof role.corporationID === "number" && role.corporationID > 0) {
     character.corporationId = role.corporationID
     if (role.corporationName) character.corporationName = role.corporationName
+    if (role.corporationTicker) character.corporationTicker = role.corporationTicker
   }
   if (typeof role.allianceID === "number" && role.allianceID > 0) {
     character.allianceId = role.allianceID
     if (role.allianceName) character.allianceName = role.allianceName
+    if (role.allianceTicker) character.allianceTicker = role.allianceTicker
   }
   return character
 }
@@ -138,10 +135,13 @@ export interface LauncherAccountsState {
   /** 重新从后端读一遍账号列表 */
   reload: () => void
   /**
-   * 本地图片服务地址（形如 http://127.0.0.1:26001）。军团 / 联盟徽标从它上面取；
-   * 端口读不到（浏览器预览 / 配置缺失）时为 null，界面就不画徽标。
+   * 军团 / 联盟的**专属**徽标（data URL），键为 `kind:id`（如 `alliances:99000000`）。
+   *
+   * 值缺失或为 null = 服务端没有这个实体的专属徽标。这时界面画短标识
+   * （军团 ticker / 联盟简称），**不要**回退到服务端那张兜底图 ——
+   * `evejscorp.png` 与 `alliance-default.png` 是同一张画，画出来军团和联盟一模一样。
    */
-  imagesBaseUrl: string | null
+  logotypes: Record<string, string | null>
 }
 
 /**
@@ -158,9 +158,12 @@ export function useLauncherAccounts(): LauncherAccountsState {
   const [hydrated, setHydrated] = useState(false)
   /** 本启动器这轮拉起过的角色：accountId → characterId（后端不报「谁在线」） */
   const [onlineByAccount, setOnlineByAccount] = useState<Record<string, string>>({})
-  const [running, setRunning] = useState(false)
-  /** 图片服务地址：徽标 <img> 的根；配置没读到就是 null */
-  const [imagesBaseUrl, setImagesBaseUrl] = useState<string | null>(null)
+  /** 军团 / 联盟专属徽标：`kind:id` → data URL（null = 服务端没有专属徽标） */
+  const [logotypes, setLogotypes] = useState<Record<string, string | null>>({})
+  /** 已经问过外壳的徽标键：null 也是答案，不重复问 */
+  const logotypeAsked = useRef<Set<string>>(new Set())
+  /** 客户端进程此刻是否在跑（订阅外壳的 client 服务态，见下面的「关窗口」效应） */
+  const clientAlive = useRef(false)
 
   const accountsRef = useRef(accounts)
   accountsRef.current = accounts
@@ -189,39 +192,86 @@ export function useLauncherAccounts(): LauncherAccountsState {
     void load()
   }, [load])
 
-  /** 徽标地址只跟配置有关，读一次就够；读不到就让界面不画徽标 */
+  /**
+   * 军团 / 联盟徽标：外壳直接从服务端图片目录读盘（服务端关着也能画），
+   * 拿不到专属徽标就回 null，界面改画短标识。问过的键（含 null）不再重复问。
+   */
   useEffect(() => {
     if (!ipc) return
+    const wanted = new Map<string, { kind: "corporations" | "alliances"; id: number }>()
+    for (const account of accounts) {
+      for (const character of account.characters) {
+        if (character.corporationId) {
+          wanted.set(`corporations:${character.corporationId}`, {
+            kind: "corporations",
+            id: character.corporationId,
+          })
+        }
+        if (character.allianceId) {
+          wanted.set(`alliances:${character.allianceId}`, {
+            kind: "alliances",
+            id: character.allianceId,
+          })
+        }
+      }
+    }
+    const pending = [...wanted.entries()].filter(([key]) => !logotypeAsked.current.has(key))
+    if (pending.length === 0) return
+    for (const [key] of pending) logotypeAsked.current.add(key)
     let alive = true
-    void callOr<RawConfigBundle>("getConfig", null).then((config) => {
-      if (!alive) return
-      const port = config?.server?.ports?.images
-      setImagesBaseUrl(typeof port === "number" && port > 0 ? `http://127.0.0.1:${port}` : null)
+    void callOr<RawLogotypeList>(
+      "accountsLogotypes",
+      null,
+      pending.map(([, request]) => request)
+    ).then((reply) => {
+      // 失败就把键放回去：下次列表变化时重问一遍，别把一次失败当成「没有徽标」
+      if (!alive || !reply?.ok || !Array.isArray(reply.data)) {
+        for (const [key] of pending) logotypeAsked.current.delete(key)
+        return
+      }
+      setLogotypes((prev) => {
+        const next = { ...prev }
+        for (const item of reply.data ?? []) next[`${item.kind}:${item.id}`] = item.dataUrl ?? null
+        return next
+      })
     })
     return () => {
       alive = false
     }
-  }, [ipc])
+  }, [ipc, accounts])
 
-  /** 客户端是否在跑：不在跑就把「在线」标记全清掉（本启动器只认自己拉起的进程） */
+  /**
+   * 客户端进程退出 = 用户把游戏窗口关了：立刻把「在线」标记全清掉。
+   *
+   * 原先这里探的是**服务端端口**（accounts:checkRunning）：服务端只要开着就恒为 true，
+   * 于是关掉游戏窗口后角色一直挂着在线徽标与「下线」按钮，永远不恢复。外壳其实已经把
+   * 客户端进程的退出写进 client 服务态（子进程 wait 返回后置 error / 清 pid），订阅它才对。
+   */
   useEffect(() => {
     if (!ipc) return
-    let alive = true
-    const timer = window.setInterval(() => {
-      void callOr<RawAccountRunning>("accountsCheckRunning", null).then((reply) => {
-        if (!alive || !reply) return
-        const next = reply.running === true
-        setRunning(next)
-        if (!next) {
-          setOnlineByAccount((prev) => (Object.keys(prev).length === 0 ? prev : {}))
-        }
-      })
-    }, 8000)
-    return () => {
-      alive = false
-      window.clearInterval(timer)
-    }
-  }, [ipc])
+    return subscribe("onServicesChanged", (payload) => {
+      const list = Array.isArray(payload) ? (payload as RawService[]) : null
+      const client = list?.find((service) => service.id === "client")
+      if (!client) return
+      const alive = client.state === "running" || client.state === "starting"
+      const was = clientAlive.current
+      clientAlive.current = alive
+      if (alive || !was) return
+      // 连 ref 一起同步清零：紧接着的 load() 才不会按旧映射把在线又标回来
+      onlineRef.current = {}
+      setOnlineByAccount({})
+      setCreating(null)
+      setAccounts((prev) =>
+        prev.map((account) => ({
+          ...account,
+          characters: account.characters.map((character) =>
+            character.online ? { ...character, online: false, onlineSince: undefined } : character
+          ),
+        }))
+      )
+      void load()
+    })
+  }, [ipc, load])
 
   useEffect(() => {
     return () => {
@@ -288,7 +338,7 @@ export function useLauncherAccounts(): LauncherAccountsState {
     [ipc, load]
   )
 
-  /** 删单个角色：后端按角色名删，不需要账号上下文 */
+  /** 删单个角色：走 delete-character（只删角色，账号保留） */
   const deleteCharacter = useCallback<LauncherAccountsState["deleteCharacter"]>(
     (accountId, characterId) => {
       const account = accountsRef.current.find((a) => a.id === accountId)
@@ -297,7 +347,9 @@ export function useLauncherAccounts(): LauncherAccountsState {
       if (character.online) return { ok: false, reason: "角色正在线上，先在客户端里退出" }
       if (!ipc) return { ok: false, reason: "没有连接后端，无法删除角色" }
       void (async () => {
-        const reply = await callOr<RawAck>("accountsDelete", null, character.name, true)
+        // 只删这一个角色：走 accounts:deleteCharacter（账号与其余角色都保留）。
+        // 绝不能退回 accounts:delete —— 那条通道传角色名会反查出账号并**连账号一起删**。
+        const reply = await callOr<RawAck>("accountsDeleteCharacter", null, character.id, true)
         if (!runOk(reply)) {
           toast.error("删除角色失败", { description: reasonOf(reply, "后端没说明原因") })
           return
@@ -467,7 +519,7 @@ export function useLauncherAccounts(): LauncherAccountsState {
     accounts,
     stats,
     hydrated,
-    offline: !ipc || !running,
+    offline: !ipc,
     addAccount,
     createInGame,
     creating,
@@ -478,6 +530,6 @@ export function useLauncherAccounts(): LauncherAccountsState {
     verify,
     setPassword,
     reload,
-    imagesBaseUrl,
+    logotypes,
   }
 }

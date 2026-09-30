@@ -2318,7 +2318,7 @@
  "这份草稿还没提交过审核，删掉后本地目录里的清单一并移除。此操作不可撤销。": "This draft was never submitted for review; deleting it also removes its entry from the local directory. This cannot be undone.",
  "这次没搬 GitHub 令牌：老启动器当时没有保存过。 如果它存过（github-token.bin），会在这一步一并带过来，不用重填。": "No GitHub token was migrated this time: the old launcher never saved one. If it had (github-token.bin), it would be carried over here so you would not re-enter it.",
  "进入游戏": "Enter game",
- "进入游戏建号": "Create in game",
+ "进入游戏创建角色": "Enter game to create a character",
  "进阶": "Advanced",
  "远程维修舰队测试指令": "Remote Maintenance Fleet Test Instructions",
  "退增强倒计时推到通知栏之后，再也没错过加固窗口。": "After pushing the vulnerability countdown to the notification bar, you’ll never miss a reinforcement window again.",
