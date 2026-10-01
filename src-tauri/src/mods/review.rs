@@ -58,6 +58,33 @@ pub fn write_urls(runtime: &RuntimePaths) -> Vec<String> {
         .collect()
 }
 
+/// 把「写入口地址」推导成某个动作的目标地址。
+///
+/// `modReviewWriteUrls` 里写的永远是**评价入口**（历史写法，离线演练也这么指），
+/// 另外四个动作由它推导：去掉结尾的 `/reviews` 当根，再拼各自的后缀。
+/// 服务端是**按路径**分派的（`/v1/replies`、`/v1/reports`…），0.3.0 却把五个动作全发到
+/// `/v1/reviews`，于是作者回复撞进 `validateReview`，回一句「version 不合法」
+/// （2026-10-02 报障）。这里改成分动作选路径，跟 `infra/README.md` 那张表对齐。
+fn action_url(base: &str, action: &str) -> Result<String, String> {
+    let trimmed = base.trim().trim_end_matches('/');
+    if trimmed.is_empty() {
+        return Err("写地址是空的".to_string());
+    }
+    let root = trimmed.strip_suffix("/reviews").unwrap_or(trimmed);
+    let path = match action {
+        "review.upsert" => "/reviews",
+        "review.retract" => "/reviews/retract",
+        "reply.upsert" => "/replies",
+        "reply.retract" => "/replies/retract",
+        "report.create" => "/reports",
+        other => return Err(format!("不认识的写动作：{other}")),
+    };
+    if root.is_empty() {
+        return Err(format!("写地址 {base} 推不出 {action} 的目标地址"));
+    }
+    Ok(format!("{root}{path}"))
+}
+
 /// 正文规范化。服务端会拒「首尾有空白」和「带 CR」，所以这一步必须发生在**签名之前**。
 fn normalise_body(raw: &str) -> String {
     raw.replace("\r\n", "\n")
@@ -105,12 +132,24 @@ fn post_signed(paths: &RuntimePaths, fields: Map<String, Value>, kind: &str) -> 
         );
     }
 
+    let action = payload
+        .get("action")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_string();
     let urls = write_urls(paths);
     if urls.is_empty() {
         return json!({ "ok": false, "reason": "没有配置评价写地址" });
     }
     let mut failures: Vec<String> = Vec::new();
-    for url in urls {
+    for base in urls {
+        let url = match action_url(&base, &action) {
+            Ok(value) => value,
+            Err(reason) => {
+                failures.push(format!("{base} → {reason}"));
+                continue;
+            }
+        };
         match post_one(&url, &payload) {
             Ok(value) => {
                 let mut out = value;
@@ -351,5 +390,45 @@ mod tests {
             .and_then(Value::as_str)
             .unwrap_or_default()
             .contains("安装包指纹"));
+    }
+
+    #[test]
+    fn action_url_derives_every_endpoint_from_the_review_entry() {
+        let base = "https://ping.5318.cm/v1/reviews";
+        assert_eq!(action_url(base, "review.upsert").unwrap(), base);
+        assert_eq!(
+            action_url(base, "review.retract").unwrap(),
+            "https://ping.5318.cm/v1/reviews/retract"
+        );
+        assert_eq!(
+            action_url(base, "reply.upsert").unwrap(),
+            "https://ping.5318.cm/v1/replies"
+        );
+        assert_eq!(
+            action_url(base, "reply.retract").unwrap(),
+            "https://ping.5318.cm/v1/replies/retract"
+        );
+        assert_eq!(
+            action_url(base, "report.create").unwrap(),
+            "https://ping.5318.cm/v1/reports"
+        );
+    }
+
+    #[test]
+    fn action_url_tolerates_a_trailing_slash_and_a_bare_root() {
+        assert_eq!(
+            action_url("https://ping.5318.cm/v1/reviews/", "reply.upsert").unwrap(),
+            "https://ping.5318.cm/v1/replies"
+        );
+        assert_eq!(
+            action_url("http://127.0.0.1:8080", "report.create").unwrap(),
+            "http://127.0.0.1:8080/reports"
+        );
+    }
+
+    #[test]
+    fn action_url_refuses_unknown_actions_and_empty_bases() {
+        assert!(action_url("https://ping.5318.cm/v1/reviews", "nope").is_err());
+        assert!(action_url("", "reply.upsert").is_err());
     }
 }

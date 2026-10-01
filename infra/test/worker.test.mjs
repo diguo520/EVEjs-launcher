@@ -130,3 +130,74 @@ test("没有这个写接口的 POST 是 404，不是崩", async () => {
   const response = await worker.fetch(request, fakeEnv(), ctxSpy())
   assert.equal(response.status, 404)
 })
+
+test("回复发到 /v1/reviews（0.3.0 的写法）也按 action 分派，不再报 version 不合法", async () => {
+  const me = await identity()
+  const payload = {
+    action: "reply.upsert",
+    modId: "evejs-autolockfire",
+    reviewId: "rv-test-0001",
+    body: "谢谢反馈，已经修了",
+    identityId: "au-1234",
+    publicKey: me.publicKey,
+    at: Date.now(),
+  }
+  const signed = await signDocument(me.pkcs8, payload, me.keyId)
+  const request = new Request("https://ping.5318.cm/v1/reviews", {
+    method: "POST",
+    body: JSON.stringify(signed),
+    headers: { "content-type": "application/json" },
+  })
+  const body = await (await worker.fetch(request, fakeEnv(), ctxSpy())).json()
+  // 走到「作者校验」说明已经过了 validateReply + 验签；撞进 validateReview 的话
+  // 会是 400「version 不合法」—— 那正是这次要钉死的回归。
+  assert.equal(body.reason, "只有这个模组的作者能回复")
+})
+
+test("同一个路径上的评价请求仍旧走 validateReview", async () => {
+  const request = new Request("https://ping.5318.cm/v1/reviews", {
+    method: "POST",
+    body: JSON.stringify({ action: "review.upsert", modId: "evejs-autolockfire" }),
+    headers: { "content-type": "application/json" },
+  })
+  const body = await (await worker.fetch(request, fakeEnv(), ctxSpy())).json()
+  assert.equal(body.reason, "version 不合法")
+})
+
+test("拿不到 request.cf 时用 CF-IPCountry 头兜底", async () => {
+  const me = await identity()
+  const payload = {
+    action: "review.upsert",
+    modId: "evejs-autolockfire",
+    version: "1.0.10",
+    pkgSha256: SHA,
+    stars: 4,
+    body: "没有 cf 对象也要记到地区",
+    reviewId: "rv-test-0002",
+    identityId: "au-1234",
+    publicKey: me.publicKey,
+    createdAt: Date.now(),
+  }
+  const signed = await signDocument(me.pkcs8, payload, me.keyId)
+  const request = new Request("https://ping.5318.cm/v1/reviews", {
+    method: "POST",
+    body: JSON.stringify(signed),
+    headers: { "content-type": "application/json", "CF-IPCountry": "cn" },
+  })
+  const env = fakeEnv()
+  const body = await (await worker.fetch(request, env, ctxSpy())).json()
+  assert.equal(body.ok, true, JSON.stringify(body))
+  assert.equal(body.country, "CN")
+})
+
+test("健康检查带上边缘诊断（排查「来自未知地区」用）", async () => {
+  const request = new Request("https://ping.5318.cm/v1/health", {
+    headers: { "CF-IPCountry": "de" },
+  })
+  Object.defineProperty(request, "cf", { value: { country: "de", colo: "FRA" } })
+  const body = await (await worker.fetch(request, fakeEnv(), ctxSpy())).json()
+  assert.equal(body.edge.country, "DE")
+  assert.equal(body.edge.headerCountry, "DE")
+  assert.equal(body.edge.colo, "FRA")
+  assert.equal(body.edge.hasCf, true)
+})
