@@ -1,6 +1,6 @@
 //! 由 scripts/gen-contract.mjs 生成 —— 请勿手改。源: contract/ipc-channels.json
 //! 抽取源: E:\Games\EveJS-v0.12.8\launcher\launcher
-//! 生成时间: 2026-09-30T12:13:48.969Z
+//! 生成时间: 2026-10-01T05:14:44.736Z
 
 #![allow(dead_code)]
 
@@ -18,7 +18,7 @@ pub struct ChannelSpec {
     pub kind: ChannelKind,
 }
 
-pub const REQUEST_COUNT: usize = 87;
+pub const REQUEST_COUNT: usize = 89;
 pub const EVENT_COUNT: usize = 7;
 
 #[rustfmt::skip]
@@ -53,6 +53,8 @@ pub const CHANNELS: &[ChannelSpec] = &[
     ChannelSpec { channel: "engage:start", api: "engageStart", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "engage:stop", api: "engageStop", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "env:check", api: "envCheck", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "gameConfig:read", api: "gameConfigRead", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "gameConfig:save", api: "gameConfigSave", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "health:check", api: "healthCheck", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "health:ping", api: "healthPing", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "init:run", api: "initRun", kind: ChannelKind::Invoke },

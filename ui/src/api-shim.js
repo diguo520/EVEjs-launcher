@@ -76,6 +76,8 @@
     engageStart: function () { return request("engage:start", []); },
     engageStop: function () { return request("engage:stop", []); },
     envCheck: function () { return request("env:check", []); },
+    gameConfigRead: function () { return request("gameConfig:read", []); },
+    gameConfigSave: function (patch) { return request("gameConfig:save", [patch]); },
     getConfig: function () { return request("config:get", []); },
     healthCheck: function () { return request("health:check", []); },
     healthPing: function () { return request("health:ping", []); },

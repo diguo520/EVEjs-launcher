@@ -1,0 +1,49 @@
+{
+  "version": "0.2.9",
+  "changelog": {
+    "zh": [
+      {
+        "type": "new",
+        "text": "启动器多了一页「宇宙配置」（在左栏服务器日志下面），把服务端 config/ 里的世界参数整个搬了进来：服务端 / 玩法 / 世界 / 采矿 / NPC / 经济 六个域，共 167 项。读的是服务端自己的配置模块，规则不另写一套 —— 能填什么、范围多少、枚举有哪几个，全部按服务端 schema 来；保存也走服务端自己的配置管理器，校验通过之后先把整份 config/ 备份到 _local/config-backups/gameconfig-<时间戳>/，再写盘。写坏了想回退，把那个目录原样盖回去就行。"
+      },
+      {
+        "type": "new",
+        "text": "其中 23 项给了拉动条：8 个倍率键（技能训练速度、建筑计时、任务奖励、行星工业产出、虫洞寿命、游荡虫洞数量、小行星带储量、工业作业速度），外加 15 项服务端自己框在 -1~1 的比例与概率。拖完旁边有输入框可以填精确值。其余的按类型给开关、数字框、下拉或 JSON 编辑框 —— 端口和毫秒没有滑动的意义，就没给。"
+      },
+      {
+        "type": "opt",
+        "text": "参数按两列并排铺开，167 条不再拉成一长条；行内只留名字和「默认 xx」，服务端的英文说明与参数原名收进悬停提示。被环境变量接管的条目整行置灰并标注，因为改文件对它并不生效。"
+      },
+      {
+        "type": "opt",
+        "text": "这一页跟着启动器语言走了：167 个参数名、28 个分区名和 6 个域名补齐了 7 种语言（英 / 日 / 韩 / 法 / 德 / 荷 / 俄）共 1386 条翻译。以前切到英文，这一页还是满屏中文。"
+      },
+      {
+        "type": "opt",
+        "text": "保存成功的提示简化成一句「配置保存成功」。重启才生效、写前会整份备份这两件事，页面顶上的提示条已经写明，不在弹窗里再重复一遍备份路径。"
+      }
+    ],
+    "en": [
+      {
+        "type": "new",
+        "text": "The launcher has a new Universe config page, under Server logs in the sidebar. It brings the server-side world configuration into the launcher: six domains — server, gameplay, world, mining, NPC and economy — 167 settings in total. It reads through the server's own config module rather than reimplementing the rules, so which values are allowed, what the ranges are and which enums exist all come from the server schema; saving goes through the server's own config manager too, which validates first, backs the whole config/ folder up to _local/config-backups/gameconfig-<timestamp>/ and only then writes. To roll back, copy that folder over the live one."
+      },
+      {
+        "type": "new",
+        "text": "Twenty-three of those settings get sliders: the eight multiplier keys (skill training speed, structure timers, mission rewards, planetary industry output, wormhole lifetime, wandering wormhole count, asteroid belt quantity and industry job speed), plus fifteen ratios and chances the server itself bounds to -1..1. Every slider has an exact-value box beside it. The rest get a switch, number box, dropdown or JSON editor according to type — ports and millisecond timeouts have nothing to drag, so they did not get one."
+      },
+      {
+        "type": "opt",
+        "text": "Settings are laid out two per row, so 167 entries no longer form one long strip. Each row shows just the name and the default value; the server's English description and the raw key moved into the hover tooltip. Entries taken over by an environment variable are greyed out and labelled, since editing the file does nothing for them."
+      },
+      {
+        "type": "opt",
+        "text": "The page now follows the launcher language: 167 parameter names, 28 section names and 6 domain names were translated into all seven languages (English, Japanese, Korean, French, German, Dutch, Russian) — 1386 strings. Switching to English used to leave this page in Chinese."
+      },
+      {
+        "type": "opt",
+        "text": "The save confirmation is now a single line, Configuration saved. That a restart is needed and that a full backup is written first is already stated in the notice at the top of the page, so the toast no longer repeats the backup path."
+      }
+    ]
+  }
+}

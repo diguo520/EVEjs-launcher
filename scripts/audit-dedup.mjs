@@ -178,7 +178,32 @@ check(
   unusedDeps.join(", ")
 );
 
-/* ---------- 4) unsafe 面（等价 cargo-geiger 的粗粒度断言） ---------- */
+/* ---------- 4) 单一来源：随包 Node 侧车清单 ---------- */
+
+// 侧车脚本出现在两处：seed.rs（单文件 exe 内嵌释放）与 build.ps1（便携版目录拷贝）。
+// 两处漏一个，用户拿到的包就会在某条通道上直接报「脚本不存在」—— 而且只有真去点那个
+// 功能才会暴露（game-config-cli.js 是 2026-10 新增的那条，正是这么被漏过一次）。
+const seedRs = SRC.get("src-tauri/src/seed.rs") ?? "";
+const seedBlock = /const CLI_SCRIPTS[\s\S]*?\n\];/.exec(seedRs)?.[0] ?? "";
+const seedScripts = [...seedBlock.matchAll(/^\s*"([^"]+\.js)",$/gm)].map((hit) => hit[1]);
+const buildPs1 = fs.readFileSync(path.join(ROOT, "scripts", "build.ps1"), "utf8");
+const buildList = /\$cliScripts\s*=\s*@\(([^)]*)\)/.exec(buildPs1)?.[1] ?? "";
+const buildScripts = [...buildList.matchAll(/"([^"]+\.js)"/g)].map((hit) => hit[1]);
+const missingVendor = [...new Set([...seedScripts, ...buildScripts])].filter(
+  (name) => !fs.existsSync(path.join(ROOT, "vendor", "cli", name))
+);
+check(
+  "随包 Node 侧车清单：seed.rs 与 build.ps1 一致且文件都在 vendor/cli 下",
+  seedScripts.length > 0 &&
+    seedScripts.length === buildScripts.length &&
+    seedScripts.every((name) => buildScripts.includes(name)) &&
+    missingVendor.length === 0,
+  missingVendor.length > 0
+    ? "vendor/cli 下缺少：" + missingVendor.join(", ")
+    : "seed.rs=[" + seedScripts.join(", ") + "] build.ps1=[" + buildScripts.join(", ") + "]"
+);
+
+/* ---------- 5) unsafe 面（等价 cargo-geiger 的粗粒度断言） ---------- */
 
 /** 允许出现 unsafe 的文件：都是手写 Win32/DPAPI FFI，且每个块都有 SAFETY 说明 */
 const UNSAFE_ALLOWED = new Set([
