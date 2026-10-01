@@ -15,6 +15,7 @@ use crate::author;
 use crate::config;
 use crate::db;
 use crate::env;
+use crate::gameconfig;
 use crate::health;
 use crate::init;
 use crate::log;
@@ -116,6 +117,19 @@ async fn dispatch(
         "config:setRepoRoot" => Ok(set_repo_root(&state, &arg_str(args, 0))),
         "config:setClient" => Ok(set_client(&root, args.first())),
         "config:repairClientDisplay" => Ok(repair_client_display(&root).await),
+
+        /* -------------------------- 游戏世界参数 --------------------------- */
+        // 规则不在这里：条目定义 / 范围校验 / 原子写全部复用服务端的配置管理器，
+        // 本层只负责把侧车的 JSON 原样转给渲染层。
+        "gameConfig:read" => Ok(gameconfig::read(&root).await),
+        "gameConfig:save" => {
+            let patch = args
+                .first()
+                .and_then(|value| value.as_object())
+                .cloned()
+                .unwrap_or_default();
+            Ok(gameconfig::save(&root, &patch).await)
+        }
 
         /* ------------------------------ 设置项 ------------------------------ */
         "settings:get" => Ok(Value::Object(config::read_settings(

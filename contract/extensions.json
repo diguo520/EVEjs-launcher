@@ -52,6 +52,24 @@
         "patch"
       ],
       "why": "现役版的「编辑信息」只存在于渲染层：主进程没有任何改写清单的通道（modManager.ts 里唯一写清单的地方在 signModFolder 里）。新界面按原型提供了编辑弹窗，如果不落一个真通道，保存就只能弹一句「请直接改文件」。"
+    },
+    {
+      "api": "gameConfigRead",
+      "channel": "gameConfig:read",
+      "kind": "invoke",
+      "signature": "",
+      "params": [],
+      "why": "服务端 config/*.json 是这套模拟器的世界参数（6 个域、167 个条目），此前启动器只能看不能改：config:get 只读 server.json 的三个端口，其余各项必须让用户手改 JSON，现役版也没有这个能力，属于纯新增。这条通道返回条目定义（类型 / 范围 / 枚举 / 说明 / 环境变量名）加当前值与每一项的来源（config 文件 / 环境变量 / 默认值），渲染层据此画控件。规则本身复用服务端 server/src/config 的 manager，不在启动器里重写，避免服务端升版 schema 后两边漂移。"
+    },
+    {
+      "api": "gameConfigSave",
+      "channel": "gameConfig:save",
+      "kind": "invoke",
+      "signature": "patch: Record<string, unknown>",
+      "params": [
+        "patch"
+      ],
+      "why": "写回世界参数。走服务端自己的 saveConfig：先按 schema 校验（未知键 / 类型 / 整数 / 范围 / 枚举全在服务端判定），再原子写 config/*.json。启动器侧额外做的事只有一件 —— 写前把整份 config 备份到 _local/config-backups/gameconfig-<时间戳>/，因为服务端自己的原子写不带回滚，而这里改的是全局玩法参数。只写 config/*.json，不碰 server/ 下任何源码。"
     }
   ],
   "send": [],

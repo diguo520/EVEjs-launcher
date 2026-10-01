@@ -1,4 +1,4 @@
-﻿<#
+<#
 一键构建（对应 docs/Tauri2迁移执行计划.md 的 G1 → G4 门禁）。
 
 步骤：
@@ -9,7 +9,7 @@
   5) 同步 ui/dist
   6) S6 应用（ui/ 下 Vite+React）：类型检查 + 打包 + 发布到 ui/dist/react
   7) cargo build（默认 release；frontendDist 在编译期嵌入，所以必须排在 6 之后）
-  8) 拷贝 Node 侧车脚本（account-cli.js / database-cli.js → _launcher/cli/）
+  8) 拷贝 Node 侧车脚本（account-cli.js / database-cli.js / game-config-cli.js → _launcher/cli/）
   9) 拷贝自更新器（evejs-updater.exe → _launcher/updater/，缺则用 go 现场编译）
   10) 体积门禁（size-gate.mjs）
   11) parity 通道 golden（driver-tauri + diff.mjs，S5 / L2）
@@ -144,15 +144,17 @@ try {
     }
 
     Invoke-Step 8 "拷贝 Node 侧车脚本" {
-        # accounts:* / database:* 继续用仓库自带的 Node CLI（见 docs/S2-后端直译-实施记录.md），
-        # 便携版必须把它们放在 exe 同级的 _launcher/cli/ 下（sidecar::script_path 第 3 级查找）
+        # accounts:* / database:* / gameConfig:* 继续用仓库自带的 Node CLI（见 docs/S2-后端直译-实施记录.md），
+        # 便携版必须把它们放在 exe 同级的 _launcher/cli/ 下（sidecar::script_path 第 3 级查找）。
+        # 这份清单要与 src-tauri/src/seed.rs 的 CLI_SCRIPTS 保持一致（单文件 exe 靠那份内嵌释放）。
         $profileName = if ($DebugBuild) { "debug" } else { "release" }
         $cliDir = Join-Path $root "src-tauri\target\$profileName\_launcher\cli"
         New-Item -ItemType Directory -Force -Path $cliDir | Out-Null
-        foreach ($name in @("account-cli.js", "database-cli.js")) {
+        $cliScripts = @("account-cli.js", "database-cli.js", "game-config-cli.js")
+        foreach ($name in $cliScripts) {
             Copy-Item -LiteralPath (Join-Path $root "vendor\cli\$name") -Destination $cliDir -Force
         }
-        Write-Host "已拷贝 2 个 CLI 脚本 -> $cliDir"
+        Write-Host "已拷贝 $($cliScripts.Count) 个 CLI 脚本 -> $cliDir"
     }
 
     Invoke-Step 9 "拷贝自更新器" {

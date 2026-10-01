@@ -1,13 +1,13 @@
 {
   "generatedFrom": "E:\\Games\\EveJS-v0.12.8\\launcher\\launcher",
-  "generatedAt": "2026-09-30T12:13:48.969Z",
+  "generatedAt": "2026-10-01T05:14:44.736Z",
   "counts": {
-    "invoke": 81,
+    "invoke": 83,
     "send": 6,
     "events": 7,
-    "requests": 87,
+    "requests": 89,
     "registered": 82,
-    "apiTotal": 94
+    "apiTotal": 96
   },
   "invoke": [
     {
@@ -255,6 +255,22 @@
       "kind": "invoke",
       "signature": "",
       "params": []
+    },
+    {
+      "api": "gameConfigRead",
+      "channel": "gameConfig:read",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "gameConfigSave",
+      "channel": "gameConfig:save",
+      "kind": "invoke",
+      "signature": "patch: Record<string, unknown>",
+      "params": [
+        "patch"
+      ]
     },
     {
       "api": "getConfig",
@@ -784,6 +800,8 @@
     "invoke": [
       "accounts:deleteCharacter",
       "accounts:logotypes",
+      "gameConfig:read",
+      "gameConfig:save",
       "mods:claimCandidates",
       "mods:claimMod",
       "mods:updateMeta"

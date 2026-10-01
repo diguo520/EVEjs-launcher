@@ -1,6 +1,6 @@
 /* 由 scripts/gen-contract.mjs 生成 —— 请勿手改。源: contract/ipc-channels.json */
 /* 抽取源: E:\Games\EveJS-v0.12.8\launcher\launcher */
-/* 生成时间: 2026-09-30T12:13:48.969Z */
+/* 生成时间: 2026-10-01T05:14:44.736Z */
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
@@ -65,6 +65,8 @@ export const api = {
   engageStart: (): Promise<unknown> => request("engage:start", []),
   engageStop: (): Promise<unknown> => request("engage:stop", []),
   envCheck: (): Promise<unknown> => request("env:check", []),
+  gameConfigRead: (): Promise<unknown> => request("gameConfig:read", []),
+  gameConfigSave: (patch: Record<string, unknown>): Promise<unknown> => request("gameConfig:save", [patch]),
   getConfig: (): Promise<unknown> => request("config:get", []),
   healthCheck: (): Promise<unknown> => request("health:check", []),
   healthPing: (): Promise<unknown> => request("health:ping", []),

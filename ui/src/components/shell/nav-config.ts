@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   Package,
   Settings,
+  SlidersHorizontal,
   Terminal,
   Users,
   Wrench,
@@ -13,6 +14,7 @@ import {
 export type ViewId =
   | "dashboard"
   | "console"
+  | "gameconfig"
   | "accounts"
   | "commands"
   | "database"
@@ -41,6 +43,12 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { id: "dashboard", label: "主控台", sub: "CORE SERVICE CONTROL", icon: LayoutDashboard },
       { id: "console", label: "服务器日志", sub: "SERVER LOGS", icon: Terminal },
+      {
+        id: "gameconfig",
+        label: "宇宙配置",
+        sub: "UNIVERSE CONFIGURATION",
+        icon: SlidersHorizontal,
+      },
     ],
   },
   {

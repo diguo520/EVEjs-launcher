@@ -33,6 +33,9 @@ pub const HANDLED: &[&str] = &[
     "config:repairClientDisplay",
     "config:setClient",
     "config:setRepoRoot",
+    // 游戏世界参数（本工程扩展，契约见 contract/extensions.json）
+    "gameConfig:read",
+    "gameConfig:save",
     "database:backup",
     "database:backups",
     "database:delete",
