@@ -21,6 +21,7 @@ use crate::init;
 use crate::log;
 use crate::mods;
 use crate::process;
+use crate::sponsors;
 use crate::updater;
 use crate::AppState;
 use serde_json::{json, Map, Value};
@@ -470,6 +471,21 @@ async fn dispatch(
         }
         "mods:mySubmissions" => Ok(mods::submit::my_submissions(&state.runtime)),
         "mods:revealSubmissionZip" => Ok(mods::submit::reveal_submission_zip(&arg_str(args, 0))),
+        // 移除记录（本工程扩展通道）：只删本机台账里自己投的那些条目（全部版本），
+        // GitHub 仓库 / Release / 审核 PR / 市场索引一概不碰，不可撤销
+        "mods:forgetSubmission" => Ok(mods::submit::forget_submission(
+            &state.runtime,
+            &arg_str(args, 0),
+        )),
+
+        /* --------------------------- 赞助人补给线 --------------------------- */
+        // 名单与模组评分同一个源、同一套读法（多镜像 + 缓存 + 验签，见 crate::snapshot）。
+        // 出网要阻塞；force=true 绕开 10 分钟的 TTL 缓存重拉。
+        "sponsors:snapshot" => {
+            let force = args.first().and_then(Value::as_bool).unwrap_or(false);
+            let runtime = state.runtime.clone();
+            Ok(blocking(move || sponsors::fetch_sponsors(&runtime, force)).await?)
+        }
 
         /* --------------------------- GitHub 令牌 --------------------------- */
         // 明文令牌只在这一次调用里出现，落盘一律 DPAPI 加密（见 secrets.rs）

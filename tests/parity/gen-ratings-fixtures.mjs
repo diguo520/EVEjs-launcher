@@ -64,11 +64,45 @@ const write = (name, value) =>
 write("valid.json", valid)
 write("tampered.json", tampered)
 write("bad-signature.json", badSig)
+
+/**
+ * 同一把夹具密钥，再冻结一份**补给线名单**：
+ * 它比评价那份多两样容易漂的东西 —— 非 ASCII 名字与**浮点金额**（32.66 / 12.5），
+ * 而 JS 的 `JSON.stringify` 与 serde_json 对 double 的「最短往返」格式化一旦不一致，
+ * 验签就会在真机上莫名其妙地失败。这条向量就是那个「逐字节」的锁。
+ */
+const sponsorsPayload = {
+  schemaVersion: 1,
+  generatedAt: 1790842714426,
+  sponsors: [
+    { id: "sponsor-01", name: "星海孤舟", amount: 666, currency: "CNY" },
+    { id: "sponsor-15", name: "Cmdr. Nova", amount: 50, currency: "USD" },
+    { id: "sponsor-07", name: "星尘补给", amount: 32.66, currency: "CNY" },
+    { id: "sponsor-16", name: "Star Drifter", amount: 12.5, currency: "USD" },
+  ],
+}
+const sponsorsValid = await signDocument(bytesToBase64(pkcs8), sponsorsPayload, KEY_ID)
+const sponsorsTampered = {
+  ...sponsorsValid,
+  sponsors: sponsorsValid.sponsors.map((item) =>
+    item.id === "sponsor-15" ? { ...item, amount: item.amount + 1 } : item
+  ),
+}
+if (!(await verifyPayload(rawPubkey, sponsorsValid))) throw new Error("自检失败：sponsors-valid 验不过")
+if (await verifyPayload(rawPubkey, sponsorsTampered)) throw new Error("自检失败：sponsors-tampered 竟然验过了")
+write("sponsors-valid.json", sponsorsValid)
+write("sponsors-tampered.json", sponsorsTampered)
 write("expected.json", {
   keyId: KEY_ID,
   pubkey: rawPubkey,
   seedSha256Of: SEED_TEXT,
-  verdicts: { "valid.json": true, "tampered.json": false, "bad-signature.json": false },
+  verdicts: {
+    "valid.json": true,
+    "tampered.json": false,
+    "bad-signature.json": false,
+    "sponsors-valid.json": true,
+    "sponsors-tampered.json": false,
+  },
 })
 console.log(`已写入 ${OUT_DIR}`)
 console.log(`公钥（base64 raw）：${rawPubkey}`)

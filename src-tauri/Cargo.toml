@@ -1,6 +1,6 @@
 [package]
 name = "evejs-launcher"
-version = "0.2.9"
+version = "0.3.0"
 description = "EvEJS 启动器（Tauri 2 外壳）"
 authors = ["EvEJS"]
 edition = "2021"

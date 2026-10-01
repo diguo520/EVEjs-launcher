@@ -5,6 +5,8 @@
   "verdicts": {
     "valid.json": true,
     "tampered.json": false,
-    "bad-signature.json": false
+    "bad-signature.json": false,
+    "sponsors-valid.json": true,
+    "sponsors-tampered.json": false
   }
 }

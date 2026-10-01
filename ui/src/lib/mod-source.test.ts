@@ -118,6 +118,32 @@ describe("fromMarket / applyLocal / applyMine", () => {
   })
 
   /**
+   * 「移除记录」的两个判据要原样落到视图模型上：own=false（换过身份投的）不给入口，
+   * recordOnly=true（本地没文件夹、索引里也没这条）才给 —— 少透传一个字段，界面要么
+   * 把别人的记录也列出来删，要么永远不出现这个入口（2026-10-01 报障）。
+   */
+  it("own / recordOnly 原样透传，缺字段按「是我的、不是只剩记录」兜底", () => {
+    const ghost = applyMine(entry, {
+      id: "demo",
+      displayName: "演示模组",
+      status: "delisted",
+      own: false,
+      recordOnly: true,
+    } as unknown as Record<string, unknown> as never)
+    expect(ghost.own).toBe(false)
+    expect(ghost.recordOnly).toBe(true)
+
+    const older = applyMine(entry, {
+      id: "demo",
+      displayName: "演示模组",
+      status: "listed",
+    } as unknown as Record<string, unknown> as never)
+    // 缺字段（老快照 / 原型演示数据）时按「是我的、不是只剩记录」兜底：不凭空藏掉入口
+    expect(older.own).toBe(true)
+    expect(older.recordOnly).toBe(false)
+  })
+
+  /**
    * 索引里的审核原因是 `{ zh, en }`（控制台填的两栏原样发布）。原先只认字符串，
    * 整个对象被 typeof 判掉 —— 就是报障里「已下架的说明理由没有显示」。
    */

@@ -2721,5 +2721,15 @@
  "回复没能发布": "Could not post the reply",
  "回复已发布": "Reply posted",
  "撤回回复失败": "Could not retract the reply",
- "回复已撤回": "Reply retracted"
+ "回复已撤回": "Reply retracted",
+ "赞助人名单": "Sponsor roll",
+ "加入 QQ 群 {group}": "Join QQ group {group}",
+ "没能打开 QQ 群链接": "Could not open the QQ group link",
+ "移除记录": "Remove record",
+ "移除「{name}」的提交记录？": "Remove the submission record for “{name}”?",
+ "只删本机的投稿记录（含历史版本），不会动 GitHub 仓库、Release 与市场收录。此操作不可撤销；删掉后在本地重建同名模组再刷新，就能重新提交上架。": "Only the local submission record (all versions) is deleted. Your GitHub repo, Releases and the market listing are untouched. This cannot be undone; rebuild a mod with the same name locally and refresh to submit it again.",
+ "确认移除": "Confirm removal",
+ "没能移除提交记录": "Could not remove the submission record",
+ "提交记录已移除": "Submission record removed",
+ "「{name}」不再出现在「我创建的」里；在本地重建同名模组再刷新，就能重新提交上架。": "“{name}” no longer appears under My mods. Rebuild a mod with the same name locally and refresh to submit it again."
 }

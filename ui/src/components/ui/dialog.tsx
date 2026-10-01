@@ -34,7 +34,11 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-lg border border-border bg-card p-5 shadow-lg",
+        // [&>*]:min-w-0 是必须的：容器是 grid，隐式那一列是 auto —— 子元素的 min-content
+        // 会把整条轨道撑宽，于是所有子元素一起冲出 max-w-* 的边框（2026-10-01 报障：
+        // 切到 ru/de/nl/fr 后模组详情的字段与底部按钮全跑到框外）。把子元素的 min-width
+        // 压到 0，轨道就老实待在面板宽度里，装不下的文字由各自的 truncate 收尾。
+        "fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-lg border border-border bg-card p-5 shadow-lg [&>*]:min-w-0",
         "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
         className
       )}
@@ -57,7 +61,9 @@ function DialogHeader({ className, ...props }: React.HTMLAttributes<HTMLDivEleme
 function DialogFooter({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn("flex flex-col-reverse gap-2 sm:flex-row sm:justify-end", className)}
+      // flex-wrap：外语按钮文案比中文长得多（Опубликовать новую версию / Neue Version
+      // veröffentlichen），一行放不下就换行，不能顶出弹窗。
+      className={cn("flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end", className)}
       {...props}
     />
   )

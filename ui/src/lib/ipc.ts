@@ -499,6 +499,20 @@ export interface RawReviewShard {
   fetchedAt?: number
 }
 
+/** sponsors:snapshot —— 补给线（赞助人）名单快照，与评分走同一套读法（src-tauri/src/sponsors.rs） */
+export interface RawSponsorsSnapshot {
+  ok: boolean
+  /** 名单条目。名字与金额是**用户数据**，界面不翻译；currency 是三位字母币种码 */
+  sponsors?: { id?: string; name?: string; amount?: unknown; currency?: string }[]
+  /** 服务端算出这份快照的时刻（epoch ms） */
+  generatedAt?: number
+  /** true = 这次给的是本地缓存（源没连上或还没到有效期） */
+  cached?: boolean
+  source?: string | null
+  fetchedAt?: number
+  reason?: string | null
+}
+
 export interface RawMarketList {
   ok: boolean
   reason?: string
@@ -557,6 +571,18 @@ export interface RawMyModItem {
   reviewPrNumber?: string
   /** 上次成功开出审核 PR 的时间（epoch ms） */
   reviewSubmittedAt?: number
+  /**
+   * 这条记录是不是**本机当前署名**投的。
+   *
+   * 台账（my-submissions.json）按机器存、不按身份存：重装系统 / 换过身份之后里面还留着
+   * 旧身份的投稿，那些是 false。界面据此只给「本机署名」的那条提供「移除记录」。
+   */
+  own?: boolean
+  /**
+   * 只剩记录撑着：本地 mods/ 里没有这个文件夹、市场索引里也没这条 ——
+   * 被驳回 / 已下架 / 审核中而本地已删。界面据此在卡片上给出「移除记录」入口。
+   */
+  recordOnly?: boolean
 }
 
 export interface RawMyMods {

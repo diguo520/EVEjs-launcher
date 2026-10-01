@@ -460,6 +460,16 @@ export interface ModEntry {
   /** 被驳回 / 被下架的原因 */
   reviewNote?: string
   /**
+   * 这条记录是不是本机当前署名投的（换过身份的机器上，台账里旧身份的投稿是 false）。
+   * 只有 mine 的模组才有意义；false 时不给「移除记录」。
+   */
+  own?: boolean
+  /**
+   * 只剩记录撑着：本地 mods/ 里没有文件夹、市场索引里也没这条（被驳回 / 已下架 /
+   * 审核中而本地已删）。为 true 时卡片给出「移除记录」。
+   */
+  recordOnly?: boolean
+  /**
    * 是否存在于模组市场的索引里。undefined = 原型演示数据（当作在市场里）；
    * false = 本地扫到但市场索引里没有，本页签不该出现（见 mod-logic.isPublished）。
    */
@@ -1204,6 +1214,16 @@ export const LAUNCHER_META = {
   /** 仓库地址：关于面板里的 GitHub 入口用它（打开前仍走外壳的白名单校验） */
   repoUrl: "https://github.com/diguo520/EVEjs-launcher",
 }
+
+/**
+ * QQ 群入口：关于面板里 GitHub 图标右侧那两个。
+ * `badge` 是图标右上角的角标序号（用户认的就是这两个数字），`group` 是群号；
+ * 加群链接按 QQ 官方那套拼，见 `about-panel.tsx` 的 `openQqGroup`。
+ */
+export const QQ_GROUPS = [
+  { badge: "1", group: "424524553" },
+  { badge: "2", group: "165893837" },
+] as const
 
 /* ---------------- 启动器更新说明 ---------------- */
 

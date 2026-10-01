@@ -1,6 +1,6 @@
 //! 由 scripts/gen-contract.mjs 生成 —— 请勿手改。源: contract/ipc-channels.json
 //! 抽取源: E:\Games\EveJS-v0.12.8\launcher\launcher
-//! 生成时间: 2026-10-01T11:08:59.246Z
+//! 生成时间: 2026-10-01T16:57:28.439Z
 
 #![allow(dead_code)]
 
@@ -18,7 +18,7 @@ pub struct ChannelSpec {
     pub kind: ChannelKind,
 }
 
-pub const REQUEST_COUNT: usize = 95;
+pub const REQUEST_COUNT: usize = 97;
 pub const EVENT_COUNT: usize = 7;
 
 #[rustfmt::skip]
@@ -68,6 +68,7 @@ pub const CHANNELS: &[ChannelSpec] = &[
     ChannelSpec { channel: "mods:claimMod", api: "modsClaimMod", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "mods:create", api: "modsCreate", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "mods:createFolder", api: "modsCreateFolder", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "mods:forgetSubmission", api: "modsForgetSubmission", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "mods:githubTokenCheck", api: "modsGithubTokenCheck", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "mods:githubTokenClear", api: "modsGithubTokenClear", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "mods:githubTokenSave", api: "modsGithubTokenSave", kind: ChannelKind::Invoke },
@@ -108,6 +109,7 @@ pub const CHANNELS: &[ChannelSpec] = &[
     ChannelSpec { channel: "settings:get", api: "settingsGet", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "settings:set", api: "settingsSet", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "shell:openExternal", api: "openExternal", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "sponsors:snapshot", api: "sponsorsSnapshot", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "terminal:input", api: "terminalInput", kind: ChannelKind::Send },
     ChannelSpec { channel: "terminal:resize", api: "terminalResize", kind: ChannelKind::Send },
     ChannelSpec { channel: "update:apply", api: "updateApply", kind: ChannelKind::Invoke },

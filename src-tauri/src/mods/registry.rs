@@ -14,6 +14,7 @@ use crate::mods::{claim, mods_root, pkg, ratings, scan, sign};
 use crate::net;
 use crate::runtime::RuntimePaths;
 use crate::shell;
+use crate::snapshot::{FETCH_TIMEOUT, TOTAL_BUDGET};
 use serde_json::{json, Map, Value};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -37,9 +38,6 @@ const CACHE_FILE: &str = "mod-index.json";
 /// 当时又不传 force，用户点了也只是再读一遍这份缓存（2026-09-28 报障的根因）。
 /// 缩短到 2 分钟让自动路径也跟得上；要「立刻同步」就走市场页签与刷新按钮的 force。
 const TTL_MS: u128 = 2 * 60 * 1000;
-const FETCH_TIMEOUT: Duration = Duration::from_secs(8);
-/// 多镜像轮询的总预算（单镜像 8s 超时 ×N 不能无限拖下去）
-const TOTAL_BUDGET: Duration = Duration::from_secs(12);
 /// 单个镜像下载 ZIP 的超时
 const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(120);
 /// 下载安装时写进模组目录的「来源」标记文件（不影响清单校验与签名）
@@ -844,6 +842,38 @@ fn moderation_reason(value: Option<&Value>) -> Value {
     }
 }
 
+/// 台账那一条最终该显示成什么状态。
+///
+/// 「台账」只知道作者交过稿，不知道后来怎么样，所以只要本地扫描 / 索引 / 审核记录
+/// （`prev`）给了结论，一律以它为准。**`prev` 给不出结论**时（本地目录没了、索引里
+/// 也没有、审核记录也没有）才由这条投稿自己的审核 PR 状态收口：
+///   - `merged`：PR 合并过，可现在市场上又没这条 —— 收录被撤了，算「已下架」；
+///   - `closed`：PR 关闭且没合并 —— 这次投稿没通过，算「已驳回」。
+///
+/// 少了这一步，被审核台删掉的模组会永远挂在「审核中」（2026-10-01 报障：modceshi
+/// 审核台删了、本地也删了，「我创建的」里还是审核中）。
+fn ledger_status(
+    prev_status: &str,
+    submitted: bool,
+    resubmitted: bool,
+    review_state: &str,
+) -> String {
+    if resubmitted {
+        return "submitted".to_string();
+    }
+    if !prev_status.is_empty() && prev_status != "local" {
+        return prev_status.to_string();
+    }
+    if !submitted {
+        return "draft".to_string();
+    }
+    match review_state {
+        "merged" => "delisted".to_string(),
+        "closed" => "rejected".to_string(),
+        _ => "submitted".to_string(),
+    }
+}
+
 /// 状态排序权重（越小越靠前）
 fn status_order(status: &str) -> u32 {
     match status {
@@ -932,6 +962,8 @@ pub fn list_my_mods(repo_root: &Path, runtime: &RuntimePaths) -> Value {
                 "prUrl": "",
                 "sizeBytes": record.size_bytes,
                 "updatedAt": 0,
+                // 本地那一路已经按 author.id / 签名 keyId 筛过，能进来的就是本机署名
+                "own": true,
             }),
         );
     }
@@ -1020,6 +1052,8 @@ pub fn list_my_mods(repo_root: &Path, runtime: &RuntimePaths) -> Value {
                 "prUrl": item_str(prev, "prUrl"),
                 "sizeBytes": entry.get("sizeBytes").and_then(Value::as_u64).unwrap_or_else(|| item_u64(prev, "sizeBytes")),
                 "updatedAt": updated_at,
+                // 索引那一路按 author.id 筛过
+                "own": true,
             }),
         );
     }
@@ -1175,6 +1209,8 @@ pub fn list_my_mods(repo_root: &Path, runtime: &RuntimePaths) -> Value {
                 "moderationReason": moderation_reason(record.get("reason")),
                 "moderatedBy": record.get("by").and_then(Value::as_str).unwrap_or_default(),
                 "moderatedAt": record.get("at").and_then(Value::as_str).unwrap_or_default(),
+                // 审核记录那一路下面判过 mine 才留下的
+                "own": true,
             }),
         );
     }
@@ -1191,15 +1227,12 @@ pub fn list_my_mods(repo_root: &Path, runtime: &RuntimePaths) -> Value {
         // 重新发布（重开一条审核 PR）之后，索引侧那条「已驳回 / 已下架」说的是上一版投稿，
         // 得翻回「审核中」；少了这一步，作者重新提交完列表永远停在驳回状态（2026-10-01 报障）。
         let resubmitted = ledger_supersedes_moderation(prev.as_ref(), submission);
-        let status = if resubmitted {
-            "submitted".to_string()
-        } else if !prev_status.is_empty() && prev_status != "local" {
-            prev_status.clone()
-        } else if submitted {
-            "submitted".to_string()
-        } else {
-            "draft".to_string()
-        };
+        let status = ledger_status(
+            &prev_status,
+            submitted,
+            resubmitted,
+            &item_str(Some(submission), "reviewPrState"),
+        );
         let display_name = {
             let value = item_str(Some(submission), "displayName");
             if value.is_empty() {
@@ -1266,6 +1299,10 @@ pub fn list_my_mods(repo_root: &Path, runtime: &RuntimePaths) -> Value {
         } else {
             item_str(prev.as_ref(), "moderatedAt")
         };
+        // 台账按机器存、不按身份存：换过身份之后这里还留着旧身份的投稿，标出来让界面
+        // 只对「本机当前署名」的那条给出「移除记录」（见 submit::submission_is_mine）
+        let ledger_owned =
+            crate::mods::submit::submission_is_mine(runtime, submission, &author_id, &key_id);
         items.insert(
             id.to_string(),
             json!({
@@ -1290,6 +1327,7 @@ pub fn list_my_mods(repo_root: &Path, runtime: &RuntimePaths) -> Value {
                 "reviewPrState": item_str(Some(submission), "reviewPrState"),
                 "reviewPrNumber": item_str(Some(submission), "reviewPrNumber"),
                 "reviewSubmittedAt": item_u64(Some(submission), "submittedAt"),
+                "own": ledger_owned,
             }),
         );
     }
@@ -1348,7 +1386,7 @@ pub fn list_my_mods(repo_root: &Path, runtime: &RuntimePaths) -> Value {
                 || listed_ids.contains(&id)
                 || keep_moderated(item)
         })
-        .cloned()
+        .map(|item| annotate_list_item(item, &local_folders, &listed_ids))
         .collect();
 
     json!({
@@ -1360,6 +1398,28 @@ pub fn list_my_mods(repo_root: &Path, runtime: &RuntimePaths) -> Value {
 
 fn entry_bool(entry: &Value, key: &str) -> bool {
     entry.get(key).and_then(Value::as_bool).unwrap_or(false)
+}
+
+/// 给留在「我创建的」里的条目补两个界面要用的判断（只加字段，不改已有结论）：
+///
+///   - `own`：这条记录是不是**本机当前署名**投的。本地扫描 / 索引 / 审核记录那三路在各自
+///     分支里已经按作者 id / keyId 筛过（恒 true）；只有台账行会带 false —— 台账按机器存，
+///     重装系统换过身份之后里面还留着旧身份的投稿，界面据此不给「移除记录」；
+///   - `recordOnly`：这条只剩「台账 / 审核记录」在撑着 —— 本地没有文件夹、索引里也没它。
+///     被驳回 / 已下架 / 审核中而本地已经删掉的那种记录就长这样，界面据此给出「移除记录」入口
+///     （2026-10-01 报障：modceshi 本地和审核台都删了，「我创建的」里那条却撤不掉）。
+fn annotate_list_item(item: &Value, local_folders: &[String], listed_ids: &[String]) -> Value {
+    let mut item = item.clone();
+    let folder = item_str(Some(&item), "folder");
+    let id = item_str(Some(&item), "id");
+    let local = !folder.is_empty() && local_folders.contains(&folder);
+    let listed = listed_ids.contains(&id);
+    if let Some(map) = item.as_object_mut() {
+        // 上一步没标过 own 的（理论上不会有）当成本机署名：宁可多给一个入口，也不凭空藏掉
+        map.entry("own").or_insert(json!(true));
+        map.insert("recordOnly".into(), json!(!local && !listed));
+    }
+    item
 }
 #[cfg(test)]
 mod tests {
@@ -1377,6 +1437,39 @@ mod tests {
             let _ = std::fs::create_dir_all(dir);
         }
         paths
+    }
+
+    #[test]
+    fn annotate_list_item_marks_ledger_only_rows() {
+        let folders = vec!["mods/demo".to_string()];
+        let listed = vec!["listed-mod".to_string()];
+
+        // 本地还有那个文件夹 → 记录有实体撑着，不是「只剩记录」
+        let local = annotate_list_item(
+            &json!({ "id": "demo", "folder": "mods/demo" }),
+            &folders,
+            &listed,
+        );
+        assert_eq!(local["recordOnly"], false);
+        assert_eq!(local["own"], true);
+
+        // 索引里还挂着这条 → 同上（在架模组不该出现「移除记录」）
+        let listed_row = annotate_list_item(&json!({ "id": "listed-mod" }), &folders, &listed);
+        assert_eq!(listed_row["recordOnly"], false);
+
+        // 本地没文件夹、索引也没这条（被驳回 / 已下架 / 审核中而本地已删）→ 只有记录
+        let ghost = annotate_list_item(
+            &json!({ "id": "ghost", "status": "delisted" }),
+            &folders,
+            &listed,
+        );
+        assert_eq!(ghost["recordOnly"], true);
+        assert_eq!(ghost["own"], true);
+
+        // 台账行自己带的 own=false（换过身份投的）不许被这条兜底改写
+        let other = annotate_list_item(&json!({ "id": "ghost", "own": false }), &folders, &listed);
+        assert_eq!(other["own"], false);
+        assert_eq!(other["recordOnly"], true);
     }
 
     #[test]
@@ -1462,6 +1555,35 @@ mod tests {
             None,
             &json!({ "submittedAt": moderated_ms + 1 })
         ));
+    }
+
+    /// 审核 PR 已经走完、可本地扫描 / 索引 / 审核记录都给不出结论时，台账不能一直说
+    /// 「审核中」（2026-10-01 报障：modceshi 在审核台删了、本地也删了，列表还是审核中）。
+    #[test]
+    fn ledger_status_settles_on_the_review_pr_state() {
+        // 审核台删掉（收录被撤）：PR 合并过、市场上又没这条 → 已下架
+        assert_eq!(ledger_status("", true, false, "merged"), "delisted");
+        // PR 关闭且没合并 → 已驳回
+        assert_eq!(ledger_status("", true, false, "closed"), "rejected");
+        // 还在审 / 状态没确认 → 维持审核中
+        assert_eq!(ledger_status("", true, false, "open"), "submitted");
+        assert_eq!(ledger_status("", true, false, ""), "submitted");
+        // 没交过就是草稿
+        assert_eq!(ledger_status("", false, false, "merged"), "draft");
+        // 本地目录还在（local）同样按 PR 状态收口：本地留着文件夹不等于还在市场上
+        assert_eq!(ledger_status("local", true, false, "merged"), "delisted");
+        // 索引 / 审核记录已有结论时一律以它为准
+        for status in [
+            "listed",
+            "delisted",
+            "rejected",
+            "update-pending",
+            "submitted",
+        ] {
+            assert_eq!(ledger_status(status, true, false, "merged"), status);
+        }
+        // 重投优先：索引侧那条旧结论已经作废
+        assert_eq!(ledger_status("delisted", true, true, "merged"), "submitted");
     }
 
     #[test]

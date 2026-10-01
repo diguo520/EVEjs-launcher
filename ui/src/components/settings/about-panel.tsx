@@ -5,12 +5,13 @@ import { Copy, FolderOpen, RefreshCw, ScrollText } from "lucide-react"
 import { cn, copyText } from "@/lib/utils"
 import { t } from "@/lib/i18n"
 import { GithubMark } from "@/components/common/github-mark"
+import { QqMark } from "@/components/common/qq-mark"
 import { Panel } from "@/components/common/panel"
 import { Button } from "@/components/ui/button"
 import { LauncherUpdateDialog } from "@/components/shell/launcher-update-dialog"
 import { useLauncherVersion } from "@/components/shell/launcher-version"
 import { callOr } from "@/lib/ipc"
-import { LAUNCHER_META } from "@/lib/mock"
+import { LAUNCHER_META, QQ_GROUPS } from "@/lib/mock"
 
 interface AboutField {
   label: string
@@ -50,6 +51,19 @@ export function AboutPanel() {
     // 写成通道名 api[name] 是 undefined，call 直接抛错，按钮永远打不开
     const reply = await callOr<boolean>("openExternal", null, LAUNCHER_META.repoUrl)
     if (reply !== true) toast.error("没能打开仓库地址")
+  }
+
+  /**
+   * QQ 群：走 QQ 官方那个加群页 `qm.qq.com`（`k=` 留空＝不绑扫码结果，只带群号）。
+   * 别改成 `jq.qq.com/?_wv=1027&k=群号` —— 那条会 302 到 qun.qq.com 首页、把群号丢掉。
+   */
+  async function openQqGroup(group: string) {
+    const reply = await callOr<boolean>(
+      "openExternal",
+      null,
+      `https://qm.qq.com/cgi-bin/qm/qr?k=&groupcode=${group}`
+    )
+    if (reply !== true) toast.error("没能打开 QQ 群链接")
   }
 
   async function openRoot() {
@@ -103,7 +117,8 @@ export function AboutPanel() {
           <ScrollText />
           更新内容
         </Button>
-        {/* 仓库入口：「更新内容」右侧，图标颜色与这一块其他图标一致（ghost 的 currentColor） */}
+        {/* 仓库入口：「更新内容」右侧，图标颜色与这一块其他图标一致（ghost 的 currentColor）。
+            `ml-auto` 挂在这一行**第一个**图标上，后面的 QQ 群图标跟着一起贴到最右。 */}
         <Button
           variant="ghost"
           size="icon-sm"
@@ -114,6 +129,27 @@ export function AboutPanel() {
         >
           <GithubMark />
         </Button>
+        {/* QQ 群：排在 GitHub 后面，图标右上角的角标就是用户要认的群序号 */}
+        {QQ_GROUPS.map((item) => (
+          <Button
+            key={item.group}
+            variant="ghost"
+            size="icon-sm"
+            title={t("加入 QQ 群 {group}", { group: item.group })}
+            aria-label={t("加入 QQ 群 {group}", { group: item.group })}
+            onClick={() => void openQqGroup(item.group)}
+          >
+            <span className="relative inline-flex">
+              <QqMark />
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute -right-1.5 -top-1.5 flex size-3 items-center justify-center rounded-full bg-primary text-[9px] font-bold leading-none text-primary-foreground"
+              >
+                {item.badge}
+              </span>
+            </span>
+          </Button>
+        ))}
       </div>
 
       <LauncherUpdateDialog open={updateOpen} onOpenChange={setUpdateOpen} />

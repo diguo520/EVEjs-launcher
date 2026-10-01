@@ -3,6 +3,7 @@ import { toast } from "sonner"
 
 import { cn, copyText } from "@/lib/utils"
 import { t } from "@/lib/i18n"
+import { useLocale } from "@/components/shell/locale-provider"
 import { Panel } from "@/components/common/panel"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -45,6 +46,7 @@ const SUGGEST_LIMIT = 8
 
 /** 指令生成器：选指令、挑目标、拼出可直接粘贴的命令行 */
 export function CommandGenerator() {
+  const { locale } = useLocale()
   const [kind, setKind] = useState<GenKind>("item")
   const [target, setTarget] = useState("")
   const [qty, setQty] = useState(100)
@@ -102,11 +104,14 @@ export function CommandGenerator() {
     [kind, items.rows, target]
   )
 
+  // 预览是一段拼好的字符串（占位符的译文在 buildXxxCommand 里取）。useMemo 缓存的是**字符串值**，
+  // 不是渲染节点：不把 locale 列进依赖，切完语言这段预览会一直停在旧语言 —— 翻译桥也救不回来，
+  // 它挂在 <code> 里，而桥按约定跳过 code / pre。
   const preview = useMemo(() => {
     if (kind === "ship") return buildShipCommand(resolved)
     if (kind === "npc") return buildNpcCommand(resolved, qty)
     return buildItemCommand(resolved, qty)
-  }, [kind, resolved, qty])
+  }, [kind, resolved, qty, locale])
 
   async function copy(text: string, message: string) {
     const ok = await copyText(text)
@@ -222,7 +227,7 @@ export function CommandGenerator() {
           ? "/ship 只生成船体，需要手动从机库登舰；不接数量参数。"
           : kind === "item"
             ? t("提示：输入中文名会自动换成英文名（服务端只认英文）；留空则用占位符 {placeholder}。", {
-                placeholder: ITEM_PLACEHOLDER,
+                placeholder: t(ITEM_PLACEHOLDER),
               })
             : "提示：/npc 的第一个参数是 NPC 档案键，不是 typeID。"}
       </p>

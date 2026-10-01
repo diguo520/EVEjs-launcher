@@ -77,6 +77,9 @@ pub const HANDLED: &[&str] = &[
     // claimCandidates=列出本机由别的身份署名的模组；claimMod=核验仓库归属并落认领记录
     "mods:claimCandidates",
     "mods:claimMod",
+    // 移除无效投稿记录（本工程扩展，契约见 contract/extensions.json）：
+    // 只删本机台账里自己投的条目，不碰 GitHub 仓库 / Release / PR / 市场索引
+    "mods:forgetSubmission",
     "service:restart",
     "service:start",
     "service:stop",
@@ -93,6 +96,7 @@ pub const HANDLED: &[&str] = &[
     // ---- S2 Batch E：模组市场 / 提交 / GitHub 令牌（13 个，见 docs/S2-发布与市场-实施记录.md）----
     "mods:marketList",
     "mods:reviews",
+    "sponsors:snapshot",
     "mods:reviewSubmit",
     "mods:reviewRetract",
     "mods:replySubmit",

@@ -19,11 +19,11 @@ export const BOOT_COLORS = {
   border: "#1E3A5F",
 } as const
 
-/** 系统里开了「减弱动效」就只画静止一帧，不做循环动画 */
-export function prefersReducedMotion(): boolean {
-  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false
-  return window.matchMedia("(prefers-reduced-motion: reduce)").matches
-}
+/**
+ * 系统里开了「减弱动效」就只画静止一帧，不做循环动画。
+ * 实现只有一份，放在 lib/three-stage —— 开机动画与设置页的补给线面板共用。
+ */
+export { prefersReducedMotion } from "@/lib/three-stage"
 
 export interface LogoCenter {
   x: number

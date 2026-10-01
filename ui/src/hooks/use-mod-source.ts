@@ -171,6 +171,13 @@ export interface ModSourceState {
   createMod: (draft: Record<string, unknown>) => Promise<RawAck>
   /** 编辑已有模组的信息（本工程扩展通道；改完后端会重签） */
   updateMeta: (folder: string, patch: Record<string, unknown>) => Promise<RawAck>
+  /**
+   * 移除某个模组的本机投稿记录（该 id 的全部版本）。
+   *
+   * 只动本机台账，不碰 GitHub 仓库 / Release / 审核 PR / 市场索引 —— 作者之后在本地
+   * 重建同名模组（id 不变）刷新一下，就能重新走「首次提交」上架。不可撤销。
+   */
+  forgetSubmission: (id: string) => Promise<RawAck>
   setAuthorName: (name: string) => Promise<RawAck>
   exportKey: () => Promise<RawAck>
   importKey: () => Promise<RawAck>
@@ -468,6 +475,7 @@ export function useModSource(): ModSourceState {
     (folder: string, patch: Record<string, unknown>) => act("modsUpdateMeta", folder, patch),
     [act]
   )
+  const forgetSubmission = useCallback((id: string) => act("modsForgetSubmission", id), [act])
   const setAuthorName = useCallback((name: string) => act("authorSetName", name), [act])
   const exportKey = useCallback(() => act("authorExportKey"), [act])
   const importKey = useCallback(async (): Promise<RawAck> => {
@@ -716,6 +724,7 @@ export function useModSource(): ModSourceState {
     installFromMarket,
     createMod,
     updateMeta,
+    forgetSubmission,
     setAuthorName,
     exportKey,
     importKey,

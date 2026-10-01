@@ -254,6 +254,9 @@ export function applyMine(
     sizeMB: item.sizeBytes ? toMB(item.sizeBytes) : entry.sizeMB,
     updatedAt: entry.updatedAt || isoDate(item.updatedAt),
     mine: true,
+    // 缺字段当「是我的」：宁可多给一个入口，也不凭空把作者自己的记录藏起来
+    own: item.own !== false,
+    recordOnly: item.recordOnly === true,
     review,
   }
   const note = localizedReason(item.moderationReason, locale)

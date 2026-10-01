@@ -3,7 +3,7 @@ import { Loader2, Play, Square } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { StatusDot } from "@/components/common/status-dot"
 import { cn } from "@/lib/utils"
-import { t } from "@/lib/i18n"
+import { listSeparator, t } from "@/lib/i18n"
 
 export function LaunchBanner({
   running,
@@ -70,7 +70,7 @@ export function LaunchBanner({
           >
             {blocked
               ? t("环境自检门禁未放行：缺少 {list}，照环境自检里的指引补上再启动。", {
-                  list: blockers.join("、"),
+                  list: blockers.join(listSeparator()),
                 })
               : "环境自检门禁 → 按序拉起全部服务。启动期间不要关闭启动器。"}
           </p>
@@ -85,7 +85,7 @@ export function LaunchBanner({
             className="px-7"
             title={
               blocked
-                ? t("缺少 {list}，补上后即可启动", { list: blockers.join("、") })
+                ? t("缺少 {list}，补上后即可启动", { list: blockers.join(listSeparator()) })
                 : undefined
             }
           >
