@@ -19,6 +19,10 @@ artifacts/
 .audit/
 .parity-out/
 
+# --- 本地跑 infra 的产物（wrangler dev 的 sqlite / 缓存；线上状态在 Cloudflare 那边） ---
+infra/.wrangler/
+infra/.dev.vars
+
 # --- 编辑器 / 系统 ---
 .vscode/
 .idea/

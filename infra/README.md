@@ -20,16 +20,28 @@ Cloudflare Pages 是**纯静态**的，没有地方放 POST 进来的评价，�
 拆成两个 deploy 只会多一份要维护的东西。哪天真的要做前台页面，再把 `public/` 独立成 Pages
 也不迟 —— 读接口的地址不会变。
 
-### 启动器读到的两份东西
+### 启动器读到的三份东西
 
 ```
 GET /v1/ratings.json            所有模组的聚合分（平均分 / 人数 / 直方图）
 GET /v1/reviews/<modId>.json    单个模组的评论正文，打开详情弹窗时才按需拉
+GET /v1/sponsors.json           赞助人「补给线」名单（与评价无关，同一次 cron 一起发）
 GET /v1/health                  给你排查用的，启动器不读
 ```
 
-两份都要**验签**：启动器内置 `RATINGS_PUBKEY`，验不过就整份丢掉（评分不显示，市场照常能用）。
+三份都要**验签**：启动器内置 `RATINGS_PUBKEY`，验不过就整份丢掉（评分不显示，市场照常能用）。
 读路径是静态快照而不是现查 D1，图的是能被边缘缓存、能被镜像、能离线重算。
+
+补给线名单同样不进 D1：**本体的家在 KV**（`source:sponsors`），由管理接口维护
+（网页在 `/admin.html`），没写过时用 `infra/src/sponsors.js` 里那份种子。
+赞助人是维护者手写的一小串名字，让它进库、进后台、进审核流是杀鸡用牛刀；
+可锁在代码里也不划算 —— 那等于「加一个人就要跑一次部署」。定时任务会把名单签名写进 KV，
+启动器照旧走「多镜像 + 本地缓存 + 验签」读，**改名单不用发版、也不用提交**。
+条目形状（币种是三位字母码，国外赞助人用 `USD` / `EUR` 这种）：
+
+```json
+{ "id": "sponsor-15", "name": "Cmdr. Nova", "amount": 50, "currency": "USD" }
+```
 
 ### 启动器写进来的东西（M2）
 
@@ -182,7 +194,53 @@ node infra/scripts/build-snapshot.mjs --rows rows.json --out .parity-out/ratings
 ```
 docs/ratings/ratings.json
 docs/ratings/reviews/<modId>.json
+docs/ratings/sponsors.json
 ```
+
+`sponsors.json` 也在同一批产物里：名单源头是 `src/sponsors.js` 的常量、不经过 D1，
+所以哪怕评价库是空的，备门镜像里这份名单也不会缺。
+
+### 维护补给线名单（不用改代码、不用部署）
+
+名单本体存在 KV 的 `source:sponsors`，没写过就用代码里那份种子。加人 / 改金额 / 删人都在
+一个页面上做：**`https://ping.5318.cm/admin.html`**（本地跑起来就是
+`http://127.0.0.1:8787/admin.html`）。保存后**立刻**重签快照，启动器按自己那 10 分钟缓存跟进。
+
+先配一次令牌 —— **没配这个 secret 时管理接口是关的**（fail closed），配了才开：
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
+npx wrangler secret put SPONSOR_ADMIN_TOKEN    # 粘上一步打印的那串
+```
+
+然后打开页面，把令牌填进「管理令牌」→ 连接（只存在这台浏览器的 localStorage 里，
+不进 URL、不进日志）。换电脑就在新电脑上再填一次。
+
+接口一共三个，全部 `Authorization: Bearer <令牌>`，**不发 CORS 头**（所以别的站点读不到回包）：
+
+```
+GET  /v1/admin/sponsors           当前名单（归一化后的视图，看到的就是启动器最终显示的）
+POST /v1/admin/sponsors           { name, amount, currency? }   加或改：同名只改金额，位置不动
+POST /v1/admin/sponsors/remove    { name } 或 { id }
+POST /v1/admin/sponsors/reset     {}                            清掉 KV 那份，回到代码里的种子
+```
+
+curl 也行：
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" https://ping.5318.cm/v1/admin/sponsors
+curl -H "Authorization: Bearer $TOKEN" -H "content-type: application/json" \
+  -d '{"name":"Cmdr. Nova","amount":50,"currency":"USD"}' https://ping.5318.cm/v1/admin/sponsors
+```
+
+几条规矩：
+- `amount` 是不小于 0 的数字；`currency` 要么三位字母（`CNY` / `USD` / `EUR`…）要么不写（默认人民币）。
+  写错了当场 400 并告诉你原因，**不会**悄悄改成人民币 —— 快照那层才做兜底，防的是历史数据。
+- 同名再存一次是「改金额」，不会变成两条，也不会跳到列表末尾。
+- 改坏了不用慌：页面上的「重置回代码名单」清掉 KV 那份，立刻回到 `src/sponsors.js`。
+- 想限制一下也容易：一个 IP 一小时最多 60 次（`index.js` 的 `MAX_ADMIN_PER_HOUR`）。
+- **别把令牌贴到聊天记录、issue 或截图里**。怀疑泄露就 `wrangler secret put` 换一个，
+  页面上的旧令牌自然失效。
 
 ### CI 需要配置的东西
 
@@ -222,6 +280,9 @@ docs/ratings/reviews/<modId>.json
 | 写评价报「安装包对不上市场记录」 | 报上来的 `pkg_sha256` 不在白名单里：本地装的那一版和索引里的不是同一个包，或者白名单还没同步（每小时整点跑一次 `sync-versions`） |
 | 写评价报「keyId 与公钥对不上」 | 客户端把 keyId 和公钥配错了 —— keyId 必须是那把公钥的 sha256 前 12 位（`keyIdFromRaw`） |
 | 所有请求都 500「ctx is not defined」 | Worker 入口 `fetch(request, env, ctx)` 少了第三个参数。`infra/test/worker.test.mjs` 钉着这一条 |
+| 管理页报「管理接口未启用」 | 没配 `SPONSOR_ADMIN_TOKEN`（或短于 16 个字符）。这不是故障，是接口默认关着 |
+| 管理页报「管理令牌不对」 | 令牌粘错了（前后空格也算）。换一个浏览器再填一次，或者重新 `secret put` |
+| 改了名单但启动器还没变 | 启动器缓存 10 分钟；先看 `/v1/health` 的 `counts.sponsors` 与 `sponsorsSource` 对不对 |
 
 回滚：`npx wrangler deployments list` 找上一个版本 `npx wrangler rollback`。
 想彻底停掉发布（让所有人读不到评分）就删掉 `RATINGS_SIGNING_KEY` secret —— 定时任务会 fail closed，
@@ -231,9 +292,12 @@ docs/ratings/reviews/<modId>.json
 
 ```
 infra/src/canonical.js      canonical JSON + Ed25519（纯 WebCrypto，零依赖，Worker 与 Node 共用）
-infra/src/snapshot.js       纯函数：聚合 / 分片 / 文件名白名单
+infra/src/snapshot.js       纯函数：聚合 / 分片 / 文件名白名单 / 补给线名单
+infra/src/sponsors.js       补给线名单的**种子**（线上的那份在 KV 里，见 admin.js）
+infra/src/admin.js          补给线名单的管理接口：令牌 + 校验 + KV 名单本体 + 归一化视图
 infra/src/write.js          纯函数：写接口的校验 + 待签名负载（服务端不改写客户端的值）
-infra/src/index.js          Worker 入口：读接口 + 五个写接口 + 静态资源兜底 + scheduled() 分派
+infra/src/index.js          Worker 入口：读接口 + 五个写接口 + 名单管理 + 静态资源兜底 + scheduled()
+infra/public/admin.html     维护者改名单的页面（令牌鉴权，同源 fetch）
 infra/schema.sql            建表（人读用）
 infra/migrations/0001_init.sql   D1 迁移（真正执行的）
 infra/scripts/build-snapshot.mjs 离线重算
