@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'none'">
+<title>EveJS 补给线 · 名单管理</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; padding: 40px 20px; background: #0b0f14; color: #d8e0ea;
+         font: 14px/1.6 "Segoe UI", system-ui, sans-serif; }
+  main { max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  p.sub { margin: 0 0 24px; color: #7d8b9c; }
+  .card { border: 1px solid #1d2733; border-radius: 10px; padding: 16px; margin-bottom: 14px;
+          background: #10161e; }
+  .row { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+  .line { display: flex; gap: 8px; margin-top: 10px; }
+  .line > input { flex: 1; min-width: 0; }
+  .ok { color: #45d483; } .bad { color: #ff6b6b; }
+  .muted { color: #7d8b9c; font-size: 12px; }
+  a { color: #63a9ff; }
+  input, button { font: inherit; background: #0b0f14; color: #d8e0ea;
+                  border: 1px solid #22303f; border-radius: 6px; padding: 6px 10px; }
+  input::placeholder { color: #55657a; }
+  button { cursor: pointer; background: #16232f; white-space: nowrap; }
+  button.ghost { background: transparent; color: #9fb0c4; }
+  button.tiny { padding: 2px 8px; font-size: 12px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #1d2733; }
+  th { color: #7d8b9c; font-weight: 600; }
+  td.amount { color: #ffb800; }
+  pre { margin: 12px 0 0; padding: 12px; background: #0b0f14; border-radius: 8px;
+        overflow: auto; font-size: 12px; color: #9fb0c4; max-height: 260px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>补给线名单</h1>
+  <p class="sub">在浏览器里加人就行 —— 保存后快照立刻重签，启动器按自己的 10 分钟缓存跟进。
+    <a href="/">← 状态页</a></p>
+
+  <div class="card">
+    <div class="row"><strong>管理令牌</strong><span id="state" class="muted">未连接</span></div>
+    <div class="line">
+      <input id="token" type="password" placeholder="SPONSOR_ADMIN_TOKEN" autocomplete="off">
+      <button id="connect">连接</button>
+      <button id="forget" class="ghost">清除</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row"><strong>添加 / 修改</strong><span class="muted">同名就是改金额，位置不动</span></div>
+    <div class="line">
+      <input id="name" placeholder="名字，例如 Cmdr. Nova">
+      <input id="amount" placeholder="金额，例如 50" size="12">
+      <input id="currency" placeholder="CNY" list="currencies" size="6">
+      <button id="save">保存</button>
+    </div>
+    <datalist id="currencies">
+      <option>CNY</option><option>USD</option><option>EUR</option><option>GBP</option>
+      <option>JPY</option><option>KRW</option><option>RUB</option>
+    </datalist>
+  </div>
+
+  <div class="card">
+    <div class="row"><strong>当前名单</strong><span id="meta" class="muted">未加载</span></div>
+    <table id="list"></table>
+  </div>
+
+  <div class="card">
+    <div class="row"><strong>工具</strong><span class="muted">重置 / 导出</span></div>
+    <div class="line">
+      <button id="reset" class="ghost">重置回代码名单</button>
+      <button id="export" class="ghost">导出 JSON</button>
+    </div>
+    <pre id="export-out" hidden></pre>
+  </div>
+</main>
+<script>
+  var KEY = "evejs-admin-token";
+  var byId = function (id) { return document.getElementById(id); };
+  var token = function () { return byId("token").value.trim(); };
+  var sponsors = [];
+  var source = "seed";
+
+  function say(message, bad) {
+    var el = byId("state");
+    el.textContent = message;
+    el.className = bad ? "bad" : "ok";
+  }
+
+  /** 所有请求都带 Bearer 头 —— 令牌不进 URL，也就不会留在历史记录和日志里 */
+  function api(method, path, body) {
+    return fetch(path, {
+      method: method,
+      headers: body
+        ? { "Authorization": "Bearer " + token(), "content-type": "application/json" }
+        : { "Authorization": "Bearer " + token() },
+      body: body ? JSON.stringify(body) : undefined
+    }).then(function (response) {
+      return response.json().catch(function () { return {}; }).then(function (payload) {
+        if (!response.ok || payload.ok === false) {
+          throw new Error(payload.reason || ("HTTP " + response.status));
+        }
+        return payload;
+      });
+    });
+  }
+
+  function cell(text, className) {
+    var td = document.createElement("td");
+    td.textContent = text;
+    if (className) td.className = className;
+    return td;
+  }
+
+  function render(list, nextSource) {
+    sponsors = list || [];
+    source = nextSource || source;
+    var table = byId("list");
+    table.textContent = "";
+    var head = document.createElement("tr");
+    ["#", "名字", "金额", "币种", ""].forEach(function (label) {
+      var th = document.createElement("th");
+      th.textContent = label;
+      head.appendChild(th);
+    });
+    table.appendChild(head);
+
+    sponsors.forEach(function (item, index) {
+      var row = document.createElement("tr");
+      row.appendChild(cell(String(index + 1)));
+      row.appendChild(cell(item.name));
+      row.appendChild(cell(String(item.amount), "amount"));
+      row.appendChild(cell(item.currency));
+      var actions = document.createElement("td");
+      var remove = document.createElement("button");
+      remove.textContent = "删";
+      remove.className = "ghost tiny";
+      remove.onclick = function () {
+        run(function () { return api("POST", "/v1/admin/sponsors/remove", { name: item.name }); });
+      };
+      actions.appendChild(remove);
+      row.appendChild(actions);
+      table.appendChild(row);
+    });
+
+    byId("meta").textContent = sponsors.length + " 位 · 名单来自" +
+      (source === "kv" ? "线上（KV）" : "代码里的种子名单");
+  }
+
+  /** 统一收口：成功就说话+重画，失败就把服务端给的原因原样摆出来 */
+  function run(action) {
+    return Promise.resolve().then(action).then(function (payload) {
+      if (payload && payload.sponsors) render(payload.sponsors, payload.source);
+      say("已保存 · " + new Date().toLocaleTimeString(), false);
+      return true;
+    }).catch(function (error) {
+      say(String(error && error.message ? error.message : error), true);
+      return false;
+    });
+  }
+
+  byId("connect").onclick = function () {
+    localStorage.setItem(KEY, token());
+    run(function () { return api("GET", "/v1/admin/sponsors"); });
+  };
+
+  byId("forget").onclick = function () {
+    localStorage.removeItem(KEY);
+    byId("token").value = "";
+    say("已清掉本机保存的令牌", false);
+  };
+
+  byId("save").onclick = function () {
+    var name = byId("name").value.trim();
+    var amount = byId("amount").value.trim();
+    if (!name || !amount) { say("名字和金额都要填", true); return; }
+    run(function () {
+      return api("POST", "/v1/admin/sponsors", {
+        name: name, amount: amount, currency: byId("currency").value.trim()
+      });
+    }).then(function (ok) {
+      if (!ok) return;
+      byId("name").value = "";
+      byId("amount").value = "";
+      byId("name").focus();
+    });
+  };
+
+  ["name", "amount", "currency"].forEach(function (id) {
+    byId(id).addEventListener("keydown", function (event) {
+      if (event.key === "Enter") byId("save").click();
+    });
+  });
+
+  byId("reset").onclick = function () {
+    if (!confirm("清掉线上那份名单，回到代码里那份种子名单？")) return;
+    run(function () { return api("POST", "/v1/admin/sponsors/reset", {}); });
+  };
+
+  byId("export").onclick = function () {
+    var out = byId("export-out");
+    out.hidden = false;
+    out.textContent = JSON.stringify(sponsors, null, 2);
+    var copied = navigator.clipboard && navigator.clipboard.writeText(out.textContent);
+    if (copied && copied.then) {
+      copied.then(function () { say("已导出，并复制到剪贴板", false); }).catch(function () { say("已导出（复制失败，手动选中即可）", false); });
+    }
+  };
+
+  var saved = localStorage.getItem(KEY);
+  if (saved) { byId("token").value = saved; byId("connect").click(); }
+</script>
+</body>
+</html>

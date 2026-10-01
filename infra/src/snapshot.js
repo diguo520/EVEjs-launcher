@@ -99,6 +99,59 @@ export function reviewShard(modId, rows) {
   return { schemaVersion: SNAPSHOT_SCHEMA_VERSION, modId, reviews }
 }
 
+/* ------------------------------ 补给线（赞助人） ------------------------------ */
+
+/**
+ * 币种码：三位字母，认不出来就**退回 CNY** —— 与其显示一个空符号，
+ * 不如按「名单里绝大多数是人民币」这个先验兜底，错的也只是符号不是名字。
+ */
+export function normalizeCurrency(value) {
+  const code = String(value ?? "").trim().toUpperCase()
+  return /^[A-Z]{3}$/.test(code) ? code : "CNY"
+}
+
+/** 金额：数字直接用；字符串先 trim（空串要判掉 —— `Number("")` 是 0，会把「没写金额」变成 0 元） */
+function toAmount(value) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null
+  const raw = String(value ?? "").trim()
+  if (!raw) return null
+  const parsed = Number(raw)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+/**
+ * 补给线名单快照。纯函数：名单数组进、可签名负载出。
+ *
+ * 校验口径与启动器侧 `ui/src/lib/sponsor-source.ts` 的 `toSponsorEntry` 一致：
+ * 名字 trim 后不能为空、金额是有限非负数、同名只留第一条；额外在这里保证 id 唯一
+ * （启动器的动画层拿它当 key）。
+ *
+ * 顺序按维护者给的顺序原样保留 —— 谁排前面是名单的事，不是这里该猜的。
+ */
+export function sponsorSnapshot(entries, now = Date.now()) {
+  const seenNames = new Set()
+  const seenIds = new Set()
+  const sponsors = []
+  for (const entry of entries ?? []) {
+    const name = String(entry?.name ?? "").trim()
+    if (!name || seenNames.has(name)) continue
+    const amount = toAmount(entry?.amount)
+    if (amount === null || amount < 0) continue
+    const id = String(entry?.id ?? "").trim()
+    const fallback = `sponsor-${String(sponsors.length + 1).padStart(2, "0")}`
+    const stable = id && !seenIds.has(id) ? id : fallback
+    seenIds.add(stable)
+    seenNames.add(name)
+    sponsors.push({
+      id: stable,
+      name,
+      amount: round2(amount),
+      currency: normalizeCurrency(entry?.currency),
+    })
+  }
+  return { schemaVersion: SNAPSHOT_SCHEMA_VERSION, generatedAt: Number(now), sponsors }
+}
+
 /**
  * 分片文件名：模组 id 允许小写字母 / 数字 / 短横（创建表单就限这些），
  * 但仍做一次白名单过滤——id 直接进 URL 路径，不能留 `..` 或 `/` 的口子。

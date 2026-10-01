@@ -10,7 +10,11 @@
  *
  * 用法：
  *   node infra/scripts/build-snapshot.mjs --rows rows.json --out .parity-out/ratings \
- *        --key .keys/ratings-key.pem --key-id evejs-ratings-2026-10-01
+ *        --key .keys/ratings-key.pem --key-id evejs-ratings-2026-10-01 [--sponsors sponsors.json]
+ *
+ * 补给线名单跟 D1 无关（它的本体在 KV 里，见 `src/admin.js`）：要把线上那份写进镜像，
+ * 就加 `--sponsors <名单.json>` —— 文件内容就是 `/admin.html` 上「导出 JSON」给出的那份；
+ * 不给就退回代码里的种子名单。
  *
  * 取 rows 的两条路（`--rows` 只吃 JSON 文件，故意不在这儿连网）：
  *   npx wrangler d1 execute evejs-mod-ratings --remote --json \
@@ -21,7 +25,8 @@ import fs from "node:fs"
 import path from "node:path"
 
 import { bytesToBase64, signDocument } from "../src/canonical.js"
-import { SNAPSHOT_SCHEMA_VERSION, aggregateReviews, reviewShard, shardPath } from "../src/snapshot.js"
+import { SNAPSHOT_SCHEMA_VERSION, aggregateReviews, reviewShard, shardPath, sponsorSnapshot } from "../src/snapshot.js"
+import { SPONSOR_LIST } from "../src/sponsors.js"
 
 const args = process.argv.slice(2)
 const value = (name, fallback = null) => {
@@ -29,6 +34,7 @@ const value = (name, fallback = null) => {
   return index >= 0 && args[index + 1] ? args[index + 1] : fallback
 }
 
+const sponsorsPath = value("--sponsors")
 const rowsPath = value("--rows")
 const outDir = value("--out")
 const keyPath = value("--key")
@@ -52,6 +58,14 @@ function readRows(file) {
   throw new Error("rows 文件既不是数组，也没有 results 字段")
 }
 
+/** 管理页导出的名单：`[{name, amount, currency}]`，也接受套着 `sponsors` 字段的外形 */
+function readSponsorFile(file) {
+  const parsed = JSON.parse(fs.readFileSync(file, "utf8"))
+  const rows = Array.isArray(parsed) ? parsed : parsed?.sponsors
+  if (!Array.isArray(rows)) throw new Error("名单文件既不是数组，也没有 sponsors 字段")
+  return rows
+}
+
 const privateKey = crypto.createPrivateKey(fs.readFileSync(keyPath))
 const secret = bytesToBase64(privateKey.export({ type: "pkcs8", format: "der" }))
 const rows = readRows(rowsPath)
@@ -70,6 +84,16 @@ const ratings = await signDocument(
 )
 write("ratings.json", ratings)
 
+// 补给线名单不来自 D1，但镜像里必须有这一份 —— 启动器内置的第二个地址就指向
+// GitHub 镜像目录，漏了它备门就少一个文件。名单本体以线上 KV 为准，所以这里优先用
+// --sponsors 传进来的那份，没传才是代码里的种子。
+const sponsors = await signDocument(
+  secret,
+  sponsorSnapshot(sponsorsPath ? readSponsorFile(sponsorsPath) : SPONSOR_LIST, generatedAt),
+  keyId
+)
+write("sponsors.json", sponsors)
+
 let shards = 0
 const modIds = [...new Set(rows.filter((row) => !row?.hidden).map((row) => String(row.mod_id)))].sort()
 for (const modId of modIds) {
@@ -82,4 +106,7 @@ for (const modId of modIds) {
   shards += 1
 }
 
-console.log(`已写入 ${outDir}：${Object.keys(ratings.mods).length} 个模组的聚合分、${shards} 份评论分片（keyId=${keyId}）`)
+console.log(
+  `已写入 ${outDir}：${Object.keys(ratings.mods).length} 个模组的聚合分、${shards} 份评论分片、` +
+    `${sponsors.sponsors.length} 位赞助人（keyId=${keyId}）`
+)

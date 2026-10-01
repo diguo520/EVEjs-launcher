@@ -6,17 +6,31 @@
  *   KV  → 定时任务算出来的只读快照，启动器读的就是它
  *   cron→ 每 10 分钟重算快照；每小时同步版本白名单
  *
+ * 另有一个**只给维护者用**的名单管理接口（`/v1/admin/sponsors*`，令牌鉴权，实现在 `admin.js`）：
+ * 补给线名单既不进 D1 也不锁在代码里 —— 在网页上填个名字和金额就行，写完立刻重签快照。
+ *
  * 读路径是**纯静态快照**（不是按请求查库）：启动器那边是「多镜像 + 本地缓存」的读法，
  * 快照才能被边缘缓存、被镜像、被离线重算，按请求现算的接口三样都做不到。
  *
  * M1 只做读；写接口（POST /v1/reviews 等）在 M2 接上，表结构已经建好。
  */
+import {
+  SPONSOR_SOURCE_KEY,
+  adminTokenState,
+  checkAdminRequest,
+  loadSponsorSource,
+  removeSponsor,
+  saveSponsorSource,
+  sponsorView,
+  upsertSponsor,
+} from "./admin.js"
 import { keyIdFromRaw, signDocument, verifyPayload } from "./canonical.js"
 import {
   SNAPSHOT_SCHEMA_VERSION,
   aggregateReviews,
   reviewShard,
   shardPath,
+  sponsorSnapshot,
 } from "./snapshot.js"
 import {
   MAX_REPORTS_PER_DAY,
@@ -33,6 +47,12 @@ import {
 
 const RATINGS_KEY = "snapshot:ratings"
 const REVIEWS_PREFIX = "snapshot:reviews:"
+/**
+ * 补给线那份名单没有 D1 表，KV 里因此放两样东西（键前缀分开，别混）：
+ *   - `snapshot:sponsors`：算好并签名的快照，启动器读的就是它；
+ *   - `source:sponsors`（`admin.js` 的 SPONSOR_SOURCE_KEY）：名单**本体**，管理接口写的。
+ */
+const SPONSORS_KEY = "snapshot:sponsors"
 
 /** 默认索引地址：与启动器 `registry.rs` 的 DEFAULT_INDEX_URLS 同源 */
 const DEFAULT_INDEX_URLS = [
@@ -113,7 +133,20 @@ export async function rebuildSnapshots(env, now = Date.now()) {
     await env.SNAPSHOTS.put(REVIEWS_PREFIX + modId, JSON.stringify(shard))
     shards += 1
   }
-  return { ok: true, mods: Object.keys(ratings.mods).length, shards, rows: rows.length }
+  // 补给线名单：与评价无关，同一次 cron 里一起重签。名单本体在 KV（管理接口写的），
+  // 没写过就用代码里那份种子；不依赖 D1，所以即使一条评价都没有也照发。
+  const { entries: sponsorEntries, source: sponsorsSource } = await loadSponsorSource(env)
+  const sponsors = await signer(sponsorSnapshot(sponsorEntries, now))
+  await env.SNAPSHOTS.put(SPONSORS_KEY, JSON.stringify(sponsors))
+
+  return {
+    ok: true,
+    mods: Object.keys(ratings.mods).length,
+    shards,
+    rows: rows.length,
+    sponsors: sponsors.sponsors.length,
+    sponsorsSource,
+  }
 }
 
 /* ------------------------------ 版本白名单 ------------------------------ */
@@ -220,14 +253,27 @@ async function signingProbe(env) {
   }
 }
 
+/** 快照里有多少条赞助人：给运维一眼看出「名单发出去没有」 */
+function sponsorCount(text) {
+  if (!text) return 0
+  try {
+    const parsed = JSON.parse(text)
+    return Array.isArray(parsed?.sponsors) ? parsed.sponsors.length : 0
+  } catch {
+    return 0
+  }
+}
+
 async function health(env) {
-  const [counts, jobs] = await Promise.all([
+  const [counts, jobs, sponsors, sponsorSource] = await Promise.all([
     env.DB.prepare(
       `SELECT (SELECT COUNT(*) FROM reviews) AS reviews,
               (SELECT COUNT(*) FROM mod_versions WHERE active = 1) AS versions,
               (SELECT COUNT(*) FROM replies) AS replies`
     ).first(),
     env.DB.prepare(`SELECT job, ran_at, ok, detail FROM job_runs`).all(),
+    env.SNAPSHOTS.get(SPONSORS_KEY),
+    env.SNAPSHOTS.get(SPONSOR_SOURCE_KEY),
   ])
   const signing = await signingProbe(env)
   return {
@@ -236,7 +282,11 @@ async function health(env) {
     schemaVersion: SNAPSHOT_SCHEMA_VERSION,
     signing: signing.state,
     signingReason: signing.reason ?? "",
-    counts: counts ?? {},
+    counts: { ...(counts ?? {}), sponsors: sponsorCount(sponsors) },
+    // 名单归谁管：kv（管理接口写过）/ seed（还在用代码里那份种子）
+    sponsorsSource: sponsorSource ? "kv" : "seed",
+    // 管理接口开着没：没配令牌就是关的（fail closed）
+    sponsorsAdmin: adminTokenState(env).ok ? "on" : "off",
     jobs: jobs?.results ?? [],
   }
 }
@@ -300,15 +350,18 @@ async function consumeQuota(env, bucket, limit) {
  * 按 IP 限流的桶键。原始 IP **在这一刻就变成 HMAC**，既不落库也不进日志：
  * IPv4 只有 2^32 个，裸 sha256 反查等于明文存 IP；带一把密钥的 HMAC 就没法反查了。
  * 密钥借用签名私钥（一把随机密钥、永不外泄），不再多要一个 secret。
+ *
+ * `prefix` 让不同用途各用各的桶：评价写用默认的 `i:`，名单管理用 `a:` ——
+ * 共用一个桶的话，正常打分会把维护者那点额度吃光。
  */
-async function ipBucket(request, env, now) {
+async function ipBucket(request, env, now, prefix = "i:") {
   const ip = String(request.headers.get("CF-Connecting-IP") ?? "").trim()
   if (!ip) return ""
   const secret = String(env?.RATINGS_SIGNING_KEY ?? "") || "evejs-mod-ratings"
   const key = await crypto.subtle.importKey("raw", writeEncoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"])
   const mac = new Uint8Array(await crypto.subtle.sign("HMAC", key, writeEncoder.encode(ip)))
   const digest = [...mac.slice(0, 8)].map((byte) => byte.toString(16).padStart(2, "0")).join("")
-  return "i:" + digest + ":" + hourKey(now)
+  return prefix + digest + ":" + hourKey(now)
 }
 
 /** 这十条只喂给 aggregateReviews，字段名与它读的一致 */
@@ -466,6 +519,73 @@ async function createReport(request, env, input) {
   return json({ ok: true, reportId: id }, 200, NO_STORE)
 }
 
+/* ------------------------------ 补给线名单管理（只给维护者） ------------------------------ */
+
+/** 管理接口的限流：猜令牌也该有个上限。一小时 60 次，正常维护碰不到 */
+const MAX_ADMIN_PER_HOUR = 60
+
+/** GET /v1/admin/sponsors：把当前名单回给管理页 —— 归一化后的视图，看到的就是启动器最终显示的 */
+async function listSponsors(request, env) {
+  const auth = checkAdminRequest(request, env)
+  if (!auth.ok) return json({ ok: false, reason: auth.reason }, auth.status, NO_STORE)
+  const { entries, source } = await loadSponsorSource(env)
+  return json({ ok: true, source, sponsors: sponsorView(entries) }, 200, NO_STORE)
+}
+
+/**
+ * POST /v1/admin/sponsors        { name, amount, currency? }  加或改（同名改金额，位置不动）
+ * POST /v1/admin/sponsors/remove { name } 或 { id }           删
+ * POST /v1/admin/sponsors/reset  {}                           清掉 KV 那份，退回代码里的种子
+ *
+ * 成功的写由 handleWrite 统一触发一次重算快照，所以启动器那边最多再等它自己的 10 分钟缓存。
+ */
+async function handleAdminWrite(pathname, request, env, input) {
+  const auth = checkAdminRequest(request, env)
+  if (!auth.ok) return json({ ok: false, reason: auth.reason }, auth.status, NO_STORE)
+
+  const now = Date.now()
+  if (!(await consumeQuota(env, await ipBucket(request, env, now, "a:"), MAX_ADMIN_PER_HOUR))) {
+    return json({ ok: false, reason: "这个网络一小时内改得太频繁了" }, 429, NO_STORE)
+  }
+
+  const { entries } = await loadSponsorSource(env)
+
+  if (pathname === "/v1/admin/sponsors/reset") {
+    await env.SNAPSHOTS.delete(SPONSOR_SOURCE_KEY)
+    const restored = await loadSponsorSource(env)
+    return json(
+      { ok: true, action: "reset", source: restored.source, sponsors: sponsorView(restored.entries) },
+      200,
+      NO_STORE
+    )
+  }
+
+  if (pathname === "/v1/admin/sponsors/remove") {
+    const result = removeSponsor(entries, input)
+    if (!result.ok) return json({ ok: false, reason: result.reason }, 400, NO_STORE)
+    if (result.removed) await saveSponsorSource(env, result.entries)
+    return json(
+      // source 直接给 "kv"：只要这条路径写成功，名单本体就一定在 KV 里了（管理页据此显示「线上」）
+      { ok: true, action: "remove", source: "kv", removed: result.removed, sponsors: sponsorView(result.entries) },
+      200,
+      NO_STORE
+    )
+  }
+
+  if (pathname === "/v1/admin/sponsors") {
+    const result = upsertSponsor(entries, input)
+    if (!result.ok) return json({ ok: false, reason: result.reason }, 400, NO_STORE)
+    await saveSponsorSource(env, result.entries)
+    return json(
+      { ok: true, action: result.mode, source: "kv", sponsors: sponsorView(result.entries) },
+      200,
+      NO_STORE
+    )
+  }
+
+  return json({ ok: false, reason: "没有这个管理接口" }, 404, NO_STORE)
+}
+
 /** 请求体上限：2000 字的正文加上签名和各种 id，16KB 绰绰有余 */
 const MAX_WRITE_BODY_BYTES = 16 * 1024
 
@@ -481,8 +601,9 @@ async function handleWrite(pathname, request, env, ctx) {
     return json({ ok: false, reason: "请求体不是合法 JSON" }, 400, NO_STORE)
   }
   const country = sanitizeCountry(request.cf?.country)
-  const respond =
-    pathname === "/v1/reviews"
+  const respond = pathname.startsWith("/v1/admin/")
+    ? await handleAdminWrite(pathname, request, env, input)
+    : pathname === "/v1/reviews"
       ? await upsertReview(request, env, input, country)
       : pathname === "/v1/reviews/retract"
         ? await retractReview(env, input)
@@ -518,8 +639,15 @@ async function handle(request, env, ctx) {
   if (pathname === "/v1/health") {
     return json(await health(env), 200, { "cache-control": "no-store" })
   }
+  // 管理接口：带令牌才给回包，**不发 CORS 头**（别的站点读不到），也不进缓存
+  if (pathname === "/v1/admin/sponsors") {
+    return listSponsors(request, env)
+  }
   if (pathname === "/v1/ratings.json") {
     return serveSnapshot(env, RATINGS_KEY)
+  }
+  if (pathname === "/v1/sponsors.json") {
+    return serveSnapshot(env, SPONSORS_KEY)
   }
   const modId = reviewIdFromPath(pathname)
   if (modId) {
