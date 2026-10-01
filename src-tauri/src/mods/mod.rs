@@ -15,6 +15,8 @@ pub mod claim;
 pub mod desktop;
 pub mod pkg;
 pub mod plan;
+pub mod ratings;
+pub mod review;
 pub mod registry;
 pub mod scaffold;
 pub mod scan;

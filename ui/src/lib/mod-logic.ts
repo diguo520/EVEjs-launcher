@@ -256,6 +256,34 @@ export function ratingOf(mod: ModEntry): RatingSummary {
   return { average: mod.ratingAvg, count: mod.ratingCount }
 }
 
+/**
+ * 从评论列表本身算聚合分。
+ *
+ * 服务端的聚合表（`ratings.json`）与模组分片用的是**同一份 SQL、同一个 hidden 过滤**，
+ * 所以分片里就是该模组的全部评价，两者口径逐字一致。差别在时效：分片在写完评价后
+ * 立刻重算（Worker 里 `ctx.waitUntil(rebuildSnapshots)`），聚合表要等索引下一次刷新 ——
+ * 拿分片算，用户刚投的那一票马上就能在汇总行看到，不会「打了分平均分不动」。
+ */
+export function ratingFromReviews(
+  reviews: ModReview[]
+): Pick<ModEntry, "ratingAvg" | "ratingCount" | "ratingHistogram"> {
+  const histogram = [0, 0, 0, 0, 0]
+  let sum = 0
+  let count = 0
+  for (const review of reviews) {
+    const stars = Math.round(review.stars)
+    if (!Number.isInteger(stars) || stars < 1 || stars > 5) continue
+    histogram[stars - 1] += 1
+    sum += stars
+    count += 1
+  }
+  return {
+    ratingAvg: count > 0 ? Math.round((sum / count) * 100) / 100 : 0,
+    ratingCount: count,
+    ratingHistogram: histogram,
+  }
+}
+
 /** 写了评论的人数，和评分人数不是一回事 */
 export function reviewCount(mod: ModEntry): number {
   return mod.reviews.length
@@ -801,6 +829,16 @@ export const EMPTY_MOD_README = "还没有填写功能说明。"
  * 写在这个数以内，任何窗口宽度下卡片都不会省略；再长也不会丢，详情里能看到全文。
  */
 export const SAFE_DESC_LENGTH = 60
+
+/**
+ * 列表里只占一行的简介：超过 60 字（SAFE_DESC_LENGTH）截断并补省略号。
+ * 「发布到市场」的模组清单一行放不下更多，全文字挂在行的 title 上，
+ * 鼠标停上去仍能看到完整简介。
+ */
+export function clampDesc(text: string | undefined | null, limit = SAFE_DESC_LENGTH): string {
+  const trimmed = (text ?? "").trim()
+  return trimmed.length > limit ? trimmed.slice(0, limit) + "…" : trimmed
+}
 
 /** 创建表单的报错：第二行用来补充说明，没内容就不显示 */
 export interface NewModError {

@@ -20,6 +20,8 @@ import type {
   RawMyMods,
   RawMySubmissions,
   RawPublishProgress,
+  RawReviewShard,
+  RawWriteAck,
   RawTokenCheck,
   RawTokenSave,
   RawSubmissionItem,
@@ -30,9 +32,15 @@ import type {
   RawReadme,
 } from "@/lib/ipc"
 import { CLAIM_PAGE_SIZE, CLAIM_SCOPE_DEFAULT, type ClaimQuery } from "@/lib/mod-claim"
-import { buildMods, latestSubmission, sourceRepoIds } from "@/lib/mod-source"
+import { buildMods, latestSubmission, reviewsOf, sourceRepoIds } from "@/lib/mod-source"
 import type { PublishCredential } from "@/lib/mod-logic"
-import type { ModEntry } from "@/lib/mock"
+import type { ModEntry, ModReview } from "@/lib/mock"
+
+/**
+ * 写完评价 / 回复后二次拉取评论的等待：服务端是写成功之后才异步重算快照的，
+ * 立刻拉大概率还是旧的那份。
+ */
+const REVIEW_REFRESH_DELAY_MS = 1500
 
 /** 一次提交要走的真流程：先打包（离线）→ 推到作者自己的仓库 → 提交版本审核 PR */
 export interface PublishInput {
@@ -110,6 +118,29 @@ export interface ModSourceState {
   marketRefreshing: boolean
   /** 强制联网同步一次索引（绕过 TTL），返回这次的原始回包 */
   refreshMarket: () => Promise<RawMarketList | null>
+  /** 评价源这次到底取没取到（读不到时市场照常出，只是没有评分） */
+  ratingsAvailable: boolean
+  ratingsReason: string
+  /** 某个模组的评论是否已经拉回来过 */
+  reviewsLoaded: (id: string) => boolean
+  /** 按需拉某个模组的评论正文（打开详情弹窗时调；force 绕过缓存） */
+  loadReviews: (id: string, force?: boolean) => Promise<void>
+  /** 打分 / 改分。`pkgSha256` 是市场索引里那一版的安装包指纹，服务端据此确认「真的装过」 */
+  submitReview: (input: {
+    modId: string
+    version: string
+    pkgSha256: string
+    stars: number
+    body: string
+  }) => Promise<RawWriteAck>
+  /** 撤回自己那条评价（打分与评论一起撤） */
+  retractReview: (modId: string) => Promise<RawWriteAck>
+  /** 作者回复 / 改回复。鉴权在服务端：签名用的 keyId 必须命中该模组的作者 */
+  submitReply: (input: { modId: string; reviewId: string; body: string }) => Promise<RawWriteAck>
+  /** 撤回作者回复 */
+  retractReply: (input: { modId: string; reviewId: string }) => Promise<RawWriteAck>
+  /** 举报一条评价：服务端只入库、不自动处置 */
+  reportReview: (input: { modId: string; reviewId: string; reason: string }) => Promise<RawWriteAck>
   /** 作者身份数据目录（author:get.dataDir） */
   dataDir: string
   /** 身份创建时间（毫秒时间戳） */
@@ -189,6 +220,8 @@ export function useModSource(): ModSourceState {
   const [publishProgress, setPublishProgress] = useState<RawPublishProgress | null>(null)
   const [publishPhase, setPublishPhase] = useState<PublishPhase>("idle")
   const [downloadProgress, setDownloadProgress] = useState<Record<string, RawDownloadProgress>>({})
+  /** 已经拉回来的评论正文：只在打开过详情的模组上才有键 */
+  const [reviewsById, setReviewsById] = useState<Record<string, ModReview[]>>({})
 
   /** 提交期间要读到最新的 mods（folder 映射用） */
   const listRef = useRef<RawModList | null>(null)
@@ -230,6 +263,81 @@ export function useModSource(): ModSourceState {
       setMarketRefreshing(false)
     }
   }, [ipc, applyMarket])
+
+  /**
+   * 按需拉评论正文。返回的评论**只进内存**（不落盘、不进索引缓存）：
+   * 正文是附加信息，丢了顶多详情页空一下，重开弹窗就再拉一次。
+   *
+   * 已经拉过且不是强制刷新就直接返回 —— 详情弹窗每次开关都打一次接口太浪费。
+   */
+  const loadReviews = useCallback(
+    async (id: string, force = false) => {
+      if (!ipc || !id) return
+      if (!force && reviewsById[id]) return
+      const reply = await callOr<RawReviewShard>("modsReviews", null, id, force)
+      if (!reply || reply.ok !== true) return
+      setReviewsById((prev) => ({ ...prev, [id]: reviewsOf(reply.reviews) }))
+    },
+    [ipc, reviewsById]
+  )
+
+  /**
+   * 写完之后把评论重新拉一遍。
+   *
+   * 读路径是一份**静态快照**，服务端在写成功之后才异步重算（Worker 里 `ctx.waitUntil`），
+   * 所以写完立刻拉很可能还是旧的。这里拉一次、等一会儿再拉一次，而且**不等它**：
+   * 界面先给出「提交成功」，一两秒后自己那一条就挂上来。
+   */
+  const refreshReviewsAfterWrite = useCallback(
+    async (id: string) => {
+      await loadReviews(id, true)
+      await new Promise((done) => setTimeout(done, REVIEW_REFRESH_DELAY_MS))
+      await loadReviews(id, true)
+    },
+    [loadReviews]
+  )
+
+  /** 五个写通道的公共收尾：签名与限流都在后端，这里只负责「成功就刷新、失败带原因回来」 */
+  const writeReviewAction = useCallback(
+    async (channel: string, args: unknown, modId: string): Promise<RawWriteAck> => {
+      const reply = (await callOr<RawWriteAck>(channel, null, args)) ?? {
+        ok: false,
+        reason: "没有回包",
+      }
+      if (reply.ok) void refreshReviewsAfterWrite(modId)
+      return reply
+    },
+    [refreshReviewsAfterWrite]
+  )
+
+  const submitReview = useCallback(
+    (input: { modId: string; version: string; pkgSha256: string; stars: number; body: string }) =>
+      writeReviewAction("modsReviewSubmit", input, input.modId),
+    [writeReviewAction]
+  )
+
+  const retractReview = useCallback(
+    (modId: string) => writeReviewAction("modsReviewRetract", { modId }, modId),
+    [writeReviewAction]
+  )
+
+  const submitReply = useCallback(
+    (input: { modId: string; reviewId: string; body: string }) =>
+      writeReviewAction("modsReplySubmit", input, input.modId),
+    [writeReviewAction]
+  )
+
+  const retractReply = useCallback(
+    (input: { modId: string; reviewId: string }) =>
+      writeReviewAction("modsReplyRetract", input, input.modId),
+    [writeReviewAction]
+  )
+
+  const reportReview = useCallback(
+    (input: { modId: string; reviewId: string; reason: string }) =>
+      writeReviewAction("modsReportReview", input, input.modId),
+    [writeReviewAction]
+  )
 
   const load = useCallback(async () => {
     if (!ipc) return
@@ -288,8 +396,16 @@ export function useModSource(): ModSourceState {
 
   const mods = useMemo(
     // 提交台账也带上：详情页的「版本历史」在索引更新前只能靠作者的逐版本记录
-    () => buildMods({ list, market, mine, submissions: submissions?.items, locale }),
-    [list, market, mine, submissions, locale]
+    () =>
+      buildMods({
+        list,
+        market,
+        mine,
+        submissions: submissions?.items,
+        reviews: reviewsById,
+        locale,
+      }),
+    [list, market, mine, submissions, reviewsById, locale]
   )
 
   const marketById = useMemo(() => {
@@ -570,6 +686,15 @@ export function useModSource(): ModSourceState {
     marketReason,
     marketRefreshing,
     refreshMarket,
+    ratingsAvailable: market?.ratings?.available === true,
+    ratingsReason: market?.ratings?.reason ?? "",
+    reviewsLoaded: (id: string) => Boolean(reviewsById[id]),
+    loadReviews,
+    submitReview,
+    retractReview,
+    submitReply,
+    retractReply,
+    reportReview,
     dataDir: author?.dataDir ?? "",
     authorSince: typeof author?.author?.since === "number" ? author.author.since : 0,
     lastSubmissionOf: (id: string) => latestSubmission(submissions?.items, id),

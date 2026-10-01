@@ -7,10 +7,12 @@ import ja from "@/locales/ja.json"
 import ko from "@/locales/ko.json"
 import nl from "@/locales/nl.json"
 import ru from "@/locales/ru.json"
+import { COUNTRY_FLAG_CODES, countryFlagUrl } from "@/lib/flags.generated"
 import {
   FALLBACK_LOCALE,
   LOCALES,
   catalogSize,
+  countryName,
   detectLocale,
   hasEntry,
   localeName,
@@ -187,6 +189,73 @@ describe("i18n", () => {
       "[启动器] {service} · {action}",
       "一键启动序列开始 · 环境自检门禁通过",
       "启动序列完成",
+    ]
+    for (const code of ["en", "ja", "ko", "fr", "de", "nl", "ru"] as const) {
+      for (const key of keys) expect(hasEntry(code, key), code + " · " + key).toBe(true)
+    }
+  })
+})
+
+/**
+ * 评论署名与顶部语言切换器：地区名走 Intl、旗子走 ui/public/flags/ 下按需加载的 SVG。
+ * 这两条一起决定「来自 <地区> 的玩家」那一行长什么样，缺一都会退化成地球图标。
+ */
+describe("国家 / 地区码", () => {
+  it("地区名按当前语言取（跟系统 ICU 走，不维护对照表）", () => {
+    expect(countryName("DE", "zh")).toBe("德国")
+    expect(countryName("de", "en")).toBe("Germany")
+    expect(countryName("DE", "ja")).toBe("ドイツ")
+    expect(countryName("US", "ru")).toBe("Соединенные Штаты")
+    // 香港的 ICU 译名太长（「中国香港特别行政区」），按玩家习惯压成两个字
+    expect(countryName("HK", "zh")).toBe("香港")
+  })
+
+  it("不是两字母地区码的一律给空串（调用方据此说「未知地区」）", () => {
+    expect(countryName("", "en")).toBe("")
+    expect(countryName("CHN", "en")).toBe("")
+    expect(countryName("T1", "en")).toBe("")
+  })
+
+  it("八种语言的旗子都在生成清单里，路径也对得上", () => {
+    for (const item of LOCALES) {
+      expect(COUNTRY_FLAG_CODES, item.code).toContain(item.flagCode)
+      expect(countryFlagUrl(item.flagCode), item.code).toBe(
+        "./flags/" + item.flagCode.toLowerCase() + ".svg"
+      )
+    }
+  })
+
+  it("清单外的地区码不给路径（界面退化成地球图标，不是错误）", () => {
+    expect(countryFlagUrl("ZZ")).toBe("")
+  })
+
+  it("「来自 {country} 的玩家」按语言拼，占位符不残留", () => {
+    expect(translate("en", "来自 {country} 的玩家", { country: "Germany" })).toBe(
+      "Player from Germany"
+    )
+    expect(translate("ja", "来自 {country} 的玩家", { country: "ドイツ" })).toBe(
+      "ドイツのプレイヤー"
+    )
+    // 法语和俄语里「来自 + 国名」要变格 / 变冠词（du Japon、из Японии），
+    // 而 Intl.DisplayNames 只给主格形式。硬拼会写出 "Joueur de Japon"、"Игрок из Япония"
+    // 这种病句，所以这两门语言换成不带介词的说法。改回去之前先想清楚这一点。
+    expect(translate("fr", "来自 {country} 的玩家", { country: "Japon" })).toBe("Joueur (Japon)")
+    expect(translate("ru", "来自 {country} 的玩家", { country: "Япония" })).toBe("Игрок (Япония)")
+    expect(translate("zh", "来自未知地区的玩家")).toBe("来自未知地区的玩家")
+  })
+
+  it("评论区新文案七种语言都有条目", () => {
+    const keys = [
+      "来自 {country} 的玩家",
+      "来自未知地区的玩家",
+      "评价已提交",
+      "评价已撤回",
+      "评价没能提交",
+      "撤回评价失败",
+      "回复已发布",
+      "回复已撤回",
+      "回复没能发布",
+      "撤回回复失败",
     ]
     for (const code of ["en", "ja", "ko", "fr", "de", "nl", "ru"] as const) {
       for (const key of keys) expect(hasEntry(code, key), code + " · " + key).toBe(true)

@@ -1,0 +1,10 @@
+{
+  "keyId": "evejs-ratings-parity-fixture",
+  "pubkey": "P5Ff2fawc4t4PhYpYq2m2aBu2CQvwC5T7D4T3uO/A0Y=",
+  "seedSha256Of": "evejs-s4-ratings-fixture",
+  "verdicts": {
+    "valid.json": true,
+    "tampered.json": false,
+    "bad-signature.json": false
+  }
+}

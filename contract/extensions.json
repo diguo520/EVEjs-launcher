@@ -54,6 +54,57 @@
       "why": "现役版的「编辑信息」只存在于渲染层：主进程没有任何改写清单的通道（modManager.ts 里唯一写清单的地方在 signModFolder 里）。新界面按原型提供了编辑弹窗，如果不落一个真通道，保存就只能弹一句「请直接改文件」。"
     },
     {
+      "api": "modsReviews",
+      "channel": "mods:reviews",
+      "kind": "invoke",
+      "signature": "modId: string, force?: boolean",
+      "params": [
+        "modId",
+        "force"
+      ],
+      "why": "模组市场的评分与评论由 infra/ 的 Cloudflare 服务托管（Workers + D1），启动器只读快照。聚合分跟主索引一起回来，评论正文更大，所以单独一条通道按需拉：打开详情弹窗才拉一次、按模组缓存，没打开过的模组不占流量。回包里每条评论带 keyId，后端据此对照本机作者身份标出 mine，界面才能把「我的评价」单拎出来改。"
+    },
+    {
+      "api": "modsReviewSubmit",
+      "channel": "mods:reviewSubmit",
+      "kind": "invoke",
+      "signature": "input: { modId: string; version: string; pkgSha256: string; stars: number; body: string }",
+      "params": ["input"],
+      "why": "评价的写路径。启动器不注册账号：署名与身份都用本机那套 Ed25519 作者身份（没有就现建一套，评价的主体正是没发过模组的普通玩家），服务端按公钥指纹一人一票。真正的闸门在服务端 —— 报上去的 pkgSha256 必须命中 mod_versions 白名单，也就是「你确实装过这个版本」，客户端自称不算数。签名覆盖的就是发出去的原值（正文先在本地规范化），服务端不替客户端改写再验签。"
+    },
+    {
+      "api": "modsReviewRetract",
+      "channel": "mods:reviewRetract",
+      "kind": "invoke",
+      "signature": "input: { modId: string }",
+      "params": ["input"],
+      "why": "撤回自己那条评价。人走了想删掉不该被拒绝，服务端按签名身份删除，不接受「删别人的」。"
+    },
+    {
+      "api": "modsReplySubmit",
+      "channel": "mods:replySubmit",
+      "kind": "invoke",
+      "signature": "input: { modId: string; reviewId: string; body: string }",
+      "params": ["input"],
+      "why": "模组作者回复评价。鉴权完全在服务端：签名者的 keyId 必须命中市场索引里该模组登记的作者 keyId，光靠界面上的「你是作者」不算数。"
+    },
+    {
+      "api": "modsReplyRetract",
+      "channel": "mods:replyRetract",
+      "kind": "invoke",
+      "signature": "input: { modId: string; reviewId: string }",
+      "params": ["input"],
+      "why": "删掉自己的回复。与发布回复同一套鉴权：服务端按签名身份定位那条回复。"
+    },
+    {
+      "api": "modsReportReview",
+      "channel": "mods:reportReview",
+      "kind": "invoke",
+      "signature": "input: { modId: string; reviewId: string; reason: string }",
+      "params": ["input"],
+      "why": "举报一条评价。先只入库、不自动处置：自动隐藏的规则还没定，宁可攒着人工看，也不要随手机器审掉一条正常评价。举报同样要签名，否则一个人能刷满整张表。"
+    },
+    {
       "api": "gameConfigRead",
       "channel": "gameConfig:read",
       "kind": "invoke",

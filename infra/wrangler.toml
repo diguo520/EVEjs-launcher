@@ -1,0 +1,44 @@
+# EveJS 模组市场 · 评价与评分服务
+#
+# 部署（`infra/README.md` 有完整步骤）：
+#   npx wrangler d1 create evejs-mod-ratings      # 拿到 database_id 填下面
+#   npx wrangler kv namespace create SNAPSHOTS    # 拿到 id 填下面
+#   npx wrangler d1 migrations apply evejs-mod-ratings --remote
+#   npx wrangler secret put RATINGS_SIGNING_KEY   # base64(PKCS8 DER)，见 scripts/gen-ratings-key.mjs
+#   npx wrangler secret put RATINGS_KEY_ID
+#   npx wrangler deploy
+#
+# CI 里 `database_id` / KV `id` 由 GitHub Actions 的 vars 注入（workflow 会替换占位符），
+# 本机部署就把真实 id 填进来，**别把填好的提交上去**——占位符保持原样，CI 才能覆盖。
+
+name = "evejs-mod-ratings"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+# 静态资源：只有一个给人看的状态页，方便出问题时浏览器直接打开 ping.5318.cm 看一眼
+[assets]
+directory = "public"
+binding = "ASSETS"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "evejs-mod-ratings"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+migrations_dir = "migrations"
+
+[[kv_namespaces]]
+binding = "SNAPSHOTS"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+
+[triggers]
+# 每 10 分钟重算快照；每小时整点同步版本白名单。
+# ⚠️ 两条的时间必须与 src/index.js 的 scheduled() 分派一致，改一处就要改另一处。
+crons = ["*/10 * * * *", "0 * * * *"]
+
+[observability]
+enabled = true
+
+# 自定义域：DNS 在同一个 Cloudflare 账号下，绑定时 Cloudflare 自己建 CNAME
+[[routes]]
+pattern = "ping.5318.cm"
+custom_domain = true

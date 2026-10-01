@@ -20,14 +20,14 @@ import ru from "@/locales/ru.json"
 
 /** 语言清单（顺序与老版下拉一致，名称按各自母语显示，永不翻译） */
 export const LOCALES = [
-  { code: "zh", name: "中文", flag: "🇨🇳" },
-  { code: "en", name: "English", flag: "🇬🇧" },
-  { code: "ja", name: "日本語", flag: "🇯🇵" },
-  { code: "ko", name: "한국어", flag: "🇰🇷" },
-  { code: "fr", name: "Français", flag: "🇫🇷" },
-  { code: "de", name: "Deutsch", flag: "🇩🇪" },
-  { code: "nl", name: "Nederlands", flag: "🇳🇱" },
-  { code: "ru", name: "Русский", flag: "🇷🇺" },
+  { code: "zh", name: "中文", flagCode: "CN" },
+  { code: "en", name: "English", flagCode: "GB" },
+  { code: "ja", name: "日本語", flagCode: "JP" },
+  { code: "ko", name: "한국어", flagCode: "KR" },
+  { code: "fr", name: "Français", flagCode: "FR" },
+  { code: "de", name: "Deutsch", flagCode: "DE" },
+  { code: "nl", name: "Nederlands", flagCode: "NL" },
+  { code: "ru", name: "Русский", flagCode: "RU" },
 ] as const
 
 export type LocaleCode = (typeof LOCALES)[number]["code"]
@@ -57,6 +57,56 @@ export function isLocaleCode(value: unknown): value is LocaleCode {
 
 export function localeName(code: LocaleCode): string {
   return LOCALES.find((item) => item.code === code)?.name ?? code
+}
+
+/** 语言 → 旗子用的国家码（`zh` → `CN`）；LOCALES 里已经登记，这里只是省得各处翻表 */
+export function localeFlagCode(code: LocaleCode): string {
+  return LOCALES.find((item) => item.code === code)?.flagCode ?? ""
+}
+
+/**
+ * 少数地区的 ICU 译名太长（香港在中文下是「中国香港特别行政区」），
+ * 挂在评论署名里会把那一行撑成两行。只压这几个，其余一律交给 Intl.DisplayNames。
+ */
+const REGION_NAME_OVERRIDES: Record<string, Partial<Record<LocaleCode, string>>> = {
+  HK: {
+    zh: "香港",
+    en: "Hong Kong",
+    ja: "香港",
+    ko: "홍콩",
+    fr: "Hong Kong",
+    de: "Hongkong",
+    nl: "Hongkong",
+    ru: "Гонконг",
+  },
+}
+
+/** 查表缓存：评论列表滚动时同一批地区名会被反复问，别每次都造一个 Intl.DisplayNames */
+const REGION_NAMES = new Map<string, string>()
+
+/**
+ * 国家 / 地区码 → 当前语言的地区名（`DE` → 「德国」/「Germany」）。
+ *
+ * 用 `Intl.DisplayNames` 而不是自带一张 57 地区 × 8 语言的对照表：译名跟着系统 ICU 走，
+ * 一次都不用维护，还省下几 KB —— 冷启动是启动器最在意的指标。拿不到（码不合法、
+ * 或者 WebView 太老）就退回地区码本身，宁可显示 `DE` 也不显示空白。
+ */
+export function countryName(code: string, locale: LocaleCode): string {
+  const upper = String(code ?? "").trim().toUpperCase()
+  if (!/^[A-Z]{2}$/.test(upper)) return ""
+  const key = locale + ":" + upper
+  const cached = REGION_NAMES.get(key)
+  if (cached !== undefined) return cached
+  let name = REGION_NAME_OVERRIDES[upper]?.[locale] ?? ""
+  if (!name) {
+    try {
+      name = new Intl.DisplayNames([locale], { type: "region" }).of(upper) || upper
+    } catch {
+      name = upper
+    }
+  }
+  REGION_NAMES.set(key, name)
+  return name
 }
 
 /**

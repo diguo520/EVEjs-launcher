@@ -1,0 +1,126 @@
+# 模组市场评价服务的流水线（infra/）。
+#
+# 与启动器主流水线（ci.yml）刻意分开：两边改动的文件、需要的凭据、失败归因都不一样，
+# 混在一起会让「infra 没配 secret」把启动器的绿灯拖红。
+#
+# PR  → 单测 + `wrangler deploy --dry-run`（不需要登录，能抓出配置写错）
+# main → 上面那些 + D1 迁移 + 真实部署
+#
+# 未配置 CLOUDFLARE_API_TOKEN 时部署阶段**跳过并打印提示**，不报错：
+# 仓库刚 clone 出来、或者 PR 来自 fork，都不该因此变红。
+name: Infra
+
+on:
+  push:
+    branches: ["main"]
+    paths: ["infra/**", ".github/workflows/infra.yml"]
+  pull_request:
+    paths: ["infra/**", ".github/workflows/infra.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: infra-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: infra test / dry-run
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: infra/package-lock.json
+
+      - name: 安装依赖
+        working-directory: infra
+        run: npm ci
+
+      - name: 单测（快照聚合 / 规范化签名）
+        working-directory: infra
+        run: npm test
+
+      # --dry-run 不登录、不写 KV、不建路由，只把 Worker 打包一遍并校验 wrangler.toml。
+      # 占位符在这里必须能替换成功，否则说明模板被人填成真实 id 提交了。
+      - name: 试部署（占位符替换 + 打包）
+        working-directory: infra
+        env:
+          D1_DATABASE_ID: ${{ vars.D1_DATABASE_ID || '00000000-0000-0000-0000-000000000000' }}
+          KV_NAMESPACE_ID: ${{ vars.KV_NAMESPACE_ID || '00000000000000000000000000000000' }}
+        run: |
+          node scripts/render-config.mjs
+          npx wrangler deploy --dry-run --outdir .wrangler-dry
+
+  deploy:
+    name: migrate / deploy
+    needs: verify
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: infra/package-lock.json
+
+      - name: 检查凭据
+        id: preflight
+        shell: bash
+        env:
+          TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=已跳过 infra 部署::未配置 CLOUDFLARE_API_TOKEN，模组市场评价服务本次未部署。配置见 infra/README.md。"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 安装依赖
+        if: steps.preflight.outputs.enabled == 'true'
+        working-directory: infra
+        run: npm ci
+
+      - name: 注入 D1 / KV id
+        if: steps.preflight.outputs.enabled == 'true'
+        working-directory: infra
+        env:
+          D1_DATABASE_ID: ${{ vars.D1_DATABASE_ID }}
+          KV_NAMESPACE_ID: ${{ vars.KV_NAMESPACE_ID }}
+        run: node scripts/render-config.mjs
+
+      # 迁移是幂等的（d1 migrations 记账），重复跑不会重复建表。
+      - name: 应用 D1 迁移
+        if: steps.preflight.outputs.enabled == 'true'
+        working-directory: infra
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler d1 migrations apply evejs-mod-ratings --remote
+
+      - name: 部署 Worker
+        if: steps.preflight.outputs.enabled == 'true'
+        working-directory: infra
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler deploy
+
+      # 只当烟雾测试用：health 永远 200，ok:false 说明「快照还没生成」也是正常状态
+      # （定时任务最多 10 分钟后才会跑），所以这里允许失败、只把 body 打出来。
+      - name: 探活
+        if: steps.preflight.outputs.enabled == 'true'
+        continue-on-error: true
+        run: |
+          echo "GET https://ping.5318.cm/v1/health"
+          curl -s --max-time 15 https://ping.5318.cm/v1/health || echo "（探活没通，自定义域可能还在签发证书）"

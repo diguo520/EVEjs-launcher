@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
-import { Check, Globe, Minus, Square, X } from "lucide-react"
+import { Check, Minus, Square, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
@@ -17,7 +17,8 @@ import { LogoMark } from "@/components/shell/logo-mark"
 import { ServiceChip } from "@/components/shell/service-chip"
 import { useLauncherVersion } from "@/components/shell/launcher-version"
 import { call } from "@/lib/ipc"
-import { localeName } from "@/lib/i18n"
+import { localeFlagCode, localeName } from "@/lib/i18n"
+import { PlayerFlag } from "@/lib/player-name"
 import { LAUNCHER_META, type Service } from "@/lib/mock"
 
 function useClock() {
@@ -98,7 +99,8 @@ export function TopBar({
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" size="sm" className="gap-1.5">
-            <Globe />
+            {/* 当前语言挂它自己的旗子；清单外的语言退化成地球图标 */}
+            <PlayerFlag country={localeFlagCode(locale)} className="h-3 w-4" />
             <span data-i18n-skip className="hidden sm:inline">
               {localeName(locale)}
             </span>
@@ -110,9 +112,7 @@ export function TopBar({
           {languages.map((item) => (
             <DropdownMenuItem key={item.code} onClick={() => setLocale(item.code)}>
               {/* 语言名按各自母语显示，永不翻译：data-i18n-skip 挡住翻译桥 */}
-              <span data-i18n-skip className="mr-2">
-                {item.flag}
-              </span>
+              <PlayerFlag country={item.flagCode} className="mr-2" />
               <span data-i18n-skip>{item.name}</span>
               {item.code === locale ? (
                 <Check className="ml-auto size-3.5 text-primary" />

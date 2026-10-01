@@ -1,13 +1,13 @@
 {
   "generatedFrom": "E:\\Games\\EveJS-v0.12.8\\launcher\\launcher",
-  "generatedAt": "2026-10-01T05:14:44.736Z",
+  "generatedAt": "2026-10-01T11:08:59.246Z",
   "counts": {
-    "invoke": 83,
+    "invoke": 89,
     "send": 6,
     "events": 7,
-    "requests": 89,
+    "requests": 95,
     "registered": 82,
-    "apiTotal": 96
+    "apiTotal": 102
   },
   "invoke": [
     {
@@ -518,12 +518,67 @@
       ]
     },
     {
+      "api": "modsReplyRetract",
+      "channel": "mods:replyRetract",
+      "kind": "invoke",
+      "signature": "input: { modId: string; reviewId: string }",
+      "params": [
+        "input"
+      ]
+    },
+    {
+      "api": "modsReplySubmit",
+      "channel": "mods:replySubmit",
+      "kind": "invoke",
+      "signature": "input: { modId: string; reviewId: string; body: string }",
+      "params": [
+        "input"
+      ]
+    },
+    {
+      "api": "modsReportReview",
+      "channel": "mods:reportReview",
+      "kind": "invoke",
+      "signature": "input: { modId: string; reviewId: string; reason: string }",
+      "params": [
+        "input"
+      ]
+    },
+    {
       "api": "modsRevealSubmissionZip",
       "channel": "mods:revealSubmissionZip",
       "kind": "invoke",
       "signature": "zipPath: string",
       "params": [
         "zipPath"
+      ]
+    },
+    {
+      "api": "modsReviewRetract",
+      "channel": "mods:reviewRetract",
+      "kind": "invoke",
+      "signature": "input: { modId: string }",
+      "params": [
+        "input"
+      ]
+    },
+    {
+      "api": "modsReviews",
+      "channel": "mods:reviews",
+      "kind": "invoke",
+      "signature": "modId: string, force?: boolean",
+      "params": [
+        "modId",
+        "force"
+      ]
+    },
+    {
+      "api": "modsReviewSubmit",
+      "channel": "mods:reviewSubmit",
+      "kind": "invoke",
+      "signature": "input: { modId: string; version: string; pkgSha256: string; stars: number; body: string }",
+      "params": [
+        "input"
       ]
     },
     {
@@ -804,6 +859,12 @@
       "gameConfig:save",
       "mods:claimCandidates",
       "mods:claimMod",
+      "mods:replyRetract",
+      "mods:replySubmit",
+      "mods:reportReview",
+      "mods:reviewRetract",
+      "mods:reviewSubmit",
+      "mods:reviews",
       "mods:updateMeta"
     ],
     "send": [],

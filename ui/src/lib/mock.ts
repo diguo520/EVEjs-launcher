@@ -372,8 +372,10 @@ export interface ModChangelog {
 export interface ModReview {
   id: string
   author: string
-  /** 评论者所属军团 */
+  /** 评论者所属军团；界面上已经不用了，留着是为了兼容老快照 */
   corp: string
+  /** 评论者所在国家 / 地区码（ISO 3166-1 alpha-2，来自 Cloudflare 边缘；空串 = 没记到） */
+  country?: string
   /** 1-5 星 */
   stars: number
   date: string
@@ -408,6 +410,8 @@ export interface ModEntry {
   ratingAvg: number
   /** 评分人数，含只打分不写评论的玩家 */
   ratingCount: number
+  /** 1..5 星的分布（下标 0 是 1 星）；评价服务没接通、或原型演示数据里没有这个键 */
+  ratingHistogram?: number[]
   /** 安装包体积（MB） */
   sizeMB: number
   /** 最近一次上架或更新时间 */
@@ -433,6 +437,13 @@ export interface ModEntry {
    * 两边不一致时界面并列显示（见 mod-logic.marketVersionDiff）。
    */
   marketVersion?: string
+  /**
+   * 市场索引里那一版的安装包 sha256。
+   *
+   * 评价服务「装过才能评」就认它（白名单 mod_versions 按 (modId, sha256) 命中），
+   * 所以评价时必须原样报上去；本地扫到的目录算不出这个指纹，只有索引里有。
+   */
+  pkgSha256?: string
   /** 与之存在加载冲突的模组 id（互为对方的 id） */
   conflicts?: string[]
   /** 冲突原因，按对方 id 索引 */

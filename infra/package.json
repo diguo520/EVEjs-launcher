@@ -1,0 +1,17 @@
+{
+  "name": "evejs-mod-ratings",
+  "private": true,
+  "type": "module",
+  "description": "EveJS 模组市场评价服务（Cloudflare Workers + D1 + KV）",
+  "scripts": {
+    "test": "node --test",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "migrate:local": "wrangler d1 migrations apply evejs-mod-ratings --local",
+    "migrate:remote": "wrangler d1 migrations apply evejs-mod-ratings --remote",
+    "snapshot": "node scripts/build-snapshot.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "^4.42.0"
+  }
+}
