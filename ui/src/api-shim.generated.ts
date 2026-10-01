@@ -1,6 +1,6 @@
 /* 由 scripts/gen-contract.mjs 生成 —— 请勿手改。源: contract/ipc-channels.json */
 /* 抽取源: E:\Games\EveJS-v0.12.8\launcher\launcher */
-/* 生成时间: 2026-10-01T11:08:59.246Z */
+/* 生成时间: 2026-10-01T16:57:28.439Z */
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
@@ -80,6 +80,7 @@ export const api = {
   modsClaimMod: (folder: string): Promise<unknown> => request("mods:claimMod", [folder]),
   modsCreate: (draft: Record<string, unknown>): Promise<unknown> => request("mods:create", [draft]),
   modsCreateFolder: (): Promise<unknown> => request("mods:createFolder", []),
+  modsForgetSubmission: (id: string): Promise<unknown> => request("mods:forgetSubmission", [id]),
   modsGithubTokenCheck: (token?: string): Promise<unknown> => request("mods:githubTokenCheck", [token]),
   modsGithubTokenClear: (): Promise<unknown> => request("mods:githubTokenClear", []),
   modsGithubTokenSave: (token: string): Promise<unknown> => request("mods:githubTokenSave", [token]),
@@ -121,6 +122,7 @@ export const api = {
   serviceStop: (id: string): Promise<unknown> => request("service:stop", [id]),
   settingsGet: (): Promise<unknown> => request("settings:get", []),
   settingsSet: (patch: Record<string, unknown>): Promise<unknown> => request("settings:set", [patch]),
+  sponsorsSnapshot: (force: boolean): Promise<unknown> => request("sponsors:snapshot", [force]),
   updateApply: (): Promise<unknown> => request("update:apply", []),
   updateCheck: (): Promise<unknown> => request("update:check", []),
   updateDownload: (): Promise<unknown> => request("update:download", []),

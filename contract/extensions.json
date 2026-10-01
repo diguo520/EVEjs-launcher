@@ -54,6 +54,16 @@
       "why": "现役版的「编辑信息」只存在于渲染层：主进程没有任何改写清单的通道（modManager.ts 里唯一写清单的地方在 signModFolder 里）。新界面按原型提供了编辑弹窗，如果不落一个真通道，保存就只能弹一句「请直接改文件」。"
     },
     {
+      "api": "modsForgetSubmission",
+      "channel": "mods:forgetSubmission",
+      "kind": "invoke",
+      "signature": "id: string",
+      "params": [
+        "id"
+      ],
+      "why": "投稿台账（my-submissions.json）在现役版里只增不减：作者把本地模组删了、审核台也把收录撤了之后，「我创建的」里那条记录永远挂着 —— 既没有入口清掉，同一个 id 再投稿又会走「更新」分支，于是作者没法重新走一遍首次上架。这条通道只删本机台账里**本机当前署名**投的那些条目（重装系统 / 换过身份的机器上不会误删别人的记录，判据与 registry 的归属判定同一套），GitHub 仓库 / Release / 审核 PR / 市场索引一概不碰 —— 那些已经是公开产物，删台账只是让本机不再挂着这条无效记录；作者之后在本地重建同名模组（id 不变）刷新一下，就能按首次提交重新上架，仓库与 Release 都是幂等复用的，不会重复建。"
+    },
+    {
       "api": "modsReviews",
       "channel": "mods:reviews",
       "kind": "invoke",
@@ -121,6 +131,14 @@
         "patch"
       ],
       "why": "写回世界参数。走服务端自己的 saveConfig：先按 schema 校验（未知键 / 类型 / 整数 / 范围 / 枚举全在服务端判定），再原子写 config/*.json。启动器侧额外做的事只有一件 —— 写前把整份 config 备份到 _local/config-backups/gameconfig-<时间戳>/，因为服务端自己的原子写不带回滚，而这里改的是全局玩法参数。只写 config/*.json，不碰 server/ 下任何源码。"
+    },
+    {
+      "api": "sponsorsSnapshot",
+      "channel": "sponsors:snapshot",
+      "kind": "invoke",
+      "signature": "force: boolean",
+      "params": ["force"],
+      "why": "赞助人「补给线」名单。名单不随启动器发版：它由 infra/ 那个 Cloudflare 服务定时签出来（源头是 infra/src/sponsors.js），这里走的是与模组评分完全一样的读法 —— 多镜像 + 本地缓存 + Ed25519 验签，实现在 src-tauri/src/snapshot.rs。force=true 绕开 TTL 缓存重拉。取不到不算错误：渲染层回落到随包那份演示名单，这块面板不开天窗。名单是用户数据，名字不翻译；条目带 currency（三位字母码），国外赞助人按符号显示 $ / € 而不是硬套 ¥。"
     }
   ],
   "send": [],

@@ -1,0 +1,121 @@
+{
+  "version": "0.3.0",
+  "changelog": {
+    "zh": [
+      {
+        "type": "new",
+        "text": "模组市场接入了玩家评分与评论。模组卡片上出现星级和人数（「★ 4.0 (3)」），点开详情弹窗能看到评论正文、打星时间与作者回复。数据来自新建的评价服务（https://ping.5318.cm，Cloudflare Workers + D1 + KV），启动器这边是「多镜像 + 本地缓存 + 验签」的读法：服务不通、还没配公钥、或快照验签不过，都只是不显示星级，市场照常能浏览和安装。打分、评论、作者回复都是真写入：本机身份签名、服务端验签后落库，写成功之后几秒内就能在详情里看到。"
+      },
+      {
+        "type": "fix",
+        "text": "被驳回 / 已下架的模组重新发布后，列表里不再停在旧结论、而是回到「审核中」。索引里的 moderation 与 delisted 说的是上一版投稿，而「我创建的」合并状态时把索引结论排在最前面，台账里那条新开出来的审核 PR 永远盖不过它 —— 于是作者重新走完发布流程，卡片还是「已驳回」，驳回理由也照旧挂着（2026-10-01 报障）。现在合并时多比一次时间：台账里这次成功开出 PR 的时刻（submittedAt）只要晚于索引记的 moderatedAt，旧结论就作废，状态翻回「审核中」并清掉驳回原因。配套补上了 submittedAt 的落盘 —— 以前这条只在类型定义和冷却函数里被读、从来没人写，所以「同一模组 30 分钟提交间隔」其实一直没生效；顺带在新 PR 开出来时清掉上一版的复查结论（否则审核中的条目会挂着上一版那条「已合并 #13」）。判不出来时（老台账没记 submittedAt、或索引没记 moderatedAt）一律维持索引侧的结论，不凭猜把真被驳回的条目显示成审核中。"
+      },
+      {
+        "type": "fix",
+        "text": "「发布模组到市场」的选择清单里，简介不再整段铺开：超过 60 字截断补省略号（与创建表单里那条「卡片上最多三行（约 60 字）」同一个口径），全文字留在鼠标悬停提示里。光截字符还不够：这一行的祖先 grid 项按 min-content 撑宽弹窗，长简介会把弹窗顶到 814px（可视宽度只有 574px）并长出横向滚动条 —— 行尾的省略号和右侧的审核状态徽章一起被推出视野。补上 min-w-0，弹窗恢复原宽，省略号与徽章都回到行内（真机读回：61 / 60 字 + 省略号，全文留在 title）。"
+      },
+      {
+        "type": "new",
+        "text": "评价能提交了：在模组详情里点星打分、顺手写两句，改分改字和删掉都行（服务端按「一个人一条」覆盖，不是追加）。只有**装过**这个模组的人才评得上 —— 凭据是报上去的安装包 sha256 必须命中市场版本白名单（每小时同步一次），所以本地目录里那些没上架的草稿、或者手动丢进 mods/ 的包，都点不了星。写出去的每一条都由本机身份签名，服务端验签之后才落库；一个人一天 20 条、一个网络一小时 60 次（IP 只在内存里当场散列，不进库、不进日志）。写成功之后服务端顺手重算一次快照，启动器这边再补拉一次，所以刚投的那一票几秒内就会出现在下面那条「我的评价」里，上面的平均分也一并跟着动 —— 不用等下一个整点。"
+      },
+      {
+        "type": "new",
+        "text": "模组作者可以回复评价了：详情里每一条别人的评价右侧多了一个回复图标，点了就能以作者身份回一句，发布之后还能改、能撤。能不能回复由服务端认签名者的身份 —— 不是这个模组作者的身份签出来的回复一律拒掉，所以别人拿不到作者这个身份，也冒充不了。点赞和回复都留在同一条评价下面，列表里一眼能看出作者接没接话。"
+      },
+      {
+        "type": "new",
+        "text": "评价的署名换成了「来自 <地区> 的玩家」加一面小国旗，不再显示用户名。评价服务本来就不做账号系统，没有注册也就没法保证昵称唯一 —— 与其显示一堆重名或可以随便冒充的昵称，不如只说明「这位玩家来自哪里」。地区码来自 Cloudflare 边缘免费给的那两位码，只存国家/地区、**不存 IP、不存城市**（IP 是可识别数据，落了库就得按 GDPR 那一套处理，而我们要的只是「哪个国家的玩家」）。认不出的地区、或者老快照里没这个字段的，退化成地球图标加「来自未知地区的玩家」，不是错误。"
+      },
+      {
+        "type": "fix",
+        "text": "顶部语言切换器里那几面旗子从 emoji 换成了 SVG 图片。Windows 的 Segoe UI 根本不画区域指示符，`🇩🇪` 这类字符会原样掉成两个字母「DE」—— 切语言时看到的是字母对而不是旗子（老版启动器也一样）。现在旗子是随包分发的小 SVG，按需加载：只登记「有哪些地区」，真正显示哪一面才去取哪个文件，不为了十几像素的图标在冷启动时多解析几百 KB 字符串（启动速度是这一版最在意的事）。"
+      },
+      {
+        "type": "new",
+        "text": "设置页最底下多了一块「赞助人名单」：一枚枚标签由远到近飘过来、原地放大、慢慢散焦消失，左下角标着「赞助人名单」。用的是启动器里本来就有的 three.js（开机动画那块），复用不额外增重：散焦在片元里按黄金角螺旋抽 16 个点算，所以「放大」和「变糊」能同时发生 —— three 自己的 mip 只在小的时候管用，放大反而更清楚。面板滚出可视区或窗口最小化就整块停掉，不在设置页上常驻吃 CPU/GPU；拿不到 WebGL 就退成一张静态标签列表，面板不会开天窗。"
+      },
+      {
+        "type": "new",
+        "text": "「关于」里的仓库图标后面多了两个 QQ 群入口，图标右上角的小圆点就是群号序号（1 = 424524553，2 = 165893837）。点一下用系统默认程序打开 QQ 的加群页 —— 走的是已有的外部链接通道，没有新开出网口子；拉不起来时给一句明确提示，不静默失败。"
+      },
+      {
+        "type": "new",
+        "text": "赞助人名单改成**不随包发版**：名单本体挪到评价服务那边（https://ping.5318.cm/v1/sponsors.json，同一个 Cloudflare Worker 定时签名下发），启动器按「多镜像 + 本地缓存 + 验签」的读法去取，与模组评分同一套。以后加人、改金额只要重新部署那个服务，不用等启动器发版。同时补上了**币种**：赞助人不全是人民币，每条带一个三位字母币种码，按符号显示（¥ / $ / € / £ / ₩ / ₽），认不出的码原样显示成「XYZ 20」，不硬套成人民币。服务不通、还没部署、或验签不过，都退回随包那份名单，面板照常显示。"
+      },
+      {
+        "type": "fix",
+        "text": "外语界面里的指令预览不再漏出中文占位符：`/item <名称|ID> 100` 这条预览是一段拼好的字符串（渲染在 `<code>` 里，翻译桥按约定跳过代码块），切完语言 `useMemo` 不重算就一直停在切换前那份，于是法语界面上照样印着 `<名称|ID>`（2026-10-01 报障）。预览的依赖表补上当前语言，输入框下面那行提示里没翻的常量也接上 `t()`。同一批还扫出六种语言的译文把 `{占位符}` 换成了翻译工具自己的记号（`[[P22R]]`、`{{P3R}}` 这种，界面上会原样印出来），以及残留的全角括号、顿号 —— 一并修掉。新增两条目录自检：译文里的占位符必须与键一一对应、不留工具记号；外语的预览里不许出现中文占位符。"
+      },
+      {
+        "type": "fix",
+        "text": "收录被审核台撤掉的模组，不再永远挂着「审核中」：台账只知道作者交过稿，以前 `submitted` 就当成终态直接写「审核中」，而复查只在审核 PR 还是 open 时才更新 —— PR 已经合并、市场上的收录又撤了、本地目录也删了，三条来源都给不出结论，于是这条记录就卡死（2026-10-01 报障：modceshi 在审核台和本地都删了，列表里还是审核中）。现在这种「谁也说不清」的情况由投稿自己的 PR 状态收口：PR 合并过而市场上没有＝已下架，PR 被关掉没合并＝已驳回。索引或审核记录只要给了结论，仍然一律以它为准；重投优先的规则不变。"
+      },
+      {
+        "type": "fix",
+        "text": "模组详情的字段和底部按钮不再跑出弹窗：弹窗外壳是 grid，隐式那一列按 `auto` 算，子元素的 min-content 会把整条轨道撑宽 —— 中文短、外语长，切到 ru/de/nl/fr 之后两列读数（НЕДАВНО ОБНОВЛЁННЫЕ / KÜRZLICH AKTUALISIERT 这些标签）和整排按钮一起顶到 `max-w-2xl` 的边框外面，最多出去 156px（2026-10-01 报障）。给弹窗外壳的直接子元素压上 min-width: 0，轨道就老实待在面板宽度里；底部按钮允许换行，外语的长按钮文案放不下时另起一行。真机实测四种语言：修前溢出 156px，修后全部收进框内（-13px），中文不受影响。"
+      },
+      {
+        "type": "new",
+        "text": "「我创建的」里那些只剩一条记录的投稿现在可以自己清掉了：本地文件夹已经删掉、审核台也把收录撤了（或驳回）之后，那条记录既没有入口删掉，同名模组再投稿又会走「更新」分支，作者就再也回不到「首次上架」。卡片右侧多了「移除记录」，点一下确认即可（不可撤销）。它只删本机的投稿台账（该模组的全部版本），GitHub 仓库 / Release / 审核 PR / 市场索引一概不碰；删掉后在本地重建同名模组再刷新，就能重新走一遍首次提交，仓库与 Release 都是幂等复用的，不会重复建。台账按机器存、不按身份存，所以换过身份的机器上，只有本机当前署名投的那些才给这个入口，不会误删别人的记录。"
+      }
+    ],
+    "en": [
+      {
+        "type": "new",
+        "text": "Player ratings and reviews are now live in the mod market. Cards show stars and a count (“★ 4.0 (3)”), and opening the detail dialog shows review text, when it was posted, and author replies. The data comes from a new ratings service (https://ping.5318.cm, Cloudflare Workers + D1 + KV), read the same way the index is read: several mirrors, a local cache and signature checks. If the service is unreachable, has no public key yet, or the snapshot fails verification, you simply see no stars — the market still browses and installs as usual. Rating, reviewing and author replies are real writes: signed with the local identity, verified server-side before they are stored, and visible in the detail dialog within seconds."
+      },
+      {
+        "type": "fix",
+        "text": "After a rejected or delisted mod is published again, the list no longer stays on the old verdict — it goes back to “Under review”. The moderation and delisted flags in the index describe the previous submission, and “My mods” ranked the index verdict first, so the new review PR could never outrank it: an author could finish the whole publish flow and the card still said “Rejected”, with the old reason attached (reported 2026-10-01). Merging now compares timestamps too: if the moment this submission opened its PR (submittedAt) is later than the index's moderatedAt, the old verdict is void, the status flips back to “Under review” and the reason is cleared. The same pass fixed submittedAt never being written — it was only ever read by the type definition and the cooldown, so the 30-minute per-mod submit cooldown had never actually worked. Opening a new PR now also clears the previous round's check result, so a pending entry no longer carries “merged #13” from the previous version. When it cannot be decided (old ledger without submittedAt, or an index without moderatedAt) the index verdict stands: a genuinely rejected entry is never guessed into “Under review”."
+      },
+      {
+        "type": "fix",
+        "text": "In the “Publish mod to the market” picker, the summary is no longer printed in full: anything over 60 characters is cut with an ellipsis (the same rule as the create form's “at most three lines, about 60 characters” for cards), and the full text stays in the hover tooltip. Cutting characters alone was not enough: this row's ancestor grid item sized to min-content, so a long summary pushed the dialog to 814px (the visible width is only 574px) and grew a horizontal scrollbar — the ellipsis and the review badge on the right were pushed out of view. min-w-0 brings the dialog back to its normal width, and both the ellipsis and the badge return inline (measured on a real build: 61/60 characters plus ellipsis, full text kept in title)."
+      },
+      {
+        "type": "new",
+        "text": "Reviews can be submitted: rate with stars in the mod detail dialog, optionally add a few words, then change the rating or the text, or delete it (the server overwrites instead of appending — one per person). Only people who actually installed the mod can rate it: the proof is that the reported package sha256 must hit the market's version allowlist (synced hourly), so local drafts and manually dropped-in packages cannot be rated. Every write is signed with the local identity and stored only after the server verifies it; the limits are 20 a day per person and 60 an hour per network (IPs are hashed in memory on the spot, never stored and never logged). After a successful write the server recomputes the snapshot and the launcher pulls it again, so your vote shows up in “My review” within seconds and the average above moves with it — no waiting for the next hour."
+      },
+      {
+        "type": "new",
+        "text": "Mod authors can now reply to reviews: every other player's review in the detail dialog has a reply icon on the right, and the author can answer in their own name, then edit or withdraw the reply. Whether you may reply is decided by the server from the identity that signed — a reply signed by anything other than the author of that mod is rejected outright, so nobody can borrow the author's identity. Ratings and replies live under the same review, so the list shows at a glance whether the author has answered."
+      },
+      {
+        "type": "new",
+        "text": "Review bylines are now “Player from <region>” with a small flag instead of a username. The ratings service has no accounts, so with no registration there is no way to keep nicknames unique: rather than showing duplicates, or names anyone can impersonate, it just says where the player is from. The region code is the two-letter code Cloudflare's edge hands out for free, and only the country/region is stored — no IPs, no cities (an IP is personal data, and storing it would mean GDPR obligations, while all we want is “which country”). Unknown regions, and old snapshots without the field, degrade to a globe icon and “Player from an unknown region” — not an error."
+      },
+      {
+        "type": "fix",
+        "text": "The flags in the top language switcher are SVG images instead of emoji. Windows' Segoe UI does not draw regional indicator pairs at all, so characters like the German flag emoji fell back to the two letters “DE” — switching language showed a letter pair instead of a flag (the old launcher had the same problem). Flags now ship as small SVGs, loaded on demand: the launcher registers only which regions exist and fetches the one file it needs to show, rather than parsing hundreds of KB of strings at cold start for a few dozen pixels of icon (startup speed is what matters most in this release)."
+      },
+      {
+        "type": "new",
+        "text": "The bottom of the settings page has a new Supporter list: badges drift in from far away, scale up in place and fade out, with a “Supporter list” label at the bottom left. It reuses the three.js already in the launcher (the one behind the boot animation), so it adds no weight: the blur samples 16 points along a golden-angle spiral in the fragment shader, which lets the scale-up and the blur happen at the same time — three's own mip-mapping only helps when shrinking, and a magnified sprite would otherwise stay sharp. The panel stops entirely when scrolled out of view or when the window is minimized, so it does not sit on the settings page eating CPU/GPU; without WebGL it degrades to a static list of labels instead of showing an empty panel."
+      },
+      {
+        "type": "new",
+        "text": "Two QQ group entries now follow the repository icon in About, with a small dot at the top right of the icon giving the group number (1 = 424524553, 2 = 165893837). Clicking opens QQ's group-join page in the system default handler — it goes through the existing external-link channel, so no new network egress is opened, and a failure gives a clear message instead of failing silently."
+      },
+      {
+        "type": "new",
+        "text": "The supporter list no longer ships with the launcher: the list itself moved to the ratings service (https://ping.5318.cm/v1/sponsors.json, signed and served periodically by the same Cloudflare Worker) and the launcher fetches it the same way it reads mod ratings — several mirrors, a local cache, signature checks. Adding a name or changing an amount now only needs a redeploy of that service instead of a launcher release. Currency came along too: supporters are not all paying in RMB, so every entry carries a three-letter currency code shown as a symbol (¥ / $ / € / £ / ₩ / ₽), and an unrecognised code is printed as “XYZ 20” rather than being forced into RMB. If the service is down, not deployed yet, or the snapshot fails verification, the bundled list is used and the panel still renders."
+      },
+      {
+        "type": "fix",
+        "text": "Command previews no longer leak Chinese placeholders in non-Chinese interfaces: the `/item <name|ID> 100` preview is a prebuilt string (rendered inside <code>, which the translation bridge skips by convention), so after a language switch the useMemo did not recompute and the previous build stayed on screen — a French UI still printed <名称|ID> (reported 2026-10-01). The preview's dependency list now includes the active language, and the untranslated constant in the hint under the input goes through t() as well. The same pass swept six languages for translations where a {placeholder} had been replaced by the translation tool's own markers ([[P22R]], {{P3R}} and friends, which would print verbatim in the UI), plus leftover full-width brackets and enumeration commas. Two new catalog self-checks came out of it: a value's placeholders must match its key one-to-one with no tool markers left over, and non-Chinese previews may not contain Chinese placeholders."
+      },
+      {
+        "type": "fix",
+        "text": "Mods whose listing was withdrawn by the review console no longer hang on “Under review” forever: the ledger only knows the author submitted something, and `submitted` used to be written straight to “Under review” as a terminal state, while the recheck only updated while the review PR was still open — once the PR had been merged, the market listing withdrawn and the local folder deleted, none of the three sources could produce a verdict, so the record froze (reported 2026-10-01: modceshi was deleted in the review console and locally, yet still showed as under review). That “nobody can say” case is now settled by the submission's own PR state: merged but absent from the market means delisted, closed without merging means rejected. Whenever the index or the moderation record does give a verdict, it still wins; the resubmission-first rule is unchanged."
+      },
+      {
+        "type": "fix",
+        "text": "The mod detail fields and the buttons at its foot no longer escape the dialog: the shell is a grid whose implicit column sizes to auto, and its children's min-content stretched the whole track — Chinese is short, other languages are long, so in ru/de/nl/fr the two reading columns (labels like НЕДАВНО ОБНОВЛЁННЫЕ / KÜRZLICH AKTUALISIERT) and the whole button row pushed past the max-w-2xl border, by up to 156px (reported 2026-10-01). Pinning min-width: 0 on the shell's direct children keeps the track inside the panel width, and the footer buttons may wrap so long localized labels start a new line. Measured on a real build in four languages: 156px of overflow before, everything inside the frame after (-13px), Chinese unaffected."
+      },
+      {
+        "type": "new",
+        "text": "Submissions in “My mods” that are down to a single record can now be cleared by the author. Once the local folder is gone and the review console has withdrawn (or rejected) the listing, there was no way to delete that record, and submitting a mod with the same name again took the “update” branch — so an author could never get back to a first-time release. The card now offers “Remove record” with a confirmation step (irreversible). It deletes only the local submission ledger — every version of that mod — and touches nothing else: not the GitHub repo, not the Releases, not the review PR, not the market index. Rebuild a mod with the same name locally and refresh to go through the first-time flow again; the repo and the Release are reused idempotently, so nothing is created twice. The ledger is stored per machine, not per identity, so on a machine that has switched identities only records submitted under the current local signature get this action — someone else's records are never deleted by mistake."
+      }
+    ]
+  }
+}

@@ -13,18 +13,17 @@
 //!   2. **评分是附加信息**。服务不通、验签失败、没配置公钥，市场列表都必须照常出，
 //!      只是没有评分 —— 评价服务挂了不该让整个模组市场打不开。
 //!   3. **读的是快照，不是接口**。跟索引一样多镜像 + 本地缓存兜底，理由同 `registry.rs`：
-//!      启动器要能在服务不可达时照常工作。
+//!      启动器要能在服务不可达时照常工作。多镜像轮询 / 验签 / 缓存三段本身在
+//!      `crate::snapshot` 里，与赞助人「补给线」名单共用同一份实现。
 //!
 //! 「装过才能评」的判定不在这里 —— 那是服务端拿 `mod_versions` 白名单做的，启动器只负责
 //! 把本机装的是哪一份（modId + version + 包 sha256）如实报上去。
 use serde_json::{json, Map, Value};
-use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant};
+use std::path::PathBuf;
 
-use crate::config;
 use crate::mods::sign;
-use crate::net;
 use crate::runtime::RuntimePaths;
+use crate::snapshot;
 
 /// 评价服务地址（主门 = 自定义域，备门 = GitHub 镜像，由定时任务单向生成）。
 ///
@@ -35,9 +34,12 @@ pub const DEFAULT_RATING_URLS: [&str; 2] = [
     "https://diguo520.github.io/EVEjs-mods/ratings/ratings.json",
 ];
 
-/// 维护者那把**评价快照专用**的签名密钥。与 `updater.rs` 的 `UPDATE_KEY_ID` / `UPDATE_PUBKEY`
-/// 是两把不同的钥匙：这把私钥放在 Cloudflare 的 secret 里，泄露的后果只是「评分可以被伪造」，
-/// 而不是「可以推一个恶意启动器更新」。
+/// 维护者那把**服务快照专用**的签名密钥。与 `updater.rs` 的 `UPDATE_KEY_ID` / `UPDATE_PUBKEY`
+/// 是两把不同的钥匙：这把私钥放在 Cloudflare 的 secret 里，泄露的后果只是「评分 / 赞助人名单
+/// 可以被伪造」，而不是「可以推一个恶意启动器更新」。
+///
+/// 同一个 `infra/` 服务发布的所有快照都用它签 —— 现在有两份：评价聚合分和补给线名单。
+/// 名字里的 `RATINGS_` 是历史包袱（先有的评分），别再按名字理解成「只签评分」。
 ///
 /// 测试与本地演练用 `EVEJS_RATINGS_KEY_ID` / `EVEJS_RATINGS_PUBKEY` 覆盖，不必重编译。
 pub const RATINGS_KEY_ID: &str = "evejs-ratings-2026-10-01";
@@ -47,15 +49,8 @@ const RATINGS_CACHE_FILE: &str = "mod-ratings.json";
 const SHARD_CACHE_DIR: &str = "mod-reviews";
 /// 聚合分的缓存有效期：5 分钟。快照本身每 10 分钟才重算一次，再快也没意义。
 const RATINGS_TTL_MS: u128 = 5 * 60 * 1000;
-const RATINGS_FETCH_TIMEOUT: Duration = Duration::from_secs(8);
-/// 多镜像轮询的总预算（与索引一致）
-const RATINGS_TOTAL_BUDGET: Duration = Duration::from_secs(12);
 /// 评论分片比聚合分大得多，缓存久一点：翻旧评论看到略旧的内容无所谓
 const SHARD_TTL_MS: u128 = 30 * 60 * 1000;
-
-fn now_ms() -> u128 {
-    crate::mods::pkg::epoch_ms()
-}
 
 pub fn cache_path(runtime: &RuntimePaths) -> PathBuf {
     runtime.cache.join(RATINGS_CACHE_FILE)
@@ -71,23 +66,7 @@ fn shard_cache_path(runtime: &RuntimePaths, mod_id: &str) -> PathBuf {
 /// 评价地址：优先设置里的 `modRatingUrls`（只认 http/https），否则用默认两条。
 /// 与 `registry::index_urls` 同一个形状 —— 用户可以只换评价源而不动索引源。
 pub fn rating_urls(runtime: &RuntimePaths) -> Vec<String> {
-    let settings = config::read_settings(&runtime.settings_file());
-    if let Some(items) = settings.get("modRatingUrls").and_then(Value::as_array) {
-        let list: Vec<String> = items
-            .iter()
-            .filter_map(Value::as_str)
-            .map(str::trim)
-            .filter(|item| item.starts_with("http://") || item.starts_with("https://"))
-            .map(str::to_string)
-            .collect();
-        if !list.is_empty() {
-            return list;
-        }
-    }
-    DEFAULT_RATING_URLS
-        .iter()
-        .map(|item| item.to_string())
-        .collect()
+    snapshot::urls_from_settings(runtime, "modRatingUrls", &DEFAULT_RATING_URLS)
 }
 
 /// 评论分片地址：把聚合地址的 `ratings.json` 换成 `reviews/<modId>.json`。
@@ -107,7 +86,8 @@ pub fn shard_urls(runtime: &RuntimePaths, mod_id: &str) -> Vec<String> {
         .collect()
 }
 
-fn signature_pair() -> (String, String) {
+/// 内置的验签身份（可用环境变量覆盖，便于本地演练指向自建源）
+pub fn signature_pair() -> (String, String) {
     let key_id = std::env::var("EVEJS_RATINGS_KEY_ID")
         .ok()
         .filter(|value| !value.trim().is_empty())
@@ -121,118 +101,22 @@ fn signature_pair() -> (String, String) {
 
 /// 校验一份快照。公钥没配置时**返回失败**而不是放行：宁可不显示评分，
 /// 也不能把「没配公钥」变成「谁都塞得进来」。
-fn verify_snapshot(payload: &Value) -> Result<(), String> {
+///
+/// 补给线名单也走它 —— 同一个服务、同一把钥匙。
+pub fn verify_snapshot(payload: &Value) -> Result<(), String> {
     let (key_id, pubkey) = signature_pair();
     sign::verify_signature_with_key(payload, &key_id, &pubkey)
 }
 
-fn read_cache_file(path: &Path) -> Option<(Value, u128)> {
-    let raw = std::fs::read_to_string(path).ok()?;
-    let parsed: Value = serde_json::from_str(&raw).ok()?;
-    let fetched_at = parsed.get("fetchedAt").and_then(Value::as_u64).unwrap_or(0) as u128;
-    let payload = parsed.get("payload").cloned()?;
-    Some((payload, fetched_at))
-}
-
-fn write_cache_file(path: &Path, payload: &Value) -> u128 {
-    if let Some(dir) = path.parent() {
-        let _ = std::fs::create_dir_all(dir);
-    }
-    let fetched_at = now_ms();
-    let document = json!({ "fetchedAt": fetched_at as u64, "payload": payload });
-    if let Ok(text) = serde_json::to_string(&document) {
-        let _ = std::fs::write(path, format!("{text}\n"));
-    }
-    fetched_at
-}
-
-fn fetch_one(url: &str) -> Result<Value, String> {
-    let separator = if url.contains('?') { '&' } else { '?' };
-    let target = format!("{url}{separator}t={}", now_ms());
-    let response = net::get(&target, "application/json", RATINGS_FETCH_TIMEOUT)?;
-    if !(200..300).contains(&response.status) {
-        return Err(format!("HTTP {}", response.status));
-    }
-    let Some(payload) = response.json() else {
-        return Err("不是合法的 JSON 对象".to_string());
-    };
-    if !payload.is_object() {
-        return Err("不是合法的 JSON 对象".to_string());
-    }
-    verify_snapshot(&payload)?;
-    Ok(payload)
-}
-
-/// 多镜像轮询 + 缓存兜底。`kind` 只用来拼错误文案（聚合分 / 评论分片）。
-fn fetch_with_cache(
-    urls: Vec<String>,
-    cache: PathBuf,
-    ttl: u128,
-    force: bool,
-    kind: &str,
-) -> Value {
-    let cached = read_cache_file(&cache);
-    if !force {
-        if let Some((payload, fetched_at)) = cached.as_ref() {
-            if now_ms().saturating_sub(*fetched_at) < ttl {
-                return json!({
-                    "ok": true,
-                    "payload": payload,
-                    "source": "cache",
-                    "fetchedAt": fetched_at,
-                    "cached": true,
-                });
-            }
-        }
-    }
-
-    let started = Instant::now();
-    let mut failures: Vec<String> = Vec::new();
-    for url in urls {
-        if started.elapsed() >= RATINGS_TOTAL_BUDGET {
-            failures.push(format!(
-                "{url} → 跳过（超出总预算 {}s）",
-                RATINGS_TOTAL_BUDGET.as_secs()
-            ));
-            continue;
-        }
-        match fetch_one(&url) {
-            Ok(payload) => {
-                let fetched_at = write_cache_file(&cache, &payload);
-                return json!({
-                    "ok": true,
-                    "payload": payload,
-                    "source": url,
-                    "fetchedAt": fetched_at,
-                    "cached": false,
-                });
-            }
-            Err(reason) => failures.push(format!("{url} → {reason}")),
-        }
-    }
-
-    let detail = failures.join("；");
-    if let Some((payload, fetched_at)) = cached {
-        return json!({
-            "ok": true,
-            "payload": payload,
-            "source": "cache",
-            "fetchedAt": fetched_at,
-            "cached": true,
-            "reason": format!("{kind}源不可用，已回退到本地缓存（{detail}）"),
-        });
-    }
-    json!({ "ok": false, "reason": detail })
-}
-
 /// 拉聚合分（`ratings.json`）
 pub fn fetch_ratings(runtime: &RuntimePaths, force: bool) -> Value {
-    fetch_with_cache(
+    snapshot::fetch_with_cache(
         rating_urls(runtime),
         cache_path(runtime),
         RATINGS_TTL_MS,
         force,
         "评价",
+        &verify_snapshot,
     )
 }
 
@@ -242,12 +126,13 @@ pub fn fetch_review_shard(runtime: &RuntimePaths, mod_id: &str, force: bool) -> 
     if urls.is_empty() {
         return json!({ "ok": false, "reason": "评价源地址里没有可用的分片路径" });
     }
-    fetch_with_cache(
+    snapshot::fetch_with_cache(
         urls,
         shard_cache_path(runtime, mod_id),
         SHARD_TTL_MS,
         force,
         "评论",
+        &verify_snapshot,
     )
 }
 

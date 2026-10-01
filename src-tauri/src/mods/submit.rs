@@ -107,6 +107,84 @@ pub fn list_submissions(runtime: &RuntimePaths) -> Value {
     json!({ "ok": true, "items": submission_items(runtime) })
 }
 
+/// 台账条目是不是**本机当前署名**投的。
+///
+/// 台账按机器存、不按身份存：重装系统 / 换过身份之后，里面还留着旧身份的投稿。
+/// 「移除记录」只该删自己投的那些，判据与 registry::list_my_mods 的归属判定保持同一套：
+/// 清单草稿里写的作者 id / keyId、条目自带的签名 keyId，以及认领过的旧模组（见 mods/claim.rs）。
+pub fn submission_is_mine(
+    runtime: &RuntimePaths,
+    item: &Value,
+    author_id: &str,
+    key_id: &str,
+) -> bool {
+    let draft_author = item.get("indexDraft").and_then(|draft| draft.get("author"));
+    let draft_id = draft_author
+        .and_then(|author| author.get("id"))
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let draft_key = draft_author
+        .and_then(|author| author.get("keyId"))
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let direct_key = item
+        .get("signatureKeyId")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let id = item.get("id").and_then(Value::as_str).unwrap_or_default();
+    (!draft_id.is_empty() && draft_id == author_id)
+        || (!draft_key.is_empty() && draft_key == key_id)
+        || (!direct_key.is_empty() && direct_key == key_id)
+        || claim::is_claimed(runtime, id)
+}
+
+/// 「移除记录」：把投稿台账里某个模组的**全部版本条目**从本机删掉。
+///
+/// 只动 `my-submissions.json` 一个文件：GitHub 仓库 / Release / 审核 PR / 市场索引一概不碰 ——
+/// 那些已经是公开产物，删台账只是让本机「我创建的」不再挂着这条已经无效的记录。删掉之后
+/// 作者在本地重建同名模组（id 不变）刷新一下，就能重新走「首次提交」上架；仓库与 Release
+/// 都是幂等复用的，不会重复建（见 github::ensure_own_repo / ensure_release）。不可撤销。
+pub fn forget_submission(runtime: &RuntimePaths, id: &str) -> Value {
+    let identity = match author::read_identity() {
+        Ok(identity) => identity,
+        Err(_) => {
+            return json!({
+                "ok": false,
+                "removed": 0,
+                "reason": "读不到本机作者身份，没法确认这条记录是你投的",
+            })
+        }
+    };
+    forget_submission_as(runtime, id, &identity.id, &identity.key_id)
+}
+
+/// `forget_submission` 的本体：身份由调用方给（单测就不必依赖机器上真有一份身份）。
+fn forget_submission_as(runtime: &RuntimePaths, id: &str, author_id: &str, key_id: &str) -> Value {
+    let id = id.trim();
+    if id.is_empty() {
+        return json!({ "ok": false, "removed": 0, "reason": "缺少模组标识" });
+    }
+    let mut file = read_submission_file(runtime);
+    let mut removed = 0usize;
+    if let Some(items) = file.get_mut("items").and_then(Value::as_array_mut) {
+        let before = items.len();
+        // 删该 id 的**全部**版本条目：只删最新一条的话，列表里会剩下更早那一条
+        items.retain(|item| {
+            let same = item.get("id").and_then(Value::as_str) == Some(id);
+            !(same && submission_is_mine(runtime, item, author_id, key_id))
+        });
+        removed = before - items.len();
+    }
+    if removed == 0 {
+        // 没有可删的（本来就是空台账 / 这条是别的身份投的）：不当错误，也不白写一次盘
+        return json!({ "ok": true, "removed": 0 });
+    }
+    match write_submission_file(runtime, &file) {
+        Ok(()) => json!({ "ok": true, "removed": removed }),
+        Err(err) => json!({ "ok": false, "removed": 0, "reason": err }),
+    }
+}
+
 /// 这个模组还要等多久才能再次提交（毫秒）；0＝现在就能提交。
 ///
 /// 只认**成功提交过**的时间戳（register_source 写完 PR 才写 `submittedAt`）：
@@ -1500,6 +1578,77 @@ mod tests {
         // 坏 JSON 当作空台账，不能让整个「我创建的」崩掉
         std::fs::write(submissions_path(&runtime), "{ not json").unwrap();
         assert_eq!(submission_items(&runtime).len(), 0);
+        let _ = std::fs::remove_dir_all(&runtime.root);
+    }
+
+    #[test]
+    fn submission_is_mine_matches_author_id_key_id_or_direct_key() {
+        // 判据按可靠度：草稿里的作者 id、草稿里的 keyId、条目自带的签名 keyId
+        let runtime = temp_runtime("mine");
+        let by_id = json!({ "id": "a", "indexDraft": { "author": { "id": "au-1" } } });
+        let by_draft_key = json!({ "id": "b", "indexDraft": { "author": { "keyId": "key-1" } } });
+        let by_direct_key = json!({ "id": "c", "signatureKeyId": "key-1" });
+        let stranger =
+            json!({ "id": "d", "indexDraft": { "author": { "id": "au-9", "keyId": "key-9" } } });
+        assert!(submission_is_mine(&runtime, &by_id, "au-1", "key-1"));
+        assert!(submission_is_mine(&runtime, &by_draft_key, "au-1", "key-1"));
+        assert!(submission_is_mine(
+            &runtime,
+            &by_direct_key,
+            "au-1",
+            "key-1"
+        ));
+        assert!(!submission_is_mine(&runtime, &stranger, "au-1", "key-1"));
+        let _ = std::fs::remove_dir_all(&runtime.root);
+    }
+
+    #[test]
+    fn forget_submission_drops_every_version_and_is_idempotent() {
+        let runtime = temp_runtime("forget");
+        let file = json!({
+            "schemaVersion": 1,
+            "items": [
+                { "id": "demo", "version": "1.0.0", "indexDraft": { "author": { "id": "au-1", "keyId": "key-1" } } },
+                { "id": "demo", "version": "1.1.0", "indexDraft": { "author": { "id": "au-1", "keyId": "key-1" } } },
+                { "id": "other", "version": "1.0.0", "indexDraft": { "author": { "id": "au-1", "keyId": "key-1" } } },
+            ]
+        });
+        write_submission_file(&runtime, &file).unwrap();
+
+        // 该 id 的**全部**版本一起走：只删最新一条的话，列表里会剩下更早那一条
+        let reply = forget_submission_as(&runtime, "demo", "au-1", "key-1");
+        assert_eq!(reply["ok"], true);
+        assert_eq!(reply["removed"], 2);
+        let left = submission_items(&runtime);
+        assert_eq!(left.len(), 1);
+        assert_eq!(left[0]["id"], "other");
+
+        // 再删一次：空手而归也算成功（界面刷新一下就行），不能报成错误
+        let again = forget_submission_as(&runtime, "demo", "au-1", "key-1");
+        assert_eq!(again["ok"], true);
+        assert_eq!(again["removed"], 0);
+
+        // 空 id 直接拒，不去猜要删哪个
+        let blank = forget_submission_as(&runtime, "  ", "au-1", "key-1");
+        assert_eq!(blank["ok"], false);
+        let _ = std::fs::remove_dir_all(&runtime.root);
+    }
+
+    #[test]
+    fn forget_submission_keeps_records_signed_by_another_identity() {
+        // 台账按机器存：重装系统换过身份之后，旧身份投的那些不该被新身份删掉
+        let runtime = temp_runtime("forget-other");
+        let file = json!({
+            "schemaVersion": 1,
+            "items": [
+                { "id": "demo", "version": "1.0.0", "indexDraft": { "author": { "id": "au-old", "keyId": "key-old" } } },
+            ]
+        });
+        write_submission_file(&runtime, &file).unwrap();
+        let reply = forget_submission_as(&runtime, "demo", "au-new", "key-new");
+        assert_eq!(reply["ok"], true);
+        assert_eq!(reply["removed"], 0);
+        assert_eq!(submission_items(&runtime).len(), 1);
         let _ = std::fs::remove_dir_all(&runtime.root);
     }
 

@@ -14,6 +14,7 @@
  * 底下的 CSS 开机画面照常工作 —— 开机动画坏掉不该挡住启动器。
  */
 import { useEffect, useRef } from "react"
+import { disposeStage, hasWebGL, loadThree } from "@/lib/three-stage"
 import { BOOT_COLORS, prefersReducedMotion, useLogoCenter, type BootLayerProps } from "./shared"
 
 /** three 的材质颜色用 0xRRGGBB */
@@ -32,9 +33,8 @@ export function BootThreeFx({ hostRef, logoRef }: BootLayerProps) {
     const host = hostRef.current
     if (!canvas || !host) return
 
-    // 先自己探一次上下文：three 的 WebGLRenderer 拿不到会抛，不如提前判掉，
-    // 免得在控制台留一条无意义的异常。
-    if (!canvas.getContext("webgl2") && !canvas.getContext("webgl")) return
+    // 先探一次上下文：three 的 WebGLRenderer 拿不到会抛，提前判掉免得留一条无意义的异常
+    if (!hasWebGL(canvas)) return
     const stage = host
 
     const still = prefersReducedMotion()
@@ -43,15 +43,10 @@ export function BootThreeFx({ hostRef, logoRef }: BootLayerProps) {
     const cleanups: Array<() => void> = []
 
     void (async () => {
-      let THREE: any
-      try {
-        // 懒加载：three 单独成一个分块，开机画面不必等它解析完才能显示
-        // （入口 chunk 因此保持在 1.25 MB 量级；这一块随包嵌在 exe 里，不联网）
-        THREE = await import("three")
-      } catch {
-        return
-      }
-      if (disposed) return
+      // 懒加载：three 单独成一个分块，开机画面不必等它解析完才能显示
+      // （入口 chunk 因此保持在 1.25 MB 量级；这一块随包嵌在 exe 里，不联网）
+      const THREE = await loadThree()
+      if (disposed || !THREE) return
 
       let renderer: any
       try {
@@ -225,8 +220,9 @@ export function BootThreeFx({ hostRef, logoRef }: BootLayerProps) {
       else frame()
 
       cleanups.push(() => {
-        renderer.dispose()
         for (const item of disposables) item.dispose()
+        // 归还 GL 上下文：dispose() 只还 three 自己造的东西，上下文要显式丢掉
+        disposeStage(renderer, canvas)
       })
     })()
 

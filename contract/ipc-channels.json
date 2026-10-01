@@ -1,13 +1,13 @@
 {
   "generatedFrom": "E:\\Games\\EveJS-v0.12.8\\launcher\\launcher",
-  "generatedAt": "2026-10-01T11:08:59.246Z",
+  "generatedAt": "2026-10-01T16:57:28.439Z",
   "counts": {
-    "invoke": 89,
+    "invoke": 91,
     "send": 6,
     "events": 7,
-    "requests": 95,
+    "requests": 97,
     "registered": 82,
-    "apiTotal": 102
+    "apiTotal": 104
   },
   "invoke": [
     {
@@ -379,6 +379,15 @@
       "params": []
     },
     {
+      "api": "modsForgetSubmission",
+      "channel": "mods:forgetSubmission",
+      "kind": "invoke",
+      "signature": "id: string",
+      "params": [
+        "id"
+      ]
+    },
+    {
       "api": "modsGithubTokenCheck",
       "channel": "mods:githubTokenCheck",
       "kind": "invoke",
@@ -731,6 +740,15 @@
       ]
     },
     {
+      "api": "sponsorsSnapshot",
+      "channel": "sponsors:snapshot",
+      "kind": "invoke",
+      "signature": "force: boolean",
+      "params": [
+        "force"
+      ]
+    },
+    {
       "api": "updateApply",
       "channel": "update:apply",
       "kind": "invoke",
@@ -859,13 +877,15 @@
       "gameConfig:save",
       "mods:claimCandidates",
       "mods:claimMod",
+      "mods:forgetSubmission",
       "mods:replyRetract",
       "mods:replySubmit",
       "mods:reportReview",
       "mods:reviewRetract",
       "mods:reviewSubmit",
       "mods:reviews",
-      "mods:updateMeta"
+      "mods:updateMeta",
+      "sponsors:snapshot"
     ],
     "send": [],
     "events": []

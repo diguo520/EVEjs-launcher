@@ -1,4 +1,4 @@
-import { Download, MessageSquare, Send, Star } from "lucide-react"
+import { Download, MessageSquare, Send, Star, Trash2 } from "lucide-react"
 
 import { t } from "@/lib/i18n"
 import { StatusDot } from "@/components/common/status-dot"
@@ -77,6 +77,8 @@ export interface ModCardProps {
   onDetail: () => void
   onSubmit: () => void
   onUninstall: () => void
+  /** 移除这条只剩记录撑着的投稿（本机台账，不碰 GitHub 与市场索引，不可撤销） */
+  onForget?: () => void
   onCancelDownload: () => void
   onResolveConflict: (other: ModEntry) => void
   /** 点标签按这个标签筛列表；再点一次取消 */
@@ -96,6 +98,7 @@ export function ModCard({
   onDetail,
   onSubmit,
   onUninstall,
+  onForget,
   onCancelDownload,
   onResolveConflict,
   onTagClick,
@@ -341,6 +344,37 @@ export function ModCard({
             </>
           ) : (
             <>
+              {/*
+                只剩记录的投稿（被驳回 / 已下架 / 审核中，而本地文件夹和索引都没了）：
+                给一条清掉的路径，否则这条记录会永远挂在「我创建的」里（2026-10-01 报障）。
+                换过身份的机器上 own=false，那是旧身份的投稿，不在这里给入口。
+              */}
+              {mod.mine && mod.recordOnly && mod.own !== false && onForget ? (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button size="sm" variant="ghost" className="hover:text-destructive">
+                      <Trash2 />
+                      {t("移除记录")}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>
+                        {t("移除「{name}」的提交记录？", { name: mod.name })}
+                      </AlertDialogTitle>
+                      <AlertDialogDescription>
+                        {t(
+                          "只删本机的投稿记录（含历史版本），不会动 GitHub 仓库、Release 与市场收录。此操作不可撤销；删掉后在本地重建同名模组再刷新，就能重新提交上架。"
+                        )}
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>{t("取消")}</AlertDialogCancel>
+                      <AlertDialogAction onClick={onForget}>{t("确认移除")}</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              ) : null}
               {mod.mine && (mod.review === "draft" || mod.review === "rejected") ? (
                 <Button size="sm" onClick={onSubmit}>
                   <Send />

@@ -54,6 +54,7 @@ import {
   type ModEntry,
 } from "@/lib/mock"
 import { cn } from "@/lib/utils"
+import { listSeparator, t } from "@/lib/i18n"
 
 function Readout({ label, value }: { label: string; value: string }) {
   return (
@@ -61,7 +62,9 @@ function Readout({ label, value }: { label: string; value: string }) {
       <span className="shrink-0 text-[10px] uppercase tracking-[0.08em] text-tertiary">
         {label}
       </span>
-      <span className="tabular truncate text-[12px] font-semibold text-telemetry">
+      {/* min-w-0：flex 项的 min-width 默认是 min-content，不写这一条 truncate 根本不生效，
+          长值会把右边的值顶到行框外面去 */}
+      <span className="tabular min-w-0 truncate text-[12px] font-semibold text-telemetry">
         {value}
       </span>
     </div>
@@ -174,7 +177,7 @@ export function ModDetailDialog({
     mod.desc.trim().length > 0 && (paragraphs[0] ?? "").trim() !== mod.desc.trim()
   /** 声明了会主动对外连接的权限，安装前要单独拦一下 */
   const netPerms = mod.perms.filter((perm) => NETWORK_PERMS.includes(perm))
-  const permLine = mod.perms.map((perm) => permLabel(perm)).join("、")
+  const permLine = mod.perms.map((perm) => t(permLabel(perm))).join(listSeparator())
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

@@ -30,6 +30,8 @@ pub mod secrets;
 pub mod seed;
 pub mod shell;
 pub mod sidecar;
+pub mod snapshot;
+pub mod sponsors;
 pub mod updater;
 pub mod webview2;
 pub mod win32;

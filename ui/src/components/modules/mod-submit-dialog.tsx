@@ -51,6 +51,7 @@ import { MOD_REVIEW_LABEL, formatMB, type ModEntry } from "@/lib/mock"
 import type { PublishOutcome, PublishPhase } from "@/hooks/use-mod-source"
 import type { RawPublishProgress } from "@/lib/ipc"
 import { cn } from "@/lib/utils"
+import { listSeparator } from "@/lib/i18n"
 
 type Step = "pick" | "form" | "sending"
 
@@ -593,7 +594,9 @@ export function ModSubmitDialog({
                 <TriangleAlert className="mt-px size-3.5 shrink-0" />
                 <span>
                   {gateLabels.length > 0
-                    ? t("还差{list}，补齐后才能发布。", { list: gateLabels.join("、") })
+                    ? t("还差{list}，补齐后才能发布。", {
+                        list: gateLabels.map((label) => t(label)).join(listSeparator()),
+                      })
                     : (blockers[0]?.hint ?? "现在还不能发布，稍后再来。")}
                 </span>
               </p>

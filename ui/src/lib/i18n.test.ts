@@ -8,16 +8,19 @@ import ko from "@/locales/ko.json"
 import nl from "@/locales/nl.json"
 import ru from "@/locales/ru.json"
 import { COUNTRY_FLAG_CODES, countryFlagUrl } from "@/lib/flags.generated"
+import { buildItemCommand, buildNpcCommand, buildShipCommand } from "@/lib/manual-logic"
 import {
   FALLBACK_LOCALE,
   LOCALES,
   catalogSize,
   countryName,
   detectLocale,
+  getActiveLocale,
   hasEntry,
   localeName,
   matchLocale,
   resolveLocale,
+  setActiveLocale,
   translate,
   translateInline,
 } from "@/lib/i18n"
@@ -244,6 +247,48 @@ describe("国家 / 地区码", () => {
     expect(translate("zh", "来自未知地区的玩家")).toBe("来自未知地区的玩家")
   })
 
+  /**
+   * 占位符口径：目录值里的 `{name}` 必须与键一一对应。
+   *
+   * 2026-10-01 报障：法/德/荷/俄/日/韩 有几条译文把 `{left}` / `{size}` / `{detail}` /
+   * `{MANIFEST_NAME}` 换成了 `[[P22R]]` / `{{P3R}}` 这类**翻译工具的记号**，
+   * 界面上会原样印出这串记号，用户看到的是 "réessayer ([ [P22R]])"。
+   * 这类错误肉眼很难扫出来，交给测试兜住。
+   */
+  it("目录值里的占位符与键一致：不缺、不多、不留翻译工具记号", () => {
+    const CATALOGS = { en, ja, ko, fr, de, nl, ru } as Record<string, Record<string, string>>
+    const names = (text: string) =>
+      [...new Set([...text.matchAll(/\{([A-Za-z_][A-Za-z0-9_]*)\}/g)].map((m) => m[1]))].sort()
+    const marker = /\[\[|\]\]|\{\{|\}\}|\bP\d+R\b/
+    for (const [code, catalog] of Object.entries(CATALOGS)) {
+      for (const [key, value] of Object.entries(catalog)) {
+        expect(marker.test(value), code + " 混进了翻译工具记号 · " + key).toBe(false)
+        expect(names(value), code + " 占位符对不上 · " + key).toEqual(names(key))
+      }
+    }
+  })
+
+  /**
+   * 指令手册的占位符：`/item <名称|ID> 100` 这种拼出来的命令行直接显示在预览条里，
+   * 而预览条挂在 `<code>` 上 —— 翻译桥按约定跳过 code / pre，译文只能由 buildXxxCommand
+   * 自己取。少取一次，外语界面的预览里就会冒出 `<名称|ID>`（2026-10-01 报障）。
+   */
+  it("指令预览的占位符按当前语言取，外文里不出现中文占位符", () => {
+    const previous = getActiveLocale()
+    try {
+      for (const code of ["en", "ja", "ko", "fr", "de", "nl", "ru"] as const) {
+        setActiveLocale(code)
+        const item = buildItemCommand("", 100)
+        expect(item, code).toBe(`/item ${translate(code, "<名称|ID>")} 100`)
+        expect(item.includes("<名称|ID>"), code + " · " + item).toBe(false)
+        expect(buildShipCommand("").includes("<舰船名|typeID>"), code).toBe(false)
+        expect(buildNpcCommand("", 100).includes("<npc键|typeID>"), code).toBe(false)
+      }
+    } finally {
+      setActiveLocale(previous)
+    }
+  })
+
   it("评论区新文案七种语言都有条目", () => {
     const keys = [
       "来自 {country} 的玩家",
@@ -256,6 +301,25 @@ describe("国家 / 地区码", () => {
       "回复已撤回",
       "回复没能发布",
       "撤回回复失败",
+    ]
+    for (const code of ["en", "ja", "ko", "fr", "de", "nl", "ru"] as const) {
+      for (const key of keys) expect(hasEntry(code, key), code + " · " + key).toBe(true)
+    }
+  })
+
+  /**
+   * 「移除记录」那条路径的文案：卡片按钮、确认弹窗与结果提示都得跟着语言走，
+   * 少一条外语用户就直接看到中文（占位符口径由上面那条通用断言兜住）。
+   */
+  it("「移除记录」的新文案七种语言都有条目", () => {
+    const keys = [
+      "移除记录",
+      "移除「{name}」的提交记录？",
+      "只删本机的投稿记录（含历史版本），不会动 GitHub 仓库、Release 与市场收录。此操作不可撤销；删掉后在本地重建同名模组再刷新，就能重新提交上架。",
+      "确认移除",
+      "没能移除提交记录",
+      "提交记录已移除",
+      "「{name}」不再出现在「我创建的」里；在本地重建同名模组再刷新，就能重新提交上架。",
     ]
     for (const code of ["en", "ja", "ko", "fr", "de", "nl", "ru"] as const) {
       for (const key of keys) expect(hasEntry(code, key), code + " · " + key).toBe(true)

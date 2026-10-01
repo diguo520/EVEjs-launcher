@@ -14,6 +14,7 @@ import { toast } from "sonner"
 
 import { SectionHeading, StatTile } from "@/components/common/panel"
 import { useLocale } from "@/components/shell/locale-provider"
+import { listSeparator } from "@/lib/i18n"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ModCard } from "@/components/modules/mod-card"
@@ -623,6 +624,20 @@ export function ModulesPage({
     })
   }
 
+  /** 移除一条已经无效的投稿记录：只清本机台账（后端不碰 GitHub 与市场索引） */
+  async function forgetSubmission(mod: ModEntry) {
+    const reply = await source.forgetSubmission(mod.id)
+    if (!reply.ok) {
+      toast.error(t("没能移除提交记录"), { description: reply.reason ?? "后端没说明原因" })
+      return
+    }
+    toast(t("提交记录已移除"), {
+      description: t("「{name}」不再出现在「我创建的」里；在本地重建同名模组再刷新，就能重新提交上架。", {
+        name: mod.name,
+      }),
+    })
+  }
+
   /** 还没提交过的草稿可以直接删掉，上架之后就得走卸载了 */
   async function deleteDraft(mod: ModEntry) {
     const reply = await source.uninstall(keyOf(mod))
@@ -906,7 +921,7 @@ export function ModulesPage({
             title={
               pendingBlockers.length > 0
                 ? t("还差{list}，发布模组前要在这里补齐", {
-                    list: pendingBlockers.map((item) => item.label).join("、"),
+                    list: pendingBlockers.map((item) => t(item.label)).join(listSeparator()),
                   })
                 : undefined
             }
@@ -1032,6 +1047,7 @@ export function ModulesPage({
               onDetail={() => setDetailId(mod.id)}
               onSubmit={() => openSubmit(mod.id)}
               onUninstall={() => void uninstallMod(mod)}
+              onForget={() => void forgetSubmission(mod)}
               onCancelDownload={() => downloads.cancel(mod.id)}
               onResolveConflict={(other) => void disableMod(other)}
               activeTag={activeTag}

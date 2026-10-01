@@ -14,6 +14,7 @@ import {
 import { toast } from "sonner"
 
 import { cn, copyText } from "@/lib/utils"
+import { listSeparator } from "@/lib/i18n"
 import { Panel } from "@/components/common/panel"
 import { useLocale } from "@/components/shell/locale-provider"
 import { Badge } from "@/components/ui/badge"
@@ -71,7 +72,7 @@ export function EnvCheck({ env }: { env: EnvCheckState }) {
   const gateNote =
     blockers.length > 0
       ? t("缺少 {list}，一键启动已被挡住；照下面每项的指引补上就会放行。", {
-          list: blockers.join("、"),
+          list: blockers.join(listSeparator()),
         })
       : "缺的是本地编译模组用的工具链，不影响启动服务器，但建模组时会编译失败。"
 
@@ -334,7 +335,7 @@ export function EnvCheck({ env }: { env: EnvCheckState }) {
                   )}
                 >
                   {itemBusy
-                    ? busy.label
+                    ? t(busy.label)
                     : phase === "running"
                       ? "检测中…"
                       : phase === "queued"

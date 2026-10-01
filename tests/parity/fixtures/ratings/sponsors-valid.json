@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": 1790842714426,
+  "sponsors": [
+    {
+      "id": "sponsor-01",
+      "name": "星海孤舟",
+      "amount": 666,
+      "currency": "CNY"
+    },
+    {
+      "id": "sponsor-15",
+      "name": "Cmdr. Nova",
+      "amount": 50,
+      "currency": "USD"
+    },
+    {
+      "id": "sponsor-07",
+      "name": "星尘补给",
+      "amount": 32.66,
+      "currency": "CNY"
+    },
+    {
+      "id": "sponsor-16",
+      "name": "Star Drifter",
+      "amount": 12.5,
+      "currency": "USD"
+    }
+  ],
+  "signature": {
+    "alg": "ed25519",
+    "keyId": "evejs-ratings-parity-fixture",
+    "sig": "a2qateQEwQPRtj+2eGmVTmLEmNKhnb7EquZA0jDC3OkdYt5A8MOgTdmIv71ohgAwvgWOBMpL1VQ8Qe16hY/LDA=="
+  }
+}

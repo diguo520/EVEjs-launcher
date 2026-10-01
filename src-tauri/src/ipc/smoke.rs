@@ -452,11 +452,15 @@ mod tests {
             // 市场 / 提交 / 令牌写通道：会联网、上传文件或改凭据，只靠单测覆盖
             "mods:marketList",
             "mods:reviews",
+            // 补给线名单：会出网，只靠单测覆盖
+            "sponsors:snapshot",
             "mods:reviewSubmit",
             "mods:reviewRetract",
             "mods:replySubmit",
             "mods:replyRetract",
             "mods:reportReview",
+            // 移除投稿台账记录：会改本机台账文件，只靠单测覆盖
+            "mods:forgetSubmission",
             "mods:marketInstall",
             "mods:submitPrepare",
             "mods:submitGithub",
