@@ -172,10 +172,28 @@ node scripts/gen-ratings-key.mjs --from .keys/ratings-key.pem --check-live https
 
 两条 cron 的时间与 `src/index.js` 的 `scheduled()` 分派是**写死的对应关系**，改一处必须改另一处。
 
-### GitHub 备门镜像（可选，但建议做）
+### GitHub 备门镜像（已自动化）
 
 `ping.5318.cm` 挂了的时候启动器还能从 GitHub 读 —— 启动器内置的第二个地址就是
-`https://diguo520.github.io/EVEjs-mods/ratings/ratings.json`。做法：
+`https://diguo520.github.io/EVEjs-mods/ratings/ratings.json`。两条源的目录结构不同，
+启动器是按「最后一个 `/` 之前」拼分片地址的，所以这边摆成：
+
+```
+docs/ratings/ratings.json
+docs/ratings/reviews/<modId>.json
+docs/ratings/sponsors.json
+```
+
+这份镜像**不用手工搬运**：索引仓库自己那条流水线在维护 —— `EVEjs-mods/scripts/mirror-ratings.mjs`
+配 `.github/workflows/mirror-ratings.yml`，每小时（也能在 Actions 页面手动跑一次）从主门抓
+`/v1/ratings.json`、`/v1/sponsors.json` 和每个模组的 `/v1/reviews/<modId>.json`，**先验签再落盘**：
+签名对不上、keyId 不是启动器内置那把，或者主门整段不可达，就整体失败并原样保留旧文件
+（坏镜像比没有镜像更糟）；线上已经撤回干净的模组，它的旧分片会被删掉。
+
+名单能进镜像是因为同一个脚本顺带抄了 `/v1/sponsors.json` —— 名单本体在 KV（见下一节），
+镜像里这份就是线上那份的副本，所以哪怕评价库是空的，备门也不会少文件。
+
+下面这条手工路只在「主门彻底不可用、要离线重算」时才用得上（灾难恢复）：
 
 ```bash
 # 导出 D1 的评价行
@@ -185,21 +203,10 @@ npx wrangler d1 execute evejs-mod-ratings --remote --json \
 
 # 用同一份纯函数重算（产物形状与 Worker 定时任务完全一致）
 node infra/scripts/build-snapshot.mjs --rows rows.json --out .parity-out/ratings \
-  --key .keys/ratings-key.pem --key-id <keyId>
+  --key .keys/ratings-key.pem --key-id <keyId> [--sponsors sponsors.json]
 ```
 
-把 `out/` 里的东西 commit 进索引仓库的 `docs/ratings/` 即可。两条源的目录结构不同，
-启动器是按「最后一个 `/` 之前」拼分片地址的，所以这边摆成：
-
-```
-docs/ratings/ratings.json
-docs/ratings/reviews/<modId>.json
-docs/ratings/sponsors.json
-```
-
-`sponsors.json` 也在同一批产物里：名单源头是 `src/sponsors.js` 的常量、不经过 D1，
-所以哪怕评价库是空的，备门镜像里这份名单也不会缺。
-
+产物按上面的结构 commit 进索引仓库的 `docs/ratings/` 即可。
 ### 维护补给线名单（不用改代码、不用部署）
 
 名单本体存在 KV 的 `source:sponsors`，没写过就用代码里那份种子。加人 / 改金额 / 删人都在
