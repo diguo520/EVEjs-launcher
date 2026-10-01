@@ -701,7 +701,11 @@ pub fn market_list(repo_root: &Path, runtime: &RuntimePaths, force: bool) -> Val
     // 评分是**附加信息**：评价服务不通、验签失败、没配公钥，市场列表都照常出，只是没有评分。
     // 所以这里不看 ok，取到 payload 就用，取不到就一律 0（见 ratings::apply_ratings）。
     let ratings_reply = ratings::fetch_ratings(runtime, force);
-    let ratings_payload = if ratings_reply.get("ok").and_then(Value::as_bool).unwrap_or(false) {
+    let ratings_payload = if ratings_reply
+        .get("ok")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+    {
         ratings_reply.get("payload").cloned()
     } else {
         None
