@@ -19,8 +19,8 @@ use serde_json::{json, Map, Value};
 
 use crate::author::{self, AuthorIdentity};
 use crate::config;
-use crate::mods::sign;
 use crate::mods::pkg;
+use crate::mods::sign;
 use crate::net;
 use crate::runtime::RuntimePaths;
 
@@ -60,7 +60,10 @@ pub fn write_urls(runtime: &RuntimePaths) -> Vec<String> {
 
 /// 正文规范化。服务端会拒「首尾有空白」和「带 CR」，所以这一步必须发生在**签名之前**。
 fn normalise_body(raw: &str) -> String {
-    raw.replace("\r\n", "\n").replace('\r', "\n").trim().to_string()
+    raw.replace("\r\n", "\n")
+        .replace('\r', "\n")
+        .trim()
+        .to_string()
 }
 
 /// 幂等键。服务端只在**第一次**插入时用它，之后改分是 UPSERT，所以够唯一就行。
@@ -161,7 +164,11 @@ fn shape_error(args: &Value, kind: &str) -> Option<String> {
     }
     if let Some(review_id) = args.get("reviewId") {
         let value = review_id.as_str().unwrap_or_default();
-        if value.is_empty() || !value.chars().all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '.' || ch == '_') {
+        if value.is_empty()
+            || !value
+                .chars()
+                .all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '.' || ch == '_')
+        {
             return Some(format!("{kind}的 reviewId 不合法"));
         }
     }
@@ -254,7 +261,11 @@ pub fn report_review(runtime: &RuntimePaths, args: &Value) -> Value {
     if let Some(reason) = shape_error(args, "举报") {
         return json!({ "ok": false, "reason": reason });
     }
-    let reason_text = normalise_body(args.get("reason").and_then(Value::as_str).unwrap_or_default());
+    let reason_text = normalise_body(
+        args.get("reason")
+            .and_then(Value::as_str)
+            .unwrap_or_default(),
+    );
     if reason_text.chars().count() > MAX_REPORT_REASON_CHARS {
         return json!({ "ok": false, "reason": format!("举报理由最多 {MAX_REPORT_REASON_CHARS} 个字") });
     }
@@ -291,7 +302,10 @@ mod tests {
     #[test]
     fn review_id_shape_matches_server_whitelist() {
         let id = new_review_id();
-        assert!(id.len() >= 8 && id.len() <= 64, "长度要落在服务端白名单里：{id}");
+        assert!(
+            id.len() >= 8 && id.len() <= 64,
+            "长度要落在服务端白名单里：{id}"
+        );
         assert!(id.starts_with("rv-"), "统一前缀好排查：{id}");
         assert!(id
             .chars()
@@ -301,7 +315,10 @@ mod tests {
     #[test]
     fn local_shape_checks_reject_before_hitting_the_network() {
         let bad = json!({ "modId": "EVEJS-AutoLockFire" });
-        assert!(shape_error(&bad, "评价").is_some(), "大写 modId 本地就该拦下");
+        assert!(
+            shape_error(&bad, "评价").is_some(),
+            "大写 modId 本地就该拦下"
+        );
         let ok = json!({ "modId": "evejs-autolockfire", "reviewId": "rv-1" });
         assert!(shape_error(&ok, "评价").is_none());
         assert!(bad_mod_id("-leading"));

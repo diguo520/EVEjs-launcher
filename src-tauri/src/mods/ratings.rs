@@ -62,7 +62,10 @@ pub fn cache_path(runtime: &RuntimePaths) -> PathBuf {
 }
 
 fn shard_cache_path(runtime: &RuntimePaths, mod_id: &str) -> PathBuf {
-    runtime.cache.join(SHARD_CACHE_DIR).join(format!("{mod_id}.json"))
+    runtime
+        .cache
+        .join(SHARD_CACHE_DIR)
+        .join(format!("{mod_id}.json"))
 }
 
 /// 评价地址：优先设置里的 `modRatingUrls`（只认 http/https），否则用默认两条。
@@ -362,9 +365,10 @@ mod tests {
         // 固定向量：种子 = sha256("evejs-s4-ratings-fixture")，见 tests/parity/gen-ratings-fixtures.mjs
         const FIXTURE_KEY_ID: &str = "evejs-ratings-parity-fixture";
         const FIXTURE_PUBKEY: &str = "P5Ff2fawc4t4PhYpYq2m2aBu2CQvwC5T7D4T3uO/A0Y=";
-        let valid: Value =
-            serde_json::from_str(include_str!("../../../tests/parity/fixtures/ratings/valid.json"))
-                .expect("valid.json 必须是合法 JSON");
+        let valid: Value = serde_json::from_str(include_str!(
+            "../../../tests/parity/fixtures/ratings/valid.json"
+        ))
+        .expect("valid.json 必须是合法 JSON");
         let tampered: Value = serde_json::from_str(include_str!(
             "../../../tests/parity/fixtures/ratings/tampered.json"
         ))
