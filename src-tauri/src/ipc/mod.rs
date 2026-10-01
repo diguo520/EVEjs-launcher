@@ -379,6 +379,33 @@ async fn dispatch(
             let runtime = state.runtime.clone();
             Ok(blocking(move || mods::registry::market_list(&repo, &runtime, force)).await?)
         }
+        "mods:reviews" => {
+            let mod_id = args
+                .first()
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_string();
+            let force = args.get(1).and_then(Value::as_bool).unwrap_or(false);
+            let runtime = state.runtime.clone();
+            Ok(blocking(move || mods::ratings::reviews_for(&runtime, &mod_id, force)).await?)
+        }
+        "mods:reviewSubmit" | "mods:reviewRetract" | "mods:replySubmit" | "mods:replyRetract"
+        | "mods:reportReview" => {
+            // 五个写动作共用一条入口：同一个签名身份、同一套「签的就是发的」约定，
+            // 拆成五个几乎一样的 arm 只会让以后改约定时漏改其中一个。
+            let input = args.first().cloned().unwrap_or(Value::Null);
+            // 闭包要 'static，`channel` 是借来的 &str，先拷成自己的
+            let action = channel.to_string();
+            let runtime = state.runtime.clone();
+            Ok(blocking(move || match action.as_str() {
+                "mods:reviewSubmit" => mods::review::submit_review(&runtime, &input),
+                "mods:reviewRetract" => mods::review::retract_review(&runtime, &input),
+                "mods:replySubmit" => mods::review::submit_reply(&runtime, &input),
+                "mods:replyRetract" => mods::review::retract_reply(&runtime, &input),
+                _ => mods::review::report_review(&runtime, &input),
+            })
+            .await?)
+        }
         "mods:marketInstall" => {
             let entry = args.first().cloned().unwrap_or(Value::Null);
             let repo = root.clone();

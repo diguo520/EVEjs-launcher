@@ -13,14 +13,15 @@ import type {
   LocalizedReason,
   RawMarketList,
   RawMarketMod,
+  RawReview,
   RawMod,
   RawModList,
   RawMyModItem,
   RawMyMods,
   RawSubmissionItem,
 } from "./ipc"
-import { FEATURES_HEADING, compareVersions, readmeParagraphs } from "./mod-logic"
-import type { ModChangelog, ModEntry, ModReviewState } from "./mock"
+import { FEATURES_HEADING, compareVersions, ratingFromReviews, readmeParagraphs } from "./mod-logic"
+import type { ModChangelog, ModEntry, ModReview, ModReviewState } from "./mock"
 
 const BYTES_PER_MB = 1024 * 1024
 
@@ -152,6 +153,7 @@ function baseEntry(id: string): ModEntry {
     downloads: 0,
     ratingAvg: 0,
     ratingCount: 0,
+    ratingHistogram: [],
     sizeMB: 0,
     updatedAt: "",
     gameVersion: "",
@@ -174,6 +176,12 @@ export function fromMarket(mod: RawMarketMod): ModEntry {
     tags: Array.isArray(mod.tags) ? mod.tags : [],
     needsRestart: mod.requiresRestart !== false,
     downloads: mod.downloads ?? mod.cdnHits ?? 0,
+    // 评价服务的快照并进来的聚合分；服务没接通时后端给的就是 0/0，界面自然显示「暂无评分」
+    ratingAvg: ratingCount0(mod.ratingAvg),
+    ratingCount: ratingCount0(mod.ratingCount),
+    ratingHistogram: Array.isArray(mod.ratingHistogram)
+      ? mod.ratingHistogram.map((n) => ratingCount0(n))
+      : [],
     sizeMB: toMB(mod.sizeBytes),
     updatedAt: mod.publishedAt || "",
     publishedAt: mod.publishedAt || "",
@@ -260,12 +268,51 @@ export function applyMine(
 }
 
 /** 合并三个来源；同 id 后面的来源覆盖前面的字段 */
+/** 索引 / 快照里缺失的数字一律当 0；负数、NaN 也当 0（界面上不出现 "NaN 分"） */
+function ratingCount0(value: number | undefined | null): number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : 0
+}
+
+/**
+ * 评价快照里的评论 → 视图模型。
+ *
+ * 快照只带「谁的 keyId 写的」，不带「是不是我」——那是本机身份才知道的事，
+ * 后端已经比对过（见 ratings.rs 的 reviews_for），字段直接透传。
+ */
+export function reviewsOf(items: RawReview[] | undefined | null): ModReview[] {
+  return (items ?? [])
+    .filter((item) => item && typeof item.id === "string" && Number.isFinite(item.stars))
+    .map((item) => ({
+      id: item.id,
+      // 署名与军团**界面上已经不用了**（统一显示「来自 <地区> 的玩家」），留着是为了兼容老快照
+      author: item.author ?? "",
+      corp: item.corp ?? "",
+      // 空串 = 服务端没记到（老快照，或者地区被过滤掉了）：界面退化成地球图标 +「未知地区」
+      country: item.country ?? "",
+      stars: item.stars,
+      date: item.date ?? "",
+      version: item.version ?? "",
+      body: item.body ?? "",
+      mine: item.mine === true,
+      edited: item.edited === true,
+      reply: item.reply?.body
+        ? {
+            date: item.reply.date ?? "",
+            body: item.reply.body,
+            edited: item.reply.edited === true,
+          }
+        : undefined,
+    }))
+}
+
 export function buildMods(input: {
   list?: RawModList | null
   market?: RawMarketList | null
   mine?: RawMyMods | null
   /** 提交台账：作者自己的逐版本记录，用来补「版本历史」 */
   submissions?: RawSubmissionItem[] | null
+  /** 已经按需拉回来的评论正文：modId → 评论。没拉过的模组不在表里 */
+  reviews?: Record<string, ModReview[]>
   /** 当前界面语言：审核原因按它取 zh / en（与更新说明同口径） */
   locale?: LocaleCode
 }): ModEntry[] {
@@ -299,13 +346,31 @@ export function buildMods(input: {
   // 市场版本单独留一个字段：version 已被本地扫描覆盖，只留它的话「本机比市场新」这种最常见的
   // 作者场景在界面上只剩一个数字，看不出市场收没收到（2026-09-30 报障）。
   const marketVersion = new Map<string, string>()
+  // 安装包指纹同理：本地目录扫不出 sha256，而评价服务正是靠它确认「这人真装过」
+  // （白名单 mod_versions 按 (modId, sha256) 命中），所以只能从索引里取
+  const marketPkgSha = new Map<string, string>()
   for (const mod of input.market?.mods ?? []) {
-    if (mod?.id) marketVersion.set(mod.id, mod.version || "")
+    if (!mod?.id) continue
+    marketVersion.set(mod.id, mod.version || "")
+    if (mod.sha256) marketPkgSha.set(mod.id, mod.sha256.toLowerCase())
   }
-  return [...byId.values()].map((entry) => {
+  // 评论正文是按需拉的（打开详情弹窗才拉），所以合并放在最后一步：
+  // 列表构建不依赖它，拉回来之后重新构建一次就能把评论挂上去
+  const withReviews = [...byId.values()].map((entry) => {
+    const loaded = input.reviews?.[entry.id]
+    // 分片就是该模组的全部评价，聚合分直接拿它算：刚投的那一票立刻反映到汇总行（见 ratingFromReviews）
+    return loaded ? { ...entry, reviews: loaded, ...ratingFromReviews(loaded) } : entry
+  })
+
+  return withReviews.map((entry) => {
     const published = marketVersion.get(entry.id)
-    if (!published) return entry
-    const merged: ModEntry = { ...entry, marketVersion: published }
+    const pkgSha256 = marketPkgSha.get(entry.id)
+    const merged: ModEntry = {
+      ...entry,
+      marketVersion: published ? published : entry.marketVersion,
+      pkgSha256: pkgSha256 ? pkgSha256 : entry.pkgSha256,
+    }
+    if (!published) return merged
     // 可更新：**严格高于**本地版本才挂。
     // 只比「不一样」会把降级当成升级（本地 1.0.5、市场 1.0.4 时挂出 1.0.5 → 1.0.4，2026-09-30 报障）。
     return {

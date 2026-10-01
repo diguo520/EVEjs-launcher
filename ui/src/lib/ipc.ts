@@ -452,6 +452,51 @@ export interface RawMarketMod {
   highlights?: string[]
   downloads?: number
   cdnHits?: number
+  /* ---- 评价与评分：由 infra/ 那个评价服务的快照并进来（见 src-tauri/src/mods/ratings.rs）---- */
+  /** 综合分（未取整）；没人打分为 0 */
+  ratingAvg?: number
+  /** 打过分的人数（含只打分不写评论的） */
+  ratingCount?: number
+  /** 写了评论的人数 —— 界面上「玩家评价 · N 条」用的是它，不是 ratingCount */
+  ratingWithText?: number
+  /** 1..5 星的分布（下标 0 是 1 星） */
+  ratingHistogram?: number[]
+}
+
+/** mods:reviews —— 某个模组的评论正文快照 */
+export interface RawReview {
+  id: string
+  /** 评论者的公钥指纹：本机身份的 keyId，用来认「哪条是我写的」 */
+  keyId?: string
+  author?: string
+  corp?: string
+  /** 评论者所在国家 / 地区码（ISO 3166-1 alpha-2）：界面据此显示「来自 <地区> 的玩家」 */
+  country?: string
+  stars: number
+  version?: string
+  date?: string
+  body?: string
+  edited?: boolean
+  mine?: boolean
+  reply?: { date?: string; body?: string; edited?: boolean }
+}
+
+/** 评价写通道（modsReviewSubmit / modsReplySubmit / …）的回包：成功就 ok，失败带 reason */
+export interface RawWriteAck {
+  ok: boolean
+  reason?: string
+  /** 真正受理这次写入的服务地址（配了多个写地址时用来排查） */
+  server?: string
+  reportId?: string
+}
+
+export interface RawReviewShard {
+  ok: boolean
+  modId?: string
+  reviews?: RawReview[]
+  reason?: string
+  cached?: boolean
+  fetchedAt?: number
 }
 
 export interface RawMarketList {
@@ -463,6 +508,8 @@ export interface RawMarketList {
   evejsVersion?: string
   indexUrls?: string[]
   mods: RawMarketMod[]
+  /** 评价源的可用性：读不到时市场照常出，只是没有评分 */
+  ratings?: { available?: boolean; source?: string; reason?: string; cached?: boolean }
   blocked?: { id: string; evejsVersions?: string[] }[]
   delisted?: { id: string; displayName?: string; reason?: LocalizedReason }[]
   updates?: { id: string; from?: string; to?: string }[]

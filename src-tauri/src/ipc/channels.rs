@@ -1,6 +1,6 @@
 //! 由 scripts/gen-contract.mjs 生成 —— 请勿手改。源: contract/ipc-channels.json
 //! 抽取源: E:\Games\EveJS-v0.12.8\launcher\launcher
-//! 生成时间: 2026-10-01T05:14:44.736Z
+//! 生成时间: 2026-10-01T11:08:59.246Z
 
 #![allow(dead_code)]
 
@@ -18,7 +18,7 @@ pub struct ChannelSpec {
     pub kind: ChannelKind,
 }
 
-pub const REQUEST_COUNT: usize = 89;
+pub const REQUEST_COUNT: usize = 95;
 pub const EVENT_COUNT: usize = 7;
 
 #[rustfmt::skip]
@@ -85,7 +85,13 @@ pub const CHANNELS: &[ChannelSpec] = &[
     ChannelSpec { channel: "mods:publishOwnRepo", api: "modsPublishOwnRepo", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "mods:readme", api: "modsReadme", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "mods:registerSource", api: "modsRegisterSource", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "mods:replyRetract", api: "modsReplyRetract", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "mods:replySubmit", api: "modsReplySubmit", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "mods:reportReview", api: "modsReportReview", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "mods:revealSubmissionZip", api: "modsRevealSubmissionZip", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "mods:reviewRetract", api: "modsReviewRetract", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "mods:reviews", api: "modsReviews", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "mods:reviewSubmit", api: "modsReviewSubmit", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "mods:saveText", api: "modsSaveText", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "mods:setEnabled", api: "modsSetEnabled", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "mods:setOrder", api: "modsSetOrder", kind: ChannelKind::Invoke },

@@ -10,7 +10,7 @@
 //! 三个来源，其中索引那一路必须走**只读缓存**（见 `read_index_cache` 的注释）。
 use crate::author;
 use crate::config;
-use crate::mods::{claim, mods_root, pkg, scan, sign};
+use crate::mods::{claim, mods_root, pkg, ratings, scan, sign};
 use crate::net;
 use crate::runtime::RuntimePaths;
 use crate::shell;
@@ -698,7 +698,25 @@ pub fn market_list(repo_root: &Path, runtime: &RuntimePaths, force: bool) -> Val
         Some(map) => map,
         None => Map::new(),
     };
+    // 评分是**附加信息**：评价服务不通、验签失败、没配公钥，市场列表都照常出，只是没有评分。
+    // 所以这里不看 ok，取到 payload 就用，取不到就一律 0（见 ratings::apply_ratings）。
+    let ratings_reply = ratings::fetch_ratings(runtime, force);
+    let ratings_payload = if ratings_reply.get("ok").and_then(Value::as_bool).unwrap_or(false) {
+        ratings_reply.get("payload").cloned()
+    } else {
+        None
+    };
+    ratings::apply_ratings(&mut compatible, ratings_payload.as_ref());
     payload.insert("mods".into(), json!(compatible));
+    payload.insert(
+        "ratings".into(),
+        json!({
+            "available": ratings_payload.is_some(),
+            "source": ratings_reply.get("source").cloned().unwrap_or(Value::Null),
+            "reason": ratings_reply.get("reason").cloned().unwrap_or(Value::Null),
+            "cached": ratings_reply.get("cached").cloned().unwrap_or(json!(false)),
+        }),
+    );
     payload.insert("blocked".into(), json!(blocked));
     payload.insert("delisted".into(), json!(delisted));
     payload.insert("moderation".into(), moderation);
@@ -743,6 +761,28 @@ fn ledger_submitted(submission: &Value) -> bool {
     item_str(Some(submission), "status") == "submitted"
         || !item_str(Some(submission), "prUrl").is_empty()
         || !item_str(Some(submission), "sourceReviewUrl").is_empty()
+}
+
+/// 台账里这条「已提交审核」是否比索引侧的驳回 / 下架结论**更新**。
+///
+/// 索引的 `moderation` 与 `delisted` 说的是上一版投稿；作者重新发布会重开一条审核 PR，
+/// 台账里那次成功开 PR 的时刻（`submittedAt`，epoch ms）只要晚于索引记的 `moderatedAt`，
+/// 那条旧结论就已经作废 —— 调用方据此把状态翻回「审核中」并清掉驳回原因。
+/// 两边任一时间戳缺失一律返回 false：宁可维持索引侧的结论，也别凭猜把真的被驳回的条目
+/// 显示成审核中。
+fn ledger_supersedes_moderation(prev: Option<&Value>, submission: &Value) -> bool {
+    let status = item_str(prev, "status");
+    if status != "rejected" && status != "delisted" {
+        return false;
+    }
+    let submitted_at = item_u64(Some(submission), "submittedAt");
+    if submitted_at == 0 {
+        return false;
+    }
+    match pkg::ms_from_iso_date(&item_str(prev, "moderatedAt")) {
+        Some(moderated_at) => submitted_at > moderated_at,
+        None => false,
+    }
 }
 
 fn item_u64(item: Option<&Value>, key: &str) -> u64 {
@@ -1144,7 +1184,12 @@ pub fn list_my_mods(repo_root: &Path, runtime: &RuntimePaths) -> Value {
         let prev = items.get(id).cloned();
         let submitted = ledger_submitted(submission);
         let prev_status = item_str(prev.as_ref(), "status");
-        let status = if !prev_status.is_empty() && prev_status != "local" {
+        // 重新发布（重开一条审核 PR）之后，索引侧那条「已驳回 / 已下架」说的是上一版投稿，
+        // 得翻回「审核中」；少了这一步，作者重新提交完列表永远停在驳回状态（2026-10-01 报障）。
+        let resubmitted = ledger_supersedes_moderation(prev.as_ref(), submission);
+        let status = if resubmitted {
+            "submitted".to_string()
+        } else if !prev_status.is_empty() && prev_status != "local" {
             prev_status.clone()
         } else if submitted {
             "submitted".to_string()
@@ -1196,6 +1241,27 @@ pub fn list_my_mods(repo_root: &Path, runtime: &RuntimePaths) -> Value {
                 }
             }
         };
+        // 重投过的条目不再带着上一版的驳回结论：否则「审核中」的卡片下面还挂着驳回理由
+        let moderation_action = if resubmitted {
+            json!("")
+        } else {
+            item_value(prev.as_ref(), "moderationAction")
+        };
+        let moderation_reason = if resubmitted {
+            Value::Null
+        } else {
+            item_value(prev.as_ref(), "moderationReason")
+        };
+        let moderated_by = if resubmitted {
+            String::new()
+        } else {
+            item_str(prev.as_ref(), "moderatedBy")
+        };
+        let moderated_at = if resubmitted {
+            String::new()
+        } else {
+            item_str(prev.as_ref(), "moderatedAt")
+        };
         items.insert(
             id.to_string(),
             json!({
@@ -1204,10 +1270,10 @@ pub fn list_my_mods(repo_root: &Path, runtime: &RuntimePaths) -> Value {
                 "version": version_value,
                 "category": item_str(prev.as_ref(), "category"),
                 "status": status,
-                "moderationAction": item_value(prev.as_ref(), "moderationAction"),
-                "moderationReason": item_value(prev.as_ref(), "moderationReason"),
-                "moderatedBy": item_str(prev.as_ref(), "moderatedBy"),
-                "moderatedAt": item_str(prev.as_ref(), "moderatedAt"),
+                "moderationAction": moderation_action,
+                "moderationReason": moderation_reason,
+                "moderatedBy": moderated_by,
+                "moderatedAt": moderated_at,
                 "folder": item_str(prev.as_ref(), "folder"),
                 "localVersion": item_str(prev.as_ref(), "localVersion"),
                 "listedVersion": item_str(prev.as_ref(), "listedVersion"),
@@ -1262,8 +1328,11 @@ pub fn list_my_mods(repo_root: &Path, runtime: &RuntimePaths) -> Value {
             .get("status")
             .and_then(Value::as_str)
             .unwrap_or_default();
+        // submitted 也算：被驳回的条目重投之后状态会翻成「审核中」，那会儿本地文件夹若
+        // 已经不在了，不该让这条正在等审核的投稿凭空消失（重投前它恰好是被 keep 住的那条）。
         status == "rejected"
             || status == "delisted"
+            || status == "submitted"
             || !item_str(Some(item), "moderationAction").is_empty()
     };
     let list: Vec<Value> = all
@@ -1338,6 +1407,57 @@ mod tests {
             &json!({ "status": "draft", "sourceReviewUrl": "" })
         ));
         assert!(!ledger_submitted(&json!({})));
+    }
+
+    /// 重新发布要能把索引侧的「已驳回 / 已下架」翻回「审核中」：判据是台账里那次
+    /// 成功开 PR 的时刻晚于索引记的驳回时刻（2026-10-01 报障：重投完状态还是已驳回）。
+    #[test]
+    fn ledger_supersedes_moderation_only_when_resubmitted_later() {
+        let moderated_ms = pkg::ms_from_iso_date("2026-09-29T05:33:15.776Z").unwrap();
+        let rejected = json!({
+            "status": "rejected",
+            "moderatedAt": "2026-09-29T05:33:15.776Z",
+        });
+        let delisted = json!({
+            "status": "delisted",
+            "moderatedAt": "2026-09-29T05:33:15.776Z",
+        });
+
+        // 驳回 / 下架之后重投 → 旧结论作废
+        assert!(ledger_supersedes_moderation(
+            Some(&rejected),
+            &json!({ "submittedAt": moderated_ms + 1 })
+        ));
+        assert!(ledger_supersedes_moderation(
+            Some(&delisted),
+            &json!({ "submittedAt": moderated_ms + 86_400_000 })
+        ));
+        // 驳回之前就投过、或同一毫秒 → 维持索引侧的结论
+        assert!(!ledger_supersedes_moderation(
+            Some(&rejected),
+            &json!({ "submittedAt": moderated_ms })
+        ));
+        assert!(!ledger_supersedes_moderation(
+            Some(&rejected),
+            &json!({ "submittedAt": moderated_ms - 1 })
+        ));
+        // 老台账没记 submittedAt、索引没记 moderatedAt → 不翻，宁可显示成已驳回
+        assert!(!ledger_supersedes_moderation(Some(&rejected), &json!({})));
+        assert!(!ledger_supersedes_moderation(
+            Some(&json!({ "status": "rejected" })),
+            &json!({ "submittedAt": moderated_ms + 1 })
+        ));
+        // 只对驳回 / 下架生效：在架、审核中、草稿都不受影响
+        for status in ["listed", "submitted", "draft", "local", "update-pending"] {
+            assert!(!ledger_supersedes_moderation(
+                Some(&json!({ "status": status, "moderatedAt": "2026-09-29T05:33:15.776Z" })),
+                &json!({ "submittedAt": moderated_ms + 1 })
+            ));
+        }
+        assert!(!ledger_supersedes_moderation(
+            None,
+            &json!({ "submittedAt": moderated_ms + 1 })
+        ));
     }
 
     #[test]

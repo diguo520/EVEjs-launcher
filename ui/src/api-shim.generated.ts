@@ -1,6 +1,6 @@
 /* 由 scripts/gen-contract.mjs 生成 —— 请勿手改。源: contract/ipc-channels.json */
 /* 抽取源: E:\Games\EveJS-v0.12.8\launcher\launcher */
-/* 生成时间: 2026-10-01T05:14:44.736Z */
+/* 生成时间: 2026-10-01T11:08:59.246Z */
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
@@ -97,7 +97,13 @@ export const api = {
   modsPublishOwnRepo: (id: string, version: string, repo: string, giteeUrl?: string): Promise<unknown> => request("mods:publishOwnRepo", [id, version, repo, giteeUrl]),
   modsReadme: (folder: string): Promise<unknown> => request("mods:readme", [folder]),
   modsRegisterSource: (id: string, version: string): Promise<unknown> => request("mods:registerSource", [id, version]),
+  modsReplyRetract: (input: { modId: string; reviewId: string }): Promise<unknown> => request("mods:replyRetract", [input]),
+  modsReplySubmit: (input: { modId: string; reviewId: string; body: string }): Promise<unknown> => request("mods:replySubmit", [input]),
+  modsReportReview: (input: { modId: string; reviewId: string; reason: string }): Promise<unknown> => request("mods:reportReview", [input]),
   modsRevealSubmissionZip: (zipPath: string): Promise<unknown> => request("mods:revealSubmissionZip", [zipPath]),
+  modsReviewRetract: (input: { modId: string }): Promise<unknown> => request("mods:reviewRetract", [input]),
+  modsReviews: (modId: string, force?: boolean): Promise<unknown> => request("mods:reviews", [modId, force]),
+  modsReviewSubmit: (input: { modId: string; version: string; pkgSha256: string; stars: number; body: string }): Promise<unknown> => request("mods:reviewSubmit", [input]),
   modsSaveText: (defaultName: string, content: string): Promise<unknown> => request("mods:saveText", [defaultName, content]),
   modsSetEnabled: (folder: string, enabled: boolean): Promise<unknown> => request("mods:setEnabled", [folder, enabled]),
   modsSetOrder: (folders: string[]): Promise<unknown> => request("mods:setOrder", [folders]),

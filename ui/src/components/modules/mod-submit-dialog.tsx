@@ -32,6 +32,7 @@ import { Progress } from "@/components/ui/progress"
 import { Textarea } from "@/components/ui/textarea"
 import {
   bumpVersion,
+  clampDesc,
   cooldownText,
   credentialLabel,
   hasOwnSignature,
@@ -389,8 +390,10 @@ export function ModSubmitDialog({
           })}
         </ol>
 
+        {/* min-w-0：不写的话 grid 项按 min-content 撑宽弹窗，长简介会顶出横向滚动条，
+            一行省略号就永远轮不到生效 */}
         {step === "pick" ? (
-          <div className="space-y-2">
+          <div className="min-w-0 space-y-2">
             {candidates.length === 0 ? (
               <p className="py-6 text-center text-[12px] text-tertiary">
                 没有可提交的模组，请先在本地创建。
@@ -427,8 +430,12 @@ export function ModSubmitDialog({
                           {mod.version}
                         </span>
                       </span>
-                      <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
-                        {mod.desc}
+                      {/* 一行放不下：超过 60 字截断补省略号，全文字挂在 title 上 */}
+                      <span
+                        className="mt-0.5 block truncate text-[11px] text-muted-foreground"
+                        title={mod.desc}
+                      >
+                        {clampDesc(mod.desc)}
                       </span>
                     </span>
                     <Badge variant="secondary">{MOD_REVIEW_LABEL[mod.review ?? "draft"]}</Badge>

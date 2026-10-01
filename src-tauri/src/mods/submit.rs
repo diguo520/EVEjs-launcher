@@ -1143,6 +1143,15 @@ pub fn register_source(runtime: &RuntimePaths, id: &str, version: &str) -> Value
             // 「草稿」，「我创建的」页签既不显示审核中、也没有入口打开那条 PR。
             file["items"][index]["prUrl"] = json!(pr_url.clone());
             file["items"][index]["status"] = json!("submitted");
+            // 成功开 PR 的时刻（epoch ms）：既是 30 分钟提交冷却的计时起点，也是
+            // 「这条投稿比索引里那条已驳回 / 已下架结论更新」的凭据（见 registry.rs 的
+            // ledger_supersedes_moderation）—— 少了它，重新发布永远翻不回「审核中」。
+            file["items"][index]["submittedAt"] = json!(pkg::epoch_ms() as u64);
+            // 新 PR 就是新的一轮审核：上一版复查出来的结论（往往是 merged）必须作废，
+            // 否则「审核中」的条目会挂着「已合并 #13」这种上一版的状态。
+            file["items"][index]["reviewPrState"] = json!("");
+            file["items"][index]["reviewPrNumber"] = json!("");
+            file["items"][index]["reviewCheckedAt"] = json!(0);
             let _ = write_submission_file(runtime, &file);
         }
     }
@@ -1235,6 +1244,11 @@ pub fn submit_to_github(runtime: &RuntimePaths, id: &str, version: &str) -> Valu
         if ok {
             file["items"][index]["status"] = json!("submitted");
             file["items"][index]["prUrl"] = json!(text_field(&result, "prUrl"));
+            // 同上：记下开 PR 的时刻，重投才能盖掉索引侧的驳回结论、冷却才有起点
+            file["items"][index]["submittedAt"] = json!(pkg::epoch_ms() as u64);
+            file["items"][index]["reviewPrState"] = json!("");
+            file["items"][index]["reviewPrNumber"] = json!("");
+            file["items"][index]["reviewCheckedAt"] = json!(0);
         }
         file["items"][index]["branch"] = json!(result_branch);
         let _ = write_submission_file(runtime, &file);

@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EveJS 模组市场 · 评价服务</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; padding: 40px 20px; background: #0b0f14; color: #d8e0ea;
+         font: 14px/1.6 "Segoe UI", system-ui, sans-serif; }
+  main { max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  p.sub { margin: 0 0 24px; color: #7d8b9c; }
+  .card { border: 1px solid #1d2733; border-radius: 10px; padding: 16px; margin-bottom: 14px;
+          background: #10161e; }
+  .row { display: flex; gap: 12px; align-items: baseline; justify-content: space-between; }
+  .ok { color: #45d483; } .bad { color: #ff6b6b; }
+  a { color: #63a9ff; }
+  pre { margin: 12px 0 0; padding: 12px; background: #0b0f14; border-radius: 8px;
+        overflow: auto; font-size: 12px; color: #9fb0c4; }
+</style>
+</head>
+<body>
+<main>
+  <h1>EveJS 模组市场 · 评价服务</h1>
+  <p class="sub">读接口给启动器用；这一页只是出问题时看一眼状态。</p>
+
+  <div class="card">
+    <div class="row"><strong>健康检查</strong><span id="health">读取中…</span></div>
+    <pre id="health-json">—</pre>
+  </div>
+
+  <div class="card">
+    <div class="row"><strong>聚合快照</strong><span><a id="ratings-link" href="/v1/ratings.json">/v1/ratings.json</a></span></div>
+    <pre id="ratings-json">—</pre>
+  </div>
+</main>
+<script>
+  var text = function (id, value) { document.getElementById(id).textContent = value; };
+  var short = function (body) {
+    var copy = JSON.parse(JSON.stringify(body));
+    if (copy.mods) {
+      var ids = Object.keys(copy.mods);
+      copy.modCount = ids.length;
+      copy.mods = ids.slice(0, 5).reduce(function (acc, id) { acc[id] = copy.mods[id]; return acc; }, {});
+      if (ids.length > 5) copy.mods["…"] = "还有 " + (ids.length - 5) + " 个模组，完整数据请点上面的链接";
+    }
+    return JSON.stringify(copy, null, 2);
+  };
+  fetch("/v1/health").then(function (r) { return r.json(); }).then(function (body) {
+    var el = document.getElementById("health");
+    el.textContent = body.ok ? "正常" : "异常";
+    el.className = body.ok ? "ok" : "bad";
+    text("health-json", JSON.stringify(body, null, 2));
+    if (!body.ok) text("ratings-json", "快照尚未生成：" + (body.reason || "见健康检查"));
+  }).catch(function (e) {
+    var el = document.getElementById("health");
+    el.textContent = "连不上";
+    el.className = "bad";
+    text("health-json", String(e));
+  });
+  fetch("/v1/ratings.json").then(function (r) { return r.json(); }).then(function (body) {
+    text("ratings-json", short(body));
+  }).catch(function () {});
+</script>
+</body>
+</html>

@@ -68,9 +68,6 @@ const TAB_LABEL: Record<ModTab, string> = {
 /** 索引「算旧」的阈值：进市场页签时超过它没同步过就强制联网拉一次（后端自动 TTL 同为 2 分钟） */
 const MARKET_STALE_MS = 2 * 60 * 1000
 
-/** 后端还没有的市场社区能力，统一回一句实话，别假装做完了 */
-const NOT_WIRED = "当前启动器还没接上这项市场服务能力"
-
 export function ModulesPage({
   serverRoot,
   onNavigate,
@@ -423,12 +420,77 @@ export function ModulesPage({
     })
   }
 
-  /* ---------------- 评分与评论：后端还没有这项服务 ---------------- */
+  /* ---------------- 评分与评论 ---------------- */
 
-  function notWired(action: string) {
-    toast(t("{action}：{reason}", { action, reason: NOT_WIRED }), {
-      description: "评分、评论与作者回复由模组市场服务托管，当前版本尚未接入，界面暂不落任何假数据。",
+  /**
+   * 评价要带上市场索引里那一版的安装包指纹：服务端拿它确认「这人真的装过」。
+   * 本地 mods/ 目录扫不出 sha256，所以指纹只能来自索引 —— 没有就先去刷新市场。
+   */
+  function reviewTarget(mod: ModEntry) {
+    return { version: mod.marketVersion || mod.version || "", pkgSha256: mod.pkgSha256 ?? "" }
+  }
+
+  function reviewFailed(title: string, reason: string | undefined) {
+    toast.error(title, { description: reason || t("服务端没有说原因，稍后再试。") })
+  }
+
+  /** 打分与改分走同一条：服务端按 (模组, 公钥) 覆盖，本来就是一人一票 */
+  async function addReview(input: { stars: number; body: string }) {
+    const mod = detailMod
+    if (!mod) return
+    const { version, pkgSha256 } = reviewTarget(mod)
+    if (!pkgSha256) {
+      toast.warning(t("这一票没有提交"), {
+        description: t("拿不到这个版本的安装包指纹，先去模组市场刷新一次索引，再来评价。"),
+      })
+      return
+    }
+    const reply = await source.submitReview({
+      modId: mod.id,
+      version,
+      pkgSha256,
+      stars: input.stars,
+      body: input.body,
     })
+    if (!reply.ok) {
+      reviewFailed(t("评价没能提交"), reply.reason)
+      return
+    }
+    toast.success(t("评价已提交"), { description: t("你的这一票已经计入平均分。") })
+  }
+
+  async function removeReview() {
+    const mod = detailMod
+    if (!mod) return
+    const reply = await source.retractReview(mod.id)
+    if (!reply.ok) {
+      reviewFailed(t("撤回评价失败"), reply.reason)
+      return
+    }
+    toast(t("评价已撤回"), { description: t("平均分与评分人数一并回退。") })
+  }
+
+  /** 发布与修改作者回复同一条通道；鉴权在服务端（签名者必须是该模组的作者） */
+  async function addReply(reviewId: string, body: string) {
+    const mod = detailMod
+    if (!mod) return
+    const reply = await source.submitReply({ modId: mod.id, reviewId, body })
+    if (!reply.ok) {
+      reviewFailed(t("回复没能发布"), reply.reason)
+      return
+    }
+    toast.success(t("回复已发布"))
+  }
+
+  async function removeReply(reviewId: string) {
+    const mod = detailMod
+    if (!mod) return
+    const reply = await source.retractReply({ modId: mod.id, reviewId })
+    if (!reply.ok) {
+      reviewFailed(t("撤回回复失败"), reply.reason)
+      return
+    }
+    toast(t("回复已撤回"))
   }
 
   /* ---------------- 目录与导入 ---------------- */
@@ -618,6 +680,20 @@ export function ModulesPage({
 
   const detailMod = mods.find((mod) => mod.id === detailId) ?? null
   const detailTask = downloads.tasks.find((task) => task.modId === detailId)
+
+  /**
+   * 评论正文按需拉：聚合分跟着市场索引一起回来（卡片上的分数、排序、评分分档都吃它），
+   * 正文更大，所以等真的打开详情弹窗再拉一次。
+   *
+   * 依赖里只放 id：弹窗开关不该每次重拉 —— source.loadReviews 内部也做了「拉过就不重复拉」。
+   */
+  const detailModId = detailMod?.id ?? null
+  const detailInMarket = detailMod?.inMarket === true
+  const loadReviews = source.loadReviews
+  useEffect(() => {
+    if (!detailModId || !detailInMarket) return
+    void loadReviews(detailModId)
+  }, [detailModId, detailInMarket, loadReviews])
 
   const handleSubmitted: ModSubmitDialogProps["onSubmitted"] = (
     mod,
@@ -996,12 +1072,12 @@ export function ModulesPage({
         }}
         onCancelDownload={() => detailId && downloads.cancel(detailId)}
         onResolveConflict={(other) => void disableMod(other)}
-        onAddReview={() => notWired("发布评价")}
-        onReply={() => notWired("发布作者回复")}
-        onEditReply={() => notWired("修改作者回复")}
-        onDeleteReply={() => notWired("删除作者回复")}
-        onEditReview={() => notWired("修改评价")}
-        onDeleteReview={() => notWired("删除评价")}
+        onAddReview={(input) => void addReview(input)}
+        onReply={(reviewId, body) => void addReply(reviewId, body)}
+        onEditReply={(reviewId, body) => void addReply(reviewId, body)}
+        onDeleteReply={(reviewId) => void removeReply(reviewId)}
+        onEditReview={(_reviewId, input) => void addReview(input)}
+        onDeleteReview={() => void removeReview()}
       />
 
       <ModFormDialog

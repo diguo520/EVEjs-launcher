@@ -92,6 +92,12 @@ pub const HANDLED: &[&str] = &[
     "window:toggleMaximize",
     // ---- S2 Batch E：模组市场 / 提交 / GitHub 令牌（13 个，见 docs/S2-发布与市场-实施记录.md）----
     "mods:marketList",
+    "mods:reviews",
+    "mods:reviewSubmit",
+    "mods:reviewRetract",
+    "mods:replySubmit",
+    "mods:replyRetract",
+    "mods:reportReview",
     "mods:marketInstall",
     "mods:myMods",
     "mods:submitPrepare",

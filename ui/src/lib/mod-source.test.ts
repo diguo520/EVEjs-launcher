@@ -13,10 +13,12 @@ import {
   localizedReason,
   readmeOf,
   reviewStateOf,
+  reviewsOf,
   sourceRepoIds,
   toMB,
 } from "@/lib/mod-source"
 import { isPublished } from "@/lib/mod-logic"
+import type { ModReview } from "@/lib/mock"
 
 function market(list: unknown[]): RawMarketList {
   return { ok: true, source: "cache", cached: true, mods: list } as unknown as RawMarketList
@@ -386,5 +388,64 @@ describe("buildMods 的可更新判定", () => {
       ]),
     })
     expect(mods[0].latest).toBeUndefined()
+  })
+})
+
+describe("评价写路径要的数据（指纹与聚合分）", () => {
+  const review = (over: Partial<ModReview>): ModReview => ({
+    id: "rv",
+    author: "",
+    corp: "",
+    stars: 5,
+    date: "2026-10-01",
+    version: "1.0.0",
+    body: "",
+    ...over,
+  })
+
+  it("安装包指纹从市场索引带过来，并统一成小写（评价服务靠它确认「真的装过」）", () => {
+    const sha = "a".repeat(64)
+    const mods = buildMods({
+      market: market([{ id: "demo", displayName: "演示", version: "1.0.0", sha256: sha.toUpperCase() }]),
+    })
+    expect(mods[0].pkgSha256).toBe(sha)
+  })
+
+  it("索引里没有指纹就不编一个", () => {
+    const mods = buildMods({
+      market: market([{ id: "demo", displayName: "演示", version: "1.0.0" }]),
+    })
+    expect(mods[0].pkgSha256).toBeUndefined()
+  })
+
+  it("评论拉回来之后聚合分改由分片算（刚投的那一票立刻进汇总行）", () => {
+    const mods = buildMods({
+      market: market([
+        { id: "demo", displayName: "演示", version: "1.0.0", ratingAvg: 2, ratingCount: 1 },
+      ]),
+      reviews: { demo: [review({ id: "rv-1", stars: 5 }), review({ id: "rv-2", stars: 4 })] },
+    })
+    expect(mods[0].ratingCount).toBe(2)
+    expect(mods[0].ratingAvg).toBe(4.5)
+    expect(mods[0].reviews).toHaveLength(2)
+  })
+
+  it("没拉过评论的模组照旧用索引里的聚合分", () => {
+    const mods = buildMods({
+      market: market([
+        { id: "demo", displayName: "演示", version: "1.0.0", ratingAvg: 3.5, ratingCount: 8 },
+      ]),
+    })
+    expect(mods[0].ratingCount).toBe(8)
+    expect(mods[0].ratingAvg).toBe(3.5)
+  })
+
+  it("评论里的地区码原样透传；旧快照没有这个字段就是空串，不伪造", () => {
+    const entries = reviewsOf([
+      { id: "rv-1", stars: 5, country: "DE" },
+      { id: "rv-2", stars: 4 },
+    ] as unknown as Parameters<typeof reviewsOf>[0])
+    expect(entries[0].country).toBe("DE")
+    expect(entries[1].country).toBe("")
   })
 })

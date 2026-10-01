@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { t } from "@/lib/i18n"
+import { PlayerFlag, fromCountryLabel } from "@/lib/player-name"
 import {
   ChevronDown,
   ChevronUp,
@@ -30,6 +31,7 @@ import {
   type ReviewSort,
 } from "@/lib/mod-logic"
 import type { ModEntry, ModReview } from "@/lib/mock"
+import { useLocale } from "@/components/shell/locale-provider"
 import { cn } from "@/lib/utils"
 
 /** 五颗星：满星数按四舍五入，空星只留描边 */
@@ -325,7 +327,6 @@ function EditReview({
 
 function ReviewItem({
   review,
-  authorName,
   today,
   stale,
   canReply,
@@ -336,8 +337,6 @@ function ReviewItem({
   onDelete,
 }: {
   review: ModReview
-  /** 模组作者，回复以这个身份署名 */
-  authorName: string
   /** 今天的日期，用来算「N 天前」 */
   today: string
   /** 评论写在旧版本上，标出版本号避免误导 */
@@ -350,6 +349,7 @@ function ReviewItem({
   onEdit: (input: { stars: number; body: string }) => void
   onDelete: () => void
 }) {
+  const { locale } = useLocale()
   const [replying, setReplying] = useState(false)
   const [editingReply, setEditingReply] = useState(false)
   const [confirmingReply, setConfirmingReply] = useState(false)
@@ -374,8 +374,10 @@ function ReviewItem({
   return (
     <li className="rounded-md border border-input bg-background/40 px-2.5 py-2">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span className="text-[12px] font-semibold text-foreground">
-          {review.author}
+        {/* 不显示昵称：评价服务不做账号，统一显示「来自 <地区> 的玩家」+ 旗子 */}
+        <span className="flex items-center gap-1.5 text-[12px] font-semibold text-foreground">
+          <PlayerFlag country={review.country} />
+          {fromCountryLabel(review.country, locale)}
         </span>
         <Stars value={review.stars} />
         <span className="tabular text-[11px] text-foreground">
@@ -470,10 +472,7 @@ function ReviewItem({
         ) : (
           <div className="mt-1.5 rounded-sm border-l-2 border-primary/45 bg-primary/5 py-1.5 pl-2.5 pr-2">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span className="text-[11px] font-semibold text-primary">
-                作者回复
-              </span>
-              <span className="text-[11px] text-foreground">{authorName}</span>
+              <span className="text-[11px] font-semibold text-primary">作者回复</span>
               <span className="tabular text-[10px] text-tertiary">
                 {relativeDate(review.reply.date, today)}
               </span>
@@ -637,7 +636,6 @@ export function ModReviews({
             <ReviewItem
               key={review.id}
               review={review}
-              authorName={mod.author}
               today={today}
               stale={isStaleReview(review, mod)}
               canReply={Boolean(mod.mine)}
