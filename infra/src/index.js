@@ -264,7 +264,7 @@ function sponsorCount(text) {
   }
 }
 
-async function health(env) {
+async function health(env, request = null) {
   const [counts, jobs, sponsors, sponsorSource] = await Promise.all([
     env.DB.prepare(
       `SELECT (SELECT COUNT(*) FROM reviews) AS reviews,
@@ -287,6 +287,14 @@ async function health(env) {
     sponsorsSource: sponsorSource ? "kv" : "seed",
     // 管理接口开着没：没配令牌就是关的（fail closed）
     sponsorsAdmin: adminTokenState(env).ok ? "on" : "off",
+    // 诊断用：边缘这一侧认为调用方在哪个国家 —— 「来自未知地区的玩家」就从这儿查起。
+    // 只回调用方自己的信息，不含 IP，也不查别人。
+    edge: {
+      hasCf: Boolean(request?.cf),
+      colo: request?.cf?.colo ?? "",
+      country: callerCountry(request),
+      headerCountry: sanitizeCountry(request?.headers?.get?.("CF-IPCountry")),
+    },
     jobs: jobs?.results ?? [],
   }
 }
@@ -589,6 +597,49 @@ async function handleAdminWrite(pathname, request, env, input) {
 /** 请求体上限：2000 字的正文加上签名和各种 id，16KB 绰绰有余 */
 const MAX_WRITE_BODY_BYTES = 16 * 1024
 
+/**
+ * 调用方的两字母地区码。优先用边缘填好的 `request.cf.country`；本地 `wrangler dev`
+ * 和某些经过中转的入口拿不到 cf 对象，就用 Cloudflare 一律会加上的 `CF-IPCountry` 头兜底。
+ * 两边都没有就当「未知地区」—— 宁可显示地球图标，也不要猜一面国旗出来。
+ */
+function callerCountry(request) {
+  const fromCf = sanitizeCountry(request.cf?.country)
+  if (fromCf) return fromCf
+  return sanitizeCountry(request.headers?.get?.("CF-IPCountry"))
+}
+
+/**
+ * 写请求 → 处理器名。**路径优先，但 `/v1/reviews` 兼收按 action 分派**。
+ *
+ * 为什么要有这条兼容：0.3.0 的启动器只有一个写地址（Rust 侧 `DEFAULT_REVIEW_WRITE_URLS`），
+ * 打分 / 撤回 / 回复 / 举报五个动作**全都**发到 `/v1/reviews`，于是「作者回复」撞进
+ * `validateReview`，回一句「version 不合法」（2026-10-02 报障）。
+ * 照 body 里的 action 分派不算「信客户端自称」：action 本来就在签名负载里
+ * （`canonical.js` 的 canonicalJson 覆盖全部顶层键），每个 handler 照样先验签、
+ * 再拿 payload 跟请求体核对，签名不对一律 403。
+ */
+const ACTION_ROUTES = {
+  "review.upsert": "review",
+  "review.retract": "review-retract",
+  "reply.upsert": "reply",
+  "reply.retract": "reply-retract",
+  "report.create": "report",
+}
+
+function writeRoute(pathname, input) {
+  if (pathname === "/v1/reviews/retract") return "review-retract"
+  if (pathname === "/v1/replies") return "reply"
+  if (pathname === "/v1/replies/retract") return "reply-retract"
+  if (pathname === "/v1/reports") return "report"
+  if (pathname === "/v1/reviews") {
+    const action = typeof input?.action === "string" ? input.action : ""
+    // 认不出的 action（包括老客户端压根没带 action）一律按评价处理：形状不对时
+    // validateReview 会带着原因拒掉，比 404「没有这个写接口」好排查得多。
+    return ACTION_ROUTES[action] ?? "review"
+  }
+  return ""
+}
+
 async function handleWrite(pathname, request, env, ctx) {
   const raw = await request.text()
   if (raw.length > MAX_WRITE_BODY_BYTES) {
@@ -600,18 +651,19 @@ async function handleWrite(pathname, request, env, ctx) {
   } catch {
     return json({ ok: false, reason: "请求体不是合法 JSON" }, 400, NO_STORE)
   }
-  const country = sanitizeCountry(request.cf?.country)
+  const country = callerCountry(request)
+  const route = writeRoute(pathname, input)
   const respond = pathname.startsWith("/v1/admin/")
     ? await handleAdminWrite(pathname, request, env, input)
-    : pathname === "/v1/reviews"
+    : route === "review"
       ? await upsertReview(request, env, input, country)
-      : pathname === "/v1/reviews/retract"
+      : route === "review-retract"
         ? await retractReview(env, input)
-        : pathname === "/v1/replies"
+        : route === "reply"
           ? await upsertReply(env, input)
-          : pathname === "/v1/replies/retract"
+          : route === "reply-retract"
             ? await retractReply(env, input)
-            : pathname === "/v1/reports"
+            : route === "report"
               ? await createReport(request, env, input)
               : json({ ok: false, reason: "没有这个写接口" }, 404, NO_STORE)
   // 写成功就顺手把快照重算一遍：读路径是静态快照，不重算的话作者自己都要等下一个 cron 才看得到
@@ -637,7 +689,7 @@ async function handle(request, env, ctx) {
   }
 
   if (pathname === "/v1/health") {
-    return json(await health(env), 200, { "cache-control": "no-store" })
+    return json(await health(env, request), 200, { "cache-control": "no-store" })
   }
   // 管理接口：带令牌才给回包，**不发 CORS 头**（别的站点读不到），也不进缓存
   if (pathname === "/v1/admin/sponsors") {

@@ -55,6 +55,15 @@ POST /v1/replies/retract    撤回作者回复
 POST /v1/reports            举报一条评价（只入库，人工处置）
 ```
 
+**`/v1/reviews` 是兼容网关**：路径优先，但发到这个地址的请求会**按 body 里的 `action` 分派**
+（`review.upsert` / `review.retract` / `reply.upsert` / `reply.retract` / `report.create`）。
+起因是 0.3.0 的启动器只有一个写地址（Rust 侧 `DEFAULT_REVIEW_WRITE_URLS`），五个动作**全**发到
+`/v1/reviews`，于是「作者回复」撞进 `validateReview`，回一句「version 不合法」（2026-10-02 报障）。
+照 `action` 分派不算「信客户端自称」—— `action` 本来就在签名负载里（`canonicalJson` 覆盖全部
+顶层键），每个 handler 照样先验签、再拿 `payload` 跟请求体核对，签名不对一律 403。
+0.3.1 起启动器改成按动作选路径（`src-tauri/src/mods/review.rs` 的 `action_url`），
+这条网关留给已经装出去的 0.3.0。
+
 签名负载就是请求体本身去掉 `signature` 之后的那份 JSON（规范化规则见 `src/canonical.js`，
 与启动器的 Rust 侧逐字节一致，parity 固定向量在两边的单测里都钉着）。
 服务端**不替客户端改写任何值再验签** —— 一改写就等于改了签名负载，客户端只会收到
@@ -70,8 +79,16 @@ POST /v1/reports            举报一条评价（只入库，人工处置）
 | 作者回复 | 签名者的 keyId 必须命中该模组的作者 | 不是作者就发不出回复 |
 
 **地区码**：请求体里没有这个字段，服务端从 Cloudflare 白送的 `request.cf.country` 取两字母码
-（`XX` / `T1` 这类未知与匿名网络一律落空串）。评论列表里显示的是「来自 <地区> 的玩家」+ 一面 SVG 旗子，
-**不显示用户名**，所以评价服务也就不需要账号系统。原始 IP 只用来限流，且当场就散列掉。
+（`XX` / `T1` / `A1` / `A2` / `O1` 这类未知与匿名网络一律落空串）。拿不到 `request.cf` 对象的入口
+（本地 `wrangler dev`、某些中转）退回同一个边缘一定会加上的 `CF-IPCountry` 头；两边都没有才算
+「未知地区」。评论列表里显示的是「来自 <地区> 的玩家」+ 一面 SVG 旗子，**不显示用户名**，
+所以评价服务也就不需要账号系统。原始 IP 只用来限流，且当场就散列掉。
+
+排查「为什么显示未知地区」：`GET /v1/health` 的 `edge` 回的是**调用方自己**这一侧的读数 ——
+`hasCf`（有没有 cf 对象）、`colo`（落到哪个边缘）、`country`（服务端算出来的码）、
+`headerCountry`（`CF-IPCountry` 头的原值）。在出问题的那台机器上打开一次 `/v1/health`，
+就知道是边缘没给，还是给了一个被过滤掉的码。`https://ping.5318.cm/cdn-cgi/trace` 的 `loc=`
+是 Cloudflare 那侧的原始读数，可以拿来对照。
 
 写成功之后 Worker 会顺手 `ctx.waitUntil(rebuildSnapshots(env))` 重算一次快照 ——
 否则作者自己都要等下一个 cron 才看得到刚写的那条。启动器那边因此是「提交成功后等 1.5 秒再拉一次」。
