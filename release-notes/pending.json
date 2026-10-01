@@ -1,15 +1,6 @@
 {
   "target": 8,
-  "completed": 2,
-  "nextVersion": "0.3.1",
-  "changes": [
-    {
-      "type": "fix",
-      "text": "作者回复、撤回回复、撤回评价、举报这四个动作以前统统发不出去：启动器只有一个写地址（`/v1/reviews`），而服务端是**按路径**分派的，于是回复被当成评价去校验，回一句「version 不合法」（2026-10-02 报障）。两边都改了 —— 启动器改成按动作选路径（`/v1/replies`、`/v1/reports`、`/v1/reviews/retract`、`/v1/replies/retract`），服务端把 `/v1/reviews` 变成兼容网关，按 body 里的 `action` 分派。后者是给已经装出去的0.3.0 用的：装过 0.3.0 的人不用升级就能回复，`action` 本来就在签名负载里，安全边界不变。"
-    },
-    {
-      "type": "fix",
-      "text": "评论署名不再无缘无故显示「来自未知地区的玩家」：地区码原本只从 `request.cf.country` 取，拿不到 cf 对象的入口（本地 `wrangler dev`、某些中转）就整条落空。现在退回 Cloudflare一定会加上的 `CF-IPCountry` 头兜底，两边都没有才算未知。另外 `GET /v1/health` 新增 `edge`诊断，直接报出边缘这一侧认的是哪个国家（`country` / `headerCountry` / `colo` / `hasCf`），下次再遇到「未知地区」不用靠猜。"
-    }
-  ]
+  "completed": 0,
+  "nextVersion": "0.3.2",
+  "changes": []
 }

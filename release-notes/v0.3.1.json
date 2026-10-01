@@ -1,0 +1,25 @@
+{
+  "version": "0.3.1",
+  "changelog": {
+    "zh": [
+      {
+        "type": "fix",
+        "text": "作者回复、撤回回复、撤回评价、举报这四个动作以前统统发不出去：启动器只有一个写地址（`/v1/reviews`），而服务端是**按路径**分派的，于是回复被当成评价去校验，回一句「version 不合法」（2026-10-02 报障）。两边都改了 —— 启动器改成按动作选路径（`/v1/replies`、`/v1/reports`、`/v1/reviews/retract`、`/v1/replies/retract`），服务端把 `/v1/reviews` 变成兼容网关、按 body 里的 `action` 分派：所以**已经装出去的 0.3.0不用升级也能回复**。`action` 本来就在签名负载里（`canonicalJson` 覆盖全部顶层键），每个写接口照样先验签再落库，签名不对一律 403，安全边界没变。"
+      },
+      {
+        "type": "fix",
+        "text": "评论署名不再无缘无故显示「来自未知地区的玩家」：地区码原本只从 `request.cf.country` 取，拿不到 cf 对象的入口（本地 `wrangler dev`、某些中转）就整条落空。现在退回 Cloudflare一定会加上的 `CF-IPCountry` 头兜底，两边都没有才算未知。另外 `GET /v1/health` 新增 `edge`诊断（`hasCf` / `colo` / `country` / `headerCountry`，只回调用方自己那一侧、不含 IP），下次再遇到「未知地区」可以直接看出来：是边缘没给，还是给了一个被过滤掉的码（`XX` / `T1` / `A1` / `A2` / `O1`）。"
+      }
+    ],
+    "en": [
+      {
+        "type": "fix",
+        "text": "Author replies, reply retraction, review retraction and reports could not be sent at all: the launcher has a single write URL (/v1/reviews) and posted all five actions there, while the service routes by path — so a reply was validated as a review and came back \"version 不合法\" (reported 2026-10-02). Both sides changed: the launcher now picks the endpoint per action (/v1/replies, /v1/reports, /v1/reviews/retract, /v1/replies/retract), and the service turns /v1/reviews into a compatibility gateway that dispatches on the body's action — so installs already running 0.3.0 can reply without updating. The action is part of the signed payload and every write endpoint still verifies the signature before storing anything; a bad signature is still a 403 and the security boundary is unchanged."
+      },
+      {
+        "type": "fix",
+        "text": "Review bylines no longer show \"Player from an unknown region\" for no reason: the region was only read from request.cf.country, so any entry point without a cf object (local wrangler dev, some proxies) stored an empty code and the UI fell back to \"unknown\". It now falls back to the CF-IPCountry header Cloudflare always adds, and only when both are missing is the region unknown. GET /v1/health also gains an edge diagnostic (hasCf / colo / country / headerCountry, caller-side only and with no IP), so the next \"unknown region\" can be traced instead of guessed: either the edge did not report it, or it returned a code we deliberately drop (XX / T1 / A1 / A2 / O1)."
+      }
+    ]
+  }
+}
