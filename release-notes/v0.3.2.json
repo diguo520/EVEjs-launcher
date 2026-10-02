@@ -21,6 +21,10 @@
       {
         "type": "fix",
         "text": "撤回评论时顺带删掉挂在它上面的作者回复：以前只删评论那一行，回复成了孤儿记录 —— 既不显示、也撤不掉，还一直占着回复计数。"
+      },
+      {
+        "type": "fix",
+        "text": "「撤回 / 隐藏」之后旧评论不再残留：分片存在 KV 里、写完或 cron 时才重算，而重算以前**只写不删** —— 一个模组的最后一条评价被删掉之后，它那份旧分片会一直躺在 KV 里被端出去，界面显示的就是「评论明明删了还在」（2026-10-02 报障，实测那种已删除的评价确实还在）。现在每一轮重算都按前缀列一遍分片、只保留这一轮真正有内容的那些（分片是派生物，删了随时能重建），作业日志里同时多一个 `removed` 计数，便于核对「删评论之后分片有没有跟着消失」。"
       }
     ],
     "en": [
@@ -43,6 +47,10 @@
       {
         "type": "fix",
         "text": "Retracting a review now also deletes the author replies attached to it: previously only the review row was removed and the replies became orphans — invisible, impossible to retract, and still counted."
+      },
+      {
+        "type": "fix",
+        "text": "Retracted or hidden reviews no longer linger: shards live in KV and are recomputed on write or by the cron, and that recomputation used to write without ever deleting — once a mod's last review was removed, its old shard stayed in KV and kept being served, so the UI showed a review that no longer existed (reported 2026-10-02 and reproduced live). Every rebuild now lists the shard keys and keeps only those with content in that round (shards are derived data and can always be rebuilt), and the job log reports a removed count so it is easy to confirm that deleting a review also drops its shard."
       }
     ]
   }
