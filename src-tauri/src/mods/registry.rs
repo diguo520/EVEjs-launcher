@@ -83,11 +83,21 @@ fn is_secure_url(url: &str) -> bool {
 
 /* ------------------------------ 缓存与验签 ------------------------------ */
 
+/// 读缓存。**缓存也要验签**：验不过就当场删掉、当作没有缓存。
+///
+/// 这一层不是「顺手补个校验」，是补一个真的洞：`trust_authors_from_index` 会把索引里
+/// 登记的作者公钥**注入信任表**，之后模组包的签名就认这些公钥。若拿一份没验签的缓存去注入，
+/// 本地被人塞一个 keyId 就等于「这个作者的所有模组都可信」。TTL 内直接用、全挂了回退，
+/// 两条路都走这里，所以尺子只此一把。
 fn read_cache(runtime: &RuntimePaths) -> Option<(Value, u128)> {
     let raw = std::fs::read_to_string(cache_path(runtime)).ok()?;
     let parsed: Value = serde_json::from_str(&raw).ok()?;
     let index = parsed.get("index")?.clone();
     if !index.is_object() {
+        return None;
+    }
+    if sign::verify_index_signature(&index).is_err() {
+        let _ = std::fs::remove_file(cache_path(runtime));
         return None;
     }
     let fetched_at = parsed.get("fetchedAt").and_then(Value::as_u64).unwrap_or(0) as u128;
@@ -134,11 +144,8 @@ fn trust_authors_from_index(index: &Value) {
 /// 「我创建的」这类要立刻出结果的调用必须用它 —— 否则索引地址不可达时会白等 8~12 秒，
 /// 用户会以为点了没反应。真正的联网刷新交给「模组市场」页签的 `fetch_mod_index`。
 pub fn read_index_cache(runtime: &RuntimePaths) -> Option<Value> {
+    // 验签在 `read_cache` 里（缓存被改过就当没有，连文件都删掉），这里只管注入作者公钥
     let (index, _) = read_cache(runtime)?;
-    // 缓存被改过就当没有（签名对不上）
-    if sign::verify_index_signature(&index).is_err() {
-        return None;
-    }
     trust_authors_from_index(&index);
     Some(index)
 }
@@ -1676,11 +1683,36 @@ mod tests {
         // 验签通过后作者公钥会被注入信任表（否则模组自己的签名校验认不出作者）
         assert!(sign::trusted_key_ids().contains(&key_id));
 
-        // 改一个字节 → 缓存立刻失效
+        // 改一个字节 → 缓存立刻失效，而且当场删掉：留着下次还会被端出来
         let mut tampered = cached.clone();
         tampered["mods"][0]["version"] = json!("9.9.9");
         write_cache(&runtime, &tampered);
         assert!(read_index_cache(&runtime).is_none());
+        assert!(!cache_path(&runtime).exists(), "验不过的缓存要删掉");
+        let _ = std::fs::remove_dir_all(&runtime.root);
+    }
+
+    #[test]
+    fn cache_with_a_foreign_signature_is_dropped_before_it_can_vouch_for_authors() {
+        let runtime = temp_runtime("foreign-cache");
+        // 签名不是我们认的那把（演练 / 自建源，或本地被人改过）
+        let mut index = json!({
+            "schemaVersion": 1,
+            "mods": [{ "id": "evil", "version": "9.9.9", "author": { "id": "au-x", "keyId": "deadbeef", "publicKey": "AAAA" } }],
+        });
+        index["signature"] = json!({ "alg": "ed25519", "keyId": "someone-else", "sig": "AAAA" });
+        write_cache(&runtime, &index);
+
+        assert!(
+            read_cache(&runtime).is_none(),
+            "未验签的缓存不能进读缓存这一层"
+        );
+        assert!(read_index_cache(&runtime).is_none());
+        assert!(
+            !sign::trusted_key_ids().contains(&"deadbeef".to_string()),
+            "未验签的索引绝不能把作者公钥注入信任表"
+        );
+        assert!(!cache_path(&runtime).exists(), "验不过的缓存要当场删掉");
         let _ = std::fs::remove_dir_all(&runtime.root);
     }
 
@@ -1743,6 +1775,8 @@ mod tests {
 
         let key = sign::generate_signing_key().expect("应能生成密钥");
         let key_id = sign::key_id_of(&key);
+        // 缓存这一层要验签，所以索引签名得来自一把受信任的钥匙
+        sign::trust_public_key(&key_id, &sign::public_key_base64(&key));
         let mut index = json!({
             "schemaVersion": 1,
             "mods": [

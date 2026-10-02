@@ -197,19 +197,32 @@ fn bad_mod_id(mod_id: &str) -> bool {
         || mod_id.starts_with('-')
 }
 
+/// 与服务端 `write.js` 的 `REVIEW_ID_RE` **同一把尺子**：首字符是字母或数字，其余只允许
+/// `[A-Za-z0-9._-]`，总长 8..=64。
+///
+/// 尺子必须一样：本地比服务端松，就会放一个服务端**一定**会拒掉的编号出去，用户只看到一句
+/// 「reviewId 不合法」，既不知道哪来的也不知道干什么（2026-10-02 报障：界面上那份演练残留的
+/// 假评论编号是 `rv-3`）。本地拦住时给一句能照着做的提示，比省一趟往返值钱。
+fn bad_review_id(value: &str) -> bool {
+    if !(8..=64).contains(&value.len()) {
+        return true;
+    }
+    let mut chars = value.chars();
+    match chars.next() {
+        Some(first) if first.is_ascii_alphanumeric() => {}
+        _ => return true,
+    }
+    !value
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '.' || ch == '_')
+}
+
 fn shape_error(args: &Value, kind: &str) -> Option<String> {
     if bad_mod_id(&text_field(args, "modId")) {
         return Some("模组 id 不合法".to_string());
     }
-    if let Some(review_id) = args.get("reviewId") {
-        let value = review_id.as_str().unwrap_or_default();
-        if value.is_empty()
-            || !value
-                .chars()
-                .all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '.' || ch == '_')
-        {
-            return Some(format!("{kind}的 reviewId 不合法"));
-        }
+    if args.get("reviewId").is_some() && bad_review_id(&text_field(args, "reviewId")) {
+        return Some(format!("{kind}的评论编号不合法 —— 刷新一次模组市场再试"));
     }
     None
 }
@@ -352,14 +365,32 @@ mod tests {
     }
 
     #[test]
+    fn review_id_ruler_matches_the_server() {
+        assert!(bad_review_id(""));
+        assert!(
+            bad_review_id("rv-1"),
+            "短编号：服务端 REVIEW_ID_RE 要求至少 8 个字符"
+        );
+        assert!(bad_review_id("-rv-1234567"), "首字符必须是字母或数字");
+        assert!(bad_review_id("rv 1790882024887"), "空格不在白名单里");
+        assert!(!bad_review_id("rv-1790882024887-29688"));
+        assert!(!bad_review_id("rv-1790882024887-29688.1"));
+    }
+
+    #[test]
     fn local_shape_checks_reject_before_hitting_the_network() {
         let bad = json!({ "modId": "EVEJS-AutoLockFire" });
         assert!(
             shape_error(&bad, "评价").is_some(),
             "大写 modId 本地就该拦下"
         );
-        let ok = json!({ "modId": "evejs-autolockfire", "reviewId": "rv-1" });
+        let ok = json!({ "modId": "evejs-autolockfire", "reviewId": "rv-1790882024887-29688" });
         assert!(shape_error(&ok, "评价").is_none());
+        let short = json!({ "modId": "evejs-autolockfire", "reviewId": "rv-1" });
+        assert!(
+            shape_error(&short, "回复").is_some(),
+            "演练残留那种短编号要本地拦下，不等服务端回一句看不懂的错"
+        );
         assert!(bad_mod_id("-leading"));
         assert!(bad_mod_id("中文"));
         assert!(!bad_mod_id("evejs-autolockfire"));

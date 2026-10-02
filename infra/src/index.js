@@ -99,7 +99,7 @@ async function readReviewRows(env) {
      AND p.updated_at = (SELECT MAX(updated_at) FROM replies WHERE review_id = r.id)`
   const statement = env.DB.prepare(
     `SELECT r.id, r.mod_id, r.version, r.stars, r.body, r.author_name, r.corp,
-            r.key_id, r.created_at, r.updated_at, r.edited, r.hidden,
+            r.country, r.key_id, r.created_at, r.updated_at, r.edited, r.hidden,
             p.body AS reply_body, p.updated_at AS reply_at, p.edited AS reply_edited
        FROM reviews r ${reply}`
   )
@@ -305,6 +305,50 @@ function reviewIdFromPath(pathname) {
   return match ? match[1] : ""
 }
 
+/**
+ * 评价分片是**按需生成**的：一个模组一条评价都没有，KV 里就没有它的键。
+ *
+ * 这里原来回 503，启动器把「取不到」当失败，于是回退到本地缓存 —— 而那份缓存可能是演练残留
+ * 或很旧的，界面就会一直显示早就该消失的评论（2026-10-02 报障：三条假评论，点回复被服务端回
+ * 「reviewId 不合法」，因为假评论的编号只有 3 个字符）。
+ *
+ * 所以「没有评价」必须是一个**正常且签名过的空分片**：一次 Ed25519 签名换掉整条错误链。
+ * 只对白名单形状的 `/v1/reviews/<modId>.json` 生效（modId 由 `reviewIdFromPath` 卡过），
+ * 并且**不落 KV** —— 免得谁随便报个 modId 就能往库里塞键。
+ */
+async function serveReviewShard(env, modId) {
+  const text = await env.SNAPSHOTS.get(REVIEWS_PREFIX + modId)
+  if (text) {
+    return new Response(text, {
+      status: 200,
+      headers: { "content-type": "application/json; charset=utf-8", ...CACHE_HEADERS },
+    })
+  }
+  const signer = await makeSigner(env)
+  if (!signer) {
+    return json(
+      { ok: false, reason: "快照还没生成（定时任务未跑过，或缺少签名密钥）" },
+      503,
+      { "cache-control": "no-store" }
+    )
+  }
+  const empty = await signer({
+    schemaVersion: SNAPSHOT_SCHEMA_VERSION,
+    generatedAt: Date.now(),
+    modId,
+    reviews: [],
+  })
+  return new Response(JSON.stringify(empty), {
+    status: 200,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      ...CACHE_HEADERS,
+      // 比别的快照短一点：第一条评价写进来最多 1 分钟就能看见
+      "cache-control": "public, max-age=60, stale-while-revalidate=300",
+    },
+  })
+}
+
 async function serveSnapshot(env, key) {
   const text = await env.SNAPSHOTS.get(key)
   if (!text) {
@@ -452,6 +496,18 @@ async function retractReview(env, input) {
   const payload = checked.payload
   const verified = await verifySignedWrite(input, payload)
   if (!verified.ok) return json({ ok: false, reason: verified.reason }, 403, NO_STORE)
+  // 回复是挂在评论上的：评论没了，回复就成了孤儿（既不显示、也撤不掉，还会一直占着行数）。
+  // 同一 (mod_id, public_key) 只会有一条评论（UNIQUE 约束），所以按查到的 id 删是准的。
+  const removed = await env.DB.prepare("SELECT id FROM reviews WHERE mod_id = ? AND public_key = ?")
+    .bind(payload.modId, payload.publicKey)
+    .all()
+  const reviewIds = (removed?.results ?? []).map((row) => String(row.id ?? "")).filter(Boolean)
+  if (reviewIds.length > 0) {
+    const holes = reviewIds.map(() => "?").join(", ")
+    await env.DB.prepare(`DELETE FROM replies WHERE review_id IN (${holes})`)
+      .bind(...reviewIds)
+      .run()
+  }
   await env.DB.prepare("DELETE FROM reviews WHERE mod_id = ? AND public_key = ?")
     .bind(payload.modId, payload.publicKey)
     .run()
@@ -703,7 +759,7 @@ async function handle(request, env, ctx) {
   }
   const modId = reviewIdFromPath(pathname)
   if (modId) {
-    return serveSnapshot(env, REVIEWS_PREFIX + modId)
+    return serveReviewShard(env, modId)
   }
   if (env.ASSETS) return env.ASSETS.fetch(request)
   return json({ ok: false, reason: "没有这个路径" }, 404, { "cache-control": "no-store" })
