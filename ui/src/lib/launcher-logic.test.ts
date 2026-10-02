@@ -6,6 +6,8 @@ import {
   genderFromCode,
   logotypeKey,
   logotypeTick,
+  missingStoredCredential,
+  needsPasswordOnce,
   raceFromId,
   totalIsk,
   type Account,
@@ -104,5 +106,25 @@ describe("账号 ISK 合计", () => {
 
   it("空账号是 0", () => {
     expect(totalIsk({ ...account, characters: [] })).toBe(0)
+  })
+})
+
+/**
+ * 「别的启动器建的号进不去」这条链路的判定（2026-10-02 报障）：
+ * 密文只落在建号那台机器上，本机读不到时后端回一句固定的中文，界面据此弹补密码框。
+ */
+describe("补一次密码的判定", () => {
+  it("只认后端那句「未找到已保存的登录凭据」，其余原因照常当失败", () => {
+    expect(missingStoredCredential("未找到已保存的登录凭据，请手动输入一次密码")).toBe(true)
+    expect(missingStoredCredential("账号或密码错误")).toBe(false)
+    expect(missingStoredCredential("")).toBe(false)
+  })
+
+  it("只有明确知道本机没有密文（false）才提前问密码", () => {
+    expect(needsPasswordOnce({ hasStoredCredential: false })).toBe(true)
+    expect(needsPasswordOnce({ hasStoredCredential: true })).toBe(false)
+    // 字段缺失（老后端 / 种子数据）按「有」处理：宁可多试一次，也别拦下本来能一键进的号
+    expect(needsPasswordOnce({ hasStoredCredential: undefined })).toBe(false)
+    expect(needsPasswordOnce({})).toBe(false)
   })
 })

@@ -1,0 +1,33 @@
+{
+  "version": "0.3.4",
+  "changelog": {
+    "zh": [
+      {
+        "type": "new",
+        "text": "新增「物品市场」页：左侧分类树、中间物品清单、右侧盘口明细，顶部四个读数（物品 / 空间站 / 挂单 / 成交）。数据直读服务端那份活的市场库，库存与最优买卖价跟着游戏内成交变，市场服务没启动也能读，不落任何随包快照。物品名与分类名中英双行显示（中文界面中文在上，外文界面英文在上），搜索两边都能命中。"
+      },
+      {
+        "type": "fix",
+        "text": "别的启动器建的账号也能一键进游戏：本机没存过密码时弹一次补录框，输一次即进并加密记住，不用再手动去客户端输。"
+      },
+      {
+        "type": "opt",
+        "text": "界面切到外文后不会再要你填「中文名」：物品市场与指令手册的搜索框按当前语言措辞，外文只提示名称 / typeID，中文界面照旧。"
+      }
+    ],
+    "en": [
+      {
+        "type": "new",
+        "text": "New \"Item & Market Catalog\" page: category tree on the left, item list in the middle, order-book details on the right, with four readouts on top (items / stations / orders / fills). It reads the server’s live market database directly, so stock and best bid/ask follow in-game trades and stay readable even while the market service is stopped; no snapshot is shipped with the launcher. Item and category names are shown in Chinese and English on two lines (Chinese first in the Chinese UI, English first everywhere else) and search matches either name."
+      },
+      {
+        "type": "fix",
+        "text": "Accounts created by another launcher now launch in one click too: when this machine has no stored password, the launcher asks for it once, signs you in, and remembers it encrypted — no manual typing into the game client."
+      },
+      {
+        "type": "opt",
+        "text": "The UI no longer asks non-Chinese players for a \"Chinese name\": the search boxes in the market browser and the GM command manual are worded per language (just name / typeID outside Chinese), while the Chinese UI keeps its original hints."
+      }
+    ]
+  }
+}

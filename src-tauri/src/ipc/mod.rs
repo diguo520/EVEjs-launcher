@@ -19,6 +19,7 @@ use crate::gameconfig;
 use crate::health;
 use crate::init;
 use crate::log;
+use crate::market;
 use crate::mods;
 use crate::process;
 use crate::sponsors;
@@ -293,6 +294,20 @@ async fn dispatch(
         "database:delete" => {
             let values = args.get(1).cloned().unwrap_or(Value::Null);
             Ok(db::delete_row(&root, &arg_str(args, 0), &values, &active_names(&state)).await)
+        }
+
+        /* ------------------------------ 物品市场 ------------------------------ */
+        // 直读服务端市场库（只读 + WAL）：市场服务跑着时能读，没跑也能读；见 market.rs 模块注释
+        "market:overview" => Ok(market::overview(&root).await),
+        "market:catalog" => Ok(market::catalog(&root).await),
+        // 0 = 没选物品，market::book 会直接回「typeId 必须是正整数」
+        "market:book" => Ok(market::book(&root, arg_u32(args, 0, 0)).await),
+        "market:trades" => {
+            let limit = args
+                .first()
+                .and_then(Value::as_u64)
+                .map(|value| value as u32);
+            Ok(market::trades(&root, limit).await)
         }
 
         /* ------------------------------ 模组管理 ------------------------------ */

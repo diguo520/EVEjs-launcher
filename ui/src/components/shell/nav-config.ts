@@ -5,6 +5,7 @@ import {
   Package,
   Settings,
   SlidersHorizontal,
+  Store,
   Terminal,
   Users,
   Wrench,
@@ -18,6 +19,7 @@ export type ViewId =
   | "accounts"
   | "commands"
   | "database"
+  | "market"
   | "modules"
   | "config"
   | "settings"
@@ -57,6 +59,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { id: "accounts", label: "账号管理", sub: "ACCOUNTS & CHARACTERS", icon: Users },
       { id: "commands", label: "指令手册", sub: "GM COMMAND REFERENCE", icon: Command },
       { id: "database", label: "数据库", sub: "PERSISTENCE LAYER", icon: Database },
+      { id: "market", label: "物品市场", sub: "ITEM & MARKET CATALOG", icon: Store },
       { id: "modules", label: "模组市场", sub: "MOD MARKETPLACE", icon: Package },
     ],
   },

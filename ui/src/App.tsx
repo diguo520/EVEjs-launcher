@@ -24,6 +24,7 @@ import { GameConfigPage } from "@/pages/game-config-page"
 import { AccountsPage } from "@/pages/accounts-page"
 import { CommandsPage } from "@/pages/commands-page"
 import { DatabasePage } from "@/pages/database-page"
+import { MarketPage } from "@/pages/market-page"
 import { ModulesPage } from "@/pages/modules-page"
 import { ConfigPage } from "@/pages/config-page"
 import { SettingsPage } from "@/pages/settings-page"
@@ -137,6 +138,8 @@ export function App() {
         return <CommandsPage />
       case "database":
         return <DatabasePage />
+      case "market":
+        return <MarketPage />
       case "modules":
         return <ModulesPage serverRoot={serverRoot} onNavigate={setView} />
       case "config":

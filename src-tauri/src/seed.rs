@@ -29,6 +29,10 @@ const CLI_SCRIPTS: &[(&str, &[u8])] = &[
         "game-config-cli.js",
         include_bytes!("../../vendor/cli/game-config-cli.js"),
     ),
+    (
+        "market-cli.js",
+        include_bytes!("../../vendor/cli/market-cli.js"),
+    ),
 ];
 
 /// 自更新器：由 `build.rs` 拷进 OUT_DIR（vendor/updater/bin 被 .gitignore 排除，

@@ -7,6 +7,7 @@ import {
   CreateAccountDialog,
   type NewAccountPayload,
 } from "@/components/accounts/create-account-dialog"
+import { PasswordPromptDialog } from "@/components/accounts/password-prompt-dialog"
 import { Panel, SectionHeading, StatTile } from "@/components/common/panel"
 import { useLocale } from "@/components/shell/locale-provider"
 import { useNow } from "@/hooks/use-now"
@@ -58,6 +59,7 @@ export function AccountsPage({ store }: { store: LauncherAccountsState }) {
     if (!guard.ok) {
       toast.error("无法进入角色创建界面", { description: guard.reason })
     }
+    // needsPassword：数据层挂起了这次操作，交给补密码弹窗接手，别再提示"正在拉起客户端"
   }
 
   function enterGame(accountId: string, character: Character) {
@@ -66,9 +68,8 @@ export function AccountsPage({ store }: { store: LauncherAccountsState }) {
       toast.error("无法登录", { description: guard.reason })
       return
     }
-    toast.info(t("正在为 {name} 拉起客户端…", { name: character.name }), {
-      description: "客户端将在数秒内启动，请勿关闭启动器。",
-    })
+    // needsPassword：本机没存过这个号的密码，弹窗接管（见 PasswordPromptDialog）；
+    // 成功提示由数据层在真正拉起客户端之后发，这里不再提示（否则静默补密码那条路会先说一句废话）。
   }
 
   function exitGame(accountId: string, character: Character) {
@@ -195,6 +196,19 @@ export function AccountsPage({ store }: { store: LauncherAccountsState }) {
         onOpenChange={setAccountOpen}
         accounts={accounts}
         onSubmit={createAccount}
+      />
+
+      {/* 别的启动器建的号：本机没有 DPAPI 密文，补一次密码后照旧一键进 */}
+      <PasswordPromptDialog
+        pending={store.pendingCredential}
+        accountName={
+          accounts.find((a) => a.id === store.pendingCredential?.accountId)?.name ?? ""
+        }
+        open={store.pendingCredential !== null}
+        onOpenChange={(v) => {
+          if (!v) store.cancelCredential()
+        }}
+        onSubmit={store.submitCredential}
       />
     </div>
   )

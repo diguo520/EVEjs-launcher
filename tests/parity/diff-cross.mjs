@@ -11,6 +11,10 @@
  * 用法：
  *   node tests/parity/diff-cross.mjs                    # .parity-out/electron.json ↔ .parity-out/tauri.json
  *   node tests/parity/diff-cross.mjs --update           # 用当前 electron.json 刷新 Electron 冻结基线
+ *
+ * 新外壳独有的通道（现役版没有 handler，驱动回 `{"__parity":"no-handler"}`）对拍没有可比对象，
+ * 因此不参与逐字段比较，但必须在 NO_HANDLER_ROWS 里逐条写明理由：没登记的直接算差异，
+ * 登记了却没触发的会在结尾报出来（防止现役版早补上了 handler，登记还挂在原处）。
  *   node tests/parity/diff-cross.mjs --electron a.json --tauri b.json --baseline c.json
  */
 import fs from "node:fs";
@@ -88,6 +92,42 @@ const EXEMPTION_ROWS = [
 ];
 const EXEMPTIONS = new Map(EXEMPTION_ROWS.map((row) => [row.channel, { keys: new Set(row.keys), text: row.reason }]));
 
+/**
+ * 现役版**没有 handler** 的通道：新外壳独有的能力，Electron 驱动只能回占位符 `{"__parity":"no-handler"}`。
+ * 口径与豁免表一致 —— 只放行登记在册的通道，理由要能指到代码，不能写「已知差异」。
+ */
+const NO_HANDLER_ROWS = [
+  {
+    channel: "market:overview",
+    reason:
+      "物品市场（新外壳独有）：直读服务端活库（vendor/cli/market-cli.js + src-tauri/src/market.rs）。现役 Electron 0.1.28 既没有这个页面、也没有对应 handler，对拍没有可比对象。",
+  },
+  {
+    channel: "market:catalog",
+    reason: "同 market:overview：市场分类树 + 全量物品清单，现役版没有这项能力。",
+  },
+  {
+    channel: "market:book",
+    reason: "同 market:overview：单件物品的盘口明细，现役版没有这项能力。",
+  },
+  {
+    channel: "market:trades",
+    reason: "同 market:overview：最近成交回执，现役版没有这项能力。",
+  },
+];
+const NO_HANDLER = new Map(NO_HANDLER_ROWS.map((row) => [row.channel, row.reason]));
+
+/** 驱动对「本实现没有这条通道」的占位回包：单键对象 `{__parity: "no-handler"}` */
+function isNoHandler(node) {
+  return (
+    !!node &&
+    typeof node === "object" &&
+    !Array.isArray(node) &&
+    Object.keys(node).length === 1 &&
+    node.__parity === "no-handler"
+  );
+}
+
 /** 递归剔除豁免键（数组元素也过一遍），返回新对象，不改原 dump */
 function dropKeys(node, keys) {
   if (Array.isArray(node)) return node.map((item) => dropKeys(item, keys));
@@ -147,6 +187,7 @@ for (const channel of [...new Set([...Object.keys(electronBaseline), ...Object.k
 
 const problems = [];
 const used = new Set();
+const noHandlerUsed = new Set();
 const all = [...new Set([...Object.keys(electron), ...Object.keys(tauri)])].sort();
 for (const channel of all) {
   if (!(channel in electron)) {
@@ -157,6 +198,15 @@ for (const channel of all) {
     problems.push(`${channel}：Tauri 侧没有该通道`);
     continue;
   }
+  if (isNoHandler(electron[channel])) {
+    if (!NO_HANDLER.has(channel)) {
+      problems.push(`${channel}：现役版没有 handler，且未在 NO_HANDLER_ROWS 里登记理由`);
+    } else {
+      noHandlerUsed.add(channel);
+    }
+    continue;
+  }
+
   const exemption = EXEMPTIONS.get(channel);
   const before = compareChannel(channel, electron[channel], tauri[channel]);
   if (!before) continue;
@@ -196,4 +246,8 @@ for (const [channel, exemption] of EXEMPTIONS) {
 }
 if (unused.length > 0) {
   console.log(`  · 未被触发的豁免（两侧当前一致，复核后可从 EXEMPTION_ROWS 删掉）：${unused.join(", ")}`);
+}
+const unusedNoHandler = [...NO_HANDLER.keys()].filter((channel) => !noHandlerUsed.has(channel));
+if (unusedNoHandler.length > 0) {
+  console.log(`  · 未被触发的 no-handler 登记（现役版这次有 handler 了，复核后可从 NO_HANDLER_ROWS 删掉）：${unusedNoHandler.join(", ")}`);
 }

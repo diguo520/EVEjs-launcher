@@ -25,7 +25,7 @@
       "phase": "3-4",
       "platform": "win32",
       "repoRoot": "<abs-path>",
-      "version": "0.3.3"
+      "version": "0.3.4"
     },
     "config:get": {
       "client": {
@@ -148,6 +148,23 @@
       "path": "<abs-path>",
       "reason": null,
       "size": 0
+    },
+    "market:book": {
+      "ok": false,
+      "reason": "typeId 必须是正整数",
+      "supported": true
+    },
+    "market:catalog": {
+      "ok": false,
+      "reason": "未找到市场数据库：<abs-path>"
+    },
+    "market:overview": {
+      "ok": false,
+      "reason": "未找到市场数据库：<abs-path>"
+    },
+    "market:trades": {
+      "ok": false,
+      "reason": "未找到市场数据库：<abs-path>"
     },
     "metrics:get": {
       "cpuPercent": 11.18817901611328,
@@ -309,7 +326,7 @@
     "terminal:input": null,
     "terminal:resize": null,
     "update:state": {
-      "currentVersion": "0.3.3",
+      "currentVersion": "0.3.4",
       "state": "idle"
     }
   }

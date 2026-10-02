@@ -797,3 +797,186 @@ export interface RawPublishProgress {
   stage: string
   percent: number
 }
+/* ------------------------------------------------------------------
+   物品 / 市场浏览器（market:*，本工程扩展，契约见 contract/extensions.json）
+   ------------------------------------------------------------------ */
+
+/**
+ * 市场库总览。库是**活库**：counts.touched 是被游戏内成交真正扣减过库存的品种数，
+ * lastChangeAt 是最近一次成交时刻 —— 这两个数字会随着游戏里买卖而变化，
+ * 也是「界面读的不是随包快照」的直接证据。
+ */
+export interface RawMarketOverview {
+  ok: boolean
+  /** false = 这台机器没带市场侧车（打包缺件）；库缺失走 ok:false + reason */
+  supported?: boolean
+  reason?: string
+  path?: string
+  sizeBytes?: number
+  modifiedAt?: number
+  journalMode?: string
+  region?: { id: number; name: string }
+  systems?: { id: number; name: string; security: number }[]
+  counts?: {
+    types: number
+    stations: number
+    systems: number
+    stockRows: number
+    buyRows: number
+    liveOrders: number
+    fills: number
+    trades: number
+    /** 库存被成交扣减过的品种数（> 0 就说明这个库在用） */
+    touched: number
+    historyDays: number
+  }
+  lastChangeAt?: string | null
+  manifest?: {
+    generatedAt: string
+    selectionLabel: string
+    seedQuantity: number
+    historyDays: number
+    markupPercent: number
+  } | null
+}
+
+/**
+ * catalog 里的一行物品，**紧凑数组**而不是对象：
+ * [typeId, mgId, groupId, catId, name, basePrice, volume, portionSize,
+ *  bestAsk, askQty, askStation, bestBid, bidQty, bidStation]
+ *
+ * 19,352 行 × 14 列，展开成对象要多占好几倍内存（启动器对内存敏感），
+ * 所以保持数组原样过 IPC，由 market-logic.ts 装成 Int32Array / Float64Array。
+ */
+export type RawMarketTypeRow = [
+  number,
+  number,
+  number,
+  number,
+  string,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+]
+
+/** 分类树节点：[marketGroupID, parentGroupID(-1 = 根), 中文名, 英文名] */
+export type RawMarketTreeRow = [number, number, string, string]
+
+/** market:catalog */
+export interface RawMarketCatalog {
+  ok: boolean
+  supported?: boolean
+  reason?: string
+  path?: string
+  modifiedAt?: number
+  region?: { id: number; name: string }
+  /** false = 没找到运行时 SDE，分类树为空（列表退化成平铺，不影响物品本身） */
+  sde?: boolean
+  stations?: {
+    station_id: number
+    station_name: string
+    solar_system_id: number
+    solar_system_name: string
+    security: number
+  }[]
+  tree?: RawMarketTreeRow[]
+  /** [groupId, 中文名, 英文名] */
+  groups?: [number, string, string][]
+  /** [categoryId, 中文名, 英文名] */
+  categories?: [number, string, string][]
+  types?: RawMarketTypeRow[]
+}
+
+/** market:book 的盘口摘要（region_summaries 的一行） */
+export interface RawMarketSummary {
+  bestAsk: number
+  askQty: number
+  askStation: number
+  bestBid: number
+  bidQty: number
+  bidStation: number
+  updatedAt: string
+}
+
+/** market:book 的一个空间站库存行。quantity < initialQuantity 就是这个品种真被买过 */
+export interface RawMarketStockRow {
+  stationId: number
+  stationName: string
+  systemName: string
+  price: number
+  quantity: number
+  initialQuantity: number
+  updatedAt: string
+}
+
+/** market:book 的价格史一天 */
+export interface RawMarketHistoryPoint {
+  day: string
+  low: number
+  high: number
+  avg: number
+  volume: number
+  orders: number
+}
+
+/** market:book 的成交回执（market_fill_receipts 的 response_json） */
+export interface RawMarketFill {
+  at: string
+  price: number
+  quantity: number
+  stationId: number
+  bid: boolean
+}
+
+/** market:book */
+export interface RawMarketBook {
+  ok: boolean
+  supported?: boolean
+  reason?: string
+  path?: string
+  region?: { id: number; name: string }
+  type?: {
+    typeId: number
+    mgId: number
+    groupId: number
+    catId: number
+    name: string
+    groupName: string
+    basePrice: number
+    volume: number
+    portionSize: number
+  }
+  summary?: RawMarketSummary | null
+  stock?: RawMarketStockRow[]
+  /** 玩家挂单（market_orders 里状态还是 open 的）。当前种子库没有，恒为空数组 */
+  orders?: unknown[]
+  history?: RawMarketHistoryPoint[]
+  fills?: RawMarketFill[]
+}
+
+/** market:trades 的一行成交流水 */
+export interface RawMarketTradeRow {
+  at: string
+  typeId: number
+  name: string
+  price: number
+  quantity: number
+  stationId: number
+  stationName: string
+  bid: boolean
+}
+
+/** market:trades */
+export interface RawMarketTrades {
+  ok: boolean
+  supported?: boolean
+  reason?: string
+  path?: string
+  rows?: RawMarketTradeRow[]
+}
