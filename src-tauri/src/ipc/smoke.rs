@@ -56,6 +56,10 @@ pub fn safe_channels() -> Vec<&'static str> {
         "health:ping",
         "init:state",
         "log:read",
+        "market:book",
+        "market:catalog",
+        "market:overview",
+        "market:trades",
         "metrics:get",
         "mods:githubTokenStatus",
         "mods:list",
@@ -476,8 +480,8 @@ mod tests {
         ] {
             assert!(!safe.contains(channel), "{channel} 有副作用，不应进自检");
         }
-        // 23 个只读 + 全部待实现通道（待实现通道统一回 {ok:false}，天然安全）
-        assert_eq!(safe.len(), 26 + registry::PLANNED.len());
+        // 30 个只读 + 全部待实现通道（待实现通道统一回 {ok:false}，天然安全）
+        assert_eq!(safe.len(), 30 + registry::PLANNED.len());
     }
 
     #[test]

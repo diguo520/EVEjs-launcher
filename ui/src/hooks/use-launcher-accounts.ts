@@ -16,6 +16,8 @@ import {
   accountStats,
   bloodlineFromId,
   genderFromCode,
+  missingStoredCredential,
+  needsPasswordOnce,
   raceFromId,
   seedAccounts,
   type Account,
@@ -25,6 +27,7 @@ import {
   type CharacterDraft,
   type Guard,
   type InGameCreation,
+  type PendingCredential,
 } from "@/lib/launcher-logic"
 
 /** 建号期间轮询账号列表的节拍与上限：客户端捏人慢，给足两分钟 */
@@ -103,6 +106,9 @@ function toAccount(raw: RawAccount, onlineId: string | null): Account {
     createdAt: "—",
     lastLogin: "—",
     characters,
+    // 后端从 0.3.0 起一直带着这个字段；真缺了就当「不知道」，别把用户拦在弹窗前
+    hasStoredCredential:
+      typeof raw.hasStoredCredential === "boolean" ? raw.hasStoredCredential : undefined,
   }
 }
 
@@ -132,6 +138,17 @@ export interface LauncherAccountsState {
   exitGame: (accountId: string, characterId: string) => void
   verify: (accountId: string, password: string) => Promise<Guard>
   setPassword: (accountId: string, oldPassword: string, newPassword: string) => Promise<Guard>
+  /**
+   * 正等着补密码的那个账号（没有就是 null）。
+   *
+   * 本机没存过密码的账号（别的启动器建的、服务端直接建的）点「进游戏」时不报错，而是走这条：
+   * 弹一次输入框，输完 `login:start` 直接进，并顺手把密码存到本机。
+   */
+  pendingCredential: PendingCredential | null
+  /** 交一次密码；`remember` 打开时后端用 DPAPI 存回本机，下次回到一键路 */
+  submitCredential: (password: string, remember: boolean) => Promise<Guard>
+  /** 关掉输入框（用户放弃），什么都不做 */
+  cancelCredential: () => void
   /** 重新从后端读一遍账号列表 */
   reload: () => void
   /**
@@ -155,6 +172,8 @@ export function useLauncherAccounts(): LauncherAccountsState {
   const ipc = hasIpc()
   const [accounts, setAccounts] = useState<Account[]>(() => (ipc ? [] : seedAccounts()))
   const [creating, setCreating] = useState<InGameCreation | null>(null)
+  /** 等着补密码的账号：本机没存过密文的号，输一次就能进，顺手补存到本机 */
+  const [pendingCredential, setPendingCredential] = useState<PendingCredential | null>(null)
   const [hydrated, setHydrated] = useState(false)
   /** 本启动器这轮拉起过的角色：accountId → characterId（后端不报「谁在线」） */
   const [onlineByAccount, setOnlineByAccount] = useState<Record<string, string>>({})
@@ -361,6 +380,65 @@ export function useLauncherAccounts(): LauncherAccountsState {
     [ipc, load]
   )
 
+  /**
+   * 把某个角色标成在线：后端不报「谁在线」，本启动器这轮拉起的自己记。
+   * 「点角色进游戏」与「补完密码进游戏」两条路共用。
+   */
+  const markOnline = useCallback((accountId: string, characterId: string | null) => {
+    if (!characterId) return
+    setOnlineByAccount((prev) => ({ ...prev, [accountId]: characterId }))
+    setAccounts((prev) =>
+      prev.map((a) =>
+        a.id === accountId
+          ? {
+              ...a,
+              characters: a.characters.map((c) => ({
+                ...c,
+                online: c.id === characterId,
+                onlineSince: c.id === characterId ? Date.now() : undefined,
+              })),
+            }
+          : a
+      )
+    )
+  }, [])
+
+  /**
+   * 拉起客户端（本机存过密码时的一键路）。
+   *
+   * 成功交给调用方收尾（进游戏 → 标在线；建号 → 进轮询）；失败时如果后端说**本机没存过密码**
+   * （别的启动器建的号、服务端直接建的号），不要甩一句错误了事 —— 挂起这次操作，让用户补一次密码：
+   * `login:start` 带 remember，输完就会补存到本机，下次回到一键路。
+   */
+  const launchClient = useCallback(
+    async (account: Account, characterId: string | null, onReady: () => void) => {
+      const reply = await callOr<RawAck>("accountsLaunch", null, account.name, characterId)
+      if (runOk(reply)) {
+        onReady()
+        // 进游戏的提示由这里发：本机没存过密码时要先走弹窗，页面那边同步返回值分不出
+        // 「已经拉起来了」还是「等用户补密码」，先提示一句就成了误导。
+        if (characterId) {
+          const name = account.characters.find((c) => c.id === characterId)?.name ?? account.name
+          toast.info(t("正在为 {name} 拉起客户端…", { name }), {
+            description: "客户端将在数秒内启动，请勿关闭启动器。",
+          })
+        }
+        return
+      }
+      const reason = reasonOf(reply, "客户端没能拉起")
+      if (missingStoredCredential(reason)) {
+        setPendingCredential({
+          accountId: account.id,
+          characterId,
+          mode: characterId ? "enter" : "create",
+        })
+        return
+      }
+      toast.error(characterId ? "无法登录" : "无法进入角色创建界面", { description: reason })
+    },
+    []
+  )
+
   const enterGame = useCallback<LauncherAccountsState["enterGame"]>(
     (accountId, characterId) => {
       const account = accountsRef.current.find((a) => a.id === accountId)
@@ -374,31 +452,15 @@ export function useLauncherAccounts(): LauncherAccountsState {
         }
       }
       if (!ipc) return { ok: false, reason: "没有连接后端，无法拉起客户端" }
-      void (async () => {
-        const reply = await callOr<RawAck>("accountsLaunch", null, account.name, characterId)
-        if (!runOk(reply)) {
-          toast.error("无法登录", { description: reasonOf(reply, "客户端没能拉起") })
-          return
-        }
-        setOnlineByAccount((prev) => ({ ...prev, [accountId]: characterId }))
-        setAccounts((prev) =>
-          prev.map((a) =>
-            a.id === accountId
-              ? {
-                  ...a,
-                  characters: a.characters.map((c) => ({
-                    ...c,
-                    online: c.id === characterId,
-                    onlineSince: c.id === characterId ? Date.now() : undefined,
-                  })),
-                }
-              : a
-          )
-        )
-      })()
+      // 本机没存过这个号的密码：先问一次，别让它白跑一趟再报错
+      if (needsPasswordOnce(account)) {
+        setPendingCredential({ accountId, characterId, mode: "enter" })
+        return { ok: true, reason: "", needsPassword: true }
+      }
+      void launchClient(account, characterId, () => markOnline(accountId, characterId))
       return { ok: true, reason: "" }
     },
-    [ipc]
+    [ipc, launchClient, markOnline]
   )
 
   const exitGame = useCallback<LauncherAccountsState["exitGame"]>(
@@ -424,6 +486,45 @@ export function useLauncherAccounts(): LauncherAccountsState {
     []
   )
 
+  /**
+   * 建号的收尾：等新角色从游戏里同步回来。客户端捏人慢，给足两分钟
+   * （每 5 秒问一次账号列表，出现新角色就算成）。
+   */
+  const watchNewCharacter = useCallback(
+    (accountId: string, before: number) => {
+      setCreating({ accountId, step: "editing" })
+      toast.info("正在把客户端拉起来", {
+        description: "角色在游戏内捏好后会自动同步回账号列表。",
+      })
+      let ticks = 0
+      const poll = window.setInterval(() => {
+        ticks += 1
+        void callOr<RawAccountList>("accountsList", null).then(async (list) => {
+          if (!list?.ok || !Array.isArray(list.data)) return
+          const fresh = list.data.find((raw) => String(raw.accountId) === accountId)
+          const count = Array.isArray(fresh?.roles) ? fresh.roles.length : 0
+          if (count > before) {
+            window.clearInterval(poll)
+            const name = fresh?.roles?.[count - 1]?.characterName ?? "新角色"
+            setCreating(null)
+            await load()
+            toast.success(t("角色 {name} 已在游戏内创建", { name }), {
+              description: "已同步回启动器。",
+            })
+            return
+          }
+          if (ticks >= ROLE_POLL_MAX) {
+            window.clearInterval(poll)
+            setCreating((current) => (current?.accountId === accountId ? null : current))
+            void load()
+          }
+        })
+      }, ROLE_POLL_MS)
+      timers.current.push(poll)
+    },
+    [load]
+  )
+
   /** 到游戏里建号：拉起客户端，然后轮询账号列表，等新角色出现 */
   const createInGame = useCallback<LauncherAccountsState["createInGame"]>(
     (accountId) => {
@@ -443,47 +544,16 @@ export function useLauncherAccounts(): LauncherAccountsState {
         return { ok: false, reason: "客户端已经在角色创建界面" }
       }
       if (!ipc) return { ok: false, reason: "没有连接后端，无法拉起客户端" }
-
+      // 同「进游戏」：本机没有密码就先问一次，建号这条路同样需要先登录
+      if (needsPasswordOnce(account)) {
+        setPendingCredential({ accountId, characterId: null, mode: "create" })
+        return { ok: true, reason: "", needsPassword: true }
+      }
       const before = account.characters.length
-      void (async () => {
-        const reply = await callOr<RawAck>("accountsLaunch", null, account.name, null)
-        if (!runOk(reply)) {
-          toast.error("无法进入角色创建界面", { description: reasonOf(reply, "客户端没能拉起") })
-          return
-        }
-        setCreating({ accountId, step: "editing" })
-        toast.info("正在把客户端拉起来", {
-          description: "角色在游戏内捏好后会自动同步回账号列表。",
-        })
-        let ticks = 0
-        const poll = window.setInterval(() => {
-          ticks += 1
-          void callOr<RawAccountList>("accountsList", null).then(async (list) => {
-            if (!list?.ok || !Array.isArray(list.data)) return
-            const fresh = list.data.find((raw) => String(raw.accountId) === accountId)
-            const count = Array.isArray(fresh?.roles) ? fresh.roles.length : 0
-            if (count > before) {
-              window.clearInterval(poll)
-              const name = fresh?.roles?.[count - 1]?.characterName ?? "新角色"
-              setCreating(null)
-              await load()
-              toast.success(t("角色 {name} 已在游戏内创建", { name }), {
-                description: "已同步回启动器。",
-              })
-              return
-            }
-            if (ticks >= ROLE_POLL_MAX) {
-              window.clearInterval(poll)
-              setCreating((current) => (current?.accountId === accountId ? null : current))
-              void load()
-            }
-          })
-        }, ROLE_POLL_MS)
-        timers.current.push(poll)
-      })()
+      void launchClient(account, null, () => watchNewCharacter(accountId, before))
       return { ok: true, reason: "" }
     },
-    [ipc, load]
+    [ipc, launchClient, watchNewCharacter]
   )
 
   const verify = useCallback<LauncherAccountsState["verify"]>(
@@ -515,6 +585,51 @@ export function useLauncherAccounts(): LauncherAccountsState {
     [load]
   )
 
+  /**
+   * 补一次密码：`login:start` 是「本地验证 + 直接拉起客户端」，`remember` 打开时后端顺便把密码
+   * DPAPI 加密存回本机 —— 于是这一次能进，下次也回到一键路（这是别的启动器建的号唯一的入口）。
+   */
+  const submitCredential = useCallback<LauncherAccountsState["submitCredential"]>(
+    async (password, remember) => {
+      const pending = pendingCredential
+      if (!pending) return { ok: false, reason: "没有待补密码的账号" }
+      const account = accountsRef.current.find((a) => a.id === pending.accountId)
+      if (!account) return { ok: false, reason: "账号不存在" }
+      const reply = await callOr<RawAck>(
+        "loginStart",
+        null,
+        account.name,
+        password,
+        remember,
+        pending.characterId
+      )
+      if (!runOk(reply)) return { ok: false, reason: reasonOf(reply, "密码不正确") }
+
+      setPendingCredential(null)
+      // 本机现在有密文了（没勾记住就还是老样子，下次再问一遍）
+      setAccounts((prev) =>
+        prev.map((a) =>
+          a.id === account.id ? { ...a, hasStoredCredential: remember || a.hasStoredCredential } : a
+        )
+      )
+      if (pending.mode === "create") {
+        watchNewCharacter(account.id, account.characters.length)
+      } else {
+        markOnline(account.id, pending.characterId)
+        // 与一键路同口径：优先报角色名，找不到（角色刚被删）再退回账号名
+        const name =
+          account.characters.find((c) => c.id === pending.characterId)?.name ?? account.name
+        toast.success(t("正在为 {name} 拉起客户端…", { name }), {
+          description: "客户端将在数秒内启动，请勿关闭启动器。",
+        })
+      }
+      return { ok: true, reason: "" }
+    },
+    [markOnline, pendingCredential, watchNewCharacter]
+  )
+
+  const cancelCredential = useCallback(() => setPendingCredential(null), [])
+
   return {
     accounts,
     stats,
@@ -529,6 +644,9 @@ export function useLauncherAccounts(): LauncherAccountsState {
     exitGame,
     verify,
     setPassword,
+    pendingCredential,
+    submitCredential,
+    cancelCredential,
     reload,
     logotypes,
   }

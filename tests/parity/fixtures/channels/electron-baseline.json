@@ -1,11 +1,9 @@
 {
   "channels": {
     "accounts:checkRunning": {
-      "listening": [],
       "ports": [
         26000
-      ],
-      "running": false
+      ]
     },
     "accounts:list": {
       "ok": false,
@@ -67,8 +65,7 @@
           "key": "rust",
           "label": "Rust / Cargo 工具链",
           "message": "rustc 1.98.1 (48a229cea 2026-09-01) · cargo 1.98.1 (797e8a9bc 2026-08-05)",
-          "ok": true,
-          "warn": false
+          "ok": true
         },
         {
           "key": "vsBuildTools",
@@ -77,41 +74,34 @@
           "ok": true
         },
         {
-          "hint": "在 server 目录执行 npm ci 安装依赖",
           "key": "serverDeps",
           "label": "主服务器依赖",
           "message": "缺少 server/node_modules（express 未安装）",
           "ok": false
         },
         {
-          "hint": "运行 tools\\DatabaseCreator\\CreateDatabase.bat 初始化数据库",
           "key": "localDb",
           "label": "本地数据库",
           "message": "本地数据库缺失（manifest/sqlite 不存在）",
           "ok": false
         },
         {
-          "hint": "按 StartMarketServer.bat 使用 VS Build Tools 构建一次（cargo build --release）",
           "key": "market",
           "label": "市场服务二进制",
           "message": "未找到 target/release/market-server.exe",
           "ok": false
         },
         {
-          "hint": "在 EvEJSConfig.bat / 配置面板中填写客户端安装路径",
           "key": "clientPath",
           "label": "客户端路径",
           "message": "路径不存在: <abs-path>",
-          "ok": false,
-          "warn": true
+          "ok": false
         },
         {
-          "hint": "运行 SetupEveJS.bat 或检查 EVEJS_CA_PEM 指向",
           "key": "caCert",
           "label": "客户端证书 CA",
           "message": "CA 证书缺失",
-          "ok": false,
-          "warn": true
+          "ok": false
         }
       ],
       "node": {
@@ -136,7 +126,6 @@
       "market": false
     },
     "health:ping": {
-      "ok": false,
       "port": 26000
     },
     "init:state": {
@@ -153,11 +142,23 @@
       "path": "<abs-path>",
       "size": 0
     },
+    "market:book": {
+      "__parity": "no-handler"
+    },
+    "market:catalog": {
+      "__parity": "no-handler"
+    },
+    "market:overview": {
+      "__parity": "no-handler"
+    },
+    "market:trades": {
+      "__parity": "no-handler"
+    },
     "metrics:get": {
-      "cpuPercent": 23.821782625386724,
+      "cpuPercent": 21.391777864992147,
       "diskRoot": "E:",
       "diskTotalGB": 976.5624961853027,
-      "diskUsedGB": 871.8747940063477,
+      "diskUsedGB": 901.731632232666,
       "gpuDedicatedTotalGB": null,
       "gpuDedicatedUsedGB": null,
       "gpuMemoryTotalGB": null,
@@ -165,38 +166,38 @@
       "gpuPercent": null,
       "gpuSharedUsedGB": null,
       "memTotalGB": 31.855934143066406,
-      "memUsedGB": 17.3363037109375,
+      "memUsedGB": 14.222274780273438,
       "netBytesPerSec": 0,
       "virtualMemTotalGB": null,
       "virtualMemUsedGB": null,
       "volumes": [
         {
-          "freeGB": 45.37015914916992,
-          "percent": 79.60247103828085,
+          "freeGB": 53.13395690917969,
+          "percent": 76.11202064902699,
           "root": "C:",
           "totalGB": 222.42968368530273,
-          "usedGB": 177.0595245361328
+          "usedGB": 169.29572677612305
         },
         {
-          "freeGB": 144.74559783935547,
-          "percent": 50.59350196085289,
+          "freeGB": 144.80627059936523,
+          "percent": 50.572792325166574,
           "root": "D:",
           "totalGB": 292.96874618530273,
-          "usedGB": 148.22314834594727
+          "usedGB": 148.1624755859375
         },
         {
-          "freeGB": 104.68770217895508,
-          "percent": 89.27997925499992,
+          "freeGB": 74.83086395263672,
+          "percent": 92.33731950131765,
           "root": "E:",
           "totalGB": 976.5624961853027,
-          "usedGB": 871.8747940063477
+          "usedGB": 901.731632232666
         },
         {
-          "freeGB": 447.31017684936523,
-          "percent": 81.79056376822031,
+          "freeGB": 354.646785736084,
+          "percent": 85.56277419138262,
           "root": "F:",
           "totalGB": 2456.4746055603027,
-          "usedGB": 2009.1644287109375
+          "usedGB": 2101.8278198242188
         }
       ]
     },

@@ -133,6 +133,38 @@
       "why": "写回世界参数。走服务端自己的 saveConfig：先按 schema 校验（未知键 / 类型 / 整数 / 范围 / 枚举全在服务端判定），再原子写 config/*.json。启动器侧额外做的事只有一件 —— 写前把整份 config 备份到 _local/config-backups/gameconfig-<时间戳>/，因为服务端自己的原子写不带回滚，而这里改的是全局玩法参数。只写 config/*.json，不碰 server/ 下任何源码。"
     },
     {
+      "api": "marketOverview",
+      "channel": "market:overview",
+      "kind": "invoke",
+      "signature": "",
+      "params": [],
+      "why": "现役版没有物品 / 市场浏览功能。这条通道直读服务端市场库 externalservices/market-server/data/generated/market.sqlite（只读 + WAL，服务跑着也能读），返回区域、星系、类型 / 站点 / 库存 / 成交行数、库文件大小与最近一次成交时间。库是活库：seed_stock.quantity 与 region_summaries 里的最优买卖价会随游戏内成交变化，所以这里刻意不走任何随包快照 —— 用户要的就是「跑着游戏读到的是当下数据，服务没启动也能读」。"
+    },
+    {
+      "api": "marketCatalog",
+      "channel": "market:catalog",
+      "kind": "invoke",
+      "signature": "",
+      "params": [],
+      "why": "物品清单一次拉全（当前 19,352 个有库存的物品 × 14 个数字列，约 2.3 MB），前端本地做分类树过滤、搜索与翻页 —— 每次按键都回 Rust 查一次库在体感上太慢，而这份清单只在打开页面时拉一次。分类树的层级与中英文名不在市场库里（库里只有 market_group_id 这个数字），运行时从 SDE 的 marketGroups.jsonl 读父子关系，SDE 缺失时退化成平铺，不影响物品本身的展示。"
+    },
+    {
+      "api": "marketBook",
+      "channel": "market:book",
+      "kind": "invoke",
+      "signature": "typeId: number",
+      "params": ["typeId"],
+      "why": "单个物品的盘口明细：各空间站的库存与价格（被交易扣减后的 quantity 与种子值 initial_quantity 分开显示，一眼能看出哪些真被买过）、30 天价格历史、以及命中过的成交回执。这三块数据量大且只在点开某个物品时才需要，所以不塞进 catalog 里一起下发。"
+    },
+    {
+      "api": "marketTrades",
+      "channel": "market:trades",
+      "kind": "invoke",
+      "signature": "limit?: number",
+      "params": ["limit"],
+      "why": "最近的成交流水（market_fill_receipts，明细在 response_json 里），用来证明「库是活的」：刷新一下就能看到新成交。order_id 是 int64，超出 JS 安全整数范围，CLI 侧必须 CAST 成 TEXT 再下发，否则前端读到的 id 会被静默改写。"
+    },
+    {
       "api": "sponsorsSnapshot",
       "channel": "sponsors:snapshot",
       "kind": "invoke",

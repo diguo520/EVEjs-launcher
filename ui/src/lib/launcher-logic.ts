@@ -58,6 +58,14 @@ export interface Account {
   createdAt: string
   lastLogin: string
   characters: Character[]
+  /**
+   * 本机 `launcher-settings.json` 里有没有这个账号的密码密文（后端 `hasStoredCredential`）。
+   *
+   * 密文只落在**建号那台机器**上：别的启动器建的号、直接在服务端建的号，本机都没有，
+   * 「一键进游戏」必然失败 —— 这时要问一次密码（`login:start` 带 remember，输完补存到本机）。
+   * 后端没给这个字段时留 `undefined`，按「先试一键」处理。
+   */
+  hasStoredCredential?: boolean
 }
 
 /* ---------------- 种族 / 血统 ---------------- */
@@ -194,9 +202,41 @@ export const GENDER_ORDER: Gender[] = ["male", "female"]
 export interface Guard {
   ok: boolean
   reason: string
+  /**
+   * `ok: true`，但这次操作还等着用户补一次密码：数据层已经把请求挂起，弹窗接管了
+   * （见 `PendingCredential`）。调用方这时**不要**再提示「正在拉起客户端」。
+   */
+  needsPassword?: boolean
 }
 
 const ALLOW: Guard = { ok: true, reason: "" }
+
+/**
+ * 后端那句「本机没存过这个账号的密码」的原文 —— `accounts.rs::launch_stored` 在设置文件里
+ * 找不到 DPAPI 密文时回的就是它。界面上不能只把这句话显示出来：得让用户**输一次密码**。
+ */
+export function missingStoredCredential(reason: string): boolean {
+  return String(reason ?? "").includes("未找到已保存的登录凭据")
+}
+
+/**
+ * 进游戏前要不要先问一次密码。
+ *
+ * 只有**明确知道**本机没有密文（`hasStoredCredential === false`）才提前问，省掉一次注定失败的往返；
+ * 字段缺失（老后端 / 种子数据）按「有」处理，真失败了再靠 `missingStoredCredential(reason)` 兜底 ——
+ * 宁可多试一次，也别让本来能一键进的号被弹窗拦住。
+ */
+export function needsPasswordOnce(account: Pick<Account, "hasStoredCredential">): boolean {
+  return account.hasStoredCredential === false
+}
+
+/** 挂起中的「补一次密码」：用户输完后按 `mode` 接着走原来的意图 */
+export interface PendingCredential {
+  accountId: string
+  /** 进游戏要直达的角色；null = 只想把客户端拉到角色创建界面 */
+  characterId: string | null
+  mode: "enter" | "create"
+}
 
 const deny = (reason: string): Guard => ({ ok: false, reason })
 

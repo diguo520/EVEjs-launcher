@@ -53,6 +53,12 @@ pub const HANDLED: &[&str] = &[
     "init:state",
     "log:read",
     "login:start",
+    // 物品市场（本工程扩展，契约见 contract/extensions.json）：直读服务端市场库，
+    // 现役版没有物品/市场浏览功能
+    "market:book",
+    "market:catalog",
+    "market:overview",
+    "market:trades",
     "metrics:get",
     "mods:authoringDoc",
     "mods:authoringDocText",

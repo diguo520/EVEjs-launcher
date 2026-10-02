@@ -1,13 +1,13 @@
 {
   "generatedFrom": "E:\\Games\\EveJS-v0.12.8\\launcher\\launcher",
-  "generatedAt": "2026-10-02T05:02:23.861Z",
+  "generatedAt": "2026-10-02T10:36:47.787Z",
   "counts": {
-    "invoke": 91,
+    "invoke": 95,
     "send": 6,
     "events": 7,
-    "requests": 97,
+    "requests": 101,
     "registered": 82,
-    "apiTotal": 104
+    "apiTotal": 108
   },
   "invoke": [
     {
@@ -319,6 +319,38 @@
         "password",
         "remember",
         "characterId"
+      ]
+    },
+    {
+      "api": "marketBook",
+      "channel": "market:book",
+      "kind": "invoke",
+      "signature": "typeId: number",
+      "params": [
+        "typeId"
+      ]
+    },
+    {
+      "api": "marketCatalog",
+      "channel": "market:catalog",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "marketOverview",
+      "channel": "market:overview",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "marketTrades",
+      "channel": "market:trades",
+      "kind": "invoke",
+      "signature": "limit?: number",
+      "params": [
+        "limit"
       ]
     },
     {
@@ -875,6 +907,10 @@
       "accounts:logotypes",
       "gameConfig:read",
       "gameConfig:save",
+      "market:book",
+      "market:catalog",
+      "market:overview",
+      "market:trades",
       "mods:claimCandidates",
       "mods:claimMod",
       "mods:forgetSubmission",
