@@ -33,6 +33,7 @@ import type {
 } from "@/lib/ipc"
 import { CLAIM_PAGE_SIZE, CLAIM_SCOPE_DEFAULT, type ClaimQuery } from "@/lib/mod-claim"
 import { buildMods, latestSubmission, reviewsOf, sourceRepoIds } from "@/lib/mod-source"
+import { planReviewLoad } from "@/lib/review-sync"
 import type { PublishCredential } from "@/lib/mod-logic"
 import type { ModEntry, ModReview } from "@/lib/mock"
 
@@ -123,8 +124,13 @@ export interface ModSourceState {
   ratingsReason: string
   /** 某个模组的评论是否已经拉回来过 */
   reviewsLoaded: (id: string) => boolean
-  /** 按需拉某个模组的评论正文（打开详情弹窗时调；force 绕过缓存） */
+  /** 按需拉某个模组的评论正文（force 绕过缓存；写完评论 / 回复之后的重拉也走它） */
   loadReviews: (id: string, force?: boolean) => Promise<void>
+  /**
+   * 打开详情弹窗时的评论入口：**先渲染、再在后台追一次**（别人刚写的评论、作者刚发的回复只会
+   * 出现在新快照里）。判断口径见 `@/lib/review-sync`，同一模组 60 秒内只真联网一次。
+   */
+  openReviews: (id: string) => void
   /** 打分 / 改分。`pkgSha256` 是市场索引里那一版的安装包指纹，服务端据此确认「真的装过」 */
   submitReview: (input: {
     modId: string
@@ -230,6 +236,9 @@ export function useModSource(): ModSourceState {
   /** 已经拉回来的评论正文：只在打开过详情的模组上才有键 */
   const [reviewsById, setReviewsById] = useState<Record<string, ModReview[]>>({})
 
+  /** 每个模组最近一次「真的打了网络」的评论拉取时刻（epoch ms），给 openReviews 的冷却用 */
+  const reviewFetchedAt = useRef(new Map<string, number>())
+
   /** 提交期间要读到最新的 mods（folder 映射用） */
   const listRef = useRef<RawModList | null>(null)
   listRef.current = list
@@ -276,6 +285,7 @@ export function useModSource(): ModSourceState {
    * 正文是附加信息，丢了顶多详情页空一下，重开弹窗就再拉一次。
    *
    * 已经拉过且不是强制刷新就直接返回 —— 详情弹窗每次开关都打一次接口太浪费。
+   * 回包 `cached === false` 说明这一趟真打了网络，记下时刻，给 openReviews 的冷却用。
    */
   const loadReviews = useCallback(
     async (id: string, force = false) => {
@@ -283,9 +293,35 @@ export function useModSource(): ModSourceState {
       if (!force && reviewsById[id]) return
       const reply = await callOr<RawReviewShard>("modsReviews", null, id, force)
       if (!reply || reply.ok !== true) return
+      if (reply.cached === false) reviewFetchedAt.current.set(id, Date.now())
       setReviewsById((prev) => ({ ...prev, [id]: reviewsOf(reply.reviews) }))
     },
     [ipc, reviewsById]
+  )
+
+  /**
+   * 打开详情弹窗时的评论入口 —— 先渲染、再在后台追一次。
+   *
+   * 分片的本地缓存 TTL 是 30 分钟，光读缓存的话，别人刚写的评论、作者刚发的回复要等到
+   * **下次重启启动器**才看得见；这里就在打开详情的当口补一次联网。失败照旧保持界面现状，
+   * 不清空也不报错（评论是附加信息，读不到顶多详情页少一段正文）。
+   */
+  const openReviews = useCallback(
+    (id: string) => {
+      if (!ipc || !id) return
+      const now = Date.now()
+      const plan = planReviewLoad({
+        inMemory: Boolean(reviewsById[id]),
+        fetchedAt: reviewFetchedAt.current.get(id) ?? 0,
+        now,
+      })
+      if (plan === "skip") return
+      // 强刷这一趟**先记账再发请求**：离网时 Rust 会回退到本地那份缓存（回包 `cached: true`），
+      // 要是等回包才记账，「内存里有、又拉不到新的」会让这个 effect 一圈圈重跑。
+      if (plan === "sync") reviewFetchedAt.current.set(id, now)
+      void loadReviews(id, plan === "sync")
+    },
+    [ipc, reviewsById, loadReviews]
   )
 
   /**
@@ -698,6 +734,7 @@ export function useModSource(): ModSourceState {
     ratingsReason: market?.ratings?.reason ?? "",
     reviewsLoaded: (id: string) => Boolean(reviewsById[id]),
     loadReviews,
+    openReviews,
     submitReview,
     retractReview,
     submitReply,

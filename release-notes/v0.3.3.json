@@ -1,0 +1,17 @@
+{
+  "version": "0.3.3",
+  "changelog": {
+    "zh": [
+      {
+        "type": "fix",
+        "text": "别人刚写的评论、作者刚发的回复，现在打开详情就能看到：评论分片在本地有 30 分钟缓存，以前这一层只认「过期没过期」，于是作者回复完之后，别的用户（以及你自己换台机器）得**重启启动器**才看得到 —— 详情页里显示的还是旧的那几条（2026-10-02 报障）。现在打开详情会先用手里的内容把画面渲染出来，同时在后台补拉一次新的，最多只滞后服务端一个重算周期（10 分钟）；同一条分片 60 秒内只真联网一次，反复开关弹窗不会把接口打满，拉不到时也照旧显示原内容、不清空。"
+      }
+    ],
+    "en": [
+      {
+        "type": "fix",
+        "text": "Reviews written by others and author replies now show up as soon as you open a mod's details: review shards sit in a 30-minute local cache that only checked freshness, so after an author replied, other players (and you on a second machine) had to restart the launcher to see it — the details pane kept showing the older list (reported 2026-10-02). Opening the details now renders what is already on hand and fetches a fresh copy in the background, so the worst case is one server rebuild cycle behind (10 minutes). Each shard is really fetched from the network at most once every 60 seconds, so reopening the dialog does not hammer the endpoint, and a failed fetch keeps the current content instead of clearing it."
+      }
+    ]
+  }
+}

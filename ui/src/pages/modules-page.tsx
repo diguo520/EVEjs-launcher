@@ -700,15 +700,16 @@ export function ModulesPage({
    * 评论正文按需拉：聚合分跟着市场索引一起回来（卡片上的分数、排序、评分分档都吃它），
    * 正文更大，所以等真的打开详情弹窗再拉一次。
    *
-   * 依赖里只放 id：弹窗开关不该每次重拉 —— source.loadReviews 内部也做了「拉过就不重复拉」。
+   * 交给 `source.openReviews` 自己拿捏「先渲染、再后台追一次」：内存里有就立刻出画面，
+   * 同一条分片 60 秒内只真联网一次，所以这里不必再自己防重。
    */
   const detailModId = detailMod?.id ?? null
   const detailInMarket = detailMod?.inMarket === true
-  const loadReviews = source.loadReviews
+  const openReviews = source.openReviews
   useEffect(() => {
     if (!detailModId || !detailInMarket) return
-    void loadReviews(detailModId)
-  }, [detailModId, detailInMarket, loadReviews])
+    openReviews(detailModId)
+  }, [detailModId, detailInMarket, openReviews])
 
   const handleSubmitted: ModSubmitDialogProps["onSubmitted"] = (
     mod,
