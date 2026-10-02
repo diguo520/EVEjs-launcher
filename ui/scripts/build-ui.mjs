@@ -25,6 +25,18 @@ const CHECK_ONLY = process.argv.includes("--check");
 /** gen-contract.mjs 的产物，不允许被本脚本删除 */
 const KEEP = new Set([SHIM, MANIFEST]);
 
+/**
+ * 只供构建期使用、**不进包**的资产。
+ *
+ * `manual/manual.html` 是「EVE.js 全指令手册」的单文件快照，`ui/scripts/build-manual-data.mjs`
+ * 从它抽出 `ui/src/data/` 下的结构化数据。现役版是用 iframe 内嵌这一页
+ * （`src/renderer/components/ManualPanel.tsx`），移植后 legacy 与 React 两层渲染层都自己画手册，
+ * 运行期没有任何地方会去取这个文件 —— 随包只会白占 5.4 MB（还要被嵌进 exe）。
+ */
+const BUILD_ONLY_PREFIXES = ["manual/"];
+const isBuildOnly = (relative) =>
+  BUILD_ONLY_PREFIXES.some((prefix) => relative === prefix || relative.startsWith(prefix));
+
 function walk(dir, base = dir, out = []) {
   let entries;
   try {
@@ -49,7 +61,7 @@ if (!fs.existsSync(SHIM_SRC)) {
   process.exit(1);
 }
 
-const sources = [...walk(WEB_DIR), SHIM];
+const sources = [...walk(WEB_DIR).filter((relative) => !isBuildOnly(relative)), SHIM];
 const previous = (() => {
   try {
     return JSON.parse(fs.readFileSync(path.join(DIST_DIR, MANIFEST), "utf8"));

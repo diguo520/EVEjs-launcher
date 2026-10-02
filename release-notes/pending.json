@@ -1,6 +1,11 @@
 {
   "target": 8,
-  "completed": 0,
+  "completed": 1,
   "nextVersion": "0.3.5",
-  "changes": []
+  "changes": [
+    {
+      "type": "opt",
+      "text": "启动器减重 0.7 MB（exe 9.96 → 9.25 MB）：随包资产里那份只供构建期使用的「EVE.js 全指令手册」单文件快照（5.4 MB，运行期没有任何地方取它）不再打进 exe；legacy 渲染层里三个零引用的旧资源（eve-theme.css / logo.svg / shoukuanma.png）和一个没人 import 的 UI 组件也一并删掉。"
+    }
+  ]
 }
