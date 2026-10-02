@@ -69,7 +69,7 @@ const rows = [
   ["Tauri 启动器 exe（release）", sizeOf(tauriExe), BUDGET_MB * 1024 * 1024],
   ["便携版 zip（对外分发物）", portableZip ? portableZip.size : null, ZIP_BUDGET_MB * 1024 * 1024],
   ["ui/dist 静态资产", sizeOf(distDir), null],
-  ["  ├ ui/web 资产（含 5.3MB 手册 + 3 个 JSON）", (sizeOf(distDir) ?? 0) - (sizeOf(shimOnly) ?? 0), null],
+  ["  ├ ui/web 资产（legacy 渲染层 + 3 个 JSON）", (sizeOf(distDir) ?? 0) - (sizeOf(shimOnly) ?? 0), null],
   ["  └ api-shim.js", sizeOf(shimOnly), null]
 ];
 

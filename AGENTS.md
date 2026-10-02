@@ -8,7 +8,7 @@
 | 路径 | 作用 |
 | --- | --- |
 | `src-tauri/` | Rust 外壳：服务管理、IPC（83 条通道）、模组、签名、更新器、旧数据接管 |
-| `ui/` | React + shadcn/ui 界面（编译期嵌入 exe）；`ui/web/` 是随包分发的静态资源 |
+| `ui/` | React + shadcn/ui 界面（编译期嵌入 exe）；`ui/web/` 是随包分发的静态资源（`ui/web/manual/` 例外：只做构建期输入，不进包，见 `ui/scripts/build-ui.mjs` 的 `BUILD_ONLY_PREFIXES`） |
 | `vendor/` | 随包分发的 Node 侧车 CLI 与 Go 自更新器源码 |
 | `contract/` | IPC 契约与固定向量，`scripts/gen-contract.mjs` 生成，禁止手改 |
 | `tests/` | parity（跨实现固定向量）、e2e、契约与安全检查 |
@@ -27,8 +27,8 @@
 2. 创建 `release-notes/vX.Y.Z.json`（`changelog.zh` / `changelog.en` 都要有，见下）。
 3. 跑门禁：`npm run check`、`npm --prefix ui test`、`pwsh -File scripts/build.ps1`。
 4. 提醒维护者提交与打标签，**不自动提交、不自动打标签**。
-5. 提交信息里同时写中文与英文摘要，例如
-   `release: v0.2.0 换用 Tauri 2 框架 / migrate to the Tauri 2 shell`。
+5. 提交信息里同时写英文与中文摘要，**英文在前**（GitHub 文件/文件夹列表那一列的「说明」取的就是最近一次提交信息），例如
+   `release: v0.2.0 migrate to the Tauri 2 shell / 换用 Tauri 2 框架`。
 
 ## 更新日志格式
 
