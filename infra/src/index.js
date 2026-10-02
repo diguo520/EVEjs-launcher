@@ -120,11 +120,11 @@ export async function rebuildSnapshots(env, now = Date.now()) {
   })
   await env.SNAPSHOTS.put(RATINGS_KEY, JSON.stringify(ratings))
 
-  const modIds = [...new Set(rows.filter((row) => !row.hidden).map((row) => String(row.mod_id)))].sort()
+  const modIds = [...new Set(rows.filter((row) => !row.hidden).map((row) => String(row.mod_id)))]
+    .filter((modId) => shardPath(modId))
+    .sort()
   let shards = 0
   for (const modId of modIds) {
-    const path = shardPath(modId)
-    if (!path) continue
     const shard = await signer({
       schemaVersion: SNAPSHOT_SCHEMA_VERSION,
       generatedAt: now,
@@ -133,6 +133,19 @@ export async function rebuildSnapshots(env, now = Date.now()) {
     await env.SNAPSHOTS.put(REVIEWS_PREFIX + modId, JSON.stringify(shard))
     shards += 1
   }
+
+  // 过期的分片必须删掉，**不能只算不删**。
+  //
+  // 分片是按需生成的派生物：一个模组的最后一条评价被删掉（或被隐藏）之后，它那一轮
+  // 已经不在 modIds 里了，可旧分片还躺在 KV 里 —— 启动器读到的就是「评论明明删了还在」
+  // （2026-10-02 报障）。分片删了随时能重建，所以这里按前缀列一遍，只留这一轮真正有内容的那些。
+  // 读接口那边（serveReviewShard）对没有分片的模组回签名空分片，两条路合起来才自洽。
+  const keep = new Set(modIds.map((modId) => REVIEWS_PREFIX + modId))
+  const listed = await env.SNAPSHOTS?.list?.({ prefix: REVIEWS_PREFIX })
+  const stale = (listed?.keys ?? [])
+    .map((item) => String(item?.name ?? ""))
+    .filter((name) => name && !keep.has(name))
+  for (const name of stale) await env.SNAPSHOTS.delete(name)
   // 补给线名单：与评价无关，同一次 cron 里一起重签。名单本体在 KV（管理接口写的），
   // 没写过就用代码里那份种子；不依赖 D1，所以即使一条评价都没有也照发。
   const { entries: sponsorEntries, source: sponsorsSource } = await loadSponsorSource(env)
@@ -143,6 +156,8 @@ export async function rebuildSnapshots(env, now = Date.now()) {
     ok: true,
     mods: Object.keys(ratings.mods).length,
     shards,
+    // 这一轮删掉的过期分片数：运维从 job_runs 就能看出「删评论之后分片有没有跟着消失」
+    removed: stale.length,
     rows: rows.length,
     sponsors: sponsors.sponsors.length,
     sponsorsSource,

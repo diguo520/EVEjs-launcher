@@ -354,3 +354,87 @@ test("撤回评论顺手删掉挂在它上面的回复（不留孤儿）", async
     "评论本身当然也要删"
   )
 })
+
+/** 造一个「只有 KV 有分片、D1 没有对应行」的假环境，专测过期分片的清理 */
+function shardEnv({ rows = [], keys = [], me }) {
+  const stored = []
+  const deleted = []
+  return {
+    stored,
+    deleted,
+    env: {
+      DB: {
+        prepare: (sql) => ({
+          all: async () =>
+            /FROM reviews r/.test(sql)
+              ? { results: rows.map((row) => projectionRow(sql, row)) }
+              : { results: [] },
+          first: async () => null,
+          run: async () => ({ success: true }),
+        }),
+      },
+      SNAPSHOTS: {
+        get: async () => null,
+        put: async (key, value) => stored.push({ key, value }),
+        list: async ({ prefix }) => ({ keys: keys.map((name) => ({ name })).filter((item) => item.name.startsWith(prefix)) }),
+        delete: async (name) => deleted.push(name),
+      },
+      RATINGS_SIGNING_KEY: me.pkcs8,
+      RATINGS_KEY_ID: me.keyId,
+    },
+  }
+}
+
+const REVIEW_ROW = {
+  id: "rv-1790882024887-29688",
+  mod_id: "evejs-a",
+  version: "1.0.0",
+  stars: 5,
+  body: "装上就能用",
+  author_name: "",
+  corp: "",
+  country: "CN",
+  key_id: "abcd1234ef",
+  created_at: 1790882024887,
+  updated_at: 1790882024887,
+  edited: 0,
+  hidden: 0,
+  reply_body: "",
+  reply_at: null,
+  reply_edited: 0,
+}
+
+test("最后一条评价删掉之后，旧分片要跟着消失（否则界面上「删掉的评论还在」）", async () => {
+  const me = await identity()
+  const { env, stored, deleted } = shardEnv({
+    rows: [],
+    keys: ["snapshot:reviews:evejs-a", "snapshot:reviews:evejs-gone"],
+    me,
+  })
+  const result = await rebuildSnapshots(env, 1790882060253)
+  assert.equal(result.ok, true, JSON.stringify(result))
+  assert.equal(result.removed, 2, "两条过期分片都要删")
+  assert.deepEqual(deleted.sort(), ["snapshot:reviews:evejs-a", "snapshot:reviews:evejs-gone"])
+  assert.equal(
+    stored.filter((item) => item.key.startsWith("snapshot:reviews:")).length,
+    0,
+    "一条评价都没有就不该再写分片"
+  )
+})
+
+test("有评价的模组分片要重建，别人的过期分片照删", async () => {
+  const me = await identity()
+  const { env, stored, deleted } = shardEnv({
+    rows: [REVIEW_ROW],
+    keys: ["snapshot:reviews:evejs-a", "snapshot:reviews:evejs-gone"],
+    me,
+  })
+  const result = await rebuildSnapshots(env, 1790882060253)
+  assert.equal(result.ok, true, JSON.stringify(result))
+  assert.equal(result.shards, 1)
+  assert.equal(result.removed, 1)
+  assert.deepEqual(deleted, ["snapshot:reviews:evejs-gone"])
+  const shard = stored.find((item) => item.key === "snapshot:reviews:evejs-a")
+  assert.ok(shard, "有评价的模组要重新签一份分片")
+  assert.equal(JSON.parse(shard.value).reviews[0].country, "CN")
+})
