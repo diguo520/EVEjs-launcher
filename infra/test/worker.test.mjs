@@ -10,8 +10,8 @@ import assert from "node:assert/strict"
 import { readFile } from "node:fs/promises"
 import test from "node:test"
 
-import { bytesToBase64, keyIdFromRaw, signDocument } from "../src/canonical.js"
-import worker from "../src/index.js"
+import { bytesToBase64, keyIdFromRaw, signDocument, verifyPayload } from "../src/canonical.js"
+import worker, { rebuildSnapshots } from "../src/index.js"
 
 const SHA = "a".repeat(64)
 
@@ -200,4 +200,157 @@ test("健康检查带上边缘诊断（排查「来自未知地区」用）", as
   assert.equal(body.edge.headerCountry, "DE")
   assert.equal(body.edge.colo, "FRA")
   assert.equal(body.edge.hasCf, true)
+})
+/**
+ * D1 只回 SELECT 里点名的列。少写一列不是「回空值」，是这一列在快照里**根本不存在** ——
+ * `shardItem` 老老实实读 `row.country`，读到的永远是 undefined，界面上所有人于是都成了
+ * 「来自未知地区的玩家」（2026-10-02 报障）。这里按 D1 的投影语义造桩：只回 SQL 里点到的列，
+ * `readReviewRows` 少点一列，这条测试就红。
+ */
+function projectionRow(sql, row) {
+  const flat = sql.replace(/\s+/g, " ")
+  const list = flat.slice(flat.indexOf("SELECT ") + 7, flat.indexOf(" FROM ")).trim()
+  const out = {}
+  for (const raw of list.split(",")) {
+    const item = raw.trim()
+    if (!item) continue
+    const [expression, alias] = item.split(/\s+AS\s+/i)
+    const key = (alias ?? expression).trim().replace(/^[a-z]+\./i, "")
+    out[key] = row[key]
+  }
+  return out
+}
+
+test("评论分片带着地区码：SELECT 少一列就等于所有人都来自未知地区", async () => {
+  const now = 1790882060253
+  const me = await identity()
+  const row = {
+    id: "rv-1790882024887-29688",
+    mod_id: "evejs-a",
+    version: "1.0.0",
+    stars: 5,
+    body: "装上就能用",
+    author_name: "",
+    corp: "",
+    country: "CN",
+    key_id: "abcd1234ef",
+    created_at: now - 5000,
+    updated_at: now - 5000,
+    edited: 0,
+    hidden: 0,
+    reply_body: "",
+    reply_at: null,
+    reply_edited: 0,
+  }
+  const stored = []
+  let selectList = ""
+  const env = {
+    DB: {
+      prepare: (sql) => ({
+        all: async () => {
+          if (/FROM reviews r/.test(sql)) {
+            selectList = sql
+            return { results: [projectionRow(sql, row)] }
+          }
+          return { results: [] }
+        },
+        first: async () => null,
+        run: async () => ({ success: true }),
+      }),
+    },
+    SNAPSHOTS: {
+      get: async () => null,
+      put: async (key, value) => stored.push({ key, value }),
+    },
+    RATINGS_SIGNING_KEY: me.pkcs8,
+    RATINGS_KEY_ID: me.keyId,
+  }
+
+  const result = await rebuildSnapshots(env, now)
+  assert.equal(result.ok, true, JSON.stringify(result))
+  assert.match(selectList, /r\.country/, "SELECT 里少了 r.country，分片就带不出地区码")
+
+  const shard = stored.find((item) => item.key === "snapshot:reviews:evejs-a")
+  assert.ok(shard, "应该写出 evejs-a 的分片")
+  const payload = JSON.parse(shard.value)
+  assert.equal(payload.reviews.length, 1)
+  assert.equal(payload.reviews[0].country, "CN")
+})
+
+test("没有评论的模组回一份签名的空分片，而不是 503（503 会让启动器去翻本地旧缓存）", async () => {
+  const me = await identity()
+  const env = {
+    DB: {
+      prepare: () => ({
+        bind() { return this },
+        all: async () => ({ results: [] }),
+        first: async () => null,
+        run: async () => ({ success: true }),
+      }),
+    },
+    SNAPSHOTS: { get: async () => null, put: async () => {} },
+    RATINGS_SIGNING_KEY: me.pkcs8,
+    RATINGS_KEY_ID: me.keyId,
+  }
+  const response = await worker.fetch(
+    new Request("https://ping.5318.cm/v1/reviews/evejs-a.json"),
+    env,
+    ctxSpy()
+  )
+  assert.equal(response.status, 200)
+  const body = await response.json()
+  assert.equal(body.modId, "evejs-a")
+  assert.deepEqual(body.reviews, [])
+  assert.equal(body.signature?.keyId, me.keyId)
+  assert.equal(await verifyPayload(me.publicKey, body), true, "空分片也要签名，启动器才肯收")
+})
+
+test("撤回评论顺手删掉挂在它上面的回复（不留孤儿）", async () => {
+  const me = await identity()
+  const reviewId = "rv-1790882024887-29688"
+  const payload = {
+    action: "review.retract",
+    modId: "evejs-autolockfire",
+    identityId: "au-1234",
+    publicKey: me.publicKey,
+    at: Date.now(),
+  }
+  const signed = await signDocument(me.pkcs8, payload, me.keyId)
+  const calls = []
+  const env = {
+    DB: {
+      prepare: (sql) => {
+        const statement = {
+          bind: (...args) => {
+            calls.push({ sql, args })
+            return statement
+          },
+          all: async () =>
+            sql.includes("SELECT id FROM reviews") ? { results: [{ id: reviewId }] } : { results: [] },
+          first: async () => null,
+          run: async () => ({ success: true }),
+        }
+        return statement
+      },
+    },
+    SNAPSHOTS: { get: async () => null, put: async () => {} },
+  }
+  const response = await worker.fetch(
+    new Request("https://ping.5318.cm/v1/reviews/retract", {
+      method: "POST",
+      body: JSON.stringify(signed),
+      headers: { "content-type": "application/json" },
+    }),
+    env,
+    ctxSpy()
+  )
+  const body = await response.json()
+  assert.equal(body.ok, true, JSON.stringify(body))
+  const replies = calls.find((call) => /DELETE FROM replies WHERE review_id IN/.test(call.sql))
+  assert.ok(replies, "应该顺手删掉回复，而不是只删评论")
+  assert.deepEqual(replies.args, [reviewId])
+  assert.ok(
+    calls.some((call) => /DELETE FROM reviews WHERE mod_id/.test(call.sql)),
+    "评论本身当然也要删"
+  )
 })

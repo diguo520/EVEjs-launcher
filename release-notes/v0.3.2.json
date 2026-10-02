@@ -1,0 +1,49 @@
+{
+  "version": "0.3.2",
+  "changelog": {
+    "zh": [
+      {
+        "type": "fix",
+        "text": "评论区不再出现「演练残留」的假评论：本地缓存以前只做过期判断、**不验签**，一份用别的钥匙签出来的快照（本地演练源 / 自建源）一旦写进 `_launcher/cache/mod-reviews/`，就会在某个模组的实时分片取不到时被当成「旧数据」端出去 —— 界面上于是出现几条根本不存在的评论，点回复还会被服务端回一句「reviewId 不合法」（2026-10-02 报障）。现在缓存与网络共用同一个验签函数，验不过**当场删掉**、重新去取真数据。同一个洞在模组市场索引缓存里也补上了，那份更要紧：未验签的索引会把索引里登记的作者公钥注入信任表，等于让本地一份被改过的缓存替所有模组背书。"
+      },
+      {
+        "type": "fix",
+        "text": "评论署名不再一律显示「来自未知地区的玩家」：`/v1/reviews/<modId>.json` 分片的 SQL 漏了 `country` 这一列，拼分片时读到的永远是 undefined，所以**任何人**写的评论都落到「未知地区」—— 跟代理开关、跟 IP 都没有关系（2026-10-02 报障）。补上这一列后，正常情况显示「来自中国 / 美国 … 的玩家」加对应旗子。"
+      },
+      {
+        "type": "fix",
+        "text": "没有评价的模组不再「取不到评论」：以前 KV 里没有这个模组的分片就回 503，启动器把它当失败，于是回退到本地旧缓存（这正是上面那份假评论被端出来的直接原因）。现在改为回一份**签名过的空分片**（200，`reviews: []`），界面正常显示「还没有人写评价」，也不会再去翻缓存。"
+      },
+      {
+        "type": "fix",
+        "text": "回复失败的提示变得能照着做：本地的评论编号校验与服务端 `REVIEW_ID_RE` 对齐（首字符是字母或数字、总长 8–64），编号不对时直接提示「刷新一次模组市场再试」，而不是等服务端回一句看不懂的「reviewId 不合法」。"
+      },
+      {
+        "type": "fix",
+        "text": "撤回评论时顺带删掉挂在它上面的作者回复：以前只删评论那一行，回复成了孤儿记录 —— 既不显示、也撤不掉，还一直占着回复计数。"
+      }
+    ],
+    "en": [
+      {
+        "type": "fix",
+        "text": "The review list no longer shows leftover rehearsal comments: the local cache only checked freshness and never verified the signature, so a snapshot signed by some other key (a local rehearsal source or a self-hosted mirror) that once landed in _launcher/cache/mod-reviews/ was served as \"old data\" whenever a mod's live shard was unavailable — which put a handful of reviews that do not exist on screen, and replying to them came back \"reviewId 不合法\" (reported 2026-10-02). The cache now goes through the exact same verifier as the network path: a payload that fails verification is deleted on the spot and the real data is fetched instead. The same hole is fixed in the mod-index cache, where it mattered more: an unverified index feeds its author public keys into the trust table, so one edited local file could vouch for every mod."
+      },
+      {
+        "type": "fix",
+        "text": "Review bylines no longer always read \"Player from an unknown region\": the shard SQL behind /v1/reviews/<modId>.json never selected the country column, so the value was always undefined and every review landed in \"unknown\" — nothing to do with a proxy or the caller's IP (reported 2026-10-02). With the column selected, reviews now read \"Player from China / the United States / …\" with the matching flag."
+      },
+      {
+        "type": "fix",
+        "text": "Mods with no reviews no longer fail to load: a mod without a shard in KV used to answer 503, which the launcher treated as a failure and fell back to the stale local cache (the direct reason the fake comments above surfaced). It now answers with a signed empty shard (200, reviews: []), so the UI shows the normal \"no reviews yet\" state and never touches the cache."
+      },
+      {
+        "type": "fix",
+        "text": "Reply failures now come with something you can act on: the local review-id check mirrors the service's REVIEW_ID_RE (first character alphanumeric, 8–64 characters total), so a malformed id is rejected up front with \"refresh the mod market and try again\" instead of waiting for the opaque \"reviewId 不合法\" from the service."
+      },
+      {
+        "type": "fix",
+        "text": "Retracting a review now also deletes the author replies attached to it: previously only the review row was removed and the replies became orphans — invisible, impossible to retract, and still counted."
+      }
+    ]
+  }
+}

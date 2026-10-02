@@ -8,6 +8,7 @@
 //!   2. **验签**：验不过就当这个镜像失败 —— 不降级成「信任未签名数据」。
 //!      验签函数刻意**不给默认实现**：默认放行等于谁都塞得进来；
 //!   3. **本地缓存兜底**：TTL 内直接用缓存；全挂了也回退到缓存；连缓存都没有才报失败。
+//!      缓存文件同样要过验签 —— 验不过就当场删掉、当作没有缓存（见 `read_cache_file`）。
 //!
 //! 为什么读快照而不是接口、为什么必须验签：见 `mods/ratings.rs` 的文件头。
 use serde_json::{json, Value};
@@ -51,11 +52,22 @@ pub fn urls_from_settings(runtime: &RuntimePaths, key: &str, defaults: &[&str]) 
     defaults.iter().map(|item| item.to_string()).collect()
 }
 
-fn read_cache_file(path: &Path) -> Option<(Value, u128)> {
+/// 读缓存。**缓存也要验签**：验不过就当场删掉、当作没有缓存 —— 与网络那条路共用同一个验签函数。
+///
+/// 为什么省不得（2026-10-02 报障）：缓存是本地磁盘上一份普通 JSON，用别的钥匙签出来的快照
+/// （本地演练源 / 自建源）一旦写进来就会一直躺着。等某个模组的实时分片取不到时（那个模组当时
+/// 一条评价都没有，服务端回 503），回退分支把它当「旧数据」端出去 —— 界面上于是出现三条演练
+/// 残留的假评论，编号是短得离谱的 `rv-3`，点回复被服务端回一句「reviewId 不合法」。
+/// 验签是这一层唯一的真伪判据，**缓存不能例外**。
+fn read_cache_file(path: &Path, verify: Verifier<'_>) -> Option<(Value, u128)> {
     let raw = std::fs::read_to_string(path).ok()?;
     let parsed: Value = serde_json::from_str(&raw).ok()?;
     let fetched_at = parsed.get("fetchedAt").and_then(Value::as_u64).unwrap_or(0) as u128;
     let payload = parsed.get("payload").cloned()?;
+    if verify(&payload).is_err() {
+        let _ = std::fs::remove_file(path);
+        return None;
+    }
     Some((payload, fetched_at))
 }
 
@@ -97,7 +109,7 @@ pub fn fetch_with_cache(
     kind: &str,
     verify: Verifier<'_>,
 ) -> Value {
-    let cached = read_cache_file(&cache);
+    let cached = read_cache_file(&cache, verify);
     if !force {
         if let Some((payload, fetched_at)) = cached.as_ref() {
             if now_ms().saturating_sub(*fetched_at) < ttl_ms {
@@ -149,4 +161,71 @@ pub fn fetch_with_cache(
         });
     }
     json!({ "ok": false, "reason": detail })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    fn temp_cache(label: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("evejs-snapshot-cache-{label}"));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).expect("应能创建测试目录");
+        dir.join("shard.json")
+    }
+
+    fn write_cache(path: &Path, payload: Value) {
+        let document = json!({ "fetchedAt": now_ms() as u64, "payload": payload });
+        fs::write(path, serde_json::to_string(&document).unwrap()).unwrap();
+    }
+
+    #[test]
+    fn cache_signed_by_a_foreign_key_is_dropped_instead_of_served() {
+        let path = temp_cache("foreign-key");
+        // 演练源 / 自建源那份快照：形状完全合法，就是签名不是我们的（2026-10-02 报障）
+        write_cache(
+            &path,
+            json!({ "schemaVersion": 1, "modId": "evejs-a", "reviews": [{ "id": "rv-3" }] }),
+        );
+        let reject = |_: &Value| Err("签名对不上".to_string());
+        // 地址列表留空 = 网络那一步必然全挂，正好只考「回退到缓存」这一条路
+        let out = fetch_with_cache(vec![], path.clone(), 60_000, false, "评论", &reject);
+        assert_eq!(out.get("ok").and_then(Value::as_bool), Some(false), "{out}");
+        assert!(!path.exists(), "验不过的缓存要删掉，别留着下次再端出去");
+    }
+
+    #[test]
+    fn verified_cache_is_served_within_ttl() {
+        let path = temp_cache("verified");
+        write_cache(
+            &path,
+            json!({ "schemaVersion": 1, "modId": "evejs-a", "reviews": [] }),
+        );
+        let accept = |_: &Value| Ok(());
+        let out = fetch_with_cache(vec![], path.clone(), 60_000, false, "评论", &accept);
+        assert_eq!(out.get("ok").and_then(Value::as_bool), Some(true), "{out}");
+        assert_eq!(out.get("cached").and_then(Value::as_bool), Some(true));
+        assert_eq!(out.get("source").and_then(Value::as_str), Some("cache"));
+        assert!(path.exists(), "验得过的缓存不该被删");
+    }
+
+    #[test]
+    fn stale_verified_cache_is_the_last_resort_when_no_source_answers() {
+        let path = temp_cache("stale");
+        write_cache(
+            &path,
+            json!({ "schemaVersion": 1, "modId": "evejs-a", "reviews": [] }),
+        );
+        let accept = |_: &Value| Ok(());
+        let out = fetch_with_cache(vec![], path.clone(), 0, false, "评论", &accept);
+        assert_eq!(out.get("ok").and_then(Value::as_bool), Some(true), "{out}");
+        assert!(
+            out.get("reason")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .contains("回退"),
+            "回退到缓存时要说清来路：{out}"
+        );
+    }
 }
