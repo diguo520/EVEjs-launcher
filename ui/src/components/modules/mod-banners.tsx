@@ -1,6 +1,7 @@
 import { Clock, TriangleAlert } from "lucide-react"
 
 import { StatusDot } from "@/components/common/status-dot"
+import { useLocale } from "@/components/shell/locale-provider"
 import { Button } from "@/components/ui/button"
 import { reviewPrStateLabel, type ConflictPair } from "@/lib/mod-logic"
 import { type ModEntry } from "@/lib/mock"
@@ -21,6 +22,8 @@ export function ConflictBanner({
   onDisableAll: () => void
   onDismiss: () => void
 }) {
+  const { t } = useLocale()
+
   if (pairs.length === 0) return null
 
   return (
@@ -68,7 +71,7 @@ export function ConflictBanner({
                 className="text-destructive hover:text-destructive"
                 onClick={() => onDisable(pair.a)}
               >
-                停用「{pair.a.name}」
+                {t("停用「{name}」", { name: pair.a.name })}
               </Button>
               <Button
                 variant="ghost"
@@ -76,7 +79,7 @@ export function ConflictBanner({
                 className="text-destructive hover:text-destructive"
                 onClick={() => onDisable(pair.b)}
               >
-                停用「{pair.b.name}」
+                {t("停用「{name}」", { name: pair.b.name })}
               </Button>
             </div>
             <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">

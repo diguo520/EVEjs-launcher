@@ -2829,5 +2829,11 @@
   "版本对不上：模组是按另一个版本的文件写的，启动时会被自动跳过 —— 不报错，也不生效。等模组作者更新，或换上模组要求的那一版服务端文件。": "Version mismatch: this mod was written for a different version of the file, so it is skipped on startup — no error, and no effect. Wait for the mod author to update, or switch to the file version the mod expects.",
   "模组没写版本：模组没说它是按哪一版改的，启动器没法提前判断，以实际启动结果为准。": "Mod did not state a version: the mod never says which version it targets, so the launcher cannot tell in advance — trust the actual startup result.",
   "服务端缺这个文件：你这份服务端里没有模组要改的文件，模组会跳过它。": "Server is missing this file: your server does not have the file this mod wants to edit, so the mod skips it.",
-  "模组作者：在补丁脚本里写上目标文件的 sha256（校验值），启动器就能在启动前替你核对。": "Mod authors: put the target file sha256 (checksum) in your patch script and the launcher will verify it for you before startup."
+  "模组作者：在补丁脚本里写上目标文件的 sha256（校验值），启动器就能在启动前替你核对。": "Mod authors: put the target file sha256 (checksum) in your patch script and the launcher will verify it for you before startup.",
+  "疑似重叠": "Suspected overlap",
+  "多个模组改同一份服务端文件不算冲突，启动器会按 slot 依次注入；但两边用了同一个注入标记时，后注册的那个会被静默跳过 —— 只有一个能生效。": "Several mods patching the same server file is not a conflict: the launcher injects them in slot order. But when two of them declare the same injection marker, the one registered later is skipped silently, so only one can take effect.",
+  "注入标记冲突": "Injection marker clash",
+  "另有 {count} 处服务端文件被多个模组同时改动，都能生效，明细见下方「启动前预检」。": "{count} more server files are patched by more than one mod; those all still take effect, see “Startup preflight” below for details.",
+  "停用「{name}」": "Disable “{name}”",
+  "启动预检": "Preflight"
 }

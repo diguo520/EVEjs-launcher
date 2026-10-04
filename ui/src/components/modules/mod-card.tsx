@@ -26,6 +26,7 @@ import {
   pendingReplies,
   ratingOf,
   reasonOf,
+  type OverlapFlag,
 } from "@/lib/mod-logic"
 import { MOD_REVIEW_LABEL, type ModEntry } from "@/lib/mock"
 import { cn } from "@/lib/utils"
@@ -85,6 +86,8 @@ export interface ModCardProps {
   onTagClick: (tag: string) => void
   /** 当前正在生效的标签筛选，用来把那枚标签点亮 */
   activeTag?: string | null
+  /** 预检判定的重叠状态：conflict = 同文件 + 同注入标记（只有一个生效），shared = 只是和别人改了同一份文件 */
+  overlap?: OverlapFlag | null
 }
 
 export function ModCard({
@@ -103,6 +106,7 @@ export function ModCard({
   onResolveConflict,
   onTagClick,
   activeTag = null,
+  overlap = null,
 }: ModCardProps) {
   const status = modStatus(mod)
   const badge = statusBadge[status]
@@ -153,6 +157,11 @@ export function ModCard({
             )}
           </div>
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+            {overlap === "conflict" ? (
+              <Badge variant="destructive">{t("注入标记冲突")}</Badge>
+            ) : overlap === "shared" ? (
+              <Badge variant="warning">{t("疑似重叠")}</Badge>
+            ) : null}
             {conflicts.length ? (
               <Badge variant="destructive">冲突</Badge>
             ) : null}

@@ -2829,5 +2829,11 @@
   "版本对不上：模组是按另一个版本的文件写的，启动时会被自动跳过 —— 不报错，也不生效。等模组作者更新，或换上模组要求的那一版服务端文件。": "Version incompatible : le mod a été écrit pour une autre version de ce fichier ; il est ignoré au démarrage — sans erreur et sans effet. Attendez une mise à jour de l'auteur, ou utilisez la version du fichier attendue par le mod.",
   "模组没写版本：模组没说它是按哪一版改的，启动器没法提前判断，以实际启动结果为准。": "Le mod n'indique pas de version : il ne précise pas la version visée, le lanceur ne peut donc pas le déterminer à l'avance — fiez-vous au démarrage réel.",
   "服务端缺这个文件：你这份服务端里没有模组要改的文件，模组会跳过它。": "Fichier absent du serveur : votre serveur n'a pas le fichier que le mod veut modifier, le mod l'ignore.",
-  "模组作者：在补丁脚本里写上目标文件的 sha256（校验值），启动器就能在启动前替你核对。": "Auteurs de mods : indiquez la somme de contrôle sha256 du fichier cible dans votre script de patch, et le lanceur la vérifiera avant le démarrage."
+  "模组作者：在补丁脚本里写上目标文件的 sha256（校验值），启动器就能在启动前替你核对。": "Auteurs de mods : indiquez la somme de contrôle sha256 du fichier cible dans votre script de patch, et le lanceur la vérifiera avant le démarrage.",
+  "疑似重叠": "Chevauchement possible",
+  "多个模组改同一份服务端文件不算冲突，启动器会按 slot 依次注入；但两边用了同一个注入标记时，后注册的那个会被静默跳过 —— 只有一个能生效。": "Que plusieurs mods modifient le même fichier serveur n'est pas un conflit : le lanceur les injecte dans l'ordre des slots. Mais si deux d'entre eux déclarent le même marqueur d'injection, celui enregistré en dernier est ignoré silencieusement : un seul prend effet.",
+  "注入标记冲突": "Conflit de marqueur d'injection",
+  "另有 {count} 处服务端文件被多个模组同时改动，都能生效，明细见下方「启动前预检」。": "{count} autres fichiers serveur sont modifiés par plusieurs mods ; ils fonctionnent tous, voir « Vérification avant démarrage » ci-dessous.",
+  "停用「{name}」": "Désactiver « {name} »",
+  "启动预检": "Pré-vérification"
 }

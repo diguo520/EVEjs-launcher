@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import type { RawModPreflightDryRun, RawModPreflightReport } from "@/lib/ipc"
 
 /**
- * 启动前预检面板（模组页「已安装」页签）。
+ * 启动前预检面板（模组页「启动预检」页签）。
  *
  * 为什么要有它：现役口径下「某个模组没生效」只有真启动一次、再去翻
  * `_launcher/logs/mod-load-report.json` 才知道；而最常见的两种失效在启动前就能看见 ——
@@ -120,7 +120,7 @@ export function ModPreflightPanel({
           <div className="text-[12px] font-semibold text-warning">
             {t("有 {count} 个目录没有被当作模组加载", { count: ignored.length })}
           </div>
-          <ul className="mt-2 space-y-2">
+          <ul className="mt-2 grid gap-2 lg:grid-cols-2">
             {ignored.map((item) => (
               <li key={item.folder} className="rounded border border-warning/25 bg-background/40 px-2.5 py-2">
                 <div className="flex flex-wrap items-center gap-x-2">
@@ -153,7 +153,7 @@ export function ModPreflightPanel({
           <p className="mt-0.5 text-[11px] text-muted-foreground">
             {t("多个模组改同一份文件不算冲突，启动器会按顺序依次注入。只有标着「版本对不上」的才真的不生效。")}
           </p>
-          <ul className="mt-2 space-y-2">
+          <ul className="mt-2 grid gap-2 lg:grid-cols-2">
             {targets.map((item) => (
               <li key={item.file} className="rounded border border-border/70 bg-card/40 px-2.5 py-2">
                 <div className="flex flex-wrap items-center gap-x-2">
@@ -200,7 +200,7 @@ export function ModPreflightPanel({
           {dryRun?.reason ? (
             <p className="mt-1 text-[11px] text-destructive">{dryRun.reason}</p>
           ) : null}
-          <ul className="mt-2 space-y-1">
+          <ul className="mt-2 grid gap-x-4 gap-y-1 sm:grid-cols-2 xl:grid-cols-3">
             {loaders.map((item) => (
               <li key={item.id} className="flex flex-wrap items-center gap-x-2">
                 <StatusDot tone={item.ok ? "success" : "destructive"} />

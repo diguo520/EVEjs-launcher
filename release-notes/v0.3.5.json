@@ -1,0 +1,81 @@
+{
+  "version": "0.3.5",
+  "changelog": {
+    "zh": [
+      {
+        "type": "opt",
+        "text": "启动器减重 0.7 MB（exe 9.96 → 9.25 MB）：随包资产里那份只供构建期使用的「EVE.js 全指令手册」单文件快照（5.4 MB，运行期没有任何地方取它）不再打进 exe；legacy 渲染层里三个零引用的旧资源（eve-theme.css / logo.svg / shoukuanma.png）和一个没人 import 的 UI 组件也一并删掉。"
+      },
+      {
+        "type": "fix",
+        "text": "进程名改回英文品牌：任务管理器里从「EvEJS 启动器」变成「EVEJS COMMAND」（exe 版本信息与窗口标题同步改），与老 Electron 版显示一致。"
+      },
+      {
+        "type": "new",
+        "text": "设置 → 危险操作接上后端：清空缓存只删启动器联网拉来的快照（模组索引、评分、模组评价、赞助人名单、GitHub 登录缓存），身份 key 与老令牌一份不动。"
+      },
+      {
+        "type": "new",
+        "text": "设置 → 危险操作接上后端：重置配置把服务端 config 各域写回服务端自己的默认值，写前整份备份到 _local/config-backups，随时能拿回来。"
+      },
+      {
+        "type": "new",
+        "text": "设置 → 危险操作接上后端：擦除世界数据把原存档整目录改名成 gameStore.bak-<时间戳> 保留，再复用现成的 db 任务重建空世界；三条在服务运行时一律拒绝。"
+      },
+      {
+        "type": "new",
+        "text": "模组页（已安装）新增「启动前预检」：不启动服务端就能先看见三类以前只会在真启动之后才暴露的问题 —— (1) `mods/` 下被**静默跳过**的目录（清单缺失，或清单被多套了一层子目录：实测用户那个「冬眠者流浪者舰船操作模组」就是这么人间蒸发的）；(2) 哪些模组在抢同一份服务端源码（重叠 ≠ 冲突，总线会把它们按序串起来，所以标成「疑似」）；(3) 每个模组自己声明的 64 位 sha256 基线指纹与当前服务端文件对不对得上 —— 标着「版本对不上」的那一行才是真的不生效（不报错、也不生效，正是 2026-10-01 那次事故的形状）。静态部分不执行任何模组代码，随模组列表刷新一起跑。面板上的判定一律说人话（版本对得上 / 版本对不上 / 模组没写版本 / 服务端缺这个文件），底部另有一张可展开的说明 —— 模组作者那半直接给出补丁脚本里该写的 sha256 基线那两行。"
+      },
+      {
+        "type": "new",
+        "text": "「启动前预检」加上干跑：点一次按钮，把 `plan_loaders` 选中的全部 loader 放进一个一次性 Node 进程里 `require` 一遍（不绑端口、不连客户端、不建世界库），提前抓出「加载期抛错 → `--require` 失败 → 服务端起不来」，并顺带量出「加载这批模组花了多少秒」，结果逐条列在面板上、输出可展开。"
+      },
+      {
+        "type": "new",
+        "text": "「创建模组」的模板改用新机制生成文件：预设骨架与「欢迎广播」案例生成的 loader.js 现在自带注入总线通道（`SOURCE_PATCH` 开关 + `__evejsMods.register`：只追加、带唯一标记、幂等，并在加载期**同步**注册 —— 放进 setImmediate 再注册就晚了，目标文件在服务端启动时已经编译过），文件头也写明「要改服务端源码就走总线，不要自己 hook Module.prototype._compile」。另加一个「Source Patch via Bus」案例模板：开箱即可用的总线补丁，往 handshake.js 末尾追加一行日志。随附：模组制作规范附录 B 的骨架同步换成新机制版本（中英各一份），README 的加载说明从「NODE_OPTIONS=--require 注入」改成注入总线口径。"
+      },
+      {
+        "type": "new",
+        "text": "模组页新增「疑似重叠」面板：把「改同一份服务端文件」和「真的会互相顶掉」分开说。注入总线按 slot 串链，多个模组改同一份文件本身是设计允许的（都能生效），所以只给一行计数、不催用户动手；真正只有一个能生效的是**同一份文件 + 同一个注入标记**（后注册的那层看到标记已在源码里就整段跳过自己，不报错也不生效 —— 实测两个模组各自以为自己在跑）。这类冲突带标记原文、目标文件与成员模组列出来，各自给「停用」按钮，并且**不并进「冲突数」**（那个只统计清单里声明互斥的模组对）。“停用「{name}」”顺带补上七种语言目录（以前是硬编码中文）。 页面排版上：「启动预检」独立成一个页签（排在「已安装」之后，只有真要处理时才在标签上显示黄色数字），原来挤在「已安装」里的两块面板整体搬进去，并把「被跳过的目录」「抢同一份文件」与干跑模组列表都改成多列排布（不再空掉半屏）；已安装列表里相关的模组卡片右上角同步打标 —— 同一份文件 + 同一个注入标记打红色「注入标记冲突」，只是和别人共用同一份文件打黄色「疑似重叠」。"
+      }
+    ],
+    "en": [
+      {
+        "type": "opt",
+        "text": "The launcher sheds 0.7 MB (exe 9.96 → 9.25 MB): the single-file snapshot of the “EVE.js full command manual” that only existed as a build-time input (5.4 MB, never read at runtime) is no longer packed into the exe, and three zero-reference legacy assets (eve-theme.css / logo.svg / shoukuanma.png) plus one unimported UI component are gone as well."
+      },
+      {
+        "type": "fix",
+        "text": "The process name is back to the English brand: Task Manager shows “EVEJS COMMAND” instead of “EvEJS 启动器” (exe version info and window title follow), matching what the old Electron build displayed."
+      },
+      {
+        "type": "new",
+        "text": "Settings → dangerous actions are now wired to the backend: Clear cache removes only the snapshots the launcher fetched online (mod index, ratings, mod reviews, sponsor list, GitHub login cache) and leaves identity keys and existing tokens untouched."
+      },
+      {
+        "type": "new",
+        "text": "Settings → dangerous actions: Reset config writes every domain of the server config back to the server’s own defaults, backing up the whole thing to _local/config-backups first so it can always be restored."
+      },
+      {
+        "type": "new",
+        "text": "Settings → dangerous actions: Erase world data renames the entire save directory to gameStore.bak-<timestamp> (kept, not deleted) and then reuses the existing db task to rebuild an empty world. All three refuse to run while services are up."
+      },
+      {
+        "type": "new",
+        "text": "The mods page gains a Startup preflight: without starting the server you can now see the three kinds of problems that used to surface only after a real launch — (1) directories under `mods/` that get silently skipped (manifest missing, or the manifest nested one level too deep: that is exactly how the user’s “Sleeper Drifter ship operation mod” vanished); (2) which mods compete for the same server source file (overlap is not a conflict — the bus chains them in order, so these are labelled “suspected”); (3) whether each mod’s own declared 64-bit sha256 baseline still matches the current server file — the rows labelled “version mismatch” are the ones that truly will not take effect (no error, no effect, precisely the shape of the 2026-10-01 incident). The static half executes no mod code at all and refreshes together with the mod list. Every verdict is worded in plain language (version matches / version mismatch / mod declared no version / server is missing this file), with an expandable explanation at the bottom — the author-facing half spells out the two sha256 baseline lines a patch script should declare."
+      },
+      {
+        "type": "new",
+        "text": "Startup preflight gains a dry run: one click requires every loader picked by `plan_loaders` inside a throwaway Node process (no ports bound, no client, no world database), which catches “throws during load → `--require` fails → server will not start” ahead of time and also measures how many seconds the batch took. Results are listed line by line and the output can be expanded."
+      },
+      {
+        "type": "new",
+        "text": "The “Create mod” templates now generate files for the new mechanism: the preset skeleton and the “welcome broadcast” sample loader.js come with the injection-bus channel (`SOURCE_PATCH` switch + `__evejsMods.register`: append-only, unique marker, idempotent, and registered **synchronously** during load — deferring it into setImmediate is too late because the target file has already been compiled by the time the server starts), and the file header states plainly that you should patch the server source through the bus instead of hooking Module.prototype._compile yourself. A new “Source Patch via Bus” template gives a ready-to-use bus patch that appends one log line to handshake.js. Alongside: Appendix B of the mod authoring spec (Chinese and English) now shows the new-mechanism skeleton, and the README loading section switched from “NODE_OPTIONS=--require injection” to the injection-bus wording."
+      },
+      {
+        "type": "new",
+        "text": "The mods page gains a “Suspected overlap” panel that keeps “edits the same server file” apart from “actually knocks the other out”. The injection bus chains mods by slot, so several mods patching one file is by design (they all take effect) and only gets a count line instead of a nag; what truly leaves only one in effect is **the same file plus the same injection marker** (the later one sees the marker already in the source and skips itself entirely — no error, no effect; measured on two demo mods, each believed it was running). Those conflicts list the marker text, the target file and the member mods, each with its own Disable button, and they are deliberately **not** merged into the existing conflict count (which only counts pairs declared mutually exclusive in their manifests). The “Disable “{name}”” button also got its seven locale entries, having been hard-coded Chinese before. Layout-wise, Startup preflight is now its own tab (right after Installed, showing a yellow count only when there is something to act on); the two panels that used to be crammed into Installed moved in there, and the skipped-directory list, the shared-file list and the dry-run mod list all became multi-column so they no longer waste half the screen; matching cards in the installed list get a badge in the top-right — red “injection marker conflict” for the same file plus the same marker, yellow “suspected overlap” for merely sharing a file."
+      }
+    ]
+  }
+}

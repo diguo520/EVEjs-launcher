@@ -2829,5 +2829,11 @@
   "版本对不上：模组是按另一个版本的文件写的，启动时会被自动跳过 —— 不报错，也不生效。等模组作者更新，或换上模组要求的那一版服务端文件。": "Versie komt niet overeen: de mod is voor een andere versie van dit bestand geschreven en wordt bij het starten overgeslagen — geen fout, geen effect. Wacht op een update van de maker of gebruik de bestandsversie die de mod verwacht.",
   "模组没写版本：模组没说它是按哪一版改的，启动器没法提前判断，以实际启动结果为准。": "Mod vermeldt geen versie: er staat niet voor welke versie hij bedoeld is, dus de launcher kan het vooraf niet zeggen — het echte startresultaat is bepalend.",
   "服务端缺这个文件：你这份服务端里没有模组要改的文件，模组会跳过它。": "Bestand ontbreekt op de server: je server heeft het bestand dat de mod wil aanpassen niet, dus de mod slaat het over.",
-  "模组作者：在补丁脚本里写上目标文件的 sha256（校验值），启动器就能在启动前替你核对。": "Voor modmakers: zet de sha256 (controlegetal) van het doelbestand in je patchscript, dan controleert de launcher het vóór het starten."
+  "模组作者：在补丁脚本里写上目标文件的 sha256（校验值），启动器就能在启动前替你核对。": "Voor modmakers: zet de sha256 (controlegetal) van het doelbestand in je patchscript, dan controleert de launcher het vóór het starten.",
+  "疑似重叠": "Vermoedelijke overlap",
+  "多个模组改同一份服务端文件不算冲突，启动器会按 slot 依次注入；但两边用了同一个注入标记时，后注册的那个会被静默跳过 —— 只有一个能生效。": "Dat meerdere mods hetzelfde serverbestand aanpassen is geen conflict: de launcher injecteert ze in slot-volgorde. Maar gebruiken twee ervan dezelfde injectiemarkering, dan wordt de laatst geregistreerde stil overgeslagen, dus slechts één werkt.",
+  "注入标记冲突": "Conflict in injectiemarkering",
+  "另有 {count} 处服务端文件被多个模组同时改动，都能生效，明细见下方「启动前预检」。": "Nog {count} serverbestanden worden door meerdere mods tegelijk aangepast; die werken allemaal. Zie „Preflight voor het starten” hieronder.",
+  "停用「{name}」": "„{name}” uitschakelen",
+  "启动预检": "Startcontrole"
 }

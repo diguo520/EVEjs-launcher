@@ -5,6 +5,7 @@
 import { pinyin } from "pinyin-pro"
 
 import { t } from "@/lib/i18n"
+import type { RawModPreflightReport } from "@/lib/ipc"
 import {
   GAME_VERSIONS,
   type ModEntry,
@@ -163,7 +164,7 @@ export const MARKET_FILTER_ORDER: MarketFilter[] = [
   "installed",
 ]
 
-export type ModTab = "installed" | "mine" | "market"
+export type ModTab = "installed" | "preflight" | "mine" | "market"
 
 /* ---------------- 上架与冲突 ---------------- */
 
@@ -236,6 +237,83 @@ export function collectConflictPairs(mods: ModEntry[]): ConflictPair[] {
     })
   })
   return pairs
+}
+
+/* ---------------- 疑似重叠（改同一份服务端文件 / 撞同一个注入标记） ---------------- */
+
+export interface OverlapMarkerRef {
+  folder: string
+  id: string
+}
+
+export interface OverlapMarker {
+  /** 服务端相对路径，例如 src/network/tcp/handshake.js */
+  target: string
+  /** 补丁脚本里声明的注入标记，例如 // evejs-inject:login-reward */
+  marker: string
+  /** 引用它的模组（folder 是本地 mods/ 目录名，id 是清单里的标识） */
+  mods: OverlapMarkerRef[]
+}
+
+export interface OverlapReport {
+  /** 同文件 + 同标记：后注册的那个会被静默跳过，只有一个能生效 */
+  markers: OverlapMarker[]
+  /** 只是被多个模组改同一份服务端文件（标记不同，能共存）的处数 */
+  sharedOnly: number
+  /** 卷进标记冲突的模组（folder || id）：卡片右上角要打红标 */
+  conflictKeys: string[]
+  /** 只是和别人改了同一份服务端文件的模组（folder || id）：卡片上打黄标 */
+  sharedKeys: string[]
+}
+
+/**
+ * 从启动前预检的静态回包里挑出「疑似重叠」。
+ *
+ * 重叠 ≠ 冲突：多个模组改同一份服务端文件是**设计允许**的 —— 注入总线按 slot 依次串链，
+ * 每一层只往末尾追加自己那一段。真正会互相顶掉的只有一种：**同一份文件 + 同一个注入标记**，
+ * 后注册的那层看到标记已经在源码里，就整段跳过自己，既不报错也不生效。
+ *
+ * 所以这里把两类分开：`markers` 能定位到具体模组，界面才敢让用户「停用其中一个」；
+ * `sharedOnly` 只是个计数，只做提示、不催用户动手。已被标记冲突覆盖的文件不重复计入。
+ */
+export function overlapReport(report: RawModPreflightReport | null): OverlapReport {
+  const markers: OverlapMarker[] = []
+  const covered = new Set<string>()
+  const conflictKeys: string[] = []
+  const sharedKeys: string[] = []
+  for (const row of report?.markerConflicts ?? []) {
+    const mods = (row.mods ?? []).filter((item) => item && (item.folder || item.id))
+    if (mods.length < 2) continue
+    covered.add(row.target)
+    for (const ref of mods) {
+      const key = ref.folder || ref.id
+      if (!conflictKeys.includes(key)) conflictKeys.push(key)
+    }
+    markers.push({ target: row.target, marker: row.marker, mods })
+  }
+  let sharedOnly = 0
+  for (const item of report?.targets ?? []) {
+    if (!item.shared || covered.has(item.file)) continue
+    sharedOnly += 1
+    for (const ref of item.mods ?? []) {
+      const key = ref.folder || ref.id
+      if (conflictKeys.includes(key) || sharedKeys.includes(key)) continue
+      sharedKeys.push(key)
+    }
+  }
+  return { markers, sharedOnly, conflictKeys, sharedKeys }
+}
+
+/** 按 (folder, id) 在模组列表里找本地记录；找不到（例如已停用、清单缺失）就返回 null */
+export function modByFolderOrId(
+  mods: ModEntry[],
+  ref: OverlapMarkerRef
+): ModEntry | null {
+  return (
+    mods.find((item) => Boolean(item.folder) && item.folder === ref.folder) ??
+    mods.find((item) => item.id === ref.id) ??
+    null
+  )
 }
 
 /* ---------------- 审核状态 ---------------- */
@@ -1215,7 +1293,9 @@ export function filterMods({
   tag?: string | null
 }): ModEntry[] {
   let pool: ModEntry[]
-  if (tab === "installed") pool = mods.filter((mod) => mod.installed)
+  // 「启动预检」页签没有模组清单，内容全在面板里
+  if (tab === "preflight") pool = []
+  else if (tab === "installed") pool = mods.filter((mod) => mod.installed)
   else if (tab === "mine") pool = mods.filter((mod) => mod.mine)
   else pool = mods.filter(isPublished)
 
@@ -1361,3 +1441,14 @@ export const REVIEW_ORDER: ModReviewState[] = [
   "approved",
   "rejected",
 ]
+
+/** 卡片上的重叠标记：真冲突（同文件 + 同标记）压过只是重叠 */
+export type OverlapFlag = "conflict" | "shared"
+
+/** 这条模组在预检里的重叠状态；没它的事就返回 null（卡片不打标） */
+export function overlapFlag(report: OverlapReport, mod: ModEntry): OverlapFlag | null {
+  const key = mod.folder ?? mod.id
+  if (report.conflictKeys.includes(key)) return "conflict"
+  if (report.sharedKeys.includes(key)) return "shared"
+  return null
+}

@@ -2829,5 +2829,11 @@
   "版本对不上：模组是按另一个版本的文件写的，启动时会被自动跳过 —— 不报错，也不生效。等模组作者更新，或换上模组要求的那一版服务端文件。": "Version passt nicht: Der Mod wurde für eine andere Version dieser Datei geschrieben und wird beim Start übersprungen – ohne Fehler und ohne Wirkung. Warte auf ein Update des Autors oder nutze die vom Mod erwartete Dateiversion.",
   "模组没写版本：模组没说它是按哪一版改的，启动器没法提前判断，以实际启动结果为准。": "Mod nennt keine Version: Es ist nicht angegeben, für welche Version er gedacht ist; der Launcher kann das vorab nicht sagen – maßgeblich ist der tatsächliche Start.",
   "服务端缺这个文件：你这份服务端里没有模组要改的文件，模组会跳过它。": "Datei fehlt auf dem Server: Dein Server hat die Datei nicht, die der Mod ändern will – der Mod überspringt sie.",
-  "模组作者：在补丁脚本里写上目标文件的 sha256（校验值），启动器就能在启动前替你核对。": "Für Mod-Autoren: Trage den sha256 (Prüfsumme) der Zieldatei in dein Patch-Skript ein, dann prüft der Launcher das vor dem Start für dich."
+  "模组作者：在补丁脚本里写上目标文件的 sha256（校验值），启动器就能在启动前替你核对。": "Für Mod-Autoren: Trage den sha256 (Prüfsumme) der Zieldatei in dein Patch-Skript ein, dann prüft der Launcher das vor dem Start für dich.",
+  "疑似重叠": "Vermutete Überlappung",
+  "多个模组改同一份服务端文件不算冲突，启动器会按 slot 依次注入；但两边用了同一个注入标记时，后注册的那个会被静默跳过 —— 只有一个能生效。": "Wenn mehrere Mods dieselbe Serverdatei ändern, ist das kein Konflikt: Der Launcher injiziert sie in Slot-Reihenfolge. Verwenden zwei davon jedoch dieselbe Injektionsmarkierung, wird der später registrierte still übersprungen – nur einer wirkt.",
+  "注入标记冲突": "Konflikt bei der Injektionsmarkierung",
+  "另有 {count} 处服务端文件被多个模组同时改动，都能生效，明细见下方「启动前预检」。": "{count} weitere Serverdateien werden von mehreren Mods geändert; alle wirken trotzdem, Details unter „Prüfung vor dem Start“ unten.",
+  "停用「{name}」": "„{name}“ deaktivieren",
+  "启动预检": "Startprüfung"
 }

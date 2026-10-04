@@ -29,6 +29,7 @@ import {
   type ModSubmitDialogProps,
 } from "@/components/modules/mod-submit-dialog"
 import { ConflictBanner, ReviewBanner } from "@/components/modules/mod-banners"
+import { ModOverlapPanel } from "@/components/modules/mod-overlap-panel"
 import { ModPreflightPanel } from "@/components/modules/mod-preflight-panel"
 import { useModDownloads, type DownloadTask } from "@/hooks/use-mod-downloads"
 import { shouldOfferClaim } from "@/lib/mod-claim"
@@ -45,6 +46,8 @@ import {
   isPublished,
   isReviewing,
   pendingConflicts,
+  overlapFlag,
+  overlapReport,
   marketCounts as countMarket,
   mineCounts as countMine,
   sortMods,
@@ -59,10 +62,11 @@ import {
 import { formatMB, type ModEntry } from "@/lib/mock"
 import type { ViewId } from "@/components/shell/nav-config"
 
-const MOD_TABS: ModTab[] = ["installed", "mine", "market"]
+const MOD_TABS: ModTab[] = ["installed", "preflight", "mine", "market"]
 
 const TAB_LABEL: Record<ModTab, string> = {
   installed: "已安装",
+  preflight: "启动预检",
   mine: "我创建的",
   market: "模组市场",
 }
@@ -219,6 +223,9 @@ export function ModulesPage({
 
   const conflictKey = conflictPairs.map((p) => `${p.a.id}|${p.b.id}`).join(",")
 
+  /** 疑似重叠只读预检回包（静态那半）：同文件 + 同标记才算真冲突，单开一块提示 */
+  const overlaps = useMemo(() => overlapReport(source.preflight), [source.preflight])
+
   // 冲突项发生变化时，把「暂时忽略」重置掉，避免新增冲突被旧状态吞掉
   useEffect(() => {
     setConflictDismissed(false)
@@ -268,8 +275,15 @@ export function ModulesPage({
   const enabledCount = mods.filter((mod) => mod.installed && mod.enabled).length
   const updatableCount = mods.filter(hasUpdate).length
 
+  /** 「启动预检」上真正要看一眼的条数：标记冲突 + 被跳过的目录 + 版本对不上 */
+  const preflightIssues =
+    overlaps.markers.length +
+    (source.preflight?.ignored.length ?? 0) +
+    (source.preflight?.summary.stale ?? 0)
+
   const tabCount: Record<ModTab, number> = {
     installed: installedCount,
+    preflight: preflightIssues,
     mine: mods.filter((mod) => mod.mine).length,
     market: marketPool.length,
   }
@@ -856,9 +870,17 @@ export function ModulesPage({
             {MOD_TABS.map((item) => (
               <TabsTrigger key={item} value={item}>
                 {TAB_LABEL[item]}
-                <span className="tabular text-[10px] text-tertiary">
-                  {tabCount[item]}
-                </span>
+                {item === "preflight" ? (
+                  preflightIssues > 0 ? (
+                    <span className="tabular flex items-center gap-0.5 rounded-sm border border-warning/35 bg-warning/10 px-1.5 text-[10px] font-semibold text-warning">
+                      {preflightIssues}
+                    </span>
+                  ) : null
+                ) : (
+                  <span className="tabular text-[10px] text-tertiary">
+                    {tabCount[item]}
+                  </span>
+                )}
                 {item === "market" && updatableCount > 0 ? (
                   <span className="tabular flex items-center gap-0.5 rounded-sm border border-primary/35 bg-primary/10 px-1.5 text-[10px] font-semibold text-primary">
                     <ArrowUpCircle className="size-2.5" />
@@ -952,16 +974,7 @@ export function ModulesPage({
 
       {tab === "mine" ? <ReviewBanner mods={reviewing} /> : null}
 
-      {/* 启动前预检：只跟本机 mods/ 目录有关，所以放在「已安装」页签 */}
-      {tab === "installed" ? (
-        <ModPreflightPanel
-          report={source.preflight}
-          dryRun={source.preflightDryRun}
-          running={source.preflightRunning}
-          onRun={(dryRun) => void source.runPreflight(dryRun)}
-        />
-      ) : null}
-
+      {tab === "preflight" ? null : (
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <StatTile
           label="已安装数"
@@ -1005,7 +1018,9 @@ export function ModulesPage({
           }
         />
       </div>
+      )}
 
+      {tab === "preflight" ? null : (
       <ModToolbar
         query={query}
         category={category}
@@ -1030,8 +1045,19 @@ export function ModulesPage({
           void refreshModsAndMarket()
         }}
       />
+      )}
 
-      {visible.length === 0 ? (
+      {tab === "preflight" ? (
+        <>
+          <ModOverlapPanel report={overlaps} mods={mods} onDisable={disableMod} />
+          <ModPreflightPanel
+            report={source.preflight}
+            dryRun={source.preflightDryRun}
+            running={source.preflightRunning}
+            onRun={(dryRun) => void source.runPreflight(dryRun)}
+          />
+        </>
+      ) : visible.length === 0 ? (
         <div className="rounded-lg border border-dashed border-border py-12 text-center">
           <p className="text-[13px] text-tertiary">没有匹配的模组</p>
           <p className="mt-1 text-[11px] text-tertiary/80">
@@ -1053,6 +1079,7 @@ export function ModulesPage({
               task={downloads.tasks.find((task) => task.modId === mod.id)}
               conflicts={activeConflicts(mods, mod)}
               pendingConflicts={pendingConflicts(mods, mod)}
+              overlap={overlapFlag(overlaps, mod)}
               onToggle={(next) => void toggleMod(mod, next)}
               onInstall={() => installMod(mod)}
               onUpdate={() => updateMod(mod)}

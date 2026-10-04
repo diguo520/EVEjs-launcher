@@ -436,6 +436,16 @@ export interface RawModPreflightTarget {
   mods: RawModPreflightMod[]
 }
 
+/** 同一份服务端文件 + 同一个注入标记：后注册的模组会被静默跳过，只有一个能生效 */
+export interface RawModPreflightMarker {
+  /** 服务端相对路径，例如 src/network/tcp/handshake.js */
+  target: string
+  /** 补丁脚本里声明的注入标记，例如 // evejs-inject:login-reward */
+  marker: string
+  /** 引用它的模组（folder 是本地 mods/ 目录名，id 是清单里的标识） */
+  mods: { folder: string; id: string }[]
+}
+
 /** mods:preflight（不带 dryRun）的静态回包 */
 export interface RawModPreflightReport {
   ok: boolean
@@ -444,6 +454,8 @@ export interface RawModPreflightReport {
   root?: string
   ignored: RawModIgnoredDir[]
   targets: RawModPreflightTarget[]
+  /** 同文件 + 同标记的真冲突：两边只有一个能生效，界面单独开一块提示 */
+  markerConflicts?: RawModPreflightMarker[]
   summary: {
     ignored: number
     targets: number
@@ -451,6 +463,8 @@ export interface RawModPreflightReport {
     stale: number
     /** 实际列进 targets[] 的条数（超上限时会被截断，先排序再截） */
     sharedListed?: number
+    /** 注入标记冲突的条数（同文件 + 同标记；超过上限会被截断） */
+    markerConflicts?: number
     staleListed?: number
     scannedMods: number
   }

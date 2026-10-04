@@ -14,11 +14,17 @@ import {
   marketVersionDiff,
   publishBlockers,
   publishIntervalRemaining,
+  ALL_CATEGORY,
+  filterMods,
+  modByFolderOrId,
+  overlapFlag,
+  overlapReport,
   ratingFromReviews,
   reviewPrStateLabel,
   submitCooldownRemaining,
   type PublishCredential,
 } from "@/lib/mod-logic"
+import type { RawModPreflightMod, RawModPreflightReport } from "@/lib/ipc"
 import type { ModEntry, ModReview } from "@/lib/mock"
 
 const NOW = 1_770_000_000_000
@@ -295,5 +301,129 @@ describe("ratingFromReviews（拿评论分片算聚合分）", () => {
   it("分片就是全部评价：只打分不写字的也算一票", () => {
     const scoreOnly: ModReview = { ...review(3), body: "" }
     expect(ratingFromReviews([scoreOnly]).ratingCount).toBe(1)
+  })
+})
+
+describe("overlapReport（疑似重叠：改同一份服务端文件 / 撞同一个注入标记）", () => {
+  const mod = (over: Partial<ModEntry>): ModEntry => ({ ...({} as ModEntry), ...over })
+  const ref = (folder: string, id: string): RawModPreflightMod => ({
+    folder,
+    id,
+    enabled: true,
+    verdict: "ok",
+    declaredFingerprints: 1,
+  })
+  const report = (over: Partial<RawModPreflightReport>): RawModPreflightReport => ({
+    ...({} as RawModPreflightReport),
+    ok: true,
+    dryRun: false,
+    ignored: [],
+    targets: [],
+    summary: { ignored: 0, targets: 0, shared: 0, stale: 0, scannedMods: 0 },
+    ...over,
+  })
+
+  it("同文件 + 同标记才算真冲突，并且能定位到具体模组", () => {
+    const result = overlapReport(
+      report({
+        markerConflicts: [
+          {
+            target: "src/network/tcp/handshake.js",
+            marker: "// evejs-inject:login-reward",
+            mods: [ref("案例A-采矿助手", "demo-a"), ref("案例B-锁定助手", "demo-b")],
+          },
+        ],
+        targets: [{ file: "src/network/tcp/handshake.js", shared: true, mods: [] }],
+      })
+    )
+    expect(result.markers).toHaveLength(1)
+    expect(result.markers[0].marker).toBe("// evejs-inject:login-reward")
+    expect(result.markers[0].mods.map((item) => item.id)).toEqual(["demo-a", "demo-b"])
+    // 卷进真冲突的模组要在卡片上打红标（按 mods/ 目录名认）
+    expect(result.conflictKeys).toEqual(["案例A-采矿助手", "案例B-锁定助手"])
+    // 已经被标记冲突覆盖的文件不再计入「只是重叠」，免得同一份文件报两遍
+    expect(result.sharedOnly).toBe(0)
+  })
+
+  it("只是改同一份文件（标记不同）：只算重叠计数，模组列进 sharedKeys", () => {
+    const result = overlapReport(
+      report({
+        targets: [
+          { file: "src/services/chat/sessionChatSync.js", shared: true, mods: [ref("重叠C", "demo-c"), ref("重叠D", "demo-d")] },
+          { file: "src/space/runtime.js", shared: true, mods: [ref("重叠C", "demo-c"), ref("别的", "other")] },
+          { file: "src/services/market/marketService.js", shared: false, mods: [ref("单个", "solo")] },
+        ],
+      })
+    )
+    expect(result.markers).toHaveLength(0)
+    expect(result.sharedOnly).toBe(2)
+    // 去重：demo-c 改了两份文件，只出现一次
+    expect(result.sharedKeys).toEqual(["重叠C", "重叠D", "别的"])
+    expect(result.conflictKeys).toEqual([])
+  })
+
+  it("预检标记冲突的模组不再进 sharedKeys（红标压过黄标）", () => {
+    const result = overlapReport(
+      report({
+        markerConflicts: [{ target: "src/a.js", marker: "// m:patch", mods: [ref("A", "a"), ref("B", "b")] }],
+        targets: [{ file: "src/a.js", shared: true, mods: [ref("A", "a"), ref("B", "b")] }],
+      })
+    )
+    expect(result.conflictKeys).toEqual(["A", "B"])
+    expect(result.sharedKeys).toEqual([])
+    expect(result.sharedOnly).toBe(0)
+  })
+
+  it("没跑过预检、或一条只有单个模组引用时不报", () => {
+    expect(overlapReport(null)).toEqual({
+      markers: [],
+      sharedOnly: 0,
+      conflictKeys: [],
+      sharedKeys: [],
+    })
+    const result = overlapReport(
+      report({
+        markerConflicts: [{ target: "a.js", marker: "// x", mods: [ref("only", "only")] }],
+      })
+    )
+    expect(result.markers).toHaveLength(0)
+    expect(result.conflictKeys).toEqual([])
+  })
+
+  it("modByFolderOrId 先按目录名找，再退回 id；找不到给 null（调用方据此不给按钮）", () => {
+    const mods = [mod({ id: "demo-a", folder: "案例A-采矿助手" })]
+    expect(modByFolderOrId(mods, { folder: "案例A-采矿助手", id: "demo-a" })?.id).toBe("demo-a")
+    expect(modByFolderOrId(mods, { folder: "改过名", id: "demo-a" })?.id).toBe("demo-a")
+    expect(modByFolderOrId(mods, { folder: "nope", id: "nope" })).toBeNull()
+  })
+
+  it("overlapFlag 给卡片挑标：真冲突 > 只是重叠 > 不打标", () => {
+    const result = overlapReport(
+      report({
+        markerConflicts: [{ target: "src/a.js", marker: "// m:patch", mods: [ref("案例A", "demo-a"), ref("案例B", "demo-b")] }],
+        targets: [{ file: "src/b.js", shared: true, mods: [ref("案例C", "demo-c"), ref("案例D", "demo-d")] }],
+      })
+    )
+    expect(overlapFlag(result, mod({ id: "demo-a", folder: "案例A" }))).toBe("conflict")
+    expect(overlapFlag(result, mod({ id: "demo-c", folder: "案例C" }))).toBe("shared")
+    expect(overlapFlag(result, mod({ id: "demo-e", folder: "案例E" }))).toBeNull()
+  })
+
+  it("没有 folder 的模组按 id 认（原型数据 / 市场条目）", () => {
+    const result = overlapReport(report({ markerConflicts: [{ target: "src/a.js", marker: "// m:patch", mods: [ref("", "demo-x"), ref("", "demo-y")] }] }))
+    expect(result.conflictKeys).toEqual(["demo-x", "demo-y"])
+    expect(overlapFlag(result, mod({ id: "demo-x" }))).toBe("conflict")
+  })
+
+  it("「启动预检」页签不参与模组清单筛选（内容是面板，不是卡片）", () => {
+    const mods = [mod({ id: "demo-a", installed: true }), mod({ id: "demo-b", mine: true })]
+    const pool = filterMods({
+      mods,
+      tab: "preflight",
+      marketFilter: "all",
+      query: "",
+      category: ALL_CATEGORY,
+    })
+    expect(pool).toEqual([])
   })
 })

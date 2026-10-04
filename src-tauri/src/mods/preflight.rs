@@ -51,6 +51,10 @@ const MAX_SOURCE_BYTES: u64 = 3 * 1024 * 1024;
 const MAX_TOTAL_BYTES: u64 = 64 * 1024 * 1024;
 /// 单次上报的「被引用的服务端文件」上限
 const MAX_TARGETS: usize = 64;
+/// 注入标记（`// xxx:patch` 这类字符串字面量）的最大长度：再长就不像是标记了
+const MAX_MARKER_BYTES: usize = 160;
+/// 单次上报的「注入标记冲突」上限
+const MAX_MARKER_ROWS: usize = 32;
 /// 干跑超时：模组多、磁盘慢时留足余量（服务端本身启动也就几十秒）
 const DRY_RUN_TIMEOUT_SECS: u64 = 180;
 /// 干跑输出保留的尾部行数
@@ -126,6 +130,47 @@ fn extract_hashes(source: &[u8]) -> BTreeSet<String> {
     out
 }
 
+/// 抠出模组声明的「注入标记」：形如 `"// xxx:patch"` 的字符串字面量。
+///
+/// 新机制里 `SOURCE_PATCH.marker` 就是这个形状（骨架默认 `// <模组 id>:patch`），
+/// 而总线的去重判断正是「当前源码里有没有这串标记」—— 两个模组撞同一个标记时，
+/// 后注册的那个会被**静默跳过**。所以「同一份文件 + 同一个标记」是真冲突，
+/// 必须与「只是改同一份文件」（总线按 slot 依次串链，能共存）分开报。
+///
+/// 只认 `//` 开头的短字面量，且左边不能是词内字符（`x+"//y"` 这种拼接不算一条独立声明）。
+fn extract_markers(source: &[u8]) -> BTreeSet<String> {
+    let mut out = BTreeSet::new();
+    let mut index = 0usize;
+    while index < source.len() {
+        let quote = source[index];
+        if quote != b'"' && quote != b'\'' && quote != b'`' {
+            index += 1;
+            continue;
+        }
+        let start = index + 1;
+        let mut end = start;
+        while end < source.len() && source[end] != quote && source[end] != b'\n' {
+            if source[end] == b'\\' {
+                end += 1;
+            }
+            end += 1;
+        }
+        if end < source.len() && source[end] == quote {
+            let slice = &source[start..end];
+            let boundary = index == 0 || !is_word_byte(source[index - 1]);
+            if boundary && slice.starts_with(b"//") && slice.len() <= MAX_MARKER_BYTES {
+                if let Ok(text) = std::str::from_utf8(slice) {
+                    if !text.chars().any(|ch| (ch as u32) < 0x20) {
+                        out.insert(text.to_string());
+                    }
+                }
+            }
+        }
+        index = if end > index { end + 1 } else { index + 1 };
+    }
+    out
+}
+
 /// 遍历模组目录下的文本文件；`budget` 是共享的总字节预算
 fn walk_text_files(dir: &Path, budget: &mut u64, visit: &mut impl FnMut(&[u8])) {
     let Ok(entries) = fs::read_dir(dir) else {
@@ -163,30 +208,44 @@ fn walk_text_files(dir: &Path, budget: &mut u64, visit: &mut impl FnMut(&[u8])) 
     }
 }
 
-/// 单个模组 → { 服务端相对路径: 该模组为它声明的基线指纹 }。
+/// 一个模组对服务端源码的主张：声明了哪些文件、每份文件上的基线指纹与注入标记。
 ///
-/// 归属口径：**同一个文件里**同时出现目标路径与指纹时才算「为它声明」
-/// （补丁脚本就是这个形状：`RELATIVE_PATH` 与 `BASELINES` 挨在一起）。
+/// 归属口径：**同一个文件里**同时出现目标路径与指纹（或标记）时才算「为它声明」
+/// （补丁脚本就是这个形状：`RELATIVE_PATH` 与 `BASELINES` / `MARKER` 挨在一起）。
 /// 取并集而不是按窗口切分，宁可漏报也不误报 —— 误报会让用户去改本来好好的模组。
-fn mod_targets(dir: &Path, budget: &mut u64) -> BTreeMap<String, BTreeSet<String>> {
-    let mut collected: Vec<(BTreeSet<String>, BTreeSet<String>)> = Vec::new();
+#[derive(Default)]
+struct ModClaims {
+    /// { 服务端相对路径: 该模组为它声明的 sha256 基线指纹 }
+    fingerprints: BTreeMap<String, BTreeSet<String>>,
+    /// { 服务端相对路径: 该模组为它声明的注入标记 }
+    markers: BTreeMap<String, BTreeSet<String>>,
+}
+
+/// 一次遍历同时抠出两样东西：分两遍扫会把 64 MiB 的字节预算算两遍，也会慢一倍。
+fn mod_claims(dir: &Path, budget: &mut u64) -> ModClaims {
+    let mut collected: Vec<(BTreeSet<String>, BTreeSet<String>, BTreeSet<String>)> = Vec::new();
     walk_text_files(dir, budget, &mut |bytes| {
         let paths = extract_paths(bytes);
         if paths.is_empty() {
             return;
         }
-        collected.push((paths, extract_hashes(bytes)));
+        collected.push((paths, extract_hashes(bytes), extract_markers(bytes)));
     });
-    let mut out: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
-    for (paths, hashes) in collected {
+
+    let mut claims = ModClaims::default();
+    for (paths, hashes, markers) in collected {
         for path in paths {
-            let entry = out.entry(path).or_default();
+            let fingerprints = claims.fingerprints.entry(path.clone()).or_default();
             for hash in &hashes {
-                entry.insert(hash.clone());
+                fingerprints.insert(hash.clone());
+            }
+            let claimed = claims.markers.entry(path).or_default();
+            for marker in &markers {
+                claimed.insert(marker.clone());
             }
         }
     }
-    out
+    claims
 }
 
 /// 一份服务端文件的指纹集合：原始字节 / LF 归一化 / LF 归一化再去尾部空白。
@@ -305,11 +364,23 @@ pub fn static_report(repo_root: &Path, runtime: &RuntimePaths) -> Value {
 
     let mut budget = MAX_TOTAL_BYTES;
     let mut by_target: BTreeMap<String, Vec<TargetRef>> = BTreeMap::new();
+    // { (服务端相对路径, 注入标记) → [模组] }：撞同一个标记的模组组
+    let mut by_marker: BTreeMap<(String, String), Vec<(String, String)>> = BTreeMap::new();
     for item in &scan_result.mods {
         if item.kind != "loader" || !item.valid || !item.enabled {
             continue;
         }
-        for (target, hashes) in mod_targets(&item.dir, &mut budget) {
+        // 同一份文件 + 同一个标记 → 后注册的会被静默跳过，单独收一份做真冲突上报
+        let claims = mod_claims(&item.dir, &mut budget);
+        for (target, markers) in &claims.markers {
+            for marker in markers {
+                by_marker
+                    .entry((target.clone(), marker.clone()))
+                    .or_default()
+                    .push((item.folder.clone(), item.id.clone()));
+            }
+        }
+        for (target, hashes) in claims.fingerprints {
             by_target.entry(target).or_default().push(TargetRef {
                 folder: item.folder.clone(),
                 id: item.id.clone(),
@@ -390,11 +461,32 @@ pub fn static_report(repo_root: &Path, runtime: &RuntimePaths) -> Value {
         .map(|(_, _, _, row)| row)
         .collect();
 
+    // 注入标记冲突：同一份文件 + 同一个标记 → 总线按 (slot, 注册先后) 串链时，
+    // 后一层看到标记已经在源码里就整段跳过自己（不报错、也不生效）。
+    // 这是真冲突，跟「只是改同一份文件」分开上报，界面上才敢让用户「停用其中一个」。
+    let marker_conflicts: Vec<Value> = by_marker
+        .into_iter()
+        .filter(|(_, mods)| mods.len() > 1)
+        .take(MAX_MARKER_ROWS)
+        .map(|((target, marker), mods)| {
+            json!({
+                "target": target,
+                "marker": marker,
+                "mods": mods
+                    .into_iter()
+                    .map(|(folder, id)| json!({ "folder": folder, "id": id }))
+                    .collect::<Vec<Value>>(),
+            })
+        })
+        .collect();
+    let marker_conflict_count = marker_conflicts.len();
+
     json!({
         "ok": true,
         "dryRun": false,
         "root": repo_root.to_string_lossy(),
         "ignored": ignored,
+        "markerConflicts": marker_conflicts,
         "targets": targets,
         "summary": {
             "ignored": ignored.len(),
@@ -403,6 +495,7 @@ pub fn static_report(repo_root: &Path, runtime: &RuntimePaths) -> Value {
             "stale": stale_count,
             "sharedListed": shared_listed,
             "staleListed": stale_listed,
+            "markerConflicts": marker_conflict_count,
             "scannedMods": scan_result.mods.iter().filter(|item| item.kind == "loader" && item.valid && item.enabled).count(),
         },
     })
@@ -681,6 +774,63 @@ mod tests {
         let hashes = extract_hashes(source);
         assert_eq!(hashes.len(), 1);
         assert!(hashes.contains("ac4939663342d0573055792ffb1f67539238ce50e0c14acaaec83beea45574a5"));
+    }
+
+    #[test]
+    fn extracts_markers_only_from_short_slash_literals() {
+        let source = br#"
+            const MARKER = "// demo:patch";
+            const other = "not a marker";
+            const url = "https://example.com";
+        "#;
+        let markers = extract_markers(source);
+        assert_eq!(markers.len(), 1, "{markers:?}");
+        assert!(markers.contains("// demo:patch"), "{markers:?}");
+    }
+
+    #[test]
+    fn marker_collision_is_reported_for_the_same_file_and_marker() {
+        let repo = repo_for("marker");
+        let runtime = runtime_for("marker");
+        write_server_file(&repo, "src/network/tcp/handshake.js", "// server file\n");
+        let body = "const RELATIVE_PATH = \"server/src/network/tcp/handshake.js\";\nconst MARKER = \"// demo:patch\";\n";
+        write_mod(&repo, "甲", "jia", body);
+        write_mod(&repo, "乙", "yi", body);
+
+        let report = static_report(&repo, &runtime);
+        let rows = report["markerConflicts"].as_array().unwrap();
+        assert_eq!(rows.len(), 1, "{report}");
+        assert_eq!(rows[0]["target"], "src/network/tcp/handshake.js");
+        assert_eq!(rows[0]["marker"], "// demo:patch");
+        assert_eq!(rows[0]["mods"].as_array().unwrap().len(), 2);
+        assert_eq!(report["summary"]["markerConflicts"], 1, "{report}");
+    }
+
+    #[test]
+    fn same_file_with_distinct_markers_is_not_a_marker_collision() {
+        let repo = repo_for("marker-distinct");
+        let runtime = runtime_for("marker-distinct");
+        write_server_file(&repo, "src/network/tcp/handshake.js", "// server file\n");
+        write_mod(
+            &repo,
+            "甲",
+            "jia",
+            "const P = \"server/src/network/tcp/handshake.js\";\nconst M = \"// jia:patch\";\n",
+        );
+        write_mod(
+            &repo,
+            "乙",
+            "yi",
+            "const P = \"server/src/network/tcp/handshake.js\";\nconst M = \"// yi:patch\";\n",
+        );
+
+        let report = static_report(&repo, &runtime);
+        assert!(
+            report["markerConflicts"].as_array().unwrap().is_empty(),
+            "{report}"
+        );
+        // 但「改同一份文件」照旧要报 —— 这两件事必须分开，界面上的处置方式也不同
+        assert_eq!(report["summary"]["shared"], 1, "{report}");
     }
 
     #[test]
