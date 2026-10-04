@@ -23,96 +23,28 @@
       "why": "军团 / 联盟徽标此前只能走本地图片服务（HTTP 26001）：服务端没起就整块不画；而服务端对「没有专属徽标」的军团与联盟回的是同一张兜底图（evejscorp.png 与 alliance-default.png 是同一张画，只差底部一行小字），缩到 20px 就是两个一模一样的图标。这条通道直接从服务端图片目录读专属徽标（`<id>_<size>.png`，运行时目录优先、legacy 次之），拿不到就回 null，界面改画军团 ticker / 联盟简称，服务关着也能看见。"
     },
     {
-      "api": "modsClaimCandidates",
-      "channel": "mods:claimCandidates",
+      "api": "dangerClearCache",
+      "channel": "danger:clearCache",
       "kind": "invoke",
-      "signature": "opts?: { offset?: number; limit?: number; query?: string; scope?: \"mine\" | \"all\" }",
-      "params": [
-        "opts"
-      ],
-      "why": "重装系统 / 换电脑 / 删掉私钥之后，作者本机换了新身份，`sign_mod_folder` 与 `prepare_submission` 的归属保护就会把他自己的旧模组当成别人的拒掉，他就再也更新不了几年前的模组。这个通道列出本机 mods/ 里「由别的身份署名」的模组（附带索引登记的仓库与仓库主人），作为认领入口的候选清单；纯离线只读，不碰网络。候选是「本机装了多少别人的模组」的量级（上万条也常见），所以按 `{ offset, limit, query }` 分页 + 搜索，只回一页（默认 50、上限 200）并带上 `total` / `skippedCount`；索引、发布台账与认领记录都只整份读一次再查表，没配 GitHub 令牌的人直接回 `needsToken`（他核验不了归属，也用不到这份清单），不为它白扫一遍上万个模组。"
+      "signature": "",
+      "params": [],
+      "why": "设置页「危险操作」的「清空缓存」。清掉的是启动器自己联网拉来的快照：模组市场索引、评分与评论分片、赞助人名单、GitHub 登录名缓存。它们都有 TTL 或下次调用自动重取，删掉只是让启动器重新拉一遍，不碰身份 key 与令牌。**按白名单删而不是清空目录**：老 Electron 版把 Chromium 的 `Local State`（OSCrypt 密钥）留在同一个 `cache/` 下，那份密钥是解密老 GitHub 令牌与身份 key 的钥匙，整个目录删掉等于让老用户重置令牌 —— 正是迁移时明确要避免的事。现役版没有这条通道，它的危险区只是渲染层占位。"
     },
     {
-      "api": "modsClaimMod",
-      "channel": "mods:claimMod",
+      "api": "dangerEraseWorld",
+      "channel": "danger:eraseWorld",
       "kind": "invoke",
-      "signature": "folder: string",
-      "params": [
-        "folder"
-      ],
-      "why": "认领动作本身：核验这个模组的仓库是不是当前 GitHub 令牌主人自己的（owner 命中 / GitHub 明确回了 push 权限），通过后落一条本机认领记录。归属保护只对认领过的 id 放行，所以离线路径上（签名 / 打包）不需要联网也能照常判断；核验只用公开信息，不接受「我说是我的」。"
+      "signature": "",
+      "params": [],
+      "why": "设置页「危险操作」的「擦除世界数据」。删的是 `_local/gameStore`：账号、角色、资产、军团、市场订单全在里面。不直接删除，先整目录改名成 `gameStore.bak-<时间戳>`（和本机已有的 `gamestore.sqlite.bak-*` 同一套思路），误点还能捡回来；随后复用现成的初始化 db 任务重建数据库，作者不用手动替换世界存档。任何服务（主服务器 / 市场服务 / 游戏客户端）在跑时一律拒绝，避免边写边删把库撕坏。现役版没有重建世界存档的通道。"
     },
     {
-      "api": "modsUpdateMeta",
-      "channel": "mods:updateMeta",
+      "api": "dangerResetConfig",
+      "channel": "danger:resetConfig",
       "kind": "invoke",
-      "signature": "folder: string, patch: Record<string, unknown>",
-      "params": [
-        "folder",
-        "patch"
-      ],
-      "why": "现役版的「编辑信息」只存在于渲染层：主进程没有任何改写清单的通道（modManager.ts 里唯一写清单的地方在 signModFolder 里）。新界面按原型提供了编辑弹窗，如果不落一个真通道，保存就只能弹一句「请直接改文件」。"
-    },
-    {
-      "api": "modsForgetSubmission",
-      "channel": "mods:forgetSubmission",
-      "kind": "invoke",
-      "signature": "id: string",
-      "params": [
-        "id"
-      ],
-      "why": "投稿台账（my-submissions.json）在现役版里只增不减：作者把本地模组删了、审核台也把收录撤了之后，「我创建的」里那条记录永远挂着 —— 既没有入口清掉，同一个 id 再投稿又会走「更新」分支，于是作者没法重新走一遍首次上架。这条通道只删本机台账里**本机当前署名**投的那些条目（重装系统 / 换过身份的机器上不会误删别人的记录，判据与 registry 的归属判定同一套），GitHub 仓库 / Release / 审核 PR / 市场索引一概不碰 —— 那些已经是公开产物，删台账只是让本机不再挂着这条无效记录；作者之后在本地重建同名模组（id 不变）刷新一下，就能按首次提交重新上架，仓库与 Release 都是幂等复用的，不会重复建。"
-    },
-    {
-      "api": "modsReviews",
-      "channel": "mods:reviews",
-      "kind": "invoke",
-      "signature": "modId: string, force?: boolean",
-      "params": [
-        "modId",
-        "force"
-      ],
-      "why": "模组市场的评分与评论由 infra/ 的 Cloudflare 服务托管（Workers + D1），启动器只读快照。聚合分跟主索引一起回来，评论正文更大，所以单独一条通道按需拉：打开详情弹窗才拉一次、按模组缓存，没打开过的模组不占流量。回包里每条评论带 keyId，后端据此对照本机作者身份标出 mine，界面才能把「我的评价」单拎出来改。"
-    },
-    {
-      "api": "modsReviewSubmit",
-      "channel": "mods:reviewSubmit",
-      "kind": "invoke",
-      "signature": "input: { modId: string; version: string; pkgSha256: string; stars: number; body: string }",
-      "params": ["input"],
-      "why": "评价的写路径。启动器不注册账号：署名与身份都用本机那套 Ed25519 作者身份（没有就现建一套，评价的主体正是没发过模组的普通玩家），服务端按公钥指纹一人一票。真正的闸门在服务端 —— 报上去的 pkgSha256 必须命中 mod_versions 白名单，也就是「你确实装过这个版本」，客户端自称不算数。签名覆盖的就是发出去的原值（正文先在本地规范化），服务端不替客户端改写再验签。"
-    },
-    {
-      "api": "modsReviewRetract",
-      "channel": "mods:reviewRetract",
-      "kind": "invoke",
-      "signature": "input: { modId: string }",
-      "params": ["input"],
-      "why": "撤回自己那条评价。人走了想删掉不该被拒绝，服务端按签名身份删除，不接受「删别人的」。"
-    },
-    {
-      "api": "modsReplySubmit",
-      "channel": "mods:replySubmit",
-      "kind": "invoke",
-      "signature": "input: { modId: string; reviewId: string; body: string }",
-      "params": ["input"],
-      "why": "模组作者回复评价。鉴权完全在服务端：签名者的 keyId 必须命中市场索引里该模组登记的作者 keyId，光靠界面上的「你是作者」不算数。"
-    },
-    {
-      "api": "modsReplyRetract",
-      "channel": "mods:replyRetract",
-      "kind": "invoke",
-      "signature": "input: { modId: string; reviewId: string }",
-      "params": ["input"],
-      "why": "删掉自己的回复。与发布回复同一套鉴权：服务端按签名身份定位那条回复。"
-    },
-    {
-      "api": "modsReportReview",
-      "channel": "mods:reportReview",
-      "kind": "invoke",
-      "signature": "input: { modId: string; reviewId: string; reason: string }",
-      "params": ["input"],
-      "why": "举报一条评价。先只入库、不自动处置：自动隐藏的规则还没定，宁可攒着人工看，也不要随手机器审掉一条正常评价。举报同样要签名，否则一个人能刷满整张表。"
+      "signature": "",
+      "params": [],
+      "why": "设置页「危险操作」的「重置配置」。服务端 `config/*.json` 的默认值、取值范围与校验都在服务端 `manager.js` 里，启动器只负责搬运：这条通道转调侧车 `game-config-cli.js reset`，由服务端自己把每个域写回默认值，Rust 侧不抄第二套默认值。写前照现有约定把整份 `config/` 备份到 `_local/config-backups/reset-<时间戳>/`，并且不碰 `config/version.json` 的版本号。服务在跑时拒绝执行，否则正在写的配置会被进程回写覆盖。现役版只能一项项改，没有一键恢复默认的通道。"
     },
     {
       "api": "gameConfigRead",
@@ -133,12 +65,14 @@
       "why": "写回世界参数。走服务端自己的 saveConfig：先按 schema 校验（未知键 / 类型 / 整数 / 范围 / 枚举全在服务端判定），再原子写 config/*.json。启动器侧额外做的事只有一件 —— 写前把整份 config 备份到 _local/config-backups/gameconfig-<时间戳>/，因为服务端自己的原子写不带回滚，而这里改的是全局玩法参数。只写 config/*.json，不碰 server/ 下任何源码。"
     },
     {
-      "api": "marketOverview",
-      "channel": "market:overview",
+      "api": "marketBook",
+      "channel": "market:book",
       "kind": "invoke",
-      "signature": "",
-      "params": [],
-      "why": "现役版没有物品 / 市场浏览功能。这条通道直读服务端市场库 externalservices/market-server/data/generated/market.sqlite（只读 + WAL，服务跑着也能读），返回区域、星系、类型 / 站点 / 库存 / 成交行数、库文件大小与最近一次成交时间。库是活库：seed_stock.quantity 与 region_summaries 里的最优买卖价会随游戏内成交变化，所以这里刻意不走任何随包快照 —— 用户要的就是「跑着游戏读到的是当下数据，服务没启动也能读」。"
+      "signature": "typeId: number",
+      "params": [
+        "typeId"
+      ],
+      "why": "单个物品的盘口明细：各空间站的库存与价格（被交易扣减后的 quantity 与种子值 initial_quantity 分开显示，一眼能看出哪些真被买过）、30 天价格历史、以及命中过的成交回执。这三块数据量大且只在点开某个物品时才需要，所以不塞进 catalog 里一起下发。"
     },
     {
       "api": "marketCatalog",
@@ -149,27 +83,143 @@
       "why": "物品清单一次拉全（当前 19,352 个有库存的物品 × 14 个数字列，约 2.3 MB），前端本地做分类树过滤、搜索与翻页 —— 每次按键都回 Rust 查一次库在体感上太慢，而这份清单只在打开页面时拉一次。分类树的层级与中英文名不在市场库里（库里只有 market_group_id 这个数字），运行时从 SDE 的 marketGroups.jsonl 读父子关系，SDE 缺失时退化成平铺，不影响物品本身的展示。"
     },
     {
-      "api": "marketBook",
-      "channel": "market:book",
+      "api": "marketOverview",
+      "channel": "market:overview",
       "kind": "invoke",
-      "signature": "typeId: number",
-      "params": ["typeId"],
-      "why": "单个物品的盘口明细：各空间站的库存与价格（被交易扣减后的 quantity 与种子值 initial_quantity 分开显示，一眼能看出哪些真被买过）、30 天价格历史、以及命中过的成交回执。这三块数据量大且只在点开某个物品时才需要，所以不塞进 catalog 里一起下发。"
+      "signature": "",
+      "params": [],
+      "why": "现役版没有物品 / 市场浏览功能。这条通道直读服务端市场库 externalservices/market-server/data/generated/market.sqlite（只读 + WAL，服务跑着也能读），返回区域、星系、类型 / 站点 / 库存 / 成交行数、库文件大小与最近一次成交时间。库是活库：seed_stock.quantity 与 region_summaries 里的最优买卖价会随游戏内成交变化，所以这里刻意不走任何随包快照 —— 用户要的就是「跑着游戏读到的是当下数据，服务没启动也能读」。"
     },
     {
       "api": "marketTrades",
       "channel": "market:trades",
       "kind": "invoke",
       "signature": "limit?: number",
-      "params": ["limit"],
+      "params": [
+        "limit"
+      ],
       "why": "最近的成交流水（market_fill_receipts，明细在 response_json 里），用来证明「库是活的」：刷新一下就能看到新成交。order_id 是 int64，超出 JS 安全整数范围，CLI 侧必须 CAST 成 TEXT 再下发，否则前端读到的 id 会被静默改写。"
+    },
+    {
+      "api": "modsClaimCandidates",
+      "channel": "mods:claimCandidates",
+      "kind": "invoke",
+      "signature": "opts?: { offset?: number; limit?: number; query?: string; scope?: \"mine\" | \"all\" }",
+      "params": [
+        "opts"
+      ],
+      "why": "重装系统 / 换电脑 / 删掉私钥之后，作者本机换了新身份，`sign_mod_folder` 与 `prepare_submission` 的归属保护就会把他自己的旧模组当成别人的拒掉，他就再也更新不了几年前的模组。这个通道列出本机 mods/ 里「由别的身份署名」的模组（附带索引登记的仓库与仓库主人），作为认领入口的候选清单；纯离线只读，不碰网络。候选是「本机装了多少别人的模组」的量级（上万条也常见），所以按 `{ offset, limit, query }` 分页 + 搜索，只回一页（默认 50、上限 200）并带上 `total` / `skippedCount`；索引、发布台账与认领记录都只整份读一次再查表，没配 GitHub 令牌的人直接回 `needsToken`（他核验不了归属，也用不到这份清单），不为它白扫一遍上万个模组。"
+    },
+    {
+      "api": "modsClaimMod",
+      "channel": "mods:claimMod",
+      "kind": "invoke",
+      "signature": "folder: string",
+      "params": [
+        "folder"
+      ],
+      "why": "认领动作本身：核验这个模组的仓库是不是当前 GitHub 令牌主人自己的（owner 命中 / GitHub 明确回了 push 权限），通过后落一条本机认领记录。归属保护只对认领过的 id 放行，所以离线路径上（签名 / 打包）不需要联网也能照常判断；核验只用公开信息，不接受「我说是我的」。"
+    },
+    {
+      "api": "modsForgetSubmission",
+      "channel": "mods:forgetSubmission",
+      "kind": "invoke",
+      "signature": "id: string",
+      "params": [
+        "id"
+      ],
+      "why": "投稿台账（my-submissions.json）在现役版里只增不减：作者把本地模组删了、审核台也把收录撤了之后，「我创建的」里那条记录永远挂着 —— 既没有入口清掉，同一个 id 再投稿又会走「更新」分支，于是作者没法重新走一遍首次上架。这条通道只删本机台账里**本机当前署名**投的那些条目（重装系统 / 换过身份的机器上不会误删别人的记录，判据与 registry 的归属判定同一套），GitHub 仓库 / Release / 审核 PR / 市场索引一概不碰 —— 那些已经是公开产物，删台账只是让本机不再挂着这条无效记录；作者之后在本地重建同名模组（id 不变）刷新一下，就能按首次提交重新上架，仓库与 Release 都是幂等复用的，不会重复建。"
+    },
+    {
+      "api": "modsPreflight",
+      "channel": "mods:preflight",
+      "kind": "invoke",
+      "signature": "opts?: { dryRun?: boolean }",
+      "params": [
+        "opts"
+      ],
+      "why": "现役版只会在**真的启动服务端之后**才从 mod-load-report.json 看出模组出了什么事，用户的原话是「不启动一次是不是就不能提前告知哪些 MOD 有冲突、哪些会让服务起不来」。这条通道把三件不启动就能回答的事一次回全：(1) `ignored[]` —— `mods/<目录>` 下没有 evejs-launcher.mod.json 时扫描器是**静默整目录跳过**的，界面上既不报错也不出现（实测用户把模组清单多套了一层子目录，13 个模组里那一个从此人间蒸发）；(2) `targets[]` —— 哪些模组引用同一份服务端源码（重复引用不等于冲突，方案 D 的注入总线就是为共存设计的，所以这里是「疑似」不是「冲突」），并顺带用模组自己声明的 64 位 sha256 基线指纹与当前服务端文件对一遍：**对不上 = 该模组会静默放弃这份文件**（不报错、也不生效，这正是 2026-10-01 AutoMining/AutoLockFire 那次事故的形状）；(3) `{ dryRun: true }` 时把 plan_loaders 选中的 loader 放进一个一次性 Node 进程里 require 一遍 —— NODE_OPTIONS 里 --require 的模块抛错会让 node 直接退出，也就是「服务端起不来」，这一条只有真跑一次才知道，但不需要起世界库、不绑端口、不连客户端（几秒）。代价与边界照实说：静态部分不执行任何模组代码，干跑会真的执行模组加载期代码（模组可能读写自己的目录），所以干跑只在用户点按钮时才跑；运行期补丁是否命中仍然要真启动才知道，界面上这条一律标成「静态推测」。"
+    },
+    {
+      "api": "modsReplyRetract",
+      "channel": "mods:replyRetract",
+      "kind": "invoke",
+      "signature": "input: { modId: string; reviewId: string }",
+      "params": [
+        "input"
+      ],
+      "why": "删掉自己的回复。与发布回复同一套鉴权：服务端按签名身份定位那条回复。"
+    },
+    {
+      "api": "modsReplySubmit",
+      "channel": "mods:replySubmit",
+      "kind": "invoke",
+      "signature": "input: { modId: string; reviewId: string; body: string }",
+      "params": [
+        "input"
+      ],
+      "why": "模组作者回复评价。鉴权完全在服务端：签名者的 keyId 必须命中市场索引里该模组登记的作者 keyId，光靠界面上的「你是作者」不算数。"
+    },
+    {
+      "api": "modsReportReview",
+      "channel": "mods:reportReview",
+      "kind": "invoke",
+      "signature": "input: { modId: string; reviewId: string; reason: string }",
+      "params": [
+        "input"
+      ],
+      "why": "举报一条评价。先只入库、不自动处置：自动隐藏的规则还没定，宁可攒着人工看，也不要随手机器审掉一条正常评价。举报同样要签名，否则一个人能刷满整张表。"
+    },
+    {
+      "api": "modsReviewRetract",
+      "channel": "mods:reviewRetract",
+      "kind": "invoke",
+      "signature": "input: { modId: string }",
+      "params": [
+        "input"
+      ],
+      "why": "撤回自己那条评价。人走了想删掉不该被拒绝，服务端按签名身份删除，不接受「删别人的」。"
+    },
+    {
+      "api": "modsReviews",
+      "channel": "mods:reviews",
+      "kind": "invoke",
+      "signature": "modId: string, force?: boolean",
+      "params": [
+        "modId",
+        "force"
+      ],
+      "why": "模组市场的评分与评论由 infra/ 的 Cloudflare 服务托管（Workers + D1），启动器只读快照。聚合分跟主索引一起回来，评论正文更大，所以单独一条通道按需拉：打开详情弹窗才拉一次、按模组缓存，没打开过的模组不占流量。回包里每条评论带 keyId，后端据此对照本机作者身份标出 mine，界面才能把「我的评价」单拎出来改。"
+    },
+    {
+      "api": "modsReviewSubmit",
+      "channel": "mods:reviewSubmit",
+      "kind": "invoke",
+      "signature": "input: { modId: string; version: string; pkgSha256: string; stars: number; body: string }",
+      "params": [
+        "input"
+      ],
+      "why": "评价的写路径。启动器不注册账号：署名与身份都用本机那套 Ed25519 作者身份（没有就现建一套，评价的主体正是没发过模组的普通玩家），服务端按公钥指纹一人一票。真正的闸门在服务端 —— 报上去的 pkgSha256 必须命中 mod_versions 白名单，也就是「你确实装过这个版本」，客户端自称不算数。签名覆盖的就是发出去的原值（正文先在本地规范化），服务端不替客户端改写再验签。"
+    },
+    {
+      "api": "modsUpdateMeta",
+      "channel": "mods:updateMeta",
+      "kind": "invoke",
+      "signature": "folder: string, patch: Record<string, unknown>",
+      "params": [
+        "folder",
+        "patch"
+      ],
+      "why": "现役版的「编辑信息」只存在于渲染层：主进程没有任何改写清单的通道（modManager.ts 里唯一写清单的地方在 signModFolder 里）。新界面按原型提供了编辑弹窗，如果不落一个真通道，保存就只能弹一句「请直接改文件」。"
     },
     {
       "api": "sponsorsSnapshot",
       "channel": "sponsors:snapshot",
       "kind": "invoke",
       "signature": "force: boolean",
-      "params": ["force"],
+      "params": [
+        "force"
+      ],
       "why": "赞助人「补给线」名单。名单不随启动器发版：它由 infra/ 那个 Cloudflare 服务定时签出来（源头是 infra/src/sponsors.js），这里走的是与模组评分完全一样的读法 —— 多镜像 + 本地缓存 + Ed25519 验签，实现在 src-tauri/src/snapshot.rs。force=true 绕开 TTL 缓存重拉。取不到不算错误：渲染层回落到随包那份演示名单，这块面板不开天窗。名单是用户数据，名字不翻译；条目带 currency（三位字母码），国外赞助人按符号显示 $ / € 而不是硬套 ¥。"
     }
   ],

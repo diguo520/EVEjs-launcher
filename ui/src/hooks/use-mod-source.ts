@@ -17,6 +17,8 @@ import type {
   RawMarketList,
   RawMarketMod,
   RawModList,
+  RawModPreflightDryRun,
+  RawModPreflightReport,
   RawMyMods,
   RawMySubmissions,
   RawPublishProgress,
@@ -159,6 +161,13 @@ export interface ModSourceState {
   openExternal: (url: string) => Promise<RawAck>
   /** 骨架模板（真后端给的那几套） */
   templates: RawModTemplate[]
+  /** 启动前预检（静态部分）：被忽略的目录 + 共享服务端文件 + 基线指纹 */
+  preflight: RawModPreflightReport | null
+  /** 最近一次干跑结果（没跑过就是 null） */
+  preflightDryRun: RawModPreflightDryRun | null
+  preflightRunning: boolean
+  /** 跑一次预检；`dryRun` 会真的在一个一次性 Node 进程里 require 一遍 loader */
+  runPreflight: (dryRun?: boolean) => Promise<RawModPreflightReport | RawModPreflightDryRun | null>
   /** 转成发布凭据：老用户升级过来时，这一步是无感的（令牌已在盘上） */
   credential: PublishCredential | null
   /** 市场索引里的原始条目（安装时整条回传给后端） */
@@ -228,6 +237,10 @@ export function useModSource(): ModSourceState {
   const [author, setAuthor] = useState<RawAuthorState | null>(null)
   const [tokenStatus, setTokenStatus] = useState<RawTokenStatus | null>(null)
   const [templates, setTemplates] = useState<RawModTemplate[]>([])
+  /** 启动前预检：静态部分随 load() 一起来，干跑只在用户点按钮时才跑 */
+  const [preflight, setPreflight] = useState<RawModPreflightReport | null>(null)
+  const [preflightDryRun, setPreflightDryRun] = useState<RawModPreflightDryRun | null>(null)
+  const [preflightRunning, setPreflightRunning] = useState(false)
   const [loading, setLoading] = useState(false)
   const [loaded, setLoaded] = useState(false)
   const [publishProgress, setPublishProgress] = useState<RawPublishProgress | null>(null)
@@ -385,7 +398,7 @@ export function useModSource(): ModSourceState {
   const load = useCallback(async () => {
     if (!ipc) return
     setLoading(true)
-    const [nextList, nextMarket, nextMine, nextSubs, nextAuthor, nextToken, nextTemplates, nextClaims] =
+    const [nextList, nextMarket, nextMine, nextSubs, nextAuthor, nextToken, nextTemplates, nextClaims, nextPreflight] =
       await Promise.all([
         callOr<RawModList>("modsList", null),
         callOr<RawMarketList>("modsMarketList", null),
@@ -401,6 +414,7 @@ export function useModSource(): ModSourceState {
           // 免得组织名下仓库的作者（owner 不是登录名）连入口都看不见
           scope: "all",
         }),
+        callOr<RawModPreflightReport>("modsPreflight", null),
       ])
     setList(nextList)
     applyMarket(nextMarket)
@@ -410,9 +424,37 @@ export function useModSource(): ModSourceState {
     setTokenStatus(nextToken)
     setTemplates(nextTemplates?.templates ?? [])
     setClaims(nextClaims)
+    setPreflight(nextPreflight)
     setLoaded(true)
     setLoading(false)
   }, [ipc, applyMarket])
+
+  /**
+   * 运行一次预检。
+   *
+   * `dryRun` 会把 loader 放进一个一次性 Node 进程里真的 require 一遍 —— 这是唯一能提前
+   * 抓出「加载期抛错 → 服务端起不来」的办法，但会执行模组的加载期代码，所以只在用户点按钮
+   * 时才走。静态那半（被忽略的目录 / 共享文件 / 基线指纹）不执行任何模组代码，随 load() 自动刷新。
+   */
+  const runPreflight = useCallback(
+    async (dryRun = false) => {
+      if (!ipc) return null
+      setPreflightRunning(true)
+      try {
+        if (dryRun) {
+          const reply = await callOr<RawModPreflightDryRun>("modsPreflight", null, { dryRun: true })
+          setPreflightDryRun(reply)
+          return reply
+        }
+        const reply = await callOr<RawModPreflightReport>("modsPreflight", null)
+        setPreflight(reply)
+        return reply
+      } finally {
+        setPreflightRunning(false)
+      }
+    },
+    [ipc]
+  )
 
   useEffect(() => {
     void load()
@@ -746,6 +788,10 @@ export function useModSource(): ModSourceState {
     openAuthoringDoc,
     openExternal,
     templates,
+    preflight,
+    preflightDryRun,
+    preflightRunning,
+    runPreflight,
     credential,
     marketById,
     reload,

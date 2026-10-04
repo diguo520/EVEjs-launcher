@@ -1,6 +1,6 @@
 /* 由 scripts/gen-contract.mjs 生成 —— 请勿手改。源: contract/ipc-channels.json */
 /* 抽取源: E:\Games\EveJS-v0.12.8\launcher\launcher */
-/* 生成时间: 2026-10-02T10:36:47.787Z */
+/* 生成时间: 2026-10-04T04:11:42.874Z */
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
@@ -54,6 +54,9 @@ export const api = {
   configRepairClientDisplay: (): Promise<unknown> => request("config:repairClientDisplay", []),
   configSetClient: (patch: Record<string, string>): Promise<unknown> => request("config:setClient", [patch]),
   configSetRepoRoot: (repoRoot: string): Promise<unknown> => request("config:setRepoRoot", [repoRoot]),
+  dangerClearCache: (): Promise<unknown> => request("danger:clearCache", []),
+  dangerEraseWorld: (): Promise<unknown> => request("danger:eraseWorld", []),
+  dangerResetConfig: (): Promise<unknown> => request("danger:resetConfig", []),
   databaseBackup: (): Promise<unknown> => request("database:backup", []),
   databaseBackups: (): Promise<unknown> => request("database:backups", []),
   databaseDeleteRow: (table: string, values: Record<string, unknown>): Promise<unknown> => request("database:delete", [table, values]),
@@ -99,6 +102,7 @@ export const api = {
   modsOpenFolder: (): Promise<unknown> => request("mods:openFolder", []),
   modsOpenModFolder: (folder: string): Promise<unknown> => request("mods:openModFolder", [folder]),
   modsPlan: (): Promise<unknown> => request("mods:plan", []),
+  modsPreflight: (opts?: { dryRun?: boolean }): Promise<unknown> => request("mods:preflight", [opts]),
   modsPublishOwnRepo: (id: string, version: string, repo: string, giteeUrl?: string): Promise<unknown> => request("mods:publishOwnRepo", [id, version, repo, giteeUrl]),
   modsReadme: (folder: string): Promise<unknown> => request("mods:readme", [folder]),
   modsRegisterSource: (id: string, version: string): Promise<unknown> => request("mods:registerSource", [id, version]),

@@ -25,7 +25,12 @@ fn unsupported(reason: String) -> Value {
     json!({ "ok": false, "supported": false, "reason": reason })
 }
 
-async fn call(root: &Path, args: Vec<String>, stdin: Option<&str>, timeout: Duration) -> Value {
+pub(crate) async fn call(
+    root: &Path,
+    args: Vec<String>,
+    stdin: Option<&str>,
+    timeout: Duration,
+) -> Value {
     let Some(script) = sidecar::script_path(root, SCRIPT) else {
         return unsupported(format!("随包侧车 {SCRIPT} 不存在，无法读写游戏参数"));
     };

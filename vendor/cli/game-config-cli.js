@@ -10,6 +10,7 @@
  * 用法（都由启动器调用，不面向用户）：
  *   node game-config-cli.js read --root <服务端根目录>
  *   node game-config-cli.js save --root <服务端根目录>   # patch 走 stdin: {"patch":{...}}
+ *   node game-config-cli.js reset --root <服务端根目录>  # 每个配置域写回服务端默认值（写前整份备份）
  *
  * 约定：无论成功失败都以退出码 0 结束，结论写在 stdout 的 JSON 里（ok 字段），
  * 免得 Rust 侧把「服务端不支持」和「node 崩了」混成一种错误。
@@ -122,9 +123,9 @@ function projectState(manager) {
 }
 
 /** 写前备份：整份 config/*.json 拷到 _local/config-backups/gameconfig-<时间戳>/ */
-function backupConfigs(root, files) {
+function backupConfigs(root, files, label) {
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const dir = path.join(root, "_local", "config-backups", "gameconfig-" + stamp);
+  const dir = path.join(root, "_local", "config-backups", (label || "gameconfig") + "-" + stamp);
   fs.mkdirSync(dir, { recursive: true });
   const copied = [];
   for (const domain of Object.keys(files)) {
@@ -221,6 +222,60 @@ function commandSave(root, rawStdin) {
   };
 }
 
+/**
+ * 重置：把每个配置域写回服务端自己的默认值。
+ *
+ * 默认值只在服务端 schema 里，这里不抄第二套：拿 getConfigStateSnapshot().defaults
+ * 当整份 patch 交给 saveConfig，由服务端校验 + 原子写回。写前整份备份到
+ * _local/config-backups/reset-<时间戳>/，失败不动盘。
+ */
+function commandReset(root) {
+  const loaded = loadManager(root);
+  if (loaded.error) return { ok: false, supported: false, reason: loaded.error };
+  const manager = loaded.manager;
+
+  let before;
+  try {
+    before = projectState(manager);
+  } catch (error) {
+    return { ok: false, supported: true, reason: errorList(error).join("；") };
+  }
+  const defaults = before.defaults && typeof before.defaults === "object" ? before.defaults : null;
+  if (!defaults || Object.keys(defaults).length === 0) {
+    return { ok: false, supported: true, reason: "服务端没有给出默认值清单，无法重置" };
+  }
+
+  let backup;
+  try {
+    backup = backupConfigs(root, before.files, "reset");
+  } catch (error) {
+    const detail = error && error.message ? error.message : String(error);
+    return { ok: false, supported: true, reason: "写前备份失败，已放弃写入：" + detail };
+  }
+
+  try {
+    manager.saveConfig(defaults, { domains: DOMAIN_ORDER });
+  } catch (error) {
+    const errors = errorList(error);
+    return { ok: false, supported: true, reason: errors.join("；"), errors: errors, backupDir: backup.dir };
+  }
+
+  const after = projectState(manager);
+  const changed = Object.keys(after.values).filter(function (key) {
+    return JSON.stringify(after.values[key]) !== JSON.stringify(before.values[key]);
+  });
+  return {
+    ok: true,
+    supported: true,
+    backupDir: backup.dir,
+    changed: changed,
+    values: after.values,
+    defaults: after.defaults,
+    sources: after.sources,
+    envOverrides: after.envOverrides
+  };
+}
+
 function main() {
   const args = parseArgs(process.argv.slice(2));
   const root = args.root ? path.resolve(args.root) : "";
@@ -238,6 +293,10 @@ function main() {
   }
   if (args.command === "save") {
     emit(commandSave(root, readStdin()));
+    return;
+  }
+  if (args.command === "reset") {
+    emit(commandReset(root));
     return;
   }
   emit({ ok: false, supported: false, reason: "未知子命令：" + args.command });

@@ -356,7 +356,7 @@ Launcher -> Mod / Plugin -> **My mods**:
 | --- | --- | --- |
 | 1 | 🟥 Do not submit somebody else's mod as yours (a manifest whose `author.id` is not yours is rejected by the main process) | Submission fails |
 | 2 | 🟥 Never share, commit or ZIP your `.eve-key` / private key | Identity theft, or you lose the ability to update forever |
-| 3 | 🟥 Do not modify any server file | Your mod breaks on other machines / after every upgrade |
+| 3 | 🟥 Do not edit server files on disk | Your mod breaks on other machines / after every upgrade; patch in memory through `__evejsMods.register` (Appendix G) |
 | 4 | 🟥 Do not `require` huge server modules from a loader | Node memory explodes |
 | 5 | 🟨 Only ever increase the version | Nobody receives your update |
 | 6 | 🟨 For a new version redo `1)` (re-sign) and `2)` (re-upload) | Stale signature / the market keeps the old package |
@@ -395,9 +395,24 @@ This is a **condensed version of the skeleton** the launcher's "create mod" dial
 const path = require("path");
 
 const TAG = "[my-mod]";
+const MOD_ID = "my-mod";
 const POLL_MS = 3000;
 const GRACE_MS = 10000;                      // wait this long after login: the session has to be ready
 const MESSAGE = "Welcome back, pilot!";
+
+// Fill this in to patch server source (the new mechanism: report through the bus, append only).
+// Leave it null when you only call server APIs.
+//   target — relative to the EveJS root, forward slashes
+//   marker — unique marker; the bus skips the stage when it is already present (idempotent)
+//   slot   — order among patches for the same file, smaller goes first (use multiples of 10)
+//   append — appended code only; never rewrite the whole file
+const SOURCE_PATCH = null;
+// const SOURCE_PATCH = {
+//   target: "server/src/network/tcp/handshake.js",
+//   marker: "// my-mod:patch",
+//   slot: 40,
+//   append: "// my-mod:patch\nconsole.log('[my-mod] patched');",
+// };
 
 console.log(TAG + " preload ran · pid=" + process.pid);
 
@@ -407,6 +422,26 @@ function isRealServerProcess() {
   const entry = (require.main && require.main.filename) || process.argv[1] || "";
   return /(^|[\\/])index\.js$/i.test(entry);
 }
+
+/** Register the source patch on the injection bus (🟥 must run synchronously, see below) */
+function registerSourcePatch() {
+  if (!SOURCE_PATCH || !SOURCE_PATCH.target) return;
+  const bus = globalThis.__evejsMods;
+  if (!bus || !(Number(bus.api) >= 1)) {
+    console.log(TAG + " no injection bus (old launcher), skipping the source patch");
+    return;
+  }
+  bus.register({
+    id: MOD_ID,
+    target: SOURCE_PATCH.target,
+    marker: SOURCE_PATCH.marker,
+    slot: SOURCE_PATCH.slot,
+    apply: (source) => source + "\n" + SOURCE_PATCH.append + "\n",
+  });
+}
+// 🟥 Register synchronously: the server requires target files during startup, so registering
+//    inside setImmediate is too late (the file is already compiled and the patch will not apply)
+registerSourcePatch();
 
 setImmediate(() => {
   if (!isRealServerProcess()) return;

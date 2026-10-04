@@ -13,6 +13,7 @@ pub mod window;
 use crate::accounts;
 use crate::author;
 use crate::config;
+use crate::danger;
 use crate::db;
 use crate::env;
 use crate::gameconfig;
@@ -148,6 +149,14 @@ async fn dispatch(
                 &patch,
             )))
         }
+
+        /* ------------------------------ 危险操作 ------------------------------ */
+        // 三条都有磁盘副作用，实现在 src-tauri/src/danger.rs：
+        // 清空缓存只删白名单里的联网快照（保留 Local State），重置配置由服务端写回默认值，
+        // 擦除世界数据先整目录改名再复用 init 的 db 任务重建。
+        "danger:clearCache" => Ok(danger::clear_cache(&state.runtime)),
+        "danger:resetConfig" => Ok(danger::reset_config(state.inner(), &root).await),
+        "danger:eraseWorld" => Ok(danger::erase_world(app, state.inner(), &root)),
 
         /* ------------------------------ 服务控制 ------------------------------ */
         // 带逐进程读数（CPU / 内存 / startedAt），与 services:changed 同形：
@@ -324,6 +333,20 @@ async fn dispatch(
             Ok(value)
         }
         "mods:plan" => Ok(mods::plan::plan_loaders(&root, &state.runtime)),
+        // 启动前预检（本工程扩展）：默认只做静态推测；`{ dryRun: true }` 才把 loader
+        // 放进一次性 Node 进程里 require 一遍（能抓出「加载期抛错 → 服务端起不来」）。
+        "mods:preflight" => {
+            let dry_run = args
+                .first()
+                .and_then(|value| value.get("dryRun"))
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
+            if dry_run {
+                Ok(mods::preflight::dry_run(&root, &state.runtime).await)
+            } else {
+                Ok(mods::preflight::static_report(&root, &state.runtime))
+            }
+        }
         "mods:readme" => Ok(mods::plan::read_mod_readme(&root, &arg_str(args, 0))),
         "mods:setEnabled" => Ok(mods::plan::set_mod_enabled(
             &root,

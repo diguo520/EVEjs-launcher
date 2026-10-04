@@ -70,6 +70,7 @@ pub const HANDLED: &[&str] = &[
     "mods:openFolder",
     "mods:openModFolder",
     "mods:plan",
+    "mods:preflight",
     "mods:readme",
     "mods:saveText",
     "mods:setEnabled",
@@ -86,6 +87,11 @@ pub const HANDLED: &[&str] = &[
     // 移除无效投稿记录（本工程扩展，契约见 contract/extensions.json）：
     // 只删本机台账里自己投的条目，不碰 GitHub 仓库 / Release / PR / 市场索引
     "mods:forgetSubmission",
+    // 危险操作（本工程扩展，契约见 contract/extensions.json）：
+    // clearCache=只删启动器联网快照；resetConfig=服务端 config 回默认值；eraseWorld=改名存档并重建
+    "danger:clearCache",
+    "danger:resetConfig",
+    "danger:eraseWorld",
     "service:restart",
     "service:start",
     "service:stop",

@@ -29,6 +29,7 @@ import {
   type ModSubmitDialogProps,
 } from "@/components/modules/mod-submit-dialog"
 import { ConflictBanner, ReviewBanner } from "@/components/modules/mod-banners"
+import { ModPreflightPanel } from "@/components/modules/mod-preflight-panel"
 import { useModDownloads, type DownloadTask } from "@/hooks/use-mod-downloads"
 import { shouldOfferClaim } from "@/lib/mod-claim"
 import { useModSource, type PublishOutcome } from "@/hooks/use-mod-source"
@@ -950,6 +951,16 @@ export function ModulesPage({
       )}
 
       {tab === "mine" ? <ReviewBanner mods={reviewing} /> : null}
+
+      {/* 启动前预检：只跟本机 mods/ 目录有关，所以放在「已安装」页签 */}
+      {tab === "installed" ? (
+        <ModPreflightPanel
+          report={source.preflight}
+          dryRun={source.preflightDryRun}
+          running={source.preflightRunning}
+          onRun={(dryRun) => void source.runPreflight(dryRun)}
+        />
+      ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <StatTile

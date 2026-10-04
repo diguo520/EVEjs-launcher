@@ -642,7 +642,7 @@ struct LoaderInjection {
 /// 启动器自带的注入总线（方案 D）：独占唯一的 `Module.prototype._compile` 钩子，
 /// 模组改成向 `globalThis.__evejsMods` 声明「改哪个文件、加什么」，不再各自挂钩子。
 /// 源文件在编译期嵌进二进制，随包分发，不落在模组目录里。
-const MOD_HOST_JS: &str = include_str!("mods/mod_host.js");
+pub(crate) const MOD_HOST_JS: &str = include_str!("mods/mod_host.js");
 /// 总线与清单落在 `_launcher/mods/` 下的文件名
 const MOD_HOST_FILE: &str = "mod-host.js";
 const MOD_PLAN_FILE: &str = "mod-plan.json";

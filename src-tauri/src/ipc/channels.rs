@@ -1,6 +1,6 @@
 //! 由 scripts/gen-contract.mjs 生成 —— 请勿手改。源: contract/ipc-channels.json
 //! 抽取源: E:\Games\EveJS-v0.12.8\launcher\launcher
-//! 生成时间: 2026-10-02T10:36:47.787Z
+//! 生成时间: 2026-10-04T04:11:42.874Z
 
 #![allow(dead_code)]
 
@@ -18,7 +18,7 @@ pub struct ChannelSpec {
     pub kind: ChannelKind,
 }
 
-pub const REQUEST_COUNT: usize = 101;
+pub const REQUEST_COUNT: usize = 105;
 pub const EVENT_COUNT: usize = 7;
 
 #[rustfmt::skip]
@@ -42,6 +42,9 @@ pub const CHANNELS: &[ChannelSpec] = &[
     ChannelSpec { channel: "config:repairClientDisplay", api: "configRepairClientDisplay", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "config:setClient", api: "configSetClient", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "config:setRepoRoot", api: "configSetRepoRoot", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "danger:clearCache", api: "dangerClearCache", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "danger:eraseWorld", api: "dangerEraseWorld", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "danger:resetConfig", api: "dangerResetConfig", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "database:backup", api: "databaseBackup", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "database:backups", api: "databaseBackups", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "database:delete", api: "databaseDeleteRow", kind: ChannelKind::Invoke },
@@ -87,6 +90,7 @@ pub const CHANNELS: &[ChannelSpec] = &[
     ChannelSpec { channel: "mods:openFolder", api: "modsOpenFolder", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "mods:openModFolder", api: "modsOpenModFolder", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "mods:plan", api: "modsPlan", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "mods:preflight", api: "modsPreflight", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "mods:publishOwnRepo", api: "modsPublishOwnRepo", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "mods:readme", api: "modsReadme", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "mods:registerSource", api: "modsRegisterSource", kind: ChannelKind::Invoke },

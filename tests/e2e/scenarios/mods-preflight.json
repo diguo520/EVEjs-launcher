@@ -1,0 +1,167 @@
+{
+  "name": "mods-preflight",
+  "note": "启动前预检（mods:preflight）端到端：静态那一半（被忽略的目录 / 引用同一份服务端源码 / 基线指纹）与「干跑真的 require 一遍 loader」两件都要验，而且要在沙箱里验 —— 静态扫描会去读 <服务端根>/server/src 下的源文件，干跑会起一个一次性 Node 进程，两者都不该越出沙箱。两个模组用 mods:create 真建（骨架 loader 在包装进程里会自己跳过，加载期不报错），被忽略的目录只能靠种子造：一种是没有清单但躺着一个 loader.js，另一种是清单被多套了一层子目录（实测用户就是这么丢模组的）。注意 dry_run 会把 _launcher/temp/mod-preflight 整块删干净（报告文件名带 pid，留着两轮指纹就对不上了），所以这里对 temp 不做落地断言，改由步骤断言回包。",
+  "seed": [
+    {
+      "path": "repo/mods/嵌套模组/内层/evejs-launcher.mod.json",
+      "content": "{\n  \"schemaVersion\": 3,\n  \"id\": \"e2e-nested\",\n  \"displayName\": \"E2E Nested\",\n  \"version\": \"1.0.0\",\n  \"kind\": \"loader\",\n  \"restart\": \"none\",\n  \"activation\": { \"strategy\": \"loader_rename\" }\n}\n"
+    },
+    {
+      "path": "repo/mods/嵌套模组/内层/loader.js.disabled",
+      "content": "\"use strict\";\nmodule.exports = 1;\n"
+    },
+    {
+      "path": "repo/mods/忘了放清单/loader.js",
+      "content": "\"use strict\";\nmodule.exports = 1;\n"
+    }
+  ],
+  "steps": [
+    {
+      "id": "create-folder",
+      "channel": "mods:createFolder",
+      "args": [],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "id": "create-a",
+      "channel": "mods:create",
+      "args": [
+        {
+          "templateId": "blank",
+          "id": "e2e-preflight-a",
+          "displayName": "E2E Preflight A",
+          "version": "1.0.0",
+          "enabled": true
+        }
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "id": "create-b",
+      "channel": "mods:create",
+      "args": [
+        {
+          "templateId": "blank",
+          "id": "e2e-preflight-b",
+          "displayName": "E2E Preflight B",
+          "version": "1.0.0",
+          "enabled": true
+        }
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "id": "list",
+      "channel": "mods:list",
+      "args": [],
+      "expect": {
+        "path": "stats.enabled",
+        "equals": 2
+      }
+    },
+    {
+      "id": "preflight-static",
+      "channel": "mods:preflight",
+      "args": [],
+      "expect": {
+        "ok": true,
+        "path": "dryRun",
+        "equals": false
+      }
+    },
+    {
+      "id": "preflight-ignored",
+      "channel": "mods:preflight",
+      "args": [],
+      "expect": {
+        "path": "summary.ignored",
+        "equals": 2
+      }
+    },
+    {
+      "id": "preflight-ignored-rows",
+      "channel": "mods:preflight",
+      "args": [],
+      "expect": {
+        "path": "ignored",
+        "minLength": 2
+      }
+    },
+    {
+      "id": "preflight-scanned",
+      "channel": "mods:preflight",
+      "args": [],
+      "expect": {
+        "path": "summary.scannedMods",
+        "equals": 2
+      }
+    },
+    {
+      "id": "preflight-targets",
+      "channel": "mods:preflight",
+      "args": [],
+      "expect": {
+        "path": "targets",
+        "isArray": true
+      }
+    },
+    {
+      "id": "preflight-dry",
+      "channel": "mods:preflight",
+      "args": [
+        {
+          "dryRun": true
+        }
+      ],
+      "expect": {
+        "path": "failed",
+        "equals": 0
+      }
+    },
+    {
+      "id": "preflight-dry-loaders",
+      "channel": "mods:preflight",
+      "args": [
+        {
+          "dryRun": true
+        }
+      ],
+      "expect": {
+        "path": "loaders",
+        "minLength": 2
+      }
+    }
+  ],
+  "fsAfter": [
+    {
+      "path": "repo/mods/e2e-preflight-a/evejs-launcher.mod.json",
+      "contains": "\"id\": \"e2e-preflight-a\""
+    },
+    {
+      "path": "repo/mods/e2e-preflight-a/loader.js",
+      "exists": true
+    },
+    {
+      "path": "repo/mods/e2e-preflight-b/loader.js",
+      "exists": true
+    },
+    {
+      "path": "repo/mods/嵌套模组/内层/evejs-launcher.mod.json",
+      "exists": true
+    },
+    {
+      "path": "repo/mods/忘了放清单/loader.js",
+      "exists": true
+    },
+    {
+      "path": "userdata/temp/mod-preflight",
+      "exists": false
+    }
+  ]
+}

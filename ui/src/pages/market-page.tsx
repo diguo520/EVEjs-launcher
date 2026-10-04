@@ -87,9 +87,6 @@ export function MarketPage() {
         sub="// ITEM & MARKET CATALOG"
         actions={
           <div className="flex items-center gap-2">
-            <span className="tabular hidden max-w-[420px] truncate text-[11px] text-muted-foreground sm:inline">
-              {store.overview?.path ?? (store.loading ? "正在读取市场库…" : "—")}
-            </span>
             <Button
               type="button"
               size="sm"

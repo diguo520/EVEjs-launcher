@@ -371,7 +371,7 @@ const hubPath = path.join(serverRoot, "src", "services", "chat", "chatHub.js");
 | --- | --- | --- |
 | 1 | 🟥 别把别人的模组当自己的提交（清单里 `author.id` 不是你的会被主进程直接拒绝） | 提交失败 |
 | 2 | 🟥 `.eve-key` / 私钥绝不外传、绝不提交、绝不打进 ZIP | 身份被盗用，或你彻底失去更新能力 |
-| 3 | 🟥 不要修改服务端任何文件 | 你的模组会在别人机器上装不上 / 一升级就崩 |
+| 3 | 🟥 不要在磁盘上改服务端文件 | 直接改别人的 `server/` 会装不上 / 一升级就崩；要在内存里改就走 `__evejsMods.register`（附录 G） |
 | 4 | 🟥 不要在 loader 里 `require` 服务端大模块 | Node 内存暴涨 |
 | 5 | 🟨 版本号只能往上加 | 别人收不到更新 |
 | 6 | 🟨 发新版必须重新走 `1)`（重签）+ `2)`（重发） | 签名失效 / 市场还是旧包 |
@@ -410,9 +410,23 @@ const hubPath = path.join(serverRoot, "src", "services", "chat", "chatHub.js");
 const path = require("path");
 
 const TAG = "[我的模组]";
+const MOD_ID = "my-mod";
 const POLL_MS = 3000;
 const GRACE_MS = 10000;                      // 上线后等这么久再发：会话要先就绪
 const MESSAGE = "欢迎回来，飞行员！";
+
+// 要改服务端源码就打开这一段（新机制：总线上报、只追加），不改就保持 null：
+//   target —— 相对 EveJS 根目录、正斜杠
+//   marker —— 唯一标记，总线上检测到已存在就跳过（幂等）
+//   slot   —— 同一个文件有多层补丁时的先后，越小越前（建议留 10 的整数倍）
+//   append —— 只追加的代码，别整段重写
+const SOURCE_PATCH = null;
+// const SOURCE_PATCH = {
+//   target: "server/src/network/tcp/handshake.js",
+//   marker: "// my-mod:patch",
+//   slot: 40,
+//   append: "// my-mod:patch\nconsole.log('[my-mod] patched');",
+// };
 
 console.log(TAG + " preload 已执行 · pid=" + process.pid);
 
@@ -422,6 +436,26 @@ function isRealServerProcess() {
   const entry = (require.main && require.main.filename) || process.argv[1] || "";
   return /(^|[\\/])index\.js$/i.test(entry);
 }
+
+/** 把源码补丁注册到注入总线（🟥 必须同步执行，原因见下面） */
+function registerSourcePatch() {
+  if (!SOURCE_PATCH || !SOURCE_PATCH.target) return;
+  const bus = globalThis.__evejsMods;
+  if (!bus || !(Number(bus.api) >= 1)) {
+    console.log(TAG + " 老启动器没有注入总线，跳过源码补丁");
+    return;
+  }
+  bus.register({
+    id: MOD_ID,
+    target: SOURCE_PATCH.target,
+    marker: SOURCE_PATCH.marker,
+    slot: SOURCE_PATCH.slot,
+    apply: (source) => source + "\n" + SOURCE_PATCH.append + "\n",
+  });
+}
+// 🟥 同步注册：服务端启动时就会 require 目标文件，
+//    放进 setImmediate 里再注册就晚了（那时文件已经编译过，补丁不会生效）
+registerSourcePatch();
 
 setImmediate(() => {
   if (!isRealServerProcess()) return;

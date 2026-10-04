@@ -1,13 +1,13 @@
 {
   "generatedFrom": "E:\\Games\\EveJS-v0.12.8\\launcher\\launcher",
-  "generatedAt": "2026-10-02T10:36:47.787Z",
+  "generatedAt": "2026-10-04T04:11:42.874Z",
   "counts": {
-    "invoke": 95,
+    "invoke": 99,
     "send": 6,
     "events": 7,
-    "requests": 101,
+    "requests": 105,
     "registered": 82,
-    "apiTotal": 108
+    "apiTotal": 112
   },
   "invoke": [
     {
@@ -163,6 +163,27 @@
       "params": [
         "repoRoot"
       ]
+    },
+    {
+      "api": "dangerClearCache",
+      "channel": "danger:clearCache",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "dangerEraseWorld",
+      "channel": "danger:eraseWorld",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "dangerResetConfig",
+      "channel": "danger:resetConfig",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
     },
     {
       "api": "databaseBackup",
@@ -526,6 +547,15 @@
       "kind": "invoke",
       "signature": "",
       "params": []
+    },
+    {
+      "api": "modsPreflight",
+      "channel": "mods:preflight",
+      "kind": "invoke",
+      "signature": "opts?: { dryRun?: boolean }",
+      "params": [
+        "opts"
+      ]
     },
     {
       "api": "modsPublishOwnRepo",
@@ -905,6 +935,9 @@
     "invoke": [
       "accounts:deleteCharacter",
       "accounts:logotypes",
+      "danger:clearCache",
+      "danger:eraseWorld",
+      "danger:resetConfig",
       "gameConfig:read",
       "gameConfig:save",
       "market:book",
@@ -914,6 +947,7 @@
       "mods:claimCandidates",
       "mods:claimMod",
       "mods:forgetSubmission",
+      "mods:preflight",
       "mods:replyRetract",
       "mods:replySubmit",
       "mods:reportReview",

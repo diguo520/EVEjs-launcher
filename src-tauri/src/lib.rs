@@ -9,6 +9,7 @@
 pub mod accounts;
 pub mod author;
 pub mod config;
+pub mod danger;
 pub mod db;
 pub mod dialog;
 pub mod env;
@@ -185,7 +186,7 @@ pub fn run() {
         .setup(move |app| {
             let page = resolve_ui_page();
             let mut shell = WebviewWindowBuilder::new(app, "main", WebviewUrl::App(page.into()))
-                .title("EvEJS 启动器")
+                .title("EVEJS COMMAND")
                 .inner_size(1360.0, 860.0)
                 .min_inner_size(1024.0, 640.0)
                 .decorations(false)

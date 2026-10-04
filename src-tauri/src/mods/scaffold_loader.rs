@@ -1,39 +1,62 @@
-//! `loader.js` 骨架文本：从现役版 `modScaffold.ts::loaderFrom` 自动抽取，逐字节一致。
+//! `loader.js` 骨架文本：新启动器（注入总线 · 方案 D）的默认写法。
 //!
-//! 生成方式（一次性，改了现役版骨架才需要重跑）：
-//!   `node scripts/extract-loader-skeleton.mjs`
+//! 与旧骨架的差别（2026-10-04）：
+//!   - 不再教「每个 loader 一条 `--require`」：启动器只在 `NODE_OPTIONS` 里放一条
+//!     `--require "mod-host.js"`，由总线按 `_launcher/mods/mod-plan.json` 的顺序 require 各 loader；
+//!   - 改服务端源码的补丁统一走 `globalThis.__evejsMods.register()`（用 `SOURCE_PATCH` 开关），
+//!     不再自己 hook `Module.prototype._compile` —— 多个模组各挂钩子会互相顶掉
+//!     （2026-10-01 实测：自动挖矿与自动锁定自动集火抢 `handshake.js`）。
 //!
 //! 为什么单独一个文件：骨架 100+ 行 JS，混在 `scaffold.rs` 里会把业务逻辑淹掉。
-//! `@ID@` / `@DISPLAY_NAME@` 是占位符，由 `scaffold.rs` 按 draft 替换。
+//! `@ID@` / `@DISPLAY_NAME@` 是占位符，由 `scaffold.rs` 按 draft 替换；
+//! 模板自己的 `SOURCE_PATCH` 值由 `ScaffoldTemplate::source_patch` 给，插在
+//! `LOADER_HEAD` 与 `LOADER_MID` 之间。
 
-/// 骨架前半（`biz` 之前）
+/// 骨架前半：文件头 / 参数 / 源码补丁说明（到 `SOURCE_PATCH` 声明之前）
 pub const LOADER_HEAD: &[&str] = &[
     "\"use strict\";",
     "/**",
     " * @DISPLAY_NAME@ —— EveJS 模组（kind: loader）",
-    " * 由 EvEJS 启动器「创建模组」生成，骨架基准：mods/welcome-mod（= MOD_AUTHORING.md §6）。",
+    " * 由 EvEJS 启动器「创建模组」生成 · 骨架基准：MOD_AUTHORING.md 附录 B。",
     " *",
-    " * 原理：服务端就是同一个 Node 进程。Node 有模块缓存，loader 里 require 同一个服务端模块",
-    " *   拿到的是**同一个实例**，所以可以直接调用服务端内部 API，而完全不需要修改服务端任何文件。",
+    " * 加载方式（新机制 · 注入总线）",
+    " *   启动器只往服务端进程的 NODE_OPTIONS 里放一条 `--require`（启动器自带的注入总线），总线再按",
+    " *   `_launcher/mods/mod-plan.json` 的顺序 require 本文件 —— 所以：",
+    " *     · 模组目录带中文或空格都没问题（旧写法会拼进 NODE_OPTIONS，被转义/分词吃掉）；",
+    " *     · NODE_OPTIONS 会被 npm → autostart.js → index.js 逐层继承，本文件在每个子进程里都会",
+    " *       执行一次 —— 身份校验和「只装一次」判断必须保留。",
     " *",
-    " * 三处必须保留的写法（删掉任何一处都会出问题）：",
-    " *   1) setImmediate + require.main.filename 身份校验 —— NODE_OPTIONS 会被",
-    " *      npm(node) → node autostart.js → node .（真正的服务端）逐层继承，每层都会加载本文件，",
-    " *      只在真正的服务端进程里启动逻辑；",
-    " *   2) **不要直接 require 服务端大模块**（chatHub 会拉起约 456MB / 645 个模块），",
-    " *      而是等 require.cache 里出现它之后再取引用，此时是缓存命中、零额外内存；",
-    " *   3) timer.unref() —— 不让定时器阻止进程退出。",
+    " * 要改服务端源码（不只是调接口）？走总线，不要自己 hook：",
+    " *   globalThis.__evejsMods.register({ id, target, marker, slot, apply })",
+    " *   🟥 四条约定：只用 register（别自己 hook Module.prototype._compile）、apply 只追加、",
+    " *      marker 唯一、校验只校验改动前的前缀 —— 别拿整份文件 sha256（多层串链必然对不上）。",
+    " *   开关就是下面的 SOURCE_PATCH：留 null 表示本模组不改服务端任何文件。",
     " */",
-    "",
     "const path = require(\"path\");",
     "",
     "const TAG = \"[@ID@]\";",
+    "const MOD_ID = \"@ID@\";",
     "/* ==== 可调参数 ==== */",
     "const POLL_MS = 3000;",
     "const WAIT_SERVER_MS = 500;",
     "const WAIT_SERVER_MAX_TRIES = 240;",
     "const GRACE_MS = 10000;",
     "const MESSAGE = \"欢迎回来，飞行员！本条消息由模组 @DISPLAY_NAME@ 发送。\";",
+    "",
+    "/* ==== 服务端源码补丁（选填 · 新机制）====",
+    " * 需要改服务端文件时，把 SOURCE_PATCH 填成这个形状：",
+    " *   const SOURCE_PATCH = {",
+    " *     target: \"server/src/…/目标文件.js\",            // 相对 EveJS 根目录，正斜杠",
+    " *     marker: \"// @ID@:patch\",                      // 唯一标记：已注入就跳过",
+    " *     slot: 40,                                     // 同文件多层补丁的先后，越小越前",
+    " *     append: \"// @ID@:patch\\nconsole.log('[@ID@] 已注入');\",  // 只追加的代码",
+    " *   };",
+    " * 只调用服务端 API 的模组（本模板的欢迎消息就是）保持 null 即可。",
+    " */",
+];
+
+/// 骨架中段：`SOURCE_PATCH` 声明之后（到业务钩子之前）
+pub const LOADER_MID: &[&str] = &[
     "",
     "console.log(TAG + \" preload 已执行 · pid=\" + process.pid);",
     "",
@@ -51,6 +74,10 @@ pub const LOADER_HEAD: &[&str] = &[
     "  if (process.env.EVEJS_GAMESTORE_OWNER_ROLE === \"world\") return true;",
     "  return /(^|[\\\\/])index\\.js$/i.test(entry);",
     "}",
+    "",
+    "// 新机制：源码补丁必须在这里同步注册 —— 服务端启动期就会 require 目标文件，",
+    "// 放进 setImmediate 里再注册就晚了（文件已经编译过，补丁不会生效）。",
+    "registerSourcePatch();",
     "",
     "setImmediate(() => {",
     "  const entry = entryFile();",
@@ -80,8 +107,20 @@ pub const LOADER_BIZ_BLANK: &[&str] = &[
     "         sessionRegistry.getSessions()                     -> 在线会话数组",
     "         sessionRegistry.resolveSessionCharacterID(s)      -> 角色 ID（未进入游戏时为 0）",
     "         chatHub.sendSystemMessage(session, \"消息\")        -> 在该角色本地频道发系统消息",
+    "       要改服务端源码就填文件顶部的 SOURCE_PATCH（走注入总线），不要自己 hook _compile；",
     "       改完记得重启主服务器，然后在游戏里验证。 */",
     "    console.log(TAG + \" 已启用（空白骨架）\");",
+];
+
+/// `template.id == "bus-patch"` 的业务钩子（补丁已经交给总线，这里只留业务逻辑的落点）
+pub const LOADER_BIZ_PATCH: &[&str] = &[
+    "    /* TODO: 源码补丁已经在文件顶部交给注入总线（见 SOURCE_PATCH），这里写业务逻辑。",
+    "       下面是可用的实测接口：",
+    "         sessionRegistry.getSessions()                     -> 在线会话数组",
+    "         sessionRegistry.resolveSessionCharacterID(s)      -> 角色 ID（未进入游戏时为 0）",
+    "         chatHub.sendSystemMessage(session, \"消息\")        -> 在该角色本地频道发系统消息",
+    "       改完记得重启主服务器，然后在游戏里验证。 */",
+    "    console.log(TAG + \" 已启用（源码补丁案例）\");",
 ];
 
 /// 默认（broadcast）的业务钩子
@@ -147,9 +186,37 @@ pub const LOADER_BIZ_BROADCAST: &[&str] = &[
     "    if (timer && typeof timer.unref === \"function\") timer.unref();",
 ];
 
-/// 骨架后半（`biz` 之后）
+/// 骨架后半：`start()` 收尾 + `registerSourcePatch()` + `whenServerChatLoaded()`
 pub const LOADER_TAIL: &[&str] = &[
     "  });",
+    "}",
+    "",
+    "/**",
+    " * 把本模组的服务端源码补丁注册到注入总线（新机制 · 方案 D）。",
+    " * 老启动器没有总线（globalThis.__evejsMods 缺席）时只提示、不注入。",
+    " */",
+    "function registerSourcePatch() {",
+    "  if (!SOURCE_PATCH || !SOURCE_PATCH.target) return;",
+    "  const bus = globalThis.__evejsMods;",
+    "  if (!bus || typeof bus.register !== \"function\" || !(Number(bus.api) >= 1)) {",
+    "    console.log(TAG + \" 未检测到注入总线（老启动器），本次不注入源码补丁：\" + SOURCE_PATCH.target);",
+    "    return;",
+    "  }",
+    "  const marker = SOURCE_PATCH.marker || (\"// \" + MOD_ID + \":patch\");",
+    "  const result = bus.register({",
+    "    id: MOD_ID,",
+    "    target: SOURCE_PATCH.target,",
+    "    marker: marker,",
+    "    slot: Number.isFinite(SOURCE_PATCH.slot) ? SOURCE_PATCH.slot : 100,",
+    "    apply: function (source) {",
+    "      return source + \"\\n\" + SOURCE_PATCH.append + \"\\n\";",
+    "    },",
+    "  });",
+    "  if (result && result.ok) {",
+    "    console.log(TAG + \" 已向注入总线注册源码补丁：\" + SOURCE_PATCH.target);",
+    "  } else {",
+    "    console.log(TAG + \" 源码补丁注册被拒绝：\" + String((result && result.reason) || \"未知原因\"));",
+    "  }",
     "}",
     "",
     "/** 等服务端自己把 chatHub 加载进 require.cache，再取引用（零额外内存、无第二份实例） */",

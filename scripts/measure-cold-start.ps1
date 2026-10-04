@@ -56,7 +56,7 @@ $electronRoot = "E:\Games\EveJS-v0.12.8\launcher\launcher"
 $targets = @(
     [pscustomobject]@{
         Id = "tauri"; Exe = (Join-Path $root "src-tauri\target\release\EvEJSLauncher.exe")
-        Title = "EvEJS 启动器"; Note = "Tauri 2.0.0 目录版（zip 解压即用）"
+        Title = "EVEJS COMMAND"; Note = "Tauri 2.0.0 目录版（zip 解压即用）"
     },
     [pscustomobject]@{
         Id = "electron-unpacked"; Exe = (Join-Path $electronRoot "release\win-unpacked\EvEJSLauncher.exe")

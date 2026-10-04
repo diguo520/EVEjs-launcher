@@ -50,8 +50,8 @@ export interface ModTemplateCard {
 }
 
 /**
- * 没有后端时的兜底模板（纯前端预览用）：名称与文件清单照抄现役版
- * `modScaffold.ts` 的 SCAFFOLD_TEMPLATES。有后端时一律以后端 `mods:templates` 为准。
+ * 没有后端时的兜底模板（纯前端预览用）：名称与文件清单与后端
+ * `scaffold.rs::SCAFFOLD_TEMPLATES` 对齐。有后端时一律以后端 `mods:templates` 为准。
  */
 export const FALLBACK_MOD_TEMPLATES: ModTemplateCard[] = [
   {
@@ -64,6 +64,12 @@ export const FALLBACK_MOD_TEMPLATES: ModTemplateCard[] = [
     id: "blank",
     name: "Blank Skeleton",
     desc: "同样的加载骨架，业务逻辑留空，适合从零写起",
+    files: SKELETON_FILES,
+  },
+  {
+    id: "bus-patch",
+    name: "Source Patch via Bus (Example)",
+    desc: "演示新机制：通过注入总线给服务端源码追加代码，多个模组改同一个文件也不会互相顶掉。",
     files: SKELETON_FILES,
   },
 ]

@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "EvEJS 启动器",
+  "productName": "EVEJS COMMAND",
   "version": "0.3.4",
   "identifier": "com.evejs.launcher",
   "build": {

@@ -407,6 +407,77 @@ export interface RawMod {
   manifestPath?: string
 }
 
+/**
+ * mods:preflight 的「被忽略的目录」：`mods/<目录>` 下没有 evejs-launcher.mod.json 时
+ * 扫描器整目录跳过，界面上既不报错也不出现，必须单独列出来。
+ */
+export interface RawModIgnoredDir {
+  folder: string
+  /** nested = 清单在 subFolder 那一层（把内容挪上来即可）；no-manifest = 目录里有 loader 却没清单 */
+  reasonKind: "nested" | "no-manifest" | string
+  subFolder: string
+  loaderFiles: string[]
+  sizeBytes: number
+}
+
+export interface RawModPreflightMod {
+  folder: string
+  id: string
+  enabled: boolean
+  /** ok=基线认得当前文件；stale=声明了基线但一个都对不上（多半会静默跳过）；unknown=没声明基线；missing-file=服务端没有这份文件 */
+  verdict: "ok" | "stale" | "unknown" | "missing-file" | string
+  declaredFingerprints: number
+}
+
+export interface RawModPreflightTarget {
+  file: string
+  /** 被 ≥2 个启用中的模组引用（重叠不等于冲突，只是「疑似」） */
+  shared: boolean
+  mods: RawModPreflightMod[]
+}
+
+/** mods:preflight（不带 dryRun）的静态回包 */
+export interface RawModPreflightReport {
+  ok: boolean
+  dryRun: false
+  reason?: string
+  root?: string
+  ignored: RawModIgnoredDir[]
+  targets: RawModPreflightTarget[]
+  summary: {
+    ignored: number
+    targets: number
+    shared: number
+    stale: number
+    /** 实际列进 targets[] 的条数（超上限时会被截断，先排序再截） */
+    sharedListed?: number
+    staleListed?: number
+    scannedMods: number
+  }
+}
+
+export interface RawModPreflightLoader {
+  id: string
+  path: string
+  ok: boolean
+  reason: string
+  ms: number
+}
+
+/** mods:preflight（dryRun: true）的干跑回包：一次性 Node 进程里 require 一遍 loader */
+export interface RawModPreflightDryRun {
+  ok: boolean
+  dryRun: true
+  reason?: string
+  root?: string
+  loaders?: RawModPreflightLoader[]
+  failed?: number
+  /** 整个 Node 进程的墙钟耗时（也就是「加载这批模组花了多少秒」） */
+  elapsedMs?: number
+  loadersMs?: number
+  output?: string[]
+}
+
 export interface RawModList {
   ok: boolean
   exists: boolean

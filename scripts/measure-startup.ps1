@@ -36,7 +36,7 @@ param(
     [int]$Iterations = 3,
     [int[]]$SampleSeconds = @(10, 60),
     [int]$TimeoutSeconds = 30,
-    [string]$WindowTitle = "EvEJS 启动器",
+    [string]$WindowTitle = "EVEJS COMMAND",
     [string]$UserDataDir = "",
     [string]$WorkingDirectory = "",
     [string]$OutFile = "",

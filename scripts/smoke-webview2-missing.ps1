@@ -22,7 +22,7 @@ if (-not (Test-Path -LiteralPath $exePath)) { throw "找不到产物：$exePath�
 
 # 对话框标题（必须与 webview2.rs::ensure_installed 里的 caption 一致）
 $dialogTitle = "EvEJS 启动器 · 缺少 WebView2 运行时"
-$mainTitle = "EvEJS 启动器"
+$mainTitle = "EVEJS COMMAND"
 
 Write-Host "自检目标：$exePath"
 $env:EVEJS_SIMULATE_NO_WEBVIEW2 = "1"

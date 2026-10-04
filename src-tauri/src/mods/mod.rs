@@ -15,6 +15,7 @@ pub mod claim;
 pub mod desktop;
 pub mod pkg;
 pub mod plan;
+pub mod preflight;
 pub mod ratings;
 pub mod registry;
 pub mod review;
@@ -23,7 +24,7 @@ pub mod scan;
 pub mod sign;
 pub mod submit;
 
-/// `loader.js` 骨架正文：由 `scripts/extract-loader-skeleton.mjs` 从现役版抽取
+/// `loader.js` 骨架正文：新机制（注入总线 · 方案 D）的默认写法
 mod scaffold_loader;
 
 use std::path::{Path, PathBuf};
