@@ -265,12 +265,13 @@
           "highlights": [
             "玩家上线后在其本地聊天频道发送欢迎消息",
             "只改运行内存，不修改 server/ 下任何文件",
-            "骨架已内置进程身份校验与 require.cache 等待，不会提前拉起大依赖"
+            "由启动器的注入总线加载，不会提前拉起大依赖",
+            "要改服务端源码时，填上 loader.js 里的 SOURCE_PATCH 即走总线"
           ],
           "id": "broadcast",
           "name": "Welcome Broadcast (Example)",
           "requiresRestart": true,
-          "sizeBytes": 7377,
+          "sizeBytes": 9892,
           "tags": [
             "聊天",
             "新手"
@@ -288,13 +289,38 @@
           ],
           "highlights": [
             "保留全部 loader 加载要点（身份校验 / require.cache 等待 / unref）",
-            "业务钩子集中在 loader.js 的 start() 里，改这一处即可"
+            "业务钩子集中在 loader.js 的 start() 里，改这一处即可",
+            "改服务端源码用 SOURCE_PATCH（走注入总线），不自己 hook _compile"
           ],
           "id": "blank",
           "name": "Blank Skeleton",
           "requiresRestart": true,
-          "sizeBytes": 5585,
+          "sizeBytes": 8245,
           "tags": []
+        },
+        {
+          "category": "工具",
+          "desc": "演示新机制：通过注入总线给服务端源码追加代码，多个模组改同一个文件也不会互相顶掉。",
+          "fileCount": 4,
+          "files": [
+            "evejs-launcher.mod.json",
+            "loader.js",
+            "README.md",
+            "CHANGELOG.md"
+          ],
+          "highlights": [
+            "用 globalThis.__evejsMods.register 声明补丁（target / marker / slot / apply）",
+            "只追加 + 唯一标记：重复启动不会叠加，也不整段重写",
+            "先后由总线按 slot 与注册顺序串链，不再自己 hook Module.prototype._compile"
+          ],
+          "id": "bus-patch",
+          "name": "Source Patch via Bus (Example)",
+          "requiresRestart": true,
+          "sizeBytes": 8586,
+          "tags": [
+            "服务端",
+            "进阶"
+          ]
         }
       ]
     },

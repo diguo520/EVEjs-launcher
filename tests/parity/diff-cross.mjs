@@ -85,9 +85,9 @@ const EXEMPTION_ROWS = [
   },
   {
     channel: "mods:templates",
-    keys: ["fileCount", "sizeBytes"],
+    keys: ["templates", "fileCount", "sizeBytes"],
     reason:
-      "新外壳独有的「骨架体积读数」：`fileCount` = files.length，`sizeBytes` = 用示例 draft 走同一条生成管线量出来的真实字节数，渲染层用它替掉原型里写死的假体积（S9 创建模组对齐改造）。现役版 modsTemplates 没有这两项、也不该有。",
+      "新外壳独有的「骨架体积读数」：`fileCount` = files.length，`sizeBytes` = 用示例 draft 走同一条生成管线量出来的真实字节数，渲染层用它替掉原型里写死的假体积（S9 创建模组对齐改造）。现役版 modsTemplates 没有这两项、也不该有；`templates` 整项豁免是因为新外壳多了一个现役版给不出的案例模板（`bus-patch`「Source Patch via Bus」，教的是注入总线 `__evejsMods.register`，0.1.28 既没有总线也没有这个模板）。共享的那两个模板并非无人看守：它们连同体积一起被 `tests/parity/fixtures/channels/tauri-baseline.json` 逐字段钉住，改坏会先在自家 golden 上红。",
   },
 ];
 const EXEMPTIONS = new Map(EXEMPTION_ROWS.map((row) => [row.channel, { keys: new Set(row.keys), text: row.reason }]));
