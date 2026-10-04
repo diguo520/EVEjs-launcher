@@ -25,7 +25,7 @@
       "phase": "3-4",
       "platform": "win32",
       "repoRoot": "<abs-path>",
-      "version": "0.3.5"
+      "version": "0.3.6"
     },
     "config:get": {
       "client": {
@@ -167,10 +167,10 @@
       "reason": "未找到市场数据库：<abs-path>"
     },
     "metrics:get": {
-      "cpuPercent": 11.18817901611328,
+      "cpuPercent": 20.37834930419922,
       "diskRoot": "<abs-path>",
       "diskTotalGB": 976.5624961853028,
-      "diskUsedGB": 900.1474685668945,
+      "diskUsedGB": 904.7893829345704,
       "gpuDedicatedTotalGB": null,
       "gpuDedicatedUsedGB": null,
       "gpuMemoryTotalGB": null,
@@ -178,38 +178,38 @@
       "gpuPercent": null,
       "gpuSharedUsedGB": null,
       "memTotalGB": 31.855934143066406,
-      "memUsedGB": 14.36895751953125,
+      "memUsedGB": 10.89019775390625,
       "netBytesPerSec": 0,
       "virtualMemTotalGB": 35.355934143066406,
-      "virtualMemUsedGB": 21.104896545410156,
+      "virtualMemUsedGB": 19.62432098388672,
       "volumes": [
         {
-          "freeGB": 49.77843475341797,
-          "percent": 77.62059724733263,
+          "freeGB": 54.63689041137695,
+          "percent": 75.43633138071709,
           "root": "<abs-path>",
           "totalGB": 222.4296836853027,
-          "usedGB": 172.65124893188477
+          "usedGB": 167.79279327392578
         },
         {
-          "freeGB": 144.80765533447266,
-          "percent": 50.57231966891042,
+          "freeGB": 143.94196319580078,
+          "percent": 50.86780925609127,
           "root": "<abs-path>",
           "totalGB": 292.96874618530273,
-          "usedGB": 148.16109085083008
+          "usedGB": 149.02678298950195
         },
         {
-          "freeGB": 76.4150276184082,
-          "percent": 92.175101141309,
+          "freeGB": 71.77311325073242,
+          "percent": 92.65043317441577,
           "root": "<abs-path>",
           "totalGB": 976.5624961853028,
-          "usedGB": 900.1474685668945
+          "usedGB": 904.7893829345704
         },
         {
-          "freeGB": 354.647274017334,
-          "percent": 85.56275431406539,
+          "freeGB": 354.06261825561523,
+          "percent": 85.5865549167826,
           "root": "<abs-path>",
           "totalGB": 2456.4746055603027,
-          "usedGB": 2101.8273315429688
+          "usedGB": 2102.4119873046875
         }
       ]
     },
@@ -297,30 +297,6 @@
           "requiresRestart": true,
           "sizeBytes": 8245,
           "tags": []
-        },
-        {
-          "category": "工具",
-          "desc": "演示新机制：通过注入总线给服务端源码追加代码，多个模组改同一个文件也不会互相顶掉。",
-          "fileCount": 4,
-          "files": [
-            "evejs-launcher.mod.json",
-            "loader.js",
-            "README.md",
-            "CHANGELOG.md"
-          ],
-          "highlights": [
-            "用 globalThis.__evejsMods.register 声明补丁（target / marker / slot / apply）",
-            "只追加 + 唯一标记：重复启动不会叠加，也不整段重写",
-            "先后由总线按 slot 与注册顺序串链，不再自己 hook Module.prototype._compile"
-          ],
-          "id": "bus-patch",
-          "name": "Source Patch via Bus (Example)",
-          "requiresRestart": true,
-          "sizeBytes": 8586,
-          "tags": [
-            "服务端",
-            "进阶"
-          ]
         }
       ]
     },
@@ -352,7 +328,7 @@
     "terminal:input": null,
     "terminal:resize": null,
     "update:state": {
-      "currentVersion": "0.3.5",
+      "currentVersion": "0.3.6",
       "state": "idle"
     }
   }

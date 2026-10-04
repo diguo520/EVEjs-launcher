@@ -16,6 +16,7 @@ pub mod env;
 pub mod gameconfig;
 pub mod github;
 pub mod health;
+pub mod hotreload;
 pub mod init;
 pub mod ipc;
 pub mod legacy;

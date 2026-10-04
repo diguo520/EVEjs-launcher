@@ -112,17 +112,6 @@ pub const LOADER_BIZ_BLANK: &[&str] = &[
     "    console.log(TAG + \" 已启用（空白骨架）\");",
 ];
 
-/// `template.id == "bus-patch"` 的业务钩子（补丁已经交给总线，这里只留业务逻辑的落点）
-pub const LOADER_BIZ_PATCH: &[&str] = &[
-    "    /* TODO: 源码补丁已经在文件顶部交给注入总线（见 SOURCE_PATCH），这里写业务逻辑。",
-    "       下面是可用的实测接口：",
-    "         sessionRegistry.getSessions()                     -> 在线会话数组",
-    "         sessionRegistry.resolveSessionCharacterID(s)      -> 角色 ID（未进入游戏时为 0）",
-    "         chatHub.sendSystemMessage(session, \"消息\")        -> 在该角色本地频道发系统消息",
-    "       改完记得重启主服务器，然后在游戏里验证。 */",
-    "    console.log(TAG + \" 已启用（源码补丁案例）\");",
-];
-
 /// 默认（broadcast）的业务钩子
 pub const LOADER_BIZ_BROADCAST: &[&str] = &[
     "    const seen = new Set();",

@@ -1,6 +1,6 @@
 /* 由 scripts/gen-contract.mjs 生成 —— 请勿手改。源: contract/ipc-channels.json */
 /* 抽取源: E:\Games\EveJS-v0.12.8\launcher\launcher */
-/* 生成时间: 2026-10-04T04:11:42.874Z */
+/* 生成时间: 2026-10-04T17:19:35.677Z */
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
@@ -73,6 +73,9 @@ export const api = {
   getConfig: (): Promise<unknown> => request("config:get", []),
   healthCheck: (): Promise<unknown> => request("health:check", []),
   healthPing: (): Promise<unknown> => request("health:ping", []),
+  hotreloadApply: (input: { tables?: string[]; snapshot?: boolean }): Promise<unknown> => request("hotreload:apply", [input]),
+  hotreloadRestore: (snapshotId?: string): Promise<unknown> => request("hotreload:restore", [snapshotId]),
+  hotreloadState: (): Promise<unknown> => request("hotreload:state", []),
   initRun: (key: string): Promise<unknown> => request("init:run", [key]),
   initState: (): Promise<unknown> => request("init:state", []),
   loginStart: (user: string, password: string, remember = false, characterId?: string | number): Promise<unknown> => request("login:start", [user, password, remember, characterId]),

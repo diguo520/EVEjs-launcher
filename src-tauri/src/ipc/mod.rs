@@ -1,6 +1,6 @@
-//! IPC 分发层：把契约里的 82 个请求通道收敛到**单一** Tauri command。
+//! IPC 分发层：把契约里的上百个请求通道收敛到**单一** Tauri command。
 //!
-//! 设计取舍：不注册 82 个 `#[tauri::command]`，只注册 `launcher_invoke`，
+//! 设计取舍：不逐条注册 `#[tauri::command]`，只注册 `launcher_invoke`，
 //! 由 `ipc::channels` 做二次白名单校验。理由有三：
 //!   1. 渲染层 shim 只需生成一个调用点，契约变更不会漏改；
 //!   2. 通道名来自生成产物，Rust 与 TS 不会各自漂移；
@@ -18,6 +18,7 @@ use crate::db;
 use crate::env;
 use crate::gameconfig;
 use crate::health;
+use crate::hotreload;
 use crate::init;
 use crate::log;
 use crate::market;
@@ -132,6 +133,37 @@ async fn dispatch(
                 .cloned()
                 .unwrap_or_default();
             Ok(gameconfig::save(&root, &patch).await)
+        }
+
+        /* --------------------------- 静态数据热重载 --------------------------- */
+        // 服务端启动时把表读进内存且之后只读内存（gameStore/index.js:1208），进程外写盘
+        // 到不了那份内存。真正的替换在启动器注入服务端进程的 host 里做
+        // （见 src-tauri/src/hotreload/host.js）；这里只负责「列表 / 发起 / 回滚」。
+        "hotreload:state" => Ok(hotreload::state(
+            &root,
+            &state.runtime,
+            state.services.pid_of(process::MAIN_SERVER),
+        )),
+        "hotreload:apply" => {
+            let input = args.first().cloned().unwrap_or(Value::Null);
+            let tables = input.get("tables").and_then(Value::as_array).map(|items| {
+                items
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .map(str::to_string)
+                    .collect::<Vec<_>>()
+            });
+            // 默认留快照：改错一张表点一下就回滚，比让用户去翻回收站便宜
+            let snapshot = input
+                .get("snapshot")
+                .and_then(Value::as_bool)
+                .unwrap_or(true);
+            Ok(hotreload::apply(&root, &state.runtime, tables, snapshot).await)
+        }
+        "hotreload:restore" => {
+            let id = arg_str(args, 0);
+            let id = if id.trim().is_empty() { None } else { Some(id) };
+            Ok(hotreload::restore(&root, &state.runtime, id.as_deref()).await)
         }
 
         /* ------------------------------ 设置项 ------------------------------ */

@@ -1,6 +1,7 @@
 import {
   Command,
   Database,
+  FileJson,
   LayoutDashboard,
   Package,
   Settings,
@@ -16,6 +17,7 @@ export type ViewId =
   | "dashboard"
   | "console"
   | "gameconfig"
+  | "staticdata"
   | "accounts"
   | "commands"
   | "database"
@@ -50,6 +52,12 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "宇宙配置",
         sub: "UNIVERSE CONFIGURATION",
         icon: SlidersHorizontal,
+      },
+      {
+        id: "staticdata",
+        label: "静态数据",
+        sub: "STATIC DATA HOT RELOAD",
+        icon: FileJson,
       },
     ],
   },

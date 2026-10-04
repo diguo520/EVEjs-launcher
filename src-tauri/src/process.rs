@@ -528,6 +528,13 @@ async fn start_main_server(app: &AppHandle) -> Result<Value, String> {
     if let Some(options) = &loader.node_options {
         env_vars.push(("NODE_OPTIONS".to_string(), options.clone()));
     }
+    // 静态数据热重载 host：请求目录交给注入进去的 host.js（它自己从 boot.json 认本轮启动）
+    if loader.hotreload {
+        env_vars.push((
+            "EVEJS_HOTRELOAD_DIR".to_string(),
+            crate::hotreload::env_dir(&state.runtime),
+        ));
+    }
     // 方案 D：清单与报告都走文件；`EVEJS_MODS_ROOT` 让总线把相对 target 解析到仓库根
     if let Some(plan_file) = &loader.plan_file {
         let _ = std::fs::create_dir_all(&state.runtime.logs);
@@ -637,6 +644,8 @@ struct LoaderInjection {
     /// 模组清单文件（`EVEJS_MODS_PLAN`）。
     /// 只有走方案 D 的总线注入时才有；退回「每个 loader 一条 --require」时是 None。
     plan_file: Option<PathBuf>,
+    /// 这一轮有没有把静态数据热重载 host 注进去（决定要不要给 EVEJS_HOTRELOAD_DIR）
+    hotreload: bool,
 }
 
 /// 启动器自带的注入总线（方案 D）：独占唯一的 `Module.prototype._compile` 钩子，
@@ -675,11 +684,21 @@ fn write_mod_bus(
     Ok((host, plan))
 }
 
-/// 计算要注入主服务器的 `NODE_OPTIONS`。
+/// `--require "<路径>"`：NODE_OPTIONS 按空格分词、且把反斜杠当转义符吃掉，
+/// 所以路径必须转成正斜杠并加双引号（已实测）。
+fn require_arg(path: &Path) -> String {
+    format!("--require \"{}\"", path.to_string_lossy().replace('\\', "/"))
+}
+
+/// 计算要注入主服务器的 `NODE_OPTIONS`，一共两条：
+///   1. 模组注入总线（方案 D）：有模组时写 `_launcher/mods/mod-host.js`，清单交给 `EVEJS_MODS_PLAN`；
+///      写盘失败退回「每个 loader 一条 `--require`」的老写法 —— 注入不能因为临时目录
+///      写不进去就整个失效。
+///   2. 静态数据热重载 host（[`crate::hotreload`]）：与模组无关，零模组时也要注入，
+///      否则「改 JSON 不重启」这个功能在干净服务端上直接不可用。顺序必须在总线之后：
+///      总线要独占 `Module.prototype._compile` 钩子。
 ///
-/// 现在只注入一条 `--require "<host.js>"`（方案 D），模组清单交给 `EVEJS_MODS_PLAN`；
-/// 写盘失败就退回「每个 loader 一条 `--require`」的老写法 —— 注入不能因为临时目录
-/// 写不进去就整个失效。
+/// 两条都装不上时 `node_options` 是 None（老行为：不设 NODE_OPTIONS）。
 ///
 /// 现役版还会把「注入了几个 loader / 跳过了哪个模组」写进启动器日志，
 /// Rust 侧暂时只做注入（没有启动器日志写入通道），跳过理由仍可从 `mods:plan` 读到。
@@ -696,13 +715,6 @@ fn mods_loader_injection(root: &Path, runtime: &crate::runtime::RuntimePaths) ->
                 .collect()
         })
         .unwrap_or_default();
-    if paths.is_empty() {
-        return LoaderInjection {
-            node_options: None,
-            count: 0,
-            plan_file: None,
-        };
-    }
     let inherited = std::env::var("NODE_OPTIONS").unwrap_or_default();
     let join = |args: &str| {
         [inherited.as_str(), args]
@@ -711,26 +723,36 @@ fn mods_loader_injection(root: &Path, runtime: &crate::runtime::RuntimePaths) ->
             .collect::<Vec<_>>()
             .join(" ")
     };
-    if let Ok((host, plan_file)) = write_mod_bus(root, runtime, &paths) {
-        let host_arg = format!(
-            "--require \"{}\"",
-            host.to_string_lossy().replace('\\', "/")
-        );
-        return LoaderInjection {
-            node_options: Some(join(&host_arg)),
-            count: paths.len(),
-            plan_file: Some(plan_file),
-        };
+    let mut args: Vec<String> = Vec::new();
+    let mut plan_file = None;
+    if !paths.is_empty() {
+        match write_mod_bus(root, runtime, &paths) {
+            Ok((host, written_plan)) => {
+                args.push(require_arg(&host));
+                plan_file = Some(written_plan);
+            }
+            Err(_) => {
+                for path in &paths {
+                    args.push(format!("--require \"{path}\""));
+                }
+            }
+        }
     }
-    let require_args = paths
-        .iter()
-        .map(|path| format!("--require \"{path}\""))
-        .collect::<Vec<_>>()
-        .join(" ");
+    let hotreload_arg = crate::hotreload::prepare(runtime, root);
+    let hotreload = hotreload_arg.is_some();
+    if let Some(arg) = hotreload_arg {
+        args.push(arg);
+    }
+    let node_options = if args.is_empty() {
+        None
+    } else {
+        Some(join(&args.join(" ")))
+    };
     LoaderInjection {
-        node_options: Some(join(&require_args)),
+        node_options,
         count: paths.len(),
-        plan_file: None,
+        plan_file,
+        hotreload,
     }
 }
 async fn start_market_server(app: &AppHandle) -> Result<Value, String> {
@@ -1598,6 +1620,39 @@ mod tests {
         assert!(listed.ends_with("/mods/demo/loader.js"), "{listed}");
         assert!(!listed.contains('\\'), "清单里的路径也要是正斜杠：{listed}");
 
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// 静态数据热重载 host：**零模组也必须注入**（否则「改 JSON 不重启」在干净服务端上直接不可用），
+    /// 并且要紧跟在模组总线后面（总线独占 `_compile` 钩子）。
+    #[test]
+    fn hotreload_host_is_injected_even_without_mods() {
+        let root = std::env::temp_dir().join(format!("evejs-hotreload-env-{}", iso_log_stamp()));
+        let repo = root.join("repo");
+        let store = repo.join("server").join("src").join("gameStore");
+        let runtime = crate::runtime::RuntimePaths::from_root(root.join("_launcher"), false);
+        std::fs::create_dir_all(&store).unwrap();
+        std::fs::create_dir_all(&runtime.root).unwrap();
+        std::fs::write(
+            store.join("index.js"),
+            "const SQLITE_TABLES = new Set([\"a\"]);\n",
+        )
+        .unwrap();
+
+        let injected = mods_loader_injection(&repo, &runtime);
+        assert!(injected.hotreload, "有服务端就必须注入热重载 host");
+        assert_eq!(injected.count, 0, "零模组时 loader 数仍是 0");
+        let options = injected.node_options.expect("零模组也要有 NODE_OPTIONS");
+        assert!(options.contains("/hotreload/host.js\""), "{options}");
+        assert!(!options.contains("mod-host.js"), "没有模组就不该注入总线：{options}");
+        assert!(!options.contains('\\'), "NODE_OPTIONS 里不能出现反斜杠：{options}");
+        assert!(runtime.root.join("hotreload").join("host.js").is_file());
+        assert!(runtime.root.join("hotreload").join("boot.json").is_file());
+
+        // 目录不是服务端时不注入：别在多出来的启动器上乱挂 --require
+        let bare = root.join("bare");
+        std::fs::create_dir_all(&bare).unwrap();
+        assert!(!mods_loader_injection(&bare, &runtime).hotreload);
         let _ = std::fs::remove_dir_all(&root);
     }
     #[test]

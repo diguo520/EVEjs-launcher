@@ -44,17 +44,6 @@ const TEMPLATE_FILES: &[&str] = &[
 /// 默认不改服务端源码：`SOURCE_PATCH` 留 null
 const NO_SOURCE_PATCH: &[&str] = &["const SOURCE_PATCH = null;"];
 
-/// 新机制案例模板的补丁声明：真的通过总线往服务端文件末尾追加一段代码。
-/// `marker` 与 `append` 里的标记一致 —— 总线上检测到标记已存在就跳过，保证幂等。
-const PATCH_BUS_DEMO: &[&str] = &[
-    "const SOURCE_PATCH = {",
-    "  target: \"server/src/network/tcp/handshake.js\",",
-    "  marker: \"// @ID@:patch\",",
-    "  slot: 40,",
-    "  append: \"// @ID@:patch\\nconsole.log('[@ID@] 服务端源码补丁已生效（注入总线）');\",",
-    "};",
-];
-
 pub const SCAFFOLD_TEMPLATES: &[ScaffoldTemplate] = &[
     ScaffoldTemplate {
         id: "broadcast",
@@ -85,21 +74,6 @@ pub const SCAFFOLD_TEMPLATES: &[ScaffoldTemplate] = &[
             "保留全部 loader 加载要点（身份校验 / require.cache 等待 / unref）",
             "业务钩子集中在 loader.js 的 start() 里，改这一处即可",
             "改服务端源码用 SOURCE_PATCH（走注入总线），不自己 hook _compile",
-        ],
-    },
-    ScaffoldTemplate {
-        id: "bus-patch",
-        name: "Source Patch via Bus (Example)",
-        desc: "演示新机制：通过注入总线给服务端源码追加代码，多个模组改同一个文件也不会互相顶掉。",
-        files: TEMPLATE_FILES,
-        category: "工具",
-        requires_restart: true,
-        tags: &["服务端", "进阶"],
-        source_patch: PATCH_BUS_DEMO,
-        highlights: &[
-            "用 globalThis.__evejsMods.register 声明补丁（target / marker / slot / apply）",
-            "只追加 + 唯一标记：重复启动不会叠加，也不整段重写",
-            "先后由总线按 slot 与注册顺序串链，不再自己 hook Module.prototype._compile",
         ],
     },
 ];
@@ -335,7 +309,6 @@ fn loader_from(draft: &Value, template: &ScaffoldTemplate) -> String {
 
     let biz: &[&str] = match template.id {
         "blank" => super::scaffold_loader::LOADER_BIZ_BLANK,
-        "bus-patch" => super::scaffold_loader::LOADER_BIZ_PATCH,
         _ => super::scaffold_loader::LOADER_BIZ_BROADCAST,
     };
     let mut lines: Vec<String> = Vec::new();
@@ -998,26 +971,11 @@ mod tests {
         assert!(!blank.contains("const seen = new Set();"));
         assert!(blank.len() < broadcast.len());
 
-        // 案例模板（bus-patch）：真的填好 SOURCE_PATCH，走总线只追加
-        let patch = loader_from(&draft("bus-demo", "总线案例"), find_template("bus-patch"));
-        assert!(patch.contains("target: \"server/src/network/tcp/handshake.js\""));
-        assert!(patch.contains("marker: \"// bus-demo:patch\""));
-        assert!(patch.contains("slot: 40,"));
-        assert!(patch.contains(
-            "append: \"// bus-demo:patch\\nconsole.log('[bus-demo] 服务端源码补丁已生效（注入总线）');\""
-        ));
-        assert!(patch.contains("registerSourcePatch();"));
-        // 补丁案例不重复「欢迎广播」那套业务，避免启用后既刷频道又打日志
-        assert!(!patch.contains("const seen = new Set();"));
-        assert!(patch.contains("已启用（源码补丁案例）"));
-        assert!(!patch.contains("@ID@"));
-
         // 组装口径：head + 模板补丁 + mid + 业务钩子 + tail（防止有人漏拼某一段）
         use super::super::scaffold_loader as skeleton;
         for (template, biz) in [
             (find_template("broadcast"), skeleton::LOADER_BIZ_BROADCAST),
             (find_template("blank"), skeleton::LOADER_BIZ_BLANK),
-            (find_template("bus-patch"), skeleton::LOADER_BIZ_PATCH),
         ] {
             let text = loader_from(&draft("demo-mod", "示例模组"), template);
             let expected = skeleton::LOADER_HEAD.len()
@@ -1358,11 +1316,9 @@ mod tests {
         let value = templates_json();
         assert_eq!(value["ok"], json!(true));
         let list = value["templates"].as_array().unwrap();
-        assert_eq!(list.len(), 3);
+        assert_eq!(list.len(), 2);
         assert_eq!(list[0]["id"], json!("broadcast"));
         assert_eq!(list[1]["id"], json!("blank"));
-        assert_eq!(list[2]["id"], json!("bus-patch"));
-        assert_eq!(list[2]["category"], json!("工具"));
         assert_eq!(list[0]["requiresRestart"], json!(true));
         assert_eq!(list[0]["files"].as_array().unwrap().len(), 4);
         assert_eq!(list[0]["fileCount"], json!(4));

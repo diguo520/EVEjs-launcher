@@ -36,6 +36,11 @@ pub const HANDLED: &[&str] = &[
     // 游戏世界参数（本工程扩展，契约见 contract/extensions.json）
     "gameConfig:read",
     "gameConfig:save",
+    // 静态数据热重载（本工程扩展，契约见 contract/extensions.json）：
+    // state=表清单/脏表/快照；apply=把改过的 JSON 送进运行中的服务端内存；restore=快照回滚
+    "hotreload:apply",
+    "hotreload:restore",
+    "hotreload:state",
     "database:backup",
     "database:backups",
     "database:delete",

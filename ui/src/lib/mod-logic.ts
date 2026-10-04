@@ -67,12 +67,6 @@ export const FALLBACK_MOD_TEMPLATES: ModTemplateCard[] = [
     desc: "同样的加载骨架，业务逻辑留空，适合从零写起",
     files: SKELETON_FILES,
   },
-  {
-    id: "bus-patch",
-    name: "Source Patch via Bus (Example)",
-    desc: "演示新机制：通过注入总线给服务端源码追加代码，多个模组改同一个文件也不会互相顶掉。",
-    files: SKELETON_FILES,
-  },
 ]
 
 /** 字节数写成一眼能读的量级；拿不到就画破折号，不编数字 */

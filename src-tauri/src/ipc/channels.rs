@@ -1,6 +1,6 @@
 //! 由 scripts/gen-contract.mjs 生成 —— 请勿手改。源: contract/ipc-channels.json
 //! 抽取源: E:\Games\EveJS-v0.12.8\launcher\launcher
-//! 生成时间: 2026-10-04T04:11:42.874Z
+//! 生成时间: 2026-10-04T17:19:35.677Z
 
 #![allow(dead_code)]
 
@@ -18,7 +18,7 @@ pub struct ChannelSpec {
     pub kind: ChannelKind,
 }
 
-pub const REQUEST_COUNT: usize = 105;
+pub const REQUEST_COUNT: usize = 108;
 pub const EVENT_COUNT: usize = 7;
 
 #[rustfmt::skip]
@@ -60,6 +60,9 @@ pub const CHANNELS: &[ChannelSpec] = &[
     ChannelSpec { channel: "gameConfig:save", api: "gameConfigSave", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "health:check", api: "healthCheck", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "health:ping", api: "healthPing", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "hotreload:apply", api: "hotreloadApply", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "hotreload:restore", api: "hotreloadRestore", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "hotreload:state", api: "hotreloadState", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "init:run", api: "initRun", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "init:state", api: "initState", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "log:read", api: "readServerLog", kind: ChannelKind::Invoke },

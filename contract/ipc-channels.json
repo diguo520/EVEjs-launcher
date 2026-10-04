@@ -1,13 +1,13 @@
 {
   "generatedFrom": "E:\\Games\\EveJS-v0.12.8\\launcher\\launcher",
-  "generatedAt": "2026-10-04T04:11:42.874Z",
+  "generatedAt": "2026-10-04T17:19:35.677Z",
   "counts": {
-    "invoke": 99,
+    "invoke": 102,
     "send": 6,
     "events": 7,
-    "requests": 105,
+    "requests": 108,
     "registered": 82,
-    "apiTotal": 112
+    "apiTotal": 115
   },
   "invoke": [
     {
@@ -310,6 +310,31 @@
     {
       "api": "healthPing",
       "channel": "health:ping",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "hotreloadApply",
+      "channel": "hotreload:apply",
+      "kind": "invoke",
+      "signature": "input: { tables?: string[]; snapshot?: boolean }",
+      "params": [
+        "input"
+      ]
+    },
+    {
+      "api": "hotreloadRestore",
+      "channel": "hotreload:restore",
+      "kind": "invoke",
+      "signature": "snapshotId?: string",
+      "params": [
+        "snapshotId"
+      ]
+    },
+    {
+      "api": "hotreloadState",
+      "channel": "hotreload:state",
       "kind": "invoke",
       "signature": "",
       "params": []
@@ -940,6 +965,9 @@
       "danger:resetConfig",
       "gameConfig:read",
       "gameConfig:save",
+      "hotreload:apply",
+      "hotreload:restore",
+      "hotreload:state",
       "market:book",
       "market:catalog",
       "market:overview",

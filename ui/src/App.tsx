@@ -21,6 +21,7 @@ import { callOr, hasIpc, type RawModList } from "@/lib/ipc"
 import { DashboardPage } from "@/pages/dashboard-page"
 import { ConsolePage } from "@/pages/console-page"
 import { GameConfigPage } from "@/pages/game-config-page"
+import { StaticDataPage } from "@/pages/static-data-page"
 import { AccountsPage } from "@/pages/accounts-page"
 import { CommandsPage } from "@/pages/commands-page"
 import { DatabasePage } from "@/pages/database-page"
@@ -132,6 +133,8 @@ export function App() {
         return <ConsolePage launcher={launcher} />
       case "gameconfig":
         return <GameConfigPage />
+      case "staticdata":
+        return <StaticDataPage />
       case "accounts":
         return <AccountsPage store={accounts} />
       case "commands":

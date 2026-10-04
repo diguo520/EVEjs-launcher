@@ -65,6 +65,34 @@
       "why": "写回世界参数。走服务端自己的 saveConfig：先按 schema 校验（未知键 / 类型 / 整数 / 范围 / 枚举全在服务端判定），再原子写 config/*.json。启动器侧额外做的事只有一件 —— 写前把整份 config 备份到 _local/config-backups/gameconfig-<时间戳>/，因为服务端自己的原子写不带回滚，而这里改的是全局玩法参数。只写 config/*.json，不碰 server/ 下任何源码。"
     },
     {
+      "api": "hotreloadApply",
+      "channel": "hotreload:apply",
+      "kind": "invoke",
+      "signature": "input: { tables?: string[]; snapshot?: boolean }",
+      "params": [
+        "input"
+      ],
+      "why": "静态数据热重载的执行入口：改完 _local/gameStore/data/<表>/data.json 不用重启服务端就能生效。服务端启动时 preloadAll() 把表读进内存且只读内存（gameStore/index.js:1208 `if (preloaded) return`），进程外写盘到不了那份内存，所以启动器在启动主服务器时用 NODE_OPTIONS=--require 注入一个 host（src-tauri/src/hotreload/host.js），由它在服务端进程内部用**公开 API** gameStore.write(table, \"/\", data) 整表覆盖内存副本，再清掉 referenceData.clearReferenceCache / skillState.refreshSkillReference 这两层读缓存 —— 服务端源码零改动，与模组注入总线互不干扰。写之前先把要换的表整份快照到 _launcher/hotreload/snapshots/，坏 JSON 在 host 里就被 INVALID_JSON 拦下，内存里的旧副本不动；SQLITE_TABLES 里的运行时表一律拒绝（那份缓存就是活的世界状态）。现役版完全没有这个能力，只能停服重启。"
+    },
+    {
+      "api": "hotreloadRestore",
+      "channel": "hotreload:restore",
+      "kind": "invoke",
+      "signature": "snapshotId?: string",
+      "params": [
+        "snapshotId"
+      ],
+      "why": "把某份热重载快照还原回 data.json 并立刻再热重载一遍。快照是 hotreload:apply 写盘前的自动备份（每张表一份 <表>.json + meta.json，最多留 10 份），改错了表点一下就回到改之前的内存状态，不用去翻回收站。不传 snapshotId 用最新那份。"
+    },
+    {
+      "api": "hotreloadState",
+      "channel": "hotreload:state",
+      "kind": "invoke",
+      "signature": "",
+      "params": [],
+      "why": "静态数据页的读数：这一轮服务端是不是启动器带 host 起来的（boot.json 的 bootId 与 host 挂牌的 session.json 一致、pid 就是当前主服务器）、可重载的静态表清单（有 data.json 且不在 SQLITE_TABLES 里，本机实测 64 张）、每个表的大小与 mtime、哪些表改过还没重载（dirty）、上一次重载结果、快照列表。为什么要在启动器里做而不是让用户自己点批处理：表清单、脏表检测、重载前的 JSON 校验、结果与耗时都有地方看，还能一眼区分「服务端即时生效 / 需重进星系（celestials、solarSystems、stargates、stations）/ 需重启」。现役版没有这个能力。"
+    },
+    {
       "api": "marketBook",
       "channel": "market:book",
       "kind": "invoke",
