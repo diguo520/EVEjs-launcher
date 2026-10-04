@@ -60,6 +60,7 @@ pub fn safe_channels() -> Vec<&'static str> {
         "market:catalog",
         "market:overview",
         "market:trades",
+        "market:typeInfo",
         "metrics:get",
         "mods:githubTokenStatus",
         "mods:list",
@@ -453,6 +454,8 @@ mod tests {
             "mods:sign",
             "mods:uninstall",
             "mods:revealSubmissionZip",
+            // 改服务端市场库的种子库存（会真的写进市场数据），只靠单测覆盖
+            "market:adjustStock",
             // 市场 / 提交 / 令牌写通道：会联网、上传文件或改凭据，只靠单测覆盖
             "mods:marketList",
             "mods:reviews",
@@ -480,8 +483,8 @@ mod tests {
         ] {
             assert!(!safe.contains(channel), "{channel} 有副作用，不应进自检");
         }
-        // 30 个只读 + 全部待实现通道（待实现通道统一回 {ok:false}，天然安全）
-        assert_eq!(safe.len(), 30 + registry::PLANNED.len());
+        // 31 个只读 + 全部待实现通道（待实现通道统一回 {ok:false}，天然安全）
+        assert_eq!(safe.len(), 31 + registry::PLANNED.len());
     }
 
     #[test]

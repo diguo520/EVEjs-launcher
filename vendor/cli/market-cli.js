@@ -8,6 +8,7 @@
  *   node market-cli.js catalog  <服务端根目录>
  *   node market-cli.js book     <服务端根目录> <typeID>
  *   node market-cli.js trades   <服务端根目录> [条数]
+ *   node market-cli.js typeinfo <服务端根目录> [界面语言]
  *
  * 为什么是「直接读 market.sqlite 文件」而不是问服务端要：
  *   1. 服务没起的时候也要能看（玩家开着启动器查价，市场服务不一定在跑）；
@@ -26,6 +27,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const readline = require("readline");
 
 const [,, cmd, repoRootArg, arg1] = process.argv;
 
@@ -478,9 +480,256 @@ function trades(root, limitArg) {
   }
 }
 
+/* ------------------------- 简介 / 属性（悬停提示用） ------------------------- */
+
+/**
+ * SDE 里的简介与属性名都带 `{de,en,es,fr,ja,ko,ru,zh}` 八种语言，而启动器的界面语言里
+ * **nl（荷兰语）不在其中** —— 一律退英文：宁可让荷兰用户看英文，也不能给他看中文。
+ * 认不出的语言码同样退英文。
+ */
+const SDE_LANGS = ["zh", "en", "ja", "ko", "fr", "de", "ru", "es"];
+
+function sdeLang(value) {
+  const code = text(value).toLowerCase().split(/[-_]/)[0];
+  return SDE_LANGS.includes(code) ? code : "en";
+}
+
+/** SDE 的本地化字段可能是 `{de,en,…}`，也可能已经是纯字符串 */
+function localized(node, lang) {
+  if (node == null) return "";
+  if (typeof node === "string") return node;
+  if (typeof node !== "object") return "";
+  return text(node[lang]) || text(node.en);
+}
+
+/**
+ * 简介里带客户端标记（`<a href=showinfo:34>Tritanium</a>`、`<br>`、`&amp;`）——
+ * 启动器里没有客户端的容器与路由，剥成纯文本：链接文字留下，标签与实体丢掉。
+ */
+function cleanDescription(value) {
+  if (!value) return "";
+  return text(value)
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|li|tr)>/gi, "\n")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&#39;|&#x27;/gi, "'")
+    .replace(/&quot;/gi, '"')
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+/**
+ * 一条加成：`[数值, 单位 id, 文字]`。
+ *
+ * - `bonus` 缺省（例如「可以安装拦截泡发射器」）表示这条只有文字，界面不画数字；
+ * - 顺序按 SDE 的 `importance` 排 —— 游戏里就是这么排的：护盾值加成 15% 排在
+ *   信号半径惩罚 10% 前面，而 SDE 数组里的顺序正好相反。
+ */
+function bonusEntries(list, lang) {
+  const rows = (Array.isArray(list) ? list : [])
+    .map((row) => {
+      const value =
+        row && typeof row.bonus === "number" && Number.isFinite(row.bonus) ? row.bonus : null;
+      return {
+        value,
+        unit: value == null || row.unitID == null ? null : Number(row.unitID),
+        label: cleanDescription(localized(row && row.bonusText, lang)),
+        importance: Number(row && row.importance) || 0,
+      };
+    })
+    .filter((row) => row.label);
+  rows.sort((left, right) => left.importance - right.importance);
+  return rows.map((row) => [row.value, row.unit, row.label]);
+}
+
+/** unitID=116 是「typeID」：属性值指向另一个物品（技能、弹药…），界面要显示名字而不是数字 */
+const TYPE_REF_UNIT = 116;
+
+function readJsonlFile(file) {
+  return fs.existsSync(file) ? readJsonl(file) : [];
+}
+
+/**
+ * 悬停提示用的索引：简介（SDE 的 `types.jsonl`）+ 属性（服务端静态表 `typeDogma` 的值、
+ * SDE 的属性元数据与单位符号）。
+ *
+ * 为什么一次返回**整个市场目录**的索引（约 7 MB JSON）：悬停是毫秒级交互，而扫一遍
+ * 144 MB 的 `types.jsonl` 要一秒多 —— 每次悬停起一个 node 进程去扫是等不起的。启动器侧
+ * 拿到后常驻内存（按界面语言失效），之后每次悬停只是内存查表。不落任何磁盘产物。
+ */
+async function typeinfo(root, langArg) {
+  const lang = sdeLang(langArg);
+  const sde = sdeDirOf(root);
+  if (!sde) {
+    throw new Error(
+      "未找到 SDE 目录：" + path.join(root, "_local", "sde") + "（简介与属性名都在 SDE 里）"
+    );
+  }
+
+  // 1) 属性元数据：只留 published 且有名字的，口径与客户端 Attributes 页一致
+  const meta = new Map();
+  for (const row of readJsonlFile(path.join(sde, "dogmaAttributes.jsonl"))) {
+    const id = Number(row && row._key);
+    if (!id || row.published !== true) continue;
+    const name = localized(row.displayName, lang) || text(row.name);
+    if (!name) continue;
+    meta.set(id, {
+      name,
+      unit: row.unitID == null ? null : Number(row.unitID),
+      highIsGood: row.highIsGood === true,
+      displayWhenZero: row.displayWhenZero === true,
+      category: Number(row.attributeCategoryID) || 0,
+    });
+  }
+
+  // 2) 单位符号与分类名：都用 SDE 原话，不自己编对照表
+  const units = new Map();
+  for (const row of readJsonlFile(path.join(sde, "dogmaUnits.jsonl"))) {
+    const id = Number(row && row._key);
+    const symbol = localized(row && row.displayName, lang) || localized(row && row.description, lang);
+    if (id && symbol) units.set(id, symbol);
+  }
+  const categories = new Map();
+  for (const row of readJsonlFile(path.join(sde, "dogmaAttributeCategories.jsonl"))) {
+    const id = Number(row && row._key);
+    if (id && text(row.name)) categories.set(id, text(row.name));
+  }
+
+  // 3) 只做在售物品：全量 2.6 万个类型里有一半不在市场上
+  const { db } = openMarketDb(root);
+  let marketIds;
+  try {
+    marketIds = new Set(
+      db
+        .prepare("SELECT type_id FROM market_types WHERE published = 1")
+        .all()
+        .map((row) => num(row.type_id))
+    );
+  } finally {
+    db.close();
+  }
+
+  // 4) 每个物品的属性值（服务端自己的静态表：服务端升级后启动器不用跟着发版）
+  const dogmaFile = path.join(root, "_local", "gameStore", "data", "typeDogma", "data.json");
+  let dogma;
+  try {
+    dogma = JSON.parse(fs.readFileSync(dogmaFile, "utf8"));
+  } catch {
+    throw new Error("未找到服务端静态表：" + dogmaFile + "（属性值读它）");
+  }
+  const byType = (dogma && dogma.typesByTypeID) || {};
+  const values = new Map();
+  const referenced = new Set();
+  let attributeRows = 0;
+  for (const id of marketIds) {
+    const entry = byType[String(id)];
+    if (!entry || !entry.attributes) continue;
+    const rows = [];
+    for (const key of Object.keys(entry.attributes)) {
+      const attributeId = Number(key);
+      const info = meta.get(attributeId);
+      if (!info) continue;
+      const value = Number(entry.attributes[key]);
+      if (!Number.isFinite(value)) continue;
+      // 值为 0 且属性标了 displayWhenZero=false 的不列出来（与客户端同一条规则）
+      if (value === 0 && !info.displayWhenZero) continue;
+      if (info.unit === TYPE_REF_UNIT && value > 0) referenced.add(value);
+      rows.push([attributeId, value]);
+    }
+    if (rows.length === 0) continue;
+    // 先按分类、再按属性 id：界面拿到就能分组，不用自己再排一遍
+    rows.sort(
+      (left, right) =>
+        meta.get(left[0]).category - meta.get(right[0]).category || left[0] - right[0]
+    );
+    values.set(id, rows);
+    attributeRows += rows.length;
+  }
+
+  // 5) 加成（技能加成 / 特有加成）：SDE 的 typeBonus.jsonl 只有 650 种类型，整份读很快。
+  //    技能名（「小型射弹炮台每升一级：」）也要一起给，所以技能 typeID 也进 referenced。
+  const bonuses = new Map();
+  for (const row of readJsonlFile(path.join(sde, "typeBonus.jsonl"))) {
+    const id = Number(row && row._key);
+    if (!id || !marketIds.has(id)) continue;
+    const sections = [];
+    for (const skill of Array.isArray(row.types) ? row.types : []) {
+      const skillId = Number(skill && skill._key);
+      const entries = bonusEntries(skill && skill._value, lang);
+      if (!entries.length) continue;
+      if (skillId) referenced.add(skillId);
+      sections.push([skillId, entries]);
+    }
+    const role = bonusEntries(row.roleBonuses, lang);
+    if (role.length) sections.push([0, role]);
+    if (sections.length) bonuses.set(id, sections);
+  }
+
+  // 6) 简介 + 「值指向的类型」的名字：流式扫 types.jsonl（144 MB，别整份读进内存）
+  const descriptions = new Map();
+  const names = new Map();
+  await new Promise((resolve, reject) => {
+    const reader = readline.createInterface({
+      input: fs.createReadStream(path.join(sde, "types.jsonl")),
+      crlfDelay: Infinity,
+    });
+    reader.on("line", (line) => {
+      if (!line || (line.indexOf('"description"') < 0 && line.indexOf('"name"') < 0)) return;
+      let row;
+      try {
+        row = JSON.parse(line);
+      } catch {
+        return;
+      }
+      const id = Number(row && row._key);
+      if (!id) return;
+      if (marketIds.has(id)) {
+        const brief = cleanDescription(localized(row.description, lang));
+        if (brief) descriptions.set(id, brief);
+      }
+      if (referenced.has(id)) {
+        const name = localized(row.name, lang);
+        if (name) names.set(id, name);
+      }
+    });
+    reader.on("close", resolve);
+    reader.on("error", reject);
+  });
+
+  return {
+    ok: true,
+    lang,
+    sde: path.basename(sde),
+    counts: {
+      marketTypes: marketIds.size,
+      described: descriptions.size,
+      attributed: values.size,
+      attributeRows,
+      bonused: bonuses.size,
+      referencedTypes: names.size,
+    },
+    units: Object.fromEntries(units),
+    categories: Object.fromEntries(categories),
+    attributes: Object.fromEntries(
+      [...meta].map(([id, info]) => [
+        id,
+        { name: info.name, unit: info.unit, highIsGood: info.highIsGood, category: info.category },
+      ])
+    ),
+    types: Object.fromEntries(values),
+    descriptions: Object.fromEntries(descriptions),
+    names: Object.fromEntries(names),
+    bonuses: Object.fromEntries(bonuses),
+  };
+}
+
 /* ------------------------------ 入口 ------------------------------ */
 
-function main() {
+async function main() {
   const root = rootOf(repoRootArg);
   switch (cmd) {
     case "overview":
@@ -491,15 +740,17 @@ function main() {
       return book(root, arg1);
     case "trades":
       return trades(root, arg1);
+    case "typeinfo":
+      return typeinfo(root, arg1);
     default:
       throw new Error("未知子命令：" + text(cmd));
   }
 }
 
-try {
-  process.stdout.write(JSON.stringify(main()));
-} catch (error) {
-  // 预期的失败（库不存在 / typeID 不合法）也走 ok:false，让界面能显示原因；
-  // 退出码保持 0，避免 sidecar 把它当成崩溃并丢掉 reason。
-  process.stdout.write(JSON.stringify({ ok: false, reason: String((error && error.message) || error) }));
-}
+// 预期的失败（库不存在 / SDE 不在 / typeID 不合法）也走 ok:false，让界面能显示原因；
+// 退出码保持 0，避免 sidecar 把它当成崩溃并丢掉 reason。typeinfo 要流式读 SDE，所以是异步。
+main().then(
+  (result) => process.stdout.write(JSON.stringify(result)),
+  (error) =>
+    process.stdout.write(JSON.stringify({ ok: false, reason: String((error && error.message) || error) }))
+);

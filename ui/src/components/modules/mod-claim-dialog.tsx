@@ -301,7 +301,7 @@ export function ModClaimDialog({
                     <span className="tabular"> {item.declaredAuthorId || "—"}</span>
                   </span>
                   <span className="min-w-0 truncate">
-                    {t("仓库")}：
+                    {t("代码仓库")}：
                     <span
                       className={cn("tabular", item.repo ? "text-foreground/80" : "text-warning")}
                       title={item.repo}

@@ -486,3 +486,51 @@ export function marketTiles(overview: RawMarketOverview | null): MarketTile[] {
     },
   ]
 }
+
+/**
+ * 「改价 / 改量」弹窗里两个输入框的解析结果。
+ *
+ * `null` = 这一项**不改**（服务端对省掉的字段保持原值，见 `market.rs` 的
+ * `adjust_seed_stock`），所以「只改价」「只改量」都是合法操作，不用逼用户把另一项抄一遍。
+ */
+export type AdjustDraft =
+  | { ok: true; price: number | null; quantity: number | null }
+  | { ok: false; reason: string }
+
+/**
+ * 解析价格 / 数量输入。
+ *
+ * 为什么在渲染层先挡一遍：服务端只校验「种子库存行存不存在」和「数量不能为负」，
+ * 价格给个负数它也照收（那就是一档负价挂单），而输入框里「1.5 个」「abc」「-3」这类东西
+ * 是在用户手里打出来的。校验不过就把原因交回界面，别让一次手滑写进市场库。
+ *
+ * 数量允许带千分位逗号（用户习惯把 9999999 写成 9,999,999），但不接受小数 ——
+ * 静默截成整数比直接报错更糟。
+ */
+export function parseAdjustDraft(priceText: string, quantityText: string): AdjustDraft {
+  const priceRaw = priceText.trim()
+  const quantityRaw = quantityText.trim()
+  if (!priceRaw && !quantityRaw) {
+    return { ok: false, reason: "请至少改一项：价格或数量。" }
+  }
+
+  let price: number | null = null
+  if (priceRaw) {
+    const value = Number(priceRaw)
+    if (!Number.isFinite(value) || value < 0) {
+      return { ok: false, reason: "价格要填不小于 0 的数字。" }
+    }
+    price = value
+  }
+
+  let quantity: number | null = null
+  if (quantityRaw) {
+    const value = Number(quantityRaw.replace(/,/g, ""))
+    if (!Number.isInteger(value) || value < 0) {
+      return { ok: false, reason: "数量要填不小于 0 的整数。" }
+    }
+    quantity = value
+  }
+
+  return { ok: true, price, quantity }
+}

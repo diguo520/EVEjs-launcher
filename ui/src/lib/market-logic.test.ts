@@ -17,6 +17,7 @@ import {
   historyChart,
   namePair,
   nodePath,
+  parseAdjustDraft,
   sortStockByPrice,
   sortTypeRows,
   toCatalog,
@@ -300,5 +301,71 @@ describe("market-logic", () => {
     expect(flat.points.every((point) => Number.isFinite(point.y))).toBe(true)
     // 空历史不炸，回空图
     expect(historyChart([], 320, 72).path).toBe("")
+  })
+})
+
+/**
+ * 「改价 / 改量」弹窗的输入解析。
+ *
+ * 这层挡的是**手滑**：服务端只校验库存行存不存在、数量不能为负，价格给负数它照收
+ * （那就是一档负价挂单）。所以这些用例盯的都是「用户真会敲出来的东西」。
+ */
+describe("改价 / 改量输入", () => {
+  it("两个框都空 = 白跑一趟，直接回原因", () => {
+    expect(parseAdjustDraft("", "")).toEqual({ ok: false, reason: "请至少改一项：价格或数量。" })
+    expect(parseAdjustDraft("   ", "  ")).toEqual({
+      ok: false,
+      reason: "请至少改一项：价格或数量。",
+    })
+  })
+
+  it("只填一项就只改一项：另一项回 null，服务端保持原值", () => {
+    expect(parseAdjustDraft("123.5", "")).toEqual({ ok: true, price: 123.5, quantity: null })
+    expect(parseAdjustDraft("", "1000")).toEqual({ ok: true, price: null, quantity: 1000 })
+  })
+
+  it("两项都填就一起改", () => {
+    expect(parseAdjustDraft("250", "9999999")).toEqual({
+      ok: true,
+      price: 250,
+      quantity: 9999999,
+    })
+  })
+
+  it("数量接受千分位逗号（9999999 敲成 9,999,999 很常见）", () => {
+    expect(parseAdjustDraft("", "9,999,999")).toEqual({ ok: true, price: null, quantity: 9999999 })
+  })
+
+  it("0 是合法值，不能被当成空", () => {
+    // 「库存清零」是正经操作：不能因为 0 是 falsy 就当成没填
+    expect(parseAdjustDraft("0", "0")).toEqual({ ok: true, price: 0, quantity: 0 })
+  })
+
+  it("价格必须是数字且不小于 0", () => {
+    expect(parseAdjustDraft("-1", "")).toEqual({ ok: false, reason: "价格要填不小于 0 的数字。" })
+    expect(parseAdjustDraft("abc", "")).toEqual({ ok: false, reason: "价格要填不小于 0 的数字。" })
+    expect(parseAdjustDraft("1e", "")).toEqual({ ok: false, reason: "价格要填不小于 0 的数字。" })
+  })
+
+  it("数量必须是整数：1.5 直接报错，不静默截成 1", () => {
+    expect(parseAdjustDraft("", "1.5")).toEqual({
+      ok: false,
+      reason: "数量要填不小于 0 的整数。",
+    })
+    expect(parseAdjustDraft("", "-3")).toEqual({
+      ok: false,
+      reason: "数量要填不小于 0 的整数。",
+    })
+    expect(parseAdjustDraft("", "abc")).toEqual({
+      ok: false,
+      reason: "数量要填不小于 0 的整数。",
+    })
+  })
+
+  it("价格出错时先报价格：一次只说一件事", () => {
+    expect(parseAdjustDraft("-1", "1.5")).toEqual({
+      ok: false,
+      reason: "价格要填不小于 0 的数字。",
+    })
   })
 })

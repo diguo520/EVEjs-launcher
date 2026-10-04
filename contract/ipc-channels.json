@@ -1,13 +1,13 @@
 {
   "generatedFrom": "E:\\Games\\EveJS-v0.12.8\\launcher\\launcher",
-  "generatedAt": "2026-10-04T17:19:35.677Z",
+  "generatedAt": "2026-10-04T22:15:30.852Z",
   "counts": {
-    "invoke": 102,
+    "invoke": 104,
     "send": 6,
     "events": 7,
-    "requests": 108,
+    "requests": 110,
     "registered": 82,
-    "apiTotal": 115
+    "apiTotal": 117
   },
   "invoke": [
     {
@@ -368,6 +368,15 @@
       ]
     },
     {
+      "api": "marketAdjustStock",
+      "channel": "market:adjustStock",
+      "kind": "invoke",
+      "signature": "input: { stationId: number; typeId: number; quantity?: number; price?: number; reason?: string }",
+      "params": [
+        "input"
+      ]
+    },
+    {
       "api": "marketBook",
       "channel": "market:book",
       "kind": "invoke",
@@ -397,6 +406,16 @@
       "signature": "limit?: number",
       "params": [
         "limit"
+      ]
+    },
+    {
+      "api": "marketTypeInfo",
+      "channel": "market:typeInfo",
+      "kind": "invoke",
+      "signature": "typeId: number, lang?: string",
+      "params": [
+        "typeId",
+        "lang"
       ]
     },
     {
@@ -968,10 +987,12 @@
       "hotreload:apply",
       "hotreload:restore",
       "hotreload:state",
+      "market:adjustStock",
       "market:book",
       "market:catalog",
       "market:overview",
       "market:trades",
+      "market:typeInfo",
       "mods:claimCandidates",
       "mods:claimMod",
       "mods:forgetSubmission",

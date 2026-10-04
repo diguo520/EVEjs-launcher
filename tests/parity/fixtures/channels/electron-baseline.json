@@ -154,6 +154,9 @@
     "market:trades": {
       "__parity": "no-handler"
     },
+    "market:typeInfo": {
+      "__parity": "no-handler"
+    },
     "metrics:get": {
       "cpuPercent": 21.391777864992147,
       "diskRoot": "E:",

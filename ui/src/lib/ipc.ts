@@ -1065,3 +1065,107 @@ export interface RawMarketTrades {
   path?: string
   rows?: RawMarketTradeRow[]
 }
+
+/**
+ * market:adjustStock 的入参。
+ *
+ * `quantity` / `price` 省掉哪一项，服务端就保持哪一项的原值 —— 只调价就只传 price。
+ * 改的是**种子库存**（NPC 那批默认 9999999 的货）：一次只落「一个空间站 + 一个物品」。
+ */
+export interface RawMarketAdjustInput {
+  stationId: number
+  typeId: number
+  quantity?: number
+  price?: number
+  /** 服务端日志里的一行备注，留个来源好排查；界面不填 */
+  reason?: string
+}
+
+/**
+ * market:adjustStock 的回包。
+ *
+ * `ok=false` 时 `reason` 是**后端原话**（可能是服务端的英文报错，也可能是
+ * 「连不上市场服务」这一句中文），界面原样透出，别自己编一句。
+ */
+export interface RawMarketAdjust {
+  ok: boolean
+  supported?: boolean
+  reason?: string
+  stationId?: number
+  typeId?: number
+  quantity?: number
+  price?: number
+}
+
+/**
+ * market:typeInfo 里的一条属性（原始 dogma 值，不是客户端算完的成品）。
+ *
+ * 格式化刻意留在渲染层：同一个「s」在 SDE 里既是秒又是毫秒（见 unitId），
+ * 而单位符号本身是**已按界面语言本地化**的，只有到界面才知道该显示成什么。
+ */
+export interface RawMarketTypeInfoAttr {
+  id: number
+  /** 属性名（SDE displayName，已本地化） */
+  name: string
+  value: number
+  /**
+   * SDE 的 unitID：101 的属性以毫秒存「秒」、108 是抗性共振系数、
+   * 116 是「值指向另一个物品」、115 是「值指向一个组别」。null = 无量纲。
+   */
+  unitId: number | null
+  /** 单位符号（已本地化，如 `MW` / `%` / `m/s`）；无量纲时是 null */
+  unit: string | null
+  highIsGood: boolean
+  /** SDE 的属性分类 id（`categories` 里查名字） */
+  category: number
+  /** unitId = 116 且那个物品在 SDE 里有名字时给名字（技能需求、弹药…） */
+  typeName: string | null
+}
+
+/**
+ * 一条加成：`value` 为 null 表示这条只有文字（例如「可以安装拦截泡发射器」），
+ * 界面按客户端的样子不画数字。`unitId` / `unit` 与属性同一套（105 = %）。
+ */
+export interface RawMarketTypeInfoBonusEntry {
+  value: number | null
+  unitId: number | null
+  unit: string | null
+  text: string
+}
+
+/**
+ * 一组加成：技能加成（`skill` 是技能名，如「拦截舰操作」）或特有加成（`skillId = 0`）。
+ * 组内顺序已按 SDE 的 importance 排好 —— 与游戏里的显示顺序一致。
+ */
+export interface RawMarketTypeInfoBonus {
+  skillId: number
+  skill: string
+  entries: RawMarketTypeInfoBonusEntry[]
+}
+
+/**
+ * market:typeInfo 的回包：一条物品的简介 + 全部属性。
+ *
+ * `typeId = 0` 是**预热**请求（打开市场页时先发一条），只回 `ready` 与 `counts`，
+ * 让侧车那 1.5 s 的 SDE 扫描发生在用户真正悬停之前。
+ *
+ * 启动器侧不落盘：这份索引只在内存里，服务端换了 SDE，重启启动器读到的就是新的。
+ * 索引按界面语言失效（SDE 只认那 8 种语言，nl 退成 en）。
+ */
+export interface RawMarketTypeInfo {
+  ok: boolean
+  /** false = 缺 SDE 目录这类「环境不全」，与「这个物品没有属性」区分开 */
+  supported?: boolean
+  /** ok=false 时是后端原话（缺 SDE / 缺静态表 / 市场库还没建种子） */
+  reason?: string
+  ready?: boolean
+  typeId?: number
+  lang?: string
+  description?: string
+  attributes?: RawMarketTypeInfoAttr[]
+  /** 技能加成 / 特有加成（SDE 的 typeBonus；只有舰船与少数装备有） */
+  bonuses?: RawMarketTypeInfoBonus[]
+  /** 属性分类 id → 名字（SDE 原话，英文） */
+  categories?: Record<string, string>
+  counts?: Record<string, number>
+}

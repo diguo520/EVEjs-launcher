@@ -114,6 +114,11 @@ const NO_HANDLER_ROWS = [
     channel: "market:trades",
     reason: "同 market:overview：最近成交回执，现役版没有这项能力。",
   },
+  {
+    channel: "market:typeInfo",
+    reason:
+      "同 market:overview：单件物品的简介与属性（侧车折 SDE 成索引后由 src-tauri/src/market.rs 常驻内存），现役版没有这项能力。",
+  },
 ];
 const NO_HANDLER = new Map(NO_HANDLER_ROWS.map((row) => [row.channel, row.reason]));
 

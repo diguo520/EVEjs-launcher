@@ -60,10 +60,15 @@ pub const HANDLED: &[&str] = &[
     "login:start",
     // 物品市场（本工程扩展，契约见 contract/extensions.json）：直读服务端市场库，
     // 现役版没有物品/市场浏览功能
+    // adjustStock 是唯一的写路径：调市场服务的 admin 接口改种子库存价格 / 数量，
+    // 服务端处理完精确失效缓存，改完立刻生效（见 market.rs 的 adjust_seed_stock）
+    "market:adjustStock",
     "market:book",
     "market:catalog",
     "market:overview",
     "market:trades",
+    // 悬停提示的简介 / 属性（只读：SDE + 静态表），首次调用建内存索引后常驻
+    "market:typeInfo",
     "metrics:get",
     "mods:authoringDoc",
     "mods:authoringDocText",

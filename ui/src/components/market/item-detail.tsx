@@ -1,11 +1,21 @@
-import { useMemo, type ReactNode } from "react"
-import { Activity, Gauge, Store, TrendingUp } from "lucide-react"
+import { useMemo, useState, type ReactNode } from "react"
+import { Activity, Gauge, Pencil, Store, TrendingUp } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CopyButton, EmptyHint, LoadingHint } from "@/components/commands/command-shared"
-import type { RawMarketBook, RawMarketHistoryPoint, RawMarketStockRow } from "@/lib/ipc"
+import { StockEditDialog } from "@/components/market/stock-edit-dialog"
+import { TypeInfoPanel } from "@/components/market/item-tooltip"
+import type {
+  RawMarketAdjust,
+  RawMarketAdjustInput,
+  RawMarketBook,
+  RawMarketHistoryPoint,
+  RawMarketStockRow,
+  RawMarketTypeInfo,
+} from "@/lib/ipc"
 import {
   formatDay,
   formatIsk,
@@ -38,6 +48,9 @@ export function ItemDetail({
   stationName,
   locale,
   className,
+  onAdjust,
+  info,
+  infoLoading,
 }: {
   book: RawMarketBook | null
   loading: boolean
@@ -47,12 +60,19 @@ export function ItemDetail({
   stationName: Map<number, string>
   locale: LocaleCode
   className?: string
+  /** 改某站某物品的种子库存价格 / 数量（一次一个站，见 market.rs 的 adjust_seed_stock） */
+  onAdjust: (input: RawMarketAdjustInput) => Promise<RawMarketAdjust | null>
+  /** 简介与属性（market:typeInfo）：点开物品时由 market-page 拉一次，和盘口并行 */
+  info: RawMarketTypeInfo | null
+  infoLoading: boolean
 }) {
   const history = useMemo(() => book?.history ?? [], [book])
   const stock = useMemo(() => sortStockByPrice(book?.stock ?? []), [book])
   const touched = useMemo(() => touchedStockRows(stock), [stock])
   const chart = useMemo(() => historyChart(history, CHART_W, CHART_H), [history])
   const fills = book?.fills ?? []
+  // 正在改哪一行；null = 没开弹窗。放在早退之前：hooks 不能排在条件分支后面
+  const [editing, setEditing] = useState<RawMarketStockRow | null>(null)
 
   if (loading && !book) {
     return (
@@ -153,10 +173,16 @@ export function ItemDetail({
           <TabsTrigger value="stock">库存分布</TabsTrigger>
           <TabsTrigger value="history">价格史</TabsTrigger>
           <TabsTrigger value="fills">成交回执</TabsTrigger>
+          <TabsTrigger value="info">简介 / 属性</TabsTrigger>
         </TabsList>
 
         <TabsContent value="stock" className="mt-0 min-h-0 flex-1 overflow-y-auto">
-          <StockTable rows={stock} />
+          <StockTable rows={stock} onEdit={setEditing} />
+        </TabsContent>
+
+        <TabsContent value="info" className="mt-0 min-h-0 flex-1 overflow-y-auto">
+          {/* key 带上物品 id：换物品时把折叠状态收回来 */}
+          <TypeInfoPanel key={info?.typeId ?? 0} info={info} loading={infoLoading} />
         </TabsContent>
 
         <TabsContent value="history" className="mt-0 min-h-0 flex-1 overflow-y-auto p-3">
@@ -205,6 +231,16 @@ export function ItemDetail({
           )}
         </TabsContent>
       </Tabs>
+
+      {editing ? (
+        <StockEditDialog
+          row={editing}
+          typeId={type.typeId}
+          typeName={pair.main}
+          onClose={() => setEditing(null)}
+          onSubmit={onAdjust}
+        />
+      ) : null}
     </div>
   )
 }
@@ -242,7 +278,13 @@ function MiniStat({
   )
 }
 
-function StockTable({ rows }: { rows: RawMarketStockRow[] }) {
+function StockTable({
+  rows,
+  onEdit,
+}: {
+  rows: RawMarketStockRow[]
+  onEdit: (row: RawMarketStockRow) => void
+}) {
   if (rows.length === 0) {
     return (
       <div className="p-3">
@@ -263,6 +305,16 @@ function StockTable({ rows }: { rows: RawMarketStockRow[] }) {
               <span className="tabular shrink-0 text-[11px] text-success">
                 {formatIsk(row.price)}
               </span>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="size-5 shrink-0 p-0 text-tertiary hover:text-foreground"
+                title="改价 / 改量"
+                onClick={() => onEdit(row)}
+              >
+                <Pencil className="size-3" />
+              </Button>
             </div>
             <div className="mt-0.5 flex items-center gap-2 text-[10px] text-tertiary">
               <span data-i18n-skip className="min-w-0 flex-1 truncate">{row.systemName}</span>

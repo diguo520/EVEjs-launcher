@@ -1,0 +1,33 @@
+{
+  "version": "0.3.7",
+  "changelog": {
+    "zh": [
+      {
+        "type": "new",
+        "text": "物品市场新增「改价 / 改量」：库存行的铅笔按钮能直接改那一站的种子库存价格与数量，保存后**立刻生效** —— 不用重启市场服务、也不用重启客户端，游戏里把市场窗口关掉再打开就是新价。留空的一项表示不改；改的是服务端预置的 NPC 种子库存（重跑 BuildMarketSeed 会覆盖手改值），玩家自己的挂单不在这里。"
+      },
+      {
+        "type": "new",
+        "text": "物品市场新增「简介 / 属性」：鼠标停在清单里的物品上，弹出的卡片带物品简介与前几条属性（含单位）；右栏盘口多一个「简介 / 属性」页签，列完整简介与全部分组属性。简介、属性名与简介文案都直接读服务端自己那份 SDE，跟着界面语言走；启动器不落任何快照文件，服务端换了 SDE 重启启动器读到的就是新的。"
+      },
+      {
+        "type": "opt",
+        "text": "「简介 / 属性」照游戏属性面板重排：分区卡片（护盾 / 装甲 / 结构 / 电容器 / 导航 / 目标锁定系统 / 感应强度 / 仓库 / 电子抗性）带标题栏，护盾 / 装甲 / 结构 再给一行「有效 HP」与电磁 / 热能 / 动能 / 爆炸四抗色块，属性行是「图标 + 名称 + 右对齐值」，整段可折叠；悬停卡改成游戏的物品提示卡样子（缩略图 + 名称 + 价格 + 蓝色的「拦截舰操作每升一级：」「特有加成：」加成段，数字按 SDE 的 importance 排）。以毫秒存的「秒」属性（护盾 / 电容回充时间那类）照游戏写成「10分25秒」。新文案八种语言都补齐。"
+      }
+    ],
+    "en": [
+      {
+        "type": "new",
+        "text": "Item market can now edit seed stock: the pencil button on a stock row changes that station's preset NPC price and quantity, and the change takes effect immediately — no market service restart, no client restart; close and reopen the market window in game and the new price is there. Leave a field empty to keep it as it is. This edits the server's seed stock (re-running BuildMarketSeed overwrites manual values); player orders are not touched."
+      },
+      {
+        "type": "new",
+        "text": "Item market now has Description / Attributes: hovering an item in the list pops a card with its description and the first few attributes (with units), and the right-hand panel gains a Description / Attributes tab listing the full description and every attribute group. Descriptions, attribute names and text come from the server's own SDE and follow the UI language; the launcher writes no snapshot files, so after swapping the server SDE a launcher restart reads the new data."
+      },
+      {
+        "type": "opt",
+        "text": "The Description / Attributes tab is laid out like the game's attribute panel: section cards (Shield / Armor / Structure / Capacitor / Navigation / Targeting / Sensor Strength / Hangars & Bays / Electronic Resistances) with a header, Shield / Armor / Structure also show a row of Effective HP plus the EM / Thermal / Kinetic / Explosive resist chips, rows are icon + name + right-aligned value, and every section folds. The hover card follows the game's item tooltip (thumbnail, name, price, blue per-level skill bonuses and role bonus, ordered by the SDE importance field). Attributes stored in milliseconds (shield / capacitor recharge and friends) are shown the way the game writes them, e.g. 10m 25s. All new strings are translated in the eight languages."
+      }
+    ]
+  }
+}

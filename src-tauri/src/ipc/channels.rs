@@ -1,6 +1,6 @@
 //! 由 scripts/gen-contract.mjs 生成 —— 请勿手改。源: contract/ipc-channels.json
 //! 抽取源: E:\Games\EveJS-v0.12.8\launcher\launcher
-//! 生成时间: 2026-10-04T17:19:35.677Z
+//! 生成时间: 2026-10-04T22:15:30.852Z
 
 #![allow(dead_code)]
 
@@ -18,7 +18,7 @@ pub struct ChannelSpec {
     pub kind: ChannelKind,
 }
 
-pub const REQUEST_COUNT: usize = 108;
+pub const REQUEST_COUNT: usize = 110;
 pub const EVENT_COUNT: usize = 7;
 
 #[rustfmt::skip]
@@ -67,10 +67,12 @@ pub const CHANNELS: &[ChannelSpec] = &[
     ChannelSpec { channel: "init:state", api: "initState", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "log:read", api: "readServerLog", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "login:start", api: "loginStart", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "market:adjustStock", api: "marketAdjustStock", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "market:book", api: "marketBook", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "market:catalog", api: "marketCatalog", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "market:overview", api: "marketOverview", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "market:trades", api: "marketTrades", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "market:typeInfo", api: "marketTypeInfo", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "metrics:get", api: "metricsGet", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "mods:authoringDoc", api: "modsAuthoringDoc", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "mods:authoringDocText", api: "modsAuthoringDocText", kind: ChannelKind::Invoke },

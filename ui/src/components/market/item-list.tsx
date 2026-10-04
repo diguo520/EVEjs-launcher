@@ -2,6 +2,8 @@ import { ArrowDown, ArrowUp, Package } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { EmptyHint, LoadingHint, Pagination, SearchInput } from "@/components/commands/command-shared"
+import { ItemTooltip } from "@/components/market/item-tooltip"
+import type { RawMarketTypeInfo } from "@/lib/ipc"
 import {
   formatIsk,
   formatQty,
@@ -24,6 +26,12 @@ interface RowView {
   ask: number
   askQty: number
   bid: number
+}
+
+/** 物品组名（如「拦截舰」）：悬停卡缩略图的悬停说明用；中文界面取中文，其余取 SDE 英文名 */
+function groupName(catalog: MarketCatalog, index: number, locale: string): string {
+  const group = catalog.groups.get(catalog.types.groupId[index])
+  return (locale === "zh" ? group?.zh : group?.en) || ""
 }
 
 /** 只把当前这一页的行折成对象：19k 行全折出来要多占好几倍内存 */
@@ -74,6 +82,7 @@ export function ItemList({
   sortKey,
   sortDesc,
   onSort,
+  loadTypeInfo,
   loading,
   failed,
   className,
@@ -92,6 +101,8 @@ export function ItemList({
   sortKey: MarketSortKey
   sortDesc: boolean
   onSort: (key: MarketSortKey) => void
+  /** 悬停卡用：取简介与属性（同语言的重复调用由 use-market 的缓存挡掉） */
+  loadTypeInfo: (typeId: number) => Promise<RawMarketTypeInfo | null>
   loading: boolean
   failed: boolean
   className?: string
@@ -165,34 +176,45 @@ export function ItemList({
             const row = rowView(catalog, index, cnNames, locale)
             const active = row.typeId === activeTypeId
             return (
-              <button
+              <ItemTooltip
                 key={row.typeId}
-                type="button"
-                onClick={() => onSelect(row.typeId)}
-                className={cn(
-                  "flex w-full items-center gap-2 border-b border-input/40 px-3 py-1.5 text-left transition-colors",
-                  active ? "bg-accent/60" : "hover:bg-accent/40"
-                )}
+                typeId={row.typeId}
+                name={row.main}
+                sub={row.sub}
+                price={formatIsk(row.ask)}
+                volume={catalog.types.volume[index]}
+                catId={catalog.types.catId[index]}
+                group={groupName(catalog, index, locale)}
+                load={loadTypeInfo}
               >
-                <Package className="size-3.5 shrink-0 text-tertiary" />
-                <span className="min-w-0 flex-1">
-                  <span data-i18n-skip className="block truncate text-[12px] leading-tight text-foreground">
-                    {row.main}
+                <button
+                  type="button"
+                  onClick={() => onSelect(row.typeId)}
+                  className={cn(
+                    "flex w-full items-center gap-2 border-b border-input/40 px-3 py-1.5 text-left transition-colors",
+                    active ? "bg-accent/60" : "hover:bg-accent/40"
+                  )}
+                >
+                  <Package className="size-3.5 shrink-0 text-tertiary" />
+                  <span className="min-w-0 flex-1">
+                    <span data-i18n-skip className="block truncate text-[12px] leading-tight text-foreground">
+                      {row.main}
+                    </span>
+                    <span data-i18n-skip className="block truncate text-[10px] leading-tight text-tertiary">
+                      {row.sub ? `${row.typeId} · ${row.sub}` : row.typeId}
+                    </span>
                   </span>
-                  <span data-i18n-skip className="block truncate text-[10px] leading-tight text-tertiary">
-                    {row.sub ? `${row.typeId} · ${row.sub}` : row.typeId}
+                  <span className="tabular w-24 shrink-0 text-right text-[11px] text-success">
+                    {formatIsk(row.ask)}
                   </span>
-                </span>
-                <span className="tabular w-24 shrink-0 text-right text-[11px] text-success">
-                  {formatIsk(row.ask)}
-                </span>
-                <span className="tabular w-20 shrink-0 text-right text-[11px] text-muted-foreground">
-                  {formatQty(row.askQty)}
-                </span>
-                <span className="tabular w-24 shrink-0 text-right text-[11px] text-destructive">
-                  {formatIsk(row.bid)}
-                </span>
-              </button>
+                  <span className="tabular w-20 shrink-0 text-right text-[11px] text-muted-foreground">
+                    {formatQty(row.askQty)}
+                  </span>
+                  <span className="tabular w-24 shrink-0 text-right text-[11px] text-destructive">
+                    {formatIsk(row.bid)}
+                  </span>
+                </button>
+              </ItemTooltip>
             )
           })
         )}

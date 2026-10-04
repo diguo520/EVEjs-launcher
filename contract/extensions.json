@@ -93,6 +93,14 @@
       "why": "静态数据页的读数：这一轮服务端是不是启动器带 host 起来的（boot.json 的 bootId 与 host 挂牌的 session.json 一致、pid 就是当前主服务器）、可重载的静态表清单（有 data.json 且不在 SQLITE_TABLES 里，本机实测 64 张）、每个表的大小与 mtime、哪些表改过还没重载（dirty）、上一次重载结果、快照列表。为什么要在启动器里做而不是让用户自己点批处理：表清单、脏表检测、重载前的 JSON 校验、结果与耗时都有地方看，还能一眼区分「服务端即时生效 / 需重进星系（celestials、solarSystems、stargates、stations）/ 需重启」。现役版没有这个能力。"
     },
     {
+      "api": "marketAdjustStock",
+      "channel": "market:adjustStock",
+      "kind": "invoke",
+      "signature": "input: { stationId: number; typeId: number; quantity?: number; price?: number; reason?: string }",
+      "params": ["input"],
+      "why": "物品市场页的「改价 / 改量」。走的是市场服务**自带**的管理接口 `POST /v1/admin/seed-stock/adjust`（路由见 market-server/src/main.rs，请求体见 market-common 的 AdjustSeedStockRequest），不是自己拿连接写 SQLite —— 服务端处理完会按 (region, system, station, type) 精确失效 region/system/station 摘要与 order_books 缓存，所以**改完立刻生效**：不用重启市场服务，也不用重启客户端，游戏里把市场窗口关掉再打开就是新价。自己写库则拿不到这份失效逻辑（库里的数字变了、服务端内存里的摘要还是旧的，游戏里看不到任何变化），还会跟守护进程抢写锁。代价是这条路径依赖市场服务正在运行：没跑时回「先把市场服务启动起来」。改的是**种子库存**（NPC 那批默认 9999999 的货）；重新跑 BuildMarketSeed*.bat 会把手改值覆盖掉。一次调用只作用于「一个空间站 + 一个物品」，批量由界面按站循环调用；玩家挂单走的是另一套 PlaceOrder / ModifyOrder 接口，不在这里。"
+    },
+    {
       "api": "marketBook",
       "channel": "market:book",
       "kind": "invoke",
@@ -127,6 +135,17 @@
         "limit"
       ],
       "why": "最近的成交流水（market_fill_receipts，明细在 response_json 里），用来证明「库是活的」：刷新一下就能看到新成交。order_id 是 int64，超出 JS 安全整数范围，CLI 侧必须 CAST 成 TEXT 再下发，否则前端读到的 id 会被静默改写。"
+    },
+    {
+      "api": "marketTypeInfo",
+      "channel": "market:typeInfo",
+      "kind": "invoke",
+      "signature": "typeId: number, lang?: string",
+      "params": [
+        "typeId",
+        "lang"
+      ],
+      "why": "物品清单里悬停一个物品（以及右侧详情的「简介 / 属性」页签）要看的简介与 dogma 属性。现役版没有物品 / 市场浏览，自然没有这条。数据全在服务端自己的静态数据里：简介与属性名、单位、分类名来自 _local/sde 的 types.jsonl / dogmaAttributes.jsonl / dogmaUnits.jsonl / dogmaAttributeCategories.jsonl，每个物品的属性值来自静态表 _local/gameStore/data/typeDogma/data.json —— 启动器不随包一份 SDE，服务端升级换了 SDE，重启启动器读到的就是新的，也不落任何磁盘产物。侧车 typeinfo 一次折好整个市场目录的索引（约 3-8 MB JSON，随界面语言变），Rust 侧常驻内存并按语言失效：悬停是毫秒级交互，每次悬停起一个 node 进程去扫 144 MB 的 SDE 是等不起的（实测首次构建约 1.5 s，之后内存查表）。属性按 published 过滤、值为 0 且 displayWhenZero=false 的不列、按 (分类, 属性 id) 排序；值是 typeID 的属性（技能需求这类，unitID=116）会回解析出来的物品名。typeId=0 表示只预热索引，界面打开市场页时先发这一条。回包里每条属性还带 SDE 的 unitID，渲染层据此折算原始值（这些是 dogma 原始值，不是客户端算完的成品）：unitID=101 的属性（护盾 / 电容回充时间、射速、装填…）实际以毫秒存、单位串却写「s」，显示前要除以 1000；unitID=108 是抗性的「共振系数」（1 = 0% 抗性），要显示成 (1 - 值) × 100；unitID=115 / 116 的单位串（组别ID / 类别ID）是说明文字不是单位，值指向别的对象。单位符号本身也是 SDE 按语言给的（zh 的「安装座」「等级」），枚举型单位（`1=小型  2=中型  3=大型`）由渲染层就地按 `数字=` 切标签，不自建对照表。侧车对「SDE 不在」这类预期失败回的是 `{ok:false, reason}`：Rust 侧必须自己看这个 ok，否则一份缺 SDE 的回包会被当成「索引是空的」，界面把「读不到」说成「这个物品没有简介与属性」。SDE 只带 zh/en/es/fr/ja/ko/ru 八种语言，界面语言里的 nl 与侧车、Rust 两侧统一退成英文（两边口径必须一致，否则每次调用都会判定语言变了而重建索引）。"
     },
     {
       "api": "modsClaimCandidates",

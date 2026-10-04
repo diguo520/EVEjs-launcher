@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { RefreshCw } from "lucide-react"
 
 import { Panel, SectionHeading, StatTile } from "@/components/common/panel"
@@ -11,6 +11,7 @@ import { TradesPanel } from "@/components/market/trades-panel"
 import { useLocale } from "@/components/shell/locale-provider"
 import { useMarket } from "@/hooks/use-market"
 import { useManualData } from "@/hooks/use-manual-data"
+import type { RawMarketTypeInfo } from "@/lib/ipc"
 import { filterTypeRows, marketTiles, sortTypeRows, type MarketSortKey } from "@/lib/market-logic"
 
 /**
@@ -26,7 +27,7 @@ import { filterTypeRows, marketTiles, sortTypeRows, type MarketSortKey } from "@
 export function MarketPage() {
   // 物品名 / 分类名是数据，不走翻译桥，得自己按当前语言取（见 namePair）
   const { locale } = useLocale()
-  const store = useMarket()
+  const store = useMarket(locale)
   // 中文名与指令手册共用同一份 items.json（模块级缓存，切页不会重复解析）
   const { rows: items } = useManualData("items")
   const cnNames = useMemo(
@@ -39,6 +40,31 @@ export function MarketPage() {
   const [sortKey, setSortKey] = useState<MarketSortKey>("name")
   const [sortDesc, setSortDesc] = useState(false)
   const [selected, setSelected] = useState<number | null>(null)
+  // 选中物品的简介与属性：与盘口并行拉。悬停卡与右栏页签共用 use-market 里那份缓存，
+  // 所以这里的调用在第二次打开同一个物品时是纯内存命中。
+  // 存 `{ typeId, info }` 而不是「选中什么就存什么」：晚到的回包自己带上物品 id，
+  // 用户已经点了别的物品时旧包自然被判定不匹配，不用再写一遍重置逻辑。
+  const [typeInfo, setTypeInfo] = useState<{ typeId: number; info: RawMarketTypeInfo | null } | null>(
+    null
+  )
+  const loadTypeInfo = store.typeInfo
+
+  useEffect(() => {
+    if (selected == null) return
+    let alive = true
+    void loadTypeInfo(selected).then((reply) => {
+      if (!alive) return
+      setTypeInfo({ typeId: selected, info: reply })
+    })
+    return () => {
+      alive = false
+    }
+  }, [selected, locale, loadTypeInfo])
+
+  const infoReady = selected != null && typeInfo !== null && typeInfo.typeId === selected
+  const info = infoReady ? typeInfo.info : null
+  // 选中了物品但还没拿到它这一份（含在飞的请求）才算加载中
+  const infoLoading = selected != null && !infoReady
 
   const filtered = useMemo(() => {
     const hit = filterTypeRows(store.catalog, { nodeId, query, cnNames })
@@ -173,6 +199,7 @@ export function MarketPage() {
               sortKey={sortKey}
               sortDesc={sortDesc}
               onSort={applySort}
+              loadTypeInfo={loadTypeInfo}
               loading={false}
               failed={false}
               className="min-w-0 border-b border-input lg:border-b-0 lg:border-r"
@@ -208,6 +235,9 @@ export function MarketPage() {
                     catalog={store.catalog}
                     stationName={store.catalog.stationName}
                     locale={locale}
+                    onAdjust={store.adjustStock}
+                    info={info}
+                    infoLoading={infoLoading}
                   />
                 </>
               )}

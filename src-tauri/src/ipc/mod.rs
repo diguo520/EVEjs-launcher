@@ -350,6 +350,35 @@ async fn dispatch(
                 .map(|value| value as u32);
             Ok(market::trades(&root, limit).await)
         }
+        // 悬停提示的简介 / 属性（本工程扩展）：数据在服务端 SDE 与静态表里，首次调用要等
+        // 侧车扫一遍 SDE（约 1.5 s）建内存索引，所以界面打开市场页时先用 typeId=0 预热；
+        // 第二个参数是界面语言（SDE 没有 nl，Rust 侧统一退英文，与侧车同一个口径）。
+        "market:typeInfo" => {
+            Ok(market::type_info(&root, arg_u32(args, 0, 0), &arg_str(args, 1)).await)
+        }
+        // 改种子库存的价格 / 数量。**不走侧车**：这是市场服务的 admin HTTP 接口，
+        // 服务端处理完会精确失效摘要与盘口缓存，所以改完立刻生效（见 market.rs）。
+        // 阻塞活儿丢给 blocking：ureq 是同步的，占着 tokio 工作线程会把并发请求一起拖住。
+        "market:adjustStock" => {
+            let input = args.first().cloned().unwrap_or(Value::Null);
+            let station_id = input.get("stationId").and_then(Value::as_u64).unwrap_or(0);
+            let type_id = input
+                .get("typeId")
+                .and_then(Value::as_u64)
+                .map(|value| value.min(u32::MAX as u64) as u32)
+                .unwrap_or(0);
+            // 省掉的那个字段服务端保持原值：None 就是「这项不改」
+            let quantity = input.get("quantity").and_then(Value::as_u64);
+            let price = input.get("price").and_then(Value::as_f64);
+            let reason = input
+                .get("reason")
+                .and_then(Value::as_str)
+                .map(str::to_string);
+            Ok(blocking(move || {
+                market::adjust_seed_stock(station_id, type_id, quantity, price, reason)
+            })
+            .await?)
+        }
 
         /* ------------------------------ 模组管理 ------------------------------ */
         "mods:list" => {
