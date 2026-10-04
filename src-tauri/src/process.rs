@@ -687,7 +687,10 @@ fn write_mod_bus(
 /// `--require "<路径>"`：NODE_OPTIONS 按空格分词、且把反斜杠当转义符吃掉，
 /// 所以路径必须转成正斜杠并加双引号（已实测）。
 fn require_arg(path: &Path) -> String {
-    format!("--require \"{}\"", path.to_string_lossy().replace('\\', "/"))
+    format!(
+        "--require \"{}\"",
+        path.to_string_lossy().replace('\\', "/")
+    )
 }
 
 /// 计算要注入主服务器的 `NODE_OPTIONS`，一共两条：
@@ -1644,8 +1647,14 @@ mod tests {
         assert_eq!(injected.count, 0, "零模组时 loader 数仍是 0");
         let options = injected.node_options.expect("零模组也要有 NODE_OPTIONS");
         assert!(options.contains("/hotreload/host.js\""), "{options}");
-        assert!(!options.contains("mod-host.js"), "没有模组就不该注入总线：{options}");
-        assert!(!options.contains('\\'), "NODE_OPTIONS 里不能出现反斜杠：{options}");
+        assert!(
+            !options.contains("mod-host.js"),
+            "没有模组就不该注入总线：{options}"
+        );
+        assert!(
+            !options.contains('\\'),
+            "NODE_OPTIONS 里不能出现反斜杠：{options}"
+        );
         assert!(runtime.root.join("hotreload").join("host.js").is_file());
         assert!(runtime.root.join("hotreload").join("boot.json").is_file());
 

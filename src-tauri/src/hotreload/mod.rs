@@ -56,31 +56,106 @@ struct FrozenTable {
 }
 
 const FROZEN_TABLES: [FrozenTable; 25] = [
-    FrozenTable { name: "solarSystems", owners: "worldData / mapService / configService" },
-    FrozenTable { name: "stations", owners: "worldData / configService / agentMissionRuntime" },
-    FrozenTable { name: "stationTypes", owners: "worldData" },
-    FrozenTable { name: "stargates", owners: "worldData / gateSkinCommand / configService" },
-    FrozenTable { name: "stargateTypes", owners: "worldData / gateSkinCommand" },
-    FrozenTable { name: "celestials", owners: "worldData / planetMgrService / configService" },
-    FrozenTable { name: "asteroidBelts", owners: "worldData / asteroidData / configService" },
-    FrozenTable { name: "moonMiningPoints", owners: "worldData" },
-    FrozenTable { name: "movementAttributes", owners: "worldData" },
-    FrozenTable { name: "itemTypes", owners: "itemTypeRegistry / liveFittingState / configService 等 10 处" },
-    FrozenTable { name: "typeDogma", owners: "liveFittingState / dogmaService / skillTradingAuthority 等 6 处" },
-    FrozenTable { name: "shipDogmaAttributes", owners: "liveFittingState" },
-    FrozenTable { name: "shipTypes", owners: "wreckRadius / shipTypeRegistry" },
-    FrozenTable { name: "dynamicItemAttributes", owners: "dynamicItemService" },
-    FrozenTable { name: "skillTypes", owners: "weaponDogma / certificateRuntime" },
-    FrozenTable { name: "skillTrainingAlphaCaps", owners: "skillCloneRestrictions" },
-    FrozenTable { name: "npcProfiles", owners: "miningNpcCatalog / empireSecurityNpcCatalog" },
-    FrozenTable { name: "npcLoadouts", owners: "miningNpcCatalog / empireSecurityNpcCatalog" },
-    FrozenTable { name: "npcSpawnPools", owners: "miningNpcCatalog" },
-    FrozenTable { name: "npcSpawnGroups", owners: "empireSecurityNpcCatalog" },
-    FrozenTable { name: "structureTypes", owners: "structureState" },
-    FrozenTable { name: "shipCosmeticsCatalog", owners: "shipCosmeticsState" },
-    FrozenTable { name: "asteroidFieldStyles", owners: "asteroidData" },
-    FrozenTable { name: "asteroidTypesBySolarSystemID", owners: "miningVisuals" },
-    FrozenTable { name: "clientEntityStandings", owners: "clientEntityStandings" },
+    FrozenTable {
+        name: "solarSystems",
+        owners: "worldData / mapService / configService",
+    },
+    FrozenTable {
+        name: "stations",
+        owners: "worldData / configService / agentMissionRuntime",
+    },
+    FrozenTable {
+        name: "stationTypes",
+        owners: "worldData",
+    },
+    FrozenTable {
+        name: "stargates",
+        owners: "worldData / gateSkinCommand / configService",
+    },
+    FrozenTable {
+        name: "stargateTypes",
+        owners: "worldData / gateSkinCommand",
+    },
+    FrozenTable {
+        name: "celestials",
+        owners: "worldData / planetMgrService / configService",
+    },
+    FrozenTable {
+        name: "asteroidBelts",
+        owners: "worldData / asteroidData / configService",
+    },
+    FrozenTable {
+        name: "moonMiningPoints",
+        owners: "worldData",
+    },
+    FrozenTable {
+        name: "movementAttributes",
+        owners: "worldData",
+    },
+    FrozenTable {
+        name: "itemTypes",
+        owners: "itemTypeRegistry / liveFittingState / configService 等 10 处",
+    },
+    FrozenTable {
+        name: "typeDogma",
+        owners: "liveFittingState / dogmaService / skillTradingAuthority 等 6 处",
+    },
+    FrozenTable {
+        name: "shipDogmaAttributes",
+        owners: "liveFittingState",
+    },
+    FrozenTable {
+        name: "shipTypes",
+        owners: "wreckRadius / shipTypeRegistry",
+    },
+    FrozenTable {
+        name: "dynamicItemAttributes",
+        owners: "dynamicItemService",
+    },
+    FrozenTable {
+        name: "skillTypes",
+        owners: "weaponDogma / certificateRuntime",
+    },
+    FrozenTable {
+        name: "skillTrainingAlphaCaps",
+        owners: "skillCloneRestrictions",
+    },
+    FrozenTable {
+        name: "npcProfiles",
+        owners: "miningNpcCatalog / empireSecurityNpcCatalog",
+    },
+    FrozenTable {
+        name: "npcLoadouts",
+        owners: "miningNpcCatalog / empireSecurityNpcCatalog",
+    },
+    FrozenTable {
+        name: "npcSpawnPools",
+        owners: "miningNpcCatalog",
+    },
+    FrozenTable {
+        name: "npcSpawnGroups",
+        owners: "empireSecurityNpcCatalog",
+    },
+    FrozenTable {
+        name: "structureTypes",
+        owners: "structureState",
+    },
+    FrozenTable {
+        name: "shipCosmeticsCatalog",
+        owners: "shipCosmeticsState",
+    },
+    FrozenTable {
+        name: "asteroidFieldStyles",
+        owners: "asteroidData",
+    },
+    FrozenTable {
+        name: "asteroidTypesBySolarSystemID",
+        owners: "miningVisuals",
+    },
+    FrozenTable {
+        name: "clientEntityStandings",
+        owners: "clientEntityStandings",
+    },
 ];
 
 /// 太空场景几何：这几张表还额外决定「已经在跑的星系」里有什么，光重载内存副本不够，
@@ -345,7 +420,10 @@ pub fn state(root: &Path, runtime: &RuntimePaths, server_pid: Option<u32>) -> Va
     let supported = server_has_gamestore(root);
     let (mut tables, runtime_count) = list_static_tables(root);
     let session = read_json(&dir(runtime).join(SESSION_FILE));
-    let session_pid = session.as_ref().and_then(|value| value.get("pid")).and_then(Value::as_u64);
+    let session_pid = session
+        .as_ref()
+        .and_then(|value| value.get("pid"))
+        .and_then(Value::as_u64);
     let session_boot = session
         .as_ref()
         .and_then(|value| value.get("bootId"))
@@ -358,7 +436,8 @@ pub fn state(root: &Path, runtime: &RuntimePaths, server_pid: Option<u32>) -> Va
         (Some(left), Some(right)) => left == right as u64,
         _ => false,
     };
-    let is_armed = supported && session_boot.is_some() && session_boot == current_boot && pid_matches;
+    let is_armed =
+        supported && session_boot.is_some() && session_boot == current_boot && pid_matches;
     if supported {
         load_baseline(runtime, &mut tables);
     }
@@ -533,7 +612,8 @@ pub async fn apply(
     let mut outcome: Option<Value> = None;
     while std::time::Instant::now() < deadline {
         if let Some(value) = read_json(&dir.join(RESULT_FILE)) {
-            let matching = value.get("requestId").and_then(Value::as_str) == Some(request_id.as_str())
+            let matching = value.get("requestId").and_then(Value::as_str)
+                == Some(request_id.as_str())
                 && value.get("bootId").and_then(Value::as_str) == Some(boot.as_str());
             if matching {
                 outcome = Some(value);
@@ -563,7 +643,11 @@ pub async fn apply(
     if let Some(reloaded) = result.get("reloaded").and_then(Value::as_array) {
         let names: Vec<String> = reloaded
             .iter()
-            .filter_map(|item| item.get("table").and_then(Value::as_str).map(str::to_string))
+            .filter_map(|item| {
+                item.get("table")
+                    .and_then(Value::as_str)
+                    .map(str::to_string)
+            })
             .collect();
         refresh_baseline_for(root, runtime, &names);
     }
@@ -583,10 +667,7 @@ fn refresh_baseline_for(root: &Path, runtime: &RuntimePaths, names: &[String]) {
     if let Some(map) = stored.get_mut("tables").and_then(Value::as_object_mut) {
         for name in names {
             if let Some((size, mtime)) = file_stamp(&data_dir(root).join(name).join("data.json")) {
-                map.insert(
-                    name.clone(),
-                    json!({ "mtimeMs": mtime, "sizeBytes": size }),
-                );
+                map.insert(name.clone(), json!({ "mtimeMs": mtime, "sizeBytes": size }));
             }
         }
     }
@@ -692,11 +773,7 @@ mod tests {
         let runtime = RuntimePaths::from_root(root.join("_launcher"), false);
         std::fs::create_dir_all(dir(&runtime)).unwrap();
         assert!(!armed(&runtime));
-        write_json(
-            &dir(&runtime).join(BOOT_FILE),
-            &json!({ "bootId": "abc" }),
-        )
-        .unwrap();
+        write_json(&dir(&runtime).join(BOOT_FILE), &json!({ "bootId": "abc" })).unwrap();
         assert!(!armed(&runtime), "只有 boot.json 还不算激活");
         write_json(
             &dir(&runtime).join(SESSION_FILE),
@@ -758,12 +835,18 @@ mod tests {
         }
         // 有钩子的表不能误标（host 会调它们的 clear*，属于即时生效）
         for name in ["mapTagsAuthority", "missionAuthority", "planetSchematics"] {
-            assert!(frozen_table(name).is_none(), "{name} 有重置入口，不该标成需重启");
+            assert!(
+                frozen_table(name).is_none(),
+                "{name} 有重置入口，不该标成需重启"
+            );
         }
         assert_eq!(FROZEN_TABLES.len(), 25);
         // 场景表必须是需重启表的子集：场景读的就是 worldData 那份被冻结的索引
         for name in SCENE_TABLES {
-            assert!(frozen_table(name).is_some(), "{name} 在场景表里却不在需重启表里");
+            assert!(
+                frozen_table(name).is_some(),
+                "{name} 在场景表里却不在需重启表里"
+            );
         }
         // 表名不许重复
         let mut names: Vec<&str> = FROZEN_TABLES.iter().map(|entry| entry.name).collect();
