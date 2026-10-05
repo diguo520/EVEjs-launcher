@@ -45,13 +45,14 @@ import { useLocale } from "@/components/shell/locale-provider"
 import type { RawMarketTypeInfo, RawMarketTypeInfoAttr } from "@/lib/ipc"
 import {
   attributeSections,
+  damageAttrSlot,
   formatAttrNumber,
   formatAttrValue,
   tooltipPlan,
-  RESIST_ATTR_IDS,
   SENSOR_ATTR_ORDER,
   SECTION_SENSOR,
   type TypeInfoDefence,
+  type TypeInfoQuad,
   type TypeInfoSectionView,
 } from "@/lib/type-info-logic"
 import { cn } from "@/lib/utils"
@@ -124,8 +125,31 @@ const CATEGORY_ICON: Record<number, Icon> = {
 /** 四抗色块：电磁蓝 / 热能红 / 动能灰 / 爆炸橙 —— 与伤害类型一一对应 */
 const DAMAGE_COLORS = ["#4a9fe0", "#e05a5a", "#9aa4b2", "#e09a4a"]
 
+/**
+ * 爆炸伤害的图标：客户端那个「中心炸开、四周一排尖角」的星爆。lucide 里没有对应的 ——
+ * 最接近的 Sparkles 是两个四角闪光，12px 下看着像撒了把星星，不像爆炸（实测反馈过）。
+ * 所以手画一个 8 角星爆：外径 10.4 / 内径 4.3（尖角够长、又不至于细成一根针），
+ * 用 currentColor 填充，跟另外三个图标一样吃 DAMAGE_COLORS 的配色。
+ */
+function BurstIcon({ className, style }: { className?: string; style?: CSSProperties }) {
+  return (
+    <svg
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className={className}
+      style={style}
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M12 1.6 13.65 8.03 19.35 4.65 15.97 10.35 22.4 12 15.97 13.65 19.35 19.35 13.65 15.97 12 22.4 10.35 15.97 4.65 19.35 8.03 13.65 1.6 12 8.03 10.35 4.65 4.65 10.35 8.03Z" />
+    </svg>
+  )
+}
+
 /** 四抗图标：电磁（电）/ 热能（火）/ 动能（动力）/ 爆炸（爆），与 DAMAGE_COLORS 同序 */
-const DAMAGE_ICONS: Icon[] = [Zap, Flame, ChevronsRight, Sparkles]
+const DAMAGE_ICONS: Icon[] = [Zap, Flame, ChevronsRight, BurstIcon]
 
 /** 四格感应强度的图标：雷达 / 光雷达 / 磁力 / 引力，与 SENSOR_ATTR_ORDER 一一对应 */
 const SENSOR_ICONS: Icon[] = [Radar, Radio, Magnet, Orbit]
@@ -552,11 +576,6 @@ function SectionCard({
     : section.alignSeconds !== undefined
       ? t("朝向时间：{value}秒", { value: formatAttrNumber(section.alignSeconds) })
       : null
-  // 四抗已经在色块条里了，就不再当属性行重复列（结构抗性两套 id 会撞出四条同名行）；
-  // 抗性不全、没有色块条时照旧全列出来，宁可重复也不丢信息
-  const rows = section.defence
-    ? section.rows.filter((attr) => !RESIST_ATTR_IDS.has(attr.id))
-    : section.rows
   return (
     <section className="border-b border-input/50 last:border-b-0">
       <button
@@ -583,23 +602,75 @@ function SectionCard({
         <SensorStrip rows={section.rows} />
       ) : (
         <div className="py-0.5">
-          {rows.map((attr) => (
-            <div key={attr.id} className="flex items-baseline gap-2 px-2 py-[3px]">
-              <Icon className="size-3 shrink-0 translate-y-[1px] text-tertiary/60" />
-              <span
-                data-i18n-skip
-                className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground"
-              >
-                {attr.name}
-              </span>
-              <span data-i18n-skip className="tabular shrink-0 text-[11px] text-foreground">
-                {formatAttrValue(attr)}
-              </span>
-            </div>
-          ))}
+          {section.items.map((item) =>
+            item.kind === "quad" ? (
+              <QuadRow key={"quad-" + item.quad.label} quad={item.quad} />
+            ) : (
+              <AttributeLine key={item.attr.id} attr={item.attr} fallback={Icon} />
+            )
+          )}
         </div>
       )}
     </section>
+  )
+}
+
+/** 一条属性行：图标 + 名字 + 右对齐的值；伤害量那几条换成对应的伤害类型图标与配色 */
+function AttributeLine({ attr, fallback }: { attr: RawMarketTypeInfoAttr; fallback: Icon }) {
+  const slot = damageAttrSlot(attr)
+  const RowIcon = slot === null ? fallback : DAMAGE_ICONS[slot % DAMAGE_ICONS.length]
+  return (
+    <div className="flex items-baseline gap-2 px-2 py-[3px]">
+      <RowIcon
+        className="size-3 shrink-0 translate-y-[1px] text-tertiary/60"
+        style={slot === null ? undefined : { color: DAMAGE_COLORS[slot % DAMAGE_COLORS.length] }}
+      />
+      <span data-i18n-skip className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
+        {attr.name}
+      </span>
+      <span data-i18n-skip className="tabular shrink-0 text-[11px] text-foreground">
+        {formatAttrValue(attr)}
+      </span>
+    </div>
+  )
+}
+
+/**
+ * 折成一行四格的属性组（伤害 / 伤害抗性加成）：跟客户端一样占两行 —— 上行只有行名
+ * （客户端这行不带图标），下行四等分列，电 / 火 / 动 / 爆四个伤害类型各占一列，
+ * 列内左对齐「图标 + 值」，这个物品没有的那格照客户端写一个「—」。列宽与上面那条
+ * 四抗色块同一套 grid，所以四个伤害类型上下对得齐。
+ *
+ * 弹药、无人机、炮台的主伤害，以及护盾 / 装甲抗性装备的「伤害抗性加成」在游戏里就是
+ * 这么显示的 —— 不是一行一条属性。
+ *
+ * 行名是界面文案走 `t()`；四格里的值是 SDE 数据，跳过翻译桥。
+ */
+function QuadRow({ quad }: { quad: TypeInfoQuad }) {
+  const { t } = useLocale()
+  return (
+    <div className="px-2 py-[3px]">
+      {/* 整段只有这一行四格时（末日武器、部分弹药）行名由标题带出，这里不再重复一遍 */}
+      {quad.only ? null : (
+        <div className="text-[11px] text-muted-foreground">{t(quad.label)}</div>
+      )}
+      <div className={cn("grid grid-cols-4 gap-2", quad.only ? "" : "mt-1")}>
+        {quad.cells.map((attr, index) => {
+          const CellIcon = DAMAGE_ICONS[index % DAMAGE_ICONS.length]
+          return (
+            <span key={index} className="flex min-w-0 items-center gap-1">
+              <CellIcon
+                className="size-3 shrink-0"
+                style={{ color: DAMAGE_COLORS[index % DAMAGE_COLORS.length] }}
+              />
+              <span data-i18n-skip className="tabular truncate text-[10px] text-foreground">
+                {attr ? formatAttrValue(attr) : "—"}
+              </span>
+            </span>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 

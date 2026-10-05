@@ -2992,6 +2992,8 @@
   "这个物品没有属性数据": "This item has no attribute data.",
   "技能需求": "Required skills",
   "加成": "Bonuses",
+  "伤害": "Damage",
+  "伤害抗性加成": "Damage Resistance Bonus",
   "炮台": "Turrets",
   "导弹": "Missiles",
   "过热": "Heat",

@@ -2992,6 +2992,8 @@
   "这个物品没有属性数据": "Dieser Gegenstand hat keine Attributdaten.",
   "技能需求": "Erforderliche Fertigkeiten",
   "加成": "Bonus",
+  "伤害": "Schaden",
+  "伤害抗性加成": "Bonus auf Schadensresistenz",
   "炮台": "Geschütztürme",
   "导弹": "Raketen",
   "过热": "Hitze",

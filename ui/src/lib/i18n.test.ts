@@ -223,6 +223,8 @@ describe("舰船属性分区", () => {
       "有效 HP：{value}",
       "{m}分{s}秒",
       "代码仓库",
+      "伤害",
+      "伤害抗性加成",
     ]
     for (const code of ["en", "ja", "ko", "fr", "de", "nl", "ru"] as const) {
       for (const key of keys) expect(hasEntry(code, key), code + " · " + key).toBe(true)

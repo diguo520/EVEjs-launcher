@@ -1,0 +1,65 @@
+{
+  "version": "0.3.9",
+  "changelog": {
+    "zh": [
+      {
+        "type": "opt",
+        "text": "物品属性面板：武器、弹药与无人机的「电磁 / 热能 / 动能 / 爆炸伤害」四条折成「伤害」一行四格，四个伤害类型图标各带一个数值，这个物品没有的那种伤害照客户端写一个「—」。以前是一行一条，跟同段的射程、射速长得一模一样。"
+      },
+      {
+        "type": "opt",
+        "text": "物品属性面板：舰载机（铁骑）的每架伤害与「伤害量」那几行改用伤害类型图标与配色；护盾 / 装甲 / 结构抗性全是 0% 的物品也照画四色抗性条，不再退成普通属性行（结构有两套抗性属性 id，都在时挑有真值的那一套）—— 无人机、舰载机这类结构抗性本来就是 0% 的物品，结构段不再和护盾 / 装甲长得不一样。"
+      },
+      {
+        "type": "opt",
+        "text": "物品属性面板：整段只有伤害的物品（末日武器、部分弹药）不再叠成「炮台 / 伤害 / 四格」，标题带直接写「伤害」，下面不再重复一遍行名；同段还有射速、抗性等属性的照旧保留原分类标题。"
+      },
+      {
+        "type": "fix",
+        "text": "物品属性面板：爆炸伤害的图标换成手画的 8 角星爆 —— 原来的 Sparkles 是两个四角闪光，缩到 12px 看着像撒了把星星，不像爆炸。四抗色块条、伤害四格与伤害量属性行三处一起换。"
+      },
+      {
+        "type": "opt",
+        "text": "物品属性面板：护盾 / 装甲抗性装备的「伤害抗性加成」四条（抗性涂层、抗性放大器、多谱抗性强化器…）也折成「伤害抗性加成」一行四格 —— 电 / 火 / 动 / 爆四个图标各带一个值，单抗装备另外三格照客户端写「—」。以前这四条是一行一条，跟同段的科技等级、衍生等级长得一模一样。"
+      },
+      {
+        "type": "fix",
+        "text": "物品属性面板：定锚建筑「护盾加固阵列」与昇威建筑装备上按反向倍率存的属性（XX伤害抗性加成 0.75、射击速度加成 0.92、电容回充速度加成 0.9）以前当百分比原样显示成「0.75 %」「0.92 %」，现在按 SDE 单位 111 的说明折算成「25 %」「8 %」「10 %」。"
+      },
+      {
+        "type": "opt",
+        "text": "物品属性面板：定锚建筑「护盾加固阵列」的「伤害抗性加成」也折成一行四格 —— 定锚那四条用的是另一套属性 id（130-133），以前单抗阵列是一行一条，跟抗性涂层、多谱抗性强化器同一个东西却两个样式，现在都并进「伤害抗性加成」四格。"
+      }
+    ],
+    "en": [
+      {
+        "type": "opt",
+        "text": "Item attributes: the four EM / thermal / kinetic / explosive damage attributes of weapons, charges and drones fold into a single Damage row with one cell per damage-type icon, and a dash is written for the damage types the item does not deal, matching the client. Each used to be its own row, looking exactly like the range and rate-of-fire rows next to it."
+      },
+      {
+        "type": "opt",
+        "text": "Item attributes: per-fighter damage and the damage-amount rows on fighters now use the damage-type icons and colours, and items whose shield / armor / structure resistances are all 0% still get the four-colour resist strip instead of falling back to plain attribute rows (structure has two sets of resist attribute ids and the one carrying real values wins). Drones and fighters, whose structure resists genuinely are 0%, no longer have a structure section that looks different from shield / armor."
+      },
+      {
+        "type": "opt",
+        "text": "Item attributes: a section that contains nothing but damage (doomsday devices, some charges) is no longer a Turrets / Damage / four-cell stack - its header band reads Damage and the row name is not repeated underneath; sections that also carry rate of fire, resistances or anything else keep their original category title."
+      },
+      {
+        "type": "fix",
+        "text": "Item attributes: the explosive damage icon is now a hand-drawn 8-point starburst. lucide's Sparkles is two four-point sparkles, which at 12px looked like a sprinkle of stars rather than an explosion. Replaced in all three places: the four-resist strip, the damage quad and the damage-amount attribute rows."
+      },
+      {
+        "type": "opt",
+        "text": "Item attributes: shield / armor resistance modules (resistance plating, resistance amplifiers, multi-spectrum hardeners and so on) fold their four Damage Resistance Bonus attributes into one Damage Resistance Bonus row of four cells carrying the EM / thermal / kinetic / explosive icons, with a dash in the other three cells for single-resist modules as the client does. Those four rows used to look exactly like the tech level and meta level rows beside them."
+      },
+      {
+        "type": "fix",
+        "text": "Item attributes: attributes stored as a reverse multiplier on the shielding arrays of anchored structures and on Upwell structure equipment (XX Damage Resistance Bonus 0.75, Rate of Fire Bonus 0.92, Capacitor Recharge Rate Bonus 0.9) were printed verbatim as percentages (0.75 %, 0.92 %) and are now converted per the SDE unit 111 description to 25 %, 8 % and 10 %."
+      },
+      {
+        "type": "opt",
+        "text": "Item attributes: the Damage Resistance Bonus of the shielding arrays on anchored structures folds into the same four-cell row. Those four use a different set of attribute ids (130-133), so a single-resist array used to be one row per resistance even though it is the same kind of module as resistance plating or a multi-spectrum hardener; both now share the Damage Resistance Bonus quad."
+      }
+    ]
+  }
+}

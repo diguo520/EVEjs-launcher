@@ -6,11 +6,17 @@ import {
   bonusPlan,
   bonusValue,
   clampDescription,
+  DAMAGE_TITLE,
+  damageAttrSlot,
   enumUnitLabel,
   formatAttrNumber,
   formatAttrValue,
+  RESIST_BONUS_TITLE,
+  RESIST_ATTR_IDS,
   SECTION_SENSOR,
   tooltipPlan,
+  type TypeInfoQuad,
+  type TypeInfoSectionView,
 } from "@/lib/type-info-logic"
 
 /**
@@ -28,6 +34,19 @@ function attr(
     typeName: null,
     ...over,
   }
+}
+
+/** 分区里折成一行四格的那一组（按行名找：伤害 / 伤害抗性加成） */
+function quadOf(section: TypeInfoSectionView, label: string = DAMAGE_TITLE): TypeInfoQuad {
+  for (const item of section.items) {
+    if (item.kind === "quad" && item.quad.label === label) return item.quad
+  }
+  throw new Error("这一段里没有这一行四格：" + label)
+}
+
+/** 渲染顺序的可读写法：普通属性行给属性 id，四格行给 "quad" */
+function shape(section: TypeInfoSectionView): (number | "quad")[] {
+  return section.items.map((item) => (item.kind === "quad" ? "quad" : item.attr.id))
 }
 
 describe("属性值格式化", () => {
@@ -56,6 +75,16 @@ describe("属性值格式化", () => {
       "50 %"
     )
     expect(formatAttrValue(attr({ id: 271, name: "护盾电磁伤害抗性", value: 1, unitId: 108, unit: "%" }))).toBe(
+      "0 %"
+    )
+  })
+
+  it("unitID 111 是反向修正百分比：0.75 = 25% 抗性", () => {
+    // 弹道偏阻阵列（定锚建筑）的动能伤害抗性加成 0.75 → 25%
+    expect(formatAttrValue(attr({ id: 131, name: "动能伤害抗性加成", value: 0.75, unitId: 111, unit: "%" }))).toBe(
+      "25 %"
+    )
+    expect(formatAttrValue(attr({ id: 130, name: "热能伤害抗性加成", value: 1, unitId: 111, unit: "%" }))).toBe(
       "0 %"
     )
   })
@@ -255,6 +284,194 @@ describe("属性分区（游戏属性页签）", () => {
     // 只有质量、没有惯性调整：整条不画，而不是画一个 0
     const half = attributeSections([rows[0]], {}).find((section) => section.id === 17)!
     expect(half.alignSeconds).toBeUndefined()
+  })
+
+  it("主伤害那四条折成一行四格（电 / 火 / 动 / 爆），插在原来那条的位置", () => {
+    // 弹药 EMP S 185：电磁 9 / 爆炸 2 / 动能 1，全挂在「炮台」段里（热能那格是 0，侧车已滤掉）
+    const ammo = [
+      attr({ id: 51, name: "射击速度", value: 2100, unitId: 101, unit: "s", category: 29 }),
+      attr({ id: 114, name: "电磁伤害", value: 9, unitId: 113, unit: "HP", category: 29 }),
+      attr({ id: 116, name: "爆炸伤害", value: 2, unitId: 113, unit: "HP", category: 29 }),
+      attr({ id: 117, name: "动能伤害", value: 1, unitId: 113, unit: "HP", category: 29 }),
+      attr({ id: 37, name: "最大速度", value: 365, unitId: 11, unit: "m/s", category: 17 }),
+    ]
+    const turret = attributeSections(ammo, {}).find((section) => section.id === 29)!
+    // 四条照旧留在 rows 里：右栏「改属性」弹窗按 rows 列输入框，一条都不能少
+    expect(turret.rows.map((row) => row.id)).toEqual([51, 114, 116, 117])
+    // 渲染顺序由 items 给：四格行插在原来第一条伤害属性的位置，同组其余几条不再单独列
+    expect(shape(turret)).toEqual([51, "quad"])
+    // 四格固定是电磁 / 热能 / 动能 / 爆炸，没填的那格留 null（界面照客户端画「—」）
+    const quad = quadOf(turret)
+    expect(quad.cells.map((cell) => cell?.id ?? null)).toEqual([114, null, 117, 116])
+    expect(quad.only).toBe(false)
+  })
+
+  it("整段只有伤害的段（末日武器、部分弹药）：标题带换成「伤害」，行里不再重复一遍行名", () => {
+    // 末日武器「赫姆达洱之焰噬爆炸末日武器」：整段就一条爆炸伤害 2,400,000，折行后什么都不剩，
+    // 旧样式会叠成「炮台 / 伤害 / 四格」；实测在售物品里有 957 段是这种
+    const doomsday = [
+      attr({ id: 116, name: "爆炸伤害", value: 2400000, unitId: 113, unit: "HP", category: 29 }),
+    ]
+    const section = attributeSections(doomsday, {})[0]
+    expect(section.title).toBe(DAMAGE_TITLE)
+    const quad = quadOf(section)
+    // 整段就这一行四格 —— 面板因此把行名收进标题带，不再画那行重复的行名
+    expect(quad.only).toBe(true)
+    expect(shape(section)).toEqual(["quad"])
+    expect(quad.cells.map((cell) => cell?.id ?? null)).toEqual([null, null, null, 116])
+    // 那一条属性还在 rows 里：改属性弹窗仍列得出它
+    expect(section.rows.map((row) => row.id)).toEqual([116])
+  })
+
+  it("同段还有别的属性时不换标题（射速 / 抗性这些照旧挂「炮台」标题带）", () => {
+    const mixed = [
+      attr({ id: 114, name: "电磁伤害", value: 20, unitId: 113, unit: "HP", category: 29 }),
+      attr({ id: 51, name: "射击速度", value: 4000, unitId: 101, unit: "s", category: 29 }),
+    ]
+    const section = attributeSections(mixed, {})[0]
+    expect(section.title).toBe("炮台")
+    expect(quadOf(section).only).toBe(false)
+    expect(shape(section)).toEqual(["quad", 51])
+  })
+
+  it("主伤害一条都没有的段不折行（舰载机那套「（每架铁骑舰载机）」保持一行一条）", () => {
+    // 铁骑舰载机 Shadow 2948：同一段里两套家族各有值，客户端那一行四格只认主伤害四条
+    const fighter = [
+      attr({ id: 2131, name: "电磁伤害（每架铁骑舰载机）", value: 200, unitId: 113, unit: "HP", category: 34 }),
+      attr({ id: 2227, name: "电磁伤害（每架铁骑舰载机）", value: 50000, unitId: 113, unit: "HP", category: 34 }),
+    ]
+    const section = attributeSections(fighter, {})[0]
+    expect(shape(section)).toEqual([2131, 2227])
+  })
+
+  it("「伤害抗性加成」四条也折成一行四格：单抗装备另外三格留空（客户端同款）", () => {
+    // 热能抗性放大器 I 2537：只有热能那条有值 -32.5，另外三条是 0（侧车按 displayWhenZero 滤掉）
+    const amplifier = [
+      attr({ id: 422, name: "科技等级", value: 1, unitId: 140, unit: "%", category: 7 }),
+      attr({ id: 987, name: "热能伤害抗性加成", value: -32.5, unitId: 124, unit: "%", category: 7 }),
+      attr({ id: 182, name: "主技能需求", value: 3425, unitId: 116, unit: "typeID", category: 8 }),
+    ]
+    const misc = attributeSections(amplifier, {}).find((section) => section.id === 7)!
+    const quad = quadOf(misc, RESIST_BONUS_TITLE)
+    // 固定顺序电磁 / 热能 / 动能 / 爆炸（与四抗色块、伤害四格同一套）
+    expect(quad.cells.map((cell) => cell?.id ?? null)).toEqual([null, 987, null, null])
+    expect(quad.cells.map((cell) => (cell ? formatAttrValue(cell) : "—"))).toEqual([
+      "—",
+      "-32.5 %",
+      "—",
+      "—",
+    ])
+    // 行插在原来第一条抗性加成所在的位置（不是拍在段首），同段别的属性照旧列在后面
+    expect(shape(misc)).toEqual([422, "quad"])
+    expect(quad.only).toBe(false)
+  })
+
+  it("四条都在时四格都有值（多谱抗性强化器 / 抗性膜这类）", () => {
+    // 多谱抗性强化器 I 578：四条都是 -25；单位 105 / 124 都是「%」
+    const hardener = [
+      attr({ id: 422, name: "科技等级", value: 1, unitId: 140, unit: "%", category: 7 }),
+      attr({ id: 984, name: "电磁伤害抗性加成", value: -25, unitId: 124, unit: "%", category: 7 }),
+      attr({ id: 985, name: "爆炸伤害抗性加成", value: -25, unitId: 124, unit: "%", category: 7 }),
+      attr({ id: 986, name: "动能伤害抗性加成", value: -25, unitId: 105, unit: "%", category: 7 }),
+      attr({ id: 987, name: "热能伤害抗性加成", value: -25, unitId: 124, unit: "%", category: 7 }),
+    ]
+    const misc = attributeSections(hardener, {}).find((section) => section.id === 7)!
+    const quad = quadOf(misc, RESIST_BONUS_TITLE)
+    expect(quad.cells.map((cell) => cell?.id ?? null)).toEqual([984, 987, 986, 985])
+    expect(quad.cells.map((cell) => formatAttrValue(cell!))).toEqual([
+      "-25 %",
+      "-25 %",
+      "-25 %",
+      "-25 %",
+    ])
+    // 四条属性照旧一条不少地留在 rows 里（改属性弹窗要用）
+    expect(misc.rows.map((row) => row.id)).toEqual([422, 984, 985, 986, 987])
+  })
+
+  it("老一套的 130-133（定锚的偏导阵列）并进同一行四格", () => {
+    // 单位是 111「反向修正百分比」：动能 0.75 折算成 25% 抗性，另外三条 1 就是 0%
+    const array = [
+      attr({ id: 130, name: "热能伤害抗性加成", value: 1, unitId: 111, unit: "%", category: 7 }),
+      attr({ id: 131, name: "动能伤害抗性加成", value: 0.75, unitId: 111, unit: "%", category: 7 }),
+      attr({ id: 132, name: "爆炸伤害抗性加成", value: 1, unitId: 111, unit: "%", category: 7 }),
+      attr({ id: 133, name: "电磁伤害抗性加成", value: 1, unitId: 111, unit: "%", category: 7 }),
+    ]
+    const section = attributeSections(array, {})[0]
+    const quad = quadOf(section, RESIST_BONUS_TITLE)
+    expect(quad.cells.map((cell) => cell?.id ?? null)).toEqual([133, 130, 131, 132])
+    expect(quad.cells.map((cell) => formatAttrValue(cell!))).toEqual(["0 %", "0 %", "25 %", "0 %"])
+    expect(shape(section)).toEqual(["quad"])
+    // 四条属性照旧一条不少地留在 rows 里（改属性弹窗要用）
+    expect(section.rows.map((row) => row.id)).toEqual([130, 131, 132, 133])
+  })
+
+  it("伤害量那几条属性行给伤害类型编号（0 电磁 / 1 热能 / 2 动能 / 3 爆炸）", () => {
+    const slot = (id: number, name: string) =>
+      damageAttrSlot(attr({ id, name, value: 1, unitId: 113, unit: "HP", category: 34 }))
+    expect(slot(2131, "电磁伤害（每架铁骑舰载机）")).toBe(0)
+    expect(slot(2132, "热能伤害（每架铁骑舰载机）")).toBe(1)
+    expect(slot(2133, "动能伤害（每架铁骑舰载机）")).toBe(2)
+    expect(slot(2134, "爆炸伤害（每架铁骑舰载机）")).toBe(3)
+    // 主伤害那四条走的是折行那条路，不再用单行图标
+    expect(damageAttrSlot(attr({ id: 117, name: "动能伤害", value: 64, unitId: 113, unit: "HP", category: 29 }))).toBeNull()
+    // 同一段的射速 / 射程与四抗不是伤害量：界面接着用分区图标
+    expect(damageAttrSlot(attr({ id: 51, name: "射击速度", value: 2100, unitId: 101, unit: "s", category: 29 }))).toBeNull()
+    expect(damageAttrSlot(attr({ id: 271, name: "护盾电磁伤害抗性", value: 1, unitId: 108, unit: "%", category: 2 }))).toBeNull()
+    // 「伤害加成」（138-141）不在其列 —— 客户端把它归「其他属性」，套伤害图标反而误导
+    expect(damageAttrSlot(attr({ id: 138, name: "电磁伤害加成", value: 5, unitId: 113, unit: "HP", category: 7 }))).toBeNull()
+  })
+
+  it("四条抗性都是 0% 的护盾 / 装甲照样画色块（铁骑舰载机的护盾抗性本来就是 0%）", () => {
+    // 铁骑舰载机 Ametat I 40362：护盾 3,762、四抗共振系数全是 1；结构只有值、没有抗性
+    const fighter = [
+      attr({ id: 263, name: "护盾容量", value: 3762, unitId: 113, unit: "HP", category: 2 }),
+      attr({ id: 271, name: "护盾电磁伤害抗性", value: 1, unitId: 108, unit: "%", category: 2 }),
+      attr({ id: 272, name: "护盾爆炸伤害抗性", value: 1, unitId: 108, unit: "%", category: 2 }),
+      attr({ id: 273, name: "护盾动能伤害抗性", value: 1, unitId: 108, unit: "%", category: 2 }),
+      attr({ id: 274, name: "护盾热能伤害抗性", value: 1, unitId: 108, unit: "%", category: 2 }),
+      attr({ id: 9, name: "结构值", value: 100, unitId: 113, unit: "HP", category: 4 }),
+    ]
+    const shield = attributeSections(fighter, {}).find((section) => section.id === 2)!
+    expect(shield.defence?.resists.map((row) => row.percent)).toEqual([0, 0, 0, 0])
+    // 抗性全 0% → 有效 HP 就是护盾容量本身；面板把四条抗性行折进色块，不再在下面重复列
+    expect(formatAttrNumber(shield.defence!.effective!)).toBe("3,762")
+    expect(shield.rows.filter((row) => !RESIST_ATTR_IDS.has(row.id)).map((row) => row.id)).toEqual([263])
+  })
+
+  it("结构抗性全是 0% 也画色块条（无人机、舰载机的结构抗性本来就是 0%）", () => {
+    const rows = [
+      attr({ id: 9, name: "结构值", value: 600, unitId: 113, unit: "HP", category: 4 }),
+      attr({ id: 974, name: "结构电磁伤害抗性", value: 1, unitId: 108, unit: "%", category: 4 }),
+      attr({ id: 975, name: "结构爆炸伤害抗性", value: 1, unitId: 108, unit: "%", category: 4 }),
+      attr({ id: 976, name: "结构动能伤害抗性", value: 1, unitId: 108, unit: "%", category: 4 }),
+      attr({ id: 977, name: "结构热能伤害抗性", value: 1, unitId: 108, unit: "%", category: 4 }),
+    ]
+    const structure = attributeSections(rows, {}).find((section) => section.id === 4)!
+    // 四条 0% 照样是色块条：面板不再给四条同名的普通行，与护盾 / 装甲一致
+    expect(structure.defence?.resists.map((row) => row.percent)).toEqual([0, 0, 0, 0])
+    expect(formatAttrNumber(structure.defence!.effective!)).toBe("600")
+    // 逻辑层照旧把四条抗性留在 rows 里，面板见到色块条才过滤掉（RESIST_ATTR_IDS）
+    expect(structure.rows.filter((row) => !RESIST_ATTR_IDS.has(row.id)).map((row) => row.id)).toEqual([9])
+  })
+
+  it("结构两套抗性 id 都在时挑有真值的那套，不挑整整齐齐的 0%", () => {
+    // 实测 9 件在售物品两套都填：974-977 全是共振 1（0%），109-113 是 0.67（33%）
+    const rows = [
+      attr({ id: 9, name: "结构值", value: 600, unitId: 113, unit: "HP", category: 4 }),
+      attr({ id: 974, name: "结构电磁伤害抗性", value: 1, unitId: 108, unit: "%", category: 4 }),
+      attr({ id: 975, name: "结构爆炸伤害抗性", value: 1, unitId: 108, unit: "%", category: 4 }),
+      attr({ id: 976, name: "结构动能伤害抗性", value: 1, unitId: 108, unit: "%", category: 4 }),
+      attr({ id: 977, name: "结构热能伤害抗性", value: 1, unitId: 108, unit: "%", category: 4 }),
+      attr({ id: 113, name: "结构电磁伤害抗性", value: 0.67, unitId: 108, unit: "%", category: 4 }),
+      attr({ id: 110, name: "结构爆炸伤害抗性", value: 0.67, unitId: 108, unit: "%", category: 4 }),
+      attr({ id: 109, name: "结构动能伤害抗性", value: 0.67, unitId: 108, unit: "%", category: 4 }),
+      attr({ id: 111, name: "结构热能伤害抗性", value: 0.67, unitId: 108, unit: "%", category: 4 }),
+    ]
+    const structure = attributeSections(rows, {}).find((section) => section.id === 4)!
+    expect(structure.defence?.resists.map((row) => row.id)).toEqual([113, 110, 109, 111])
+    expect(structure.defence?.resists.map((row) => Math.round(row.percent))).toEqual([33, 33, 33, 33])
+    // 两套加起来 8 条同名行都不再列出来 —— 色块条已经把这件事说清了
+    expect(structure.rows.filter((row) => !RESIST_ATTR_IDS.has(row.id)).map((row) => row.id)).toEqual([9])
   })
 
   it("没有属性时回空数组（界面据此画空态）", () => {
