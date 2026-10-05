@@ -66,6 +66,9 @@ pub const HANDLED: &[&str] = &[
     "market:book",
     "market:catalog",
     "market:overview",
+    // 改属性（本工程扩展）：写服务端静态表 typeDogma / shipDogmaAttributes，再用注入的
+    // 热重载 host 换进内存（见 market.rs 的 set_type_attributes）
+    "market:setTypeAttributes",
     "market:trades",
     // 悬停提示的简介 / 属性（只读：SDE + 静态表），首次调用建内存索引后常驻
     "market:typeInfo",

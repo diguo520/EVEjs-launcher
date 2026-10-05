@@ -22,6 +22,11 @@ pub const CANCELLED: &str = "已取消下载";
 pub struct Response {
     pub status: u16,
     pub body: Vec<u8>,
+    /// `x-oauth-scopes`：只有 classic / OAuth 令牌会返回这个头（逗号分隔的 scope 清单）；
+    /// fine-grained 令牌与 GitHub App 令牌没有它。启动器靠这个差别判断「这枚令牌能不能
+    /// 碰别人名下的索引仓库」—— fine-grained 只能给「自己有权限的仓库」授权，投稿索引仓库
+    /// 在维护者名下，普通作者根本勾不到，所以那种令牌会 403。
+    pub oauth_scopes: Option<String>,
 }
 
 impl Response {
@@ -117,6 +122,11 @@ pub fn send(
     };
     let mut response = result.map_err(|err| friendly(&err.to_string(), timeout))?;
     let status = response.status().as_u16();
+    let oauth_scopes = response
+        .headers()
+        .get("x-oauth-scopes")
+        .and_then(|value| value.to_str().ok())
+        .map(|value| value.trim().to_string());
     let mut buffer = Vec::new();
     response
         .body_mut()
@@ -126,6 +136,7 @@ pub fn send(
     Ok(Response {
         status,
         body: buffer,
+        oauth_scopes,
     })
 }
 
@@ -252,11 +263,13 @@ mod tests {
         let ok = Response {
             status: 200,
             body: br#"{"a":1}"#.to_vec(),
+            oauth_scopes: None,
         };
         assert_eq!(ok.json().and_then(|v| v["a"].as_u64()), Some(1));
         let broken = Response {
             status: 200,
             body: b"<html>502</html>".to_vec(),
+            oauth_scopes: None,
         };
         assert!(broken.json().is_none());
         assert_eq!(broken.text(), "<html>502</html>");

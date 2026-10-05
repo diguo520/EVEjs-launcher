@@ -11,7 +11,7 @@ import { TradesPanel } from "@/components/market/trades-panel"
 import { useLocale } from "@/components/shell/locale-provider"
 import { useMarket } from "@/hooks/use-market"
 import { useManualData } from "@/hooks/use-manual-data"
-import type { RawMarketTypeInfo } from "@/lib/ipc"
+import type { RawMarketAttrsInput, RawMarketTypeInfo } from "@/lib/ipc"
 import { filterTypeRows, marketTiles, sortTypeRows, type MarketSortKey } from "@/lib/market-logic"
 
 /**
@@ -48,6 +48,22 @@ export function MarketPage() {
     null
   )
   const loadTypeInfo = store.typeInfo
+  const setTypeAttributes = store.setTypeAttributes
+
+  // 改完属性：写盘 + 热重载在 store 里做，这里负责把右栏那一份**强制重拉**并换掉。
+  // 缓存分层要注意：Rust 侧的内存索引已经就地更新，但 use-market 里按 typeId 存的回包
+  // 还是旧值 —— 不 force 重拉，界面就会「提示保存成功、数字没变」。
+  const saveAttrs = useCallback(
+    async (input: RawMarketAttrsInput) => {
+      const reply = await setTypeAttributes(input)
+      if (reply && reply.ok === true && (reply.changed ?? 0) > 0) {
+        const fresh = await loadTypeInfo(input.typeId, true)
+        setTypeInfo({ typeId: input.typeId, info: fresh })
+      }
+      return reply
+    },
+    [setTypeAttributes, loadTypeInfo]
+  )
 
   useEffect(() => {
     if (selected == null) return
@@ -236,6 +252,7 @@ export function MarketPage() {
                     stationName={store.catalog.stationName}
                     locale={locale}
                     onAdjust={store.adjustStock}
+                    onSaveAttrs={saveAttrs}
                     info={info}
                     infoLoading={infoLoading}
                   />

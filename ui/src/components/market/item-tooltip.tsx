@@ -4,6 +4,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type ComponentType,
   type ReactNode,
 } from "react"
@@ -17,18 +18,24 @@ import {
   Boxes,
   Brain,
   ChevronDown,
+  ChevronsRight,
   Cpu,
   Crosshair,
   FileCode2,
+  Flame,
   Gem,
   Layers,
+  Magnet,
+  Orbit,
   Package,
   Palette,
   Radar,
+  Radio,
   Rocket,
   Shield,
   Shirt,
   Sparkles,
+  Target,
   Wrench,
   Zap,
 } from "lucide-react"
@@ -41,6 +48,8 @@ import {
   formatAttrNumber,
   formatAttrValue,
   tooltipPlan,
+  RESIST_ATTR_IDS,
+  SENSOR_ATTR_ORDER,
   SECTION_SENSOR,
   type TypeInfoDefence,
   type TypeInfoSectionView,
@@ -54,7 +63,8 @@ const CURSOR_GAP = 16
 /** 卡片离窗口边缘至少留这么多空白 */
 const VIEWPORT_MARGIN = 12
 
-type Icon = ComponentType<{ className?: string }>
+/** 图标组件：lucide 的图标只吃 className 与 style（四抗要按伤害类型上色） */
+type Icon = ComponentType<{ className?: string; style?: CSSProperties }>
 
 /**
  * 分区图标：SDE 里每个属性只有 iconID，图标本体在客户端资源包里，启动器拿不到 ——
@@ -72,6 +82,22 @@ const SECTION_ICON: Record<number, Icon> = {
   36: Zap, // 电子抗性
   37: Sparkles, // 加成
   40: Package, // 仓库
+  // 装备 / 无人机 / 舰载机那几段：以前都落进 Boxes 那个通用方块，一眼看不出差别
+  20: Radio, // 远程协助
+  21: Palette, // 目标标记
+  22: BatteryCharging, // 能量中和
+  24: Radar, // 感应抑阻
+  25: Magnet, // 目标干扰
+  26: Target, // 跟踪干扰
+  27: Orbit, // 跃迁扰频
+  28: Orbit, // 停滞缠绕
+  29: Target, // 炮台
+  30: Rocket, // 导弹
+  34: Bot, // 舰载机能力
+  38: Bot, // 舰载机属性
+  39: Bomb, // 超级武器
+  51: Gem, // 采矿
+  52: Flame, // 过热
   [SECTION_SENSOR]: Radar, // 感应强度
 }
 
@@ -97,6 +123,12 @@ const CATEGORY_ICON: Record<number, Icon> = {
 
 /** 四抗色块：电磁蓝 / 热能红 / 动能灰 / 爆炸橙 —— 与伤害类型一一对应 */
 const DAMAGE_COLORS = ["#4a9fe0", "#e05a5a", "#9aa4b2", "#e09a4a"]
+
+/** 四抗图标：电磁（电）/ 热能（火）/ 动能（动力）/ 爆炸（爆），与 DAMAGE_COLORS 同序 */
+const DAMAGE_ICONS: Icon[] = [Zap, Flame, ChevronsRight, Sparkles]
+
+/** 四格感应强度的图标：雷达 / 光雷达 / 磁力 / 引力，与 SENSOR_ATTR_ORDER 一一对应 */
+const SENSOR_ICONS: Icon[] = [Radar, Radio, Magnet, Orbit]
 
 const sectionIcon = (id: number): Icon => SECTION_ICON[id] ?? Boxes
 
@@ -426,11 +458,16 @@ function AttributeRow({ attr }: { attr: RawMarketTypeInfoAttr }) {
 }
 
 /**
- * 右栏「简介 / 属性」页签：按客户端的「属性」面板排版 —— 每个分区一张卡片，
- * 标题栏是「图标 + 分区名」，护盾 / 装甲 / 结构 再给一行「有效 HP」与四抗色块，
- * 属性行是「图标 + 名字 + 右对齐的值」。整段可折叠（点标题栏）。
+ * 右栏「属性」页签：照客户端「属性」面板排版 —— 整段是一张长表，每个分区一条标题带
+ * （图标 + 分区名 + 右侧概要 + 折叠箭头），下面接属性行（图标 + 名字 + 右对齐的值）。
  *
- * 分区顺序、有效 HP 算法与标题都在 type-info-logic 里，这里只画。
+ * 三种分区在属性行之外还有一行：
+ *   - 护盾 / 装甲 / 结构：标题带右侧给「有效 HP」，下面一条四抗色块；
+ *   - 导航：标题带右侧给「朝向时间」；
+ *   - 感应强度：四格读数（雷达 / 光雷达 / 磁力 / 引力），没填的那几格留「—」。
+ *
+ * 分区顺序、有效 HP 与朝向时间的算法都在 type-info-logic 里，这里只画。
+ * 物品简介不在这里 —— 它挪到右栏标题栏那个书页图标上，点开是弹窗。
  */
 export function TypeInfoPanel({
   info,
@@ -465,48 +502,37 @@ export function TypeInfoPanel({
     )
   }
 
-  const description = (info.description ?? "").trim()
-  const attributeRows = sections.reduce((sum, section) => sum + section.rows.length, 0)
-  if (!description && attributeRows === 0) {
+  if (sections.length === 0) {
     return (
       <div className={cn("p-3", className)}>
-        <EmptyHint text={t("这个物品没有简介与属性数据")} />
+        <EmptyHint text={t("这个物品没有属性数据")} />
       </div>
     )
   }
 
   return (
-    <div className={cn("space-y-2 p-3", className)}>
-      {description ? (
-        <div className="rounded-md border border-input bg-background/40 px-2.5 py-2">
-          <div className="panel-label">{t("物品简介")}</div>
-          <p
-            data-i18n-skip
-            className="mt-1 whitespace-pre-wrap text-[11px] leading-relaxed text-foreground/90"
-          >
-            {description}
-          </p>
-        </div>
-      ) : null}
-      {sections.map((section) => (
-        <SectionCard
-          key={section.id}
-          section={section}
-          folded={folded.includes(section.id)}
-          onToggle={() =>
-            setFolded((prev) =>
-              prev.includes(section.id)
-                ? prev.filter((id) => id !== section.id)
-                : [...prev, section.id]
-            )
-          }
-        />
-      ))}
+    <div className={cn("p-3", className)}>
+      <div className="overflow-hidden rounded-md border border-input bg-background/40">
+        {sections.map((section) => (
+          <SectionCard
+            key={section.id}
+            section={section}
+            folded={folded.includes(section.id)}
+            onToggle={() =>
+              setFolded((prev) =>
+                prev.includes(section.id)
+                  ? prev.filter((id) => id !== section.id)
+                  : [...prev, section.id]
+              )
+            }
+          />
+        ))}
+      </div>
     </div>
   )
 }
 
-/** 一个属性分区：标题栏（可折叠）+ 四抗 / 属性行 */
+/** 一个属性分区：标题带（可折叠）+ 四抗 / 感应强度 / 属性行 */
 function SectionCard({
   section,
   folded,
@@ -518,23 +544,32 @@ function SectionCard({
 }) {
   const { t } = useLocale()
   const Icon = sectionIcon(section.id)
+  // 标题带右侧那一小段概要：护盾 / 装甲 / 结构给「有效 HP」，导航给「朝向时间」
+  // 「有效 HP」要有值属性才算得出来：装备只有四抗、没有护盾容量 / 装甲值那几条，
+  // 那就只画四抗条，读数留空（免得写一个 0 出来）
+  const summary = section.defence?.effective != null
+    ? t("有效 HP：{value}", { value: formatAttrNumber(section.defence.effective) })
+    : section.alignSeconds !== undefined
+      ? t("朝向时间：{value}秒", { value: formatAttrNumber(section.alignSeconds) })
+      : null
+  // 四抗已经在色块条里了，就不再当属性行重复列（结构抗性两套 id 会撞出四条同名行）；
+  // 抗性不全、没有色块条时照旧全列出来，宁可重复也不丢信息
+  const rows = section.defence
+    ? section.rows.filter((attr) => !RESIST_ATTR_IDS.has(attr.id))
+    : section.rows
   return (
-    <section className="overflow-hidden rounded-md border border-input bg-background/40">
+    <section className="border-b border-input/50 last:border-b-0">
       <button
         type="button"
         onClick={onToggle}
-        className="flex w-full items-center gap-1.5 border-b border-input/60 bg-muted/20 px-2 py-1 text-left transition-colors hover:bg-muted/40"
+        className="flex w-full items-center gap-1.5 bg-muted/25 px-2 py-1 text-left transition-colors hover:bg-muted/40"
       >
-        <Icon className="size-3.5 shrink-0 text-primary" />
+        <Icon className="size-3.5 shrink-0 text-tertiary" />
         {/* 分区名是界面文案（护盾 / 装甲…）走翻译桥；SDE 那个英文分类名查不到就原样显示 */}
-        <span className="min-w-0 flex-1 truncate text-[11px] font-semibold text-primary">
+        <span className="min-w-0 flex-1 truncate text-[11px] font-semibold text-foreground">
           {section.title}
         </span>
-        {section.defence ? (
-          <span className="tabular shrink-0 text-[10px] text-tertiary">
-            {t("有效 HP：{value}", { value: formatAttrNumber(section.defence.effective) })}
-          </span>
-        ) : null}
+        {summary ? <span className="tabular shrink-0 text-[10px] text-tertiary">{summary}</span> : null}
         <ChevronDown
           className={cn(
             "size-3 shrink-0 text-tertiary transition-transform",
@@ -542,10 +577,13 @@ function SectionCard({
           )}
         />
       </button>
-      {folded ? null : section.defence ? <ResistStrip defence={section.defence} /> : null}
-      {folded ? null : (
-        <div className="divide-y divide-input/30">
-          {section.rows.map((attr) => (
+      {folded ? null : section.defence ? (
+        <ResistStrip defence={section.defence} />
+      ) : section.id === SECTION_SENSOR ? (
+        <SensorStrip rows={section.rows} />
+      ) : (
+        <div className="py-0.5">
+          {rows.map((attr) => (
             <div key={attr.id} className="flex items-baseline gap-2 px-2 py-[3px]">
               <Icon className="size-3 shrink-0 translate-y-[1px] text-tertiary/60" />
               <span
@@ -565,21 +603,73 @@ function SectionCard({
   )
 }
 
-/** 四抗一行：色块 + 百分比；指针停在色块上给出这条抗性的 SDE 全名（护盾电磁伤害抗性…） */
+/**
+ * 四抗一行：伤害类型图标 + 百分比 + 一条进度条（条长就是抗性百分比），与客户端一致。
+ *
+ * 指针停在整格上给出这条抗性的 SDE 全名（护盾电磁伤害抗性…）—— 四个图标是近义字形，
+ * 光看图标分不出是哪条属性。
+ */
 function ResistStrip({ defence }: { defence: TypeInfoDefence }) {
   return (
-    <div className="flex items-center gap-3 border-b border-input/60 px-2 py-1">
-      {defence.resists.map((resist, index) => (
-        <span key={resist.id} title={resist.name} className="flex items-center gap-1">
-          <span
-            className="size-2 rounded-[2px]"
-            style={{ background: DAMAGE_COLORS[index % DAMAGE_COLORS.length] }}
-          />
-          <span data-i18n-skip className="tabular text-[10px] text-foreground">
-            {formatAttrNumber(Math.round(resist.percent)) + "%"}
+    <div className="grid grid-cols-4 gap-2 border-b border-input/40 px-2 py-1.5">
+      {defence.resists.map((resist, index) => {
+        // 抗性理论上落在 0-100，但静态表里手改过的值可能越界：夹一下，别让条跑出格子
+        const percent = Math.max(0, Math.min(100, Math.round(resist.percent)))
+        const color = DAMAGE_COLORS[index % DAMAGE_COLORS.length]
+        const Glyph = DAMAGE_ICONS[index % DAMAGE_ICONS.length]
+        return (
+          <span key={resist.id} title={resist.name} className="flex flex-col gap-1">
+            <span className="flex items-center gap-1">
+              <Glyph className="size-3 shrink-0" style={{ color }} />
+              <span data-i18n-skip className="tabular text-[11px] font-semibold text-foreground">
+                {percent}%
+              </span>
+            </span>
+            <span className="h-1 w-full overflow-hidden rounded-full bg-white/10">
+              <span
+                className="block h-full rounded-full"
+                style={{ width: percent + "%", background: color }}
+              />
+            </span>
           </span>
-        </span>
-      ))}
+        )
+      })}
+    </div>
+  )
+}
+
+/**
+ * 感应强度一行：雷达 / 光雷达 / 磁力 / 引力四格读数，一格一个图标。
+ *
+ * 服务端静态表里值为 0 的感应强度根本不会列出来（与客户端同一条 displayWhenZero 规则），
+ * 所以四格是**按固定顺序补出来的**：查不到的那格写「—」，而不是把剩下几格挤在一起。
+ */
+function SensorStrip({ rows }: { rows: RawMarketTypeInfoAttr[] }) {
+  const byId = new Map(rows.map((attr) => [attr.id, attr]))
+  return (
+    <div className="grid grid-cols-4 gap-1 border-b border-input/40 px-2 py-1">
+      {SENSOR_ATTR_ORDER.map((id, index) => {
+        const attr = byId.get(id)
+        const Icon = SENSOR_ICONS[index % SENSOR_ICONS.length]
+        return (
+          <span
+            key={id}
+            title={attr?.name}
+            className="flex items-center justify-center gap-1"
+          >
+            <Icon className="size-3 shrink-0 text-tertiary/70" />
+            <span
+              data-i18n-skip
+              className={cn(
+                "tabular text-[11px]",
+                attr ? "font-semibold text-foreground" : "text-tertiary"
+              )}
+            >
+              {attr ? formatAttrValue(attr) : "—"}
+            </span>
+          </span>
+        )
+      })}
     </div>
   )
 }

@@ -140,6 +140,8 @@ pub struct ApiReply {
     pub status: u16,
     pub data: Option<Value>,
     pub reason: String,
+    /// `x-oauth-scopes`：classic / OAuth 令牌才有；fine-grained 与 GitHub App 为 None
+    pub scopes: Option<String>,
 }
 
 impl ApiReply {
@@ -149,6 +151,7 @@ impl ApiReply {
             status,
             data: None,
             reason,
+            scopes: None,
         }
     }
 }
@@ -156,8 +159,8 @@ impl ApiReply {
 /// 把 GitHub 的 403 / 404 翻成「到底缺哪一项令牌权限」（对齐 `githubPublish::permissionHint`）
 pub fn permission_hint(status: u16) -> &'static str {
     match status {
-        403 => "（令牌权限不足，fine-grained 令牌需要同时满足以下三项）1) Repository access 必须勾选目标仓库（申请收录必须勾上索引仓库 EVEjs-mods，不只是你自己的仓库）；2) Repository permissions 里 Contents = Read and write（写文件 / 建分支 / 建 Release / 传资产）；3) Repository permissions 里 Pull requests = Read and write（开 PR，最常漏的就是这一项）；只有让启动器自动建仓库时才额外需要 Administration = Read and write",
-        404 => "（仓库或文件不存在，或者令牌的 Repository access 没有覆盖这个仓库）",
+        403 => "（令牌权限不足：索引仓库 EVEjs-mods 在维护者名下）请改用 classic 令牌并勾选 public_repo（或 repo）；如果你是索引仓库协作者，请把 fine-grained 令牌的 Repository access 勾上 EVEjs-mods，并开 Contents / Pull requests = Read and write",
+        404 => "（仓库或文件不存在，或者令牌没有覆盖它；索引仓库属于维护者时 fine-grained 令牌覆盖不到，投稿请改用 classic 令牌勾 public_repo 或 repo）",
         _ => "",
     }
 }
@@ -179,6 +182,7 @@ pub fn call(
     };
     let status = response.status;
     let data = response.json();
+    let scopes = response.oauth_scopes.clone();
     if !(200..300).contains(&status) {
         let message = data
             .as_ref()
@@ -197,7 +201,10 @@ pub fn call(
         let mut reason = format!("GitHub {status}：{message}");
         if with_path_and_hint {
             reason.push_str(&format!(" [{method} {path}]"));
-            reason.push_str(permission_hint(status));
+            // 限流也是 403，别把「API rate limit exceeded」说成令牌权限问题
+            if !message.to_ascii_lowercase().contains("rate limit") {
+                reason.push_str(permission_hint(status));
+            }
         }
         return ApiReply::failed(status, reason);
     }
@@ -206,12 +213,14 @@ pub fn call(
         status,
         data,
         reason: String::new(),
+        scopes,
     }
 }
 
-/// 便捷包装：提交链路（无路径尾注 / 无权限提示）
+/// 便捷包装：提交链路（带路径尾注与权限提示 —— 投稿会连做「建 fork / 写文件 / 开 PR」
+/// 三件在别人仓库上的事，403 光秃秃一句 `Resource not accessible` 作者根本无从下手）
 fn call_submit(token: &str, method: &str, path: &str, body: Option<&Value>) -> ApiReply {
-    call(token, method, path, body, API_TIMEOUT, false)
+    call(token, method, path, body, API_TIMEOUT, true)
 }
 
 /// 便捷包装：发布链路（带路径尾注与权限提示）
@@ -227,9 +236,17 @@ fn object_field(value: &Value, key: &str) -> String {
         .to_string()
 }
 
+/// `GET /user` 的原始回包：登录名在 `data`，classic 令牌的 scope 在 `x-oauth-scopes` 头。
+///
+/// 刻意**不带**路径尾注与权限提示：这个端点跟仓库权限无关，坏令牌的 401/403
+/// 不该被误报成「缺 Contents」。
+fn user_reply(token: &str) -> ApiReply {
+    call(token, "GET", "/user", None, API_TIMEOUT, false)
+}
+
 /// `GET /user`：校验令牌并拿到登录名（`validateToken` / `whoami` 是同一件事）
 pub fn validate_token(token: &str) -> Value {
-    let reply = call_submit(token, "GET", "/user", None);
+    let reply = user_reply(token);
     let login = reply
         .data
         .as_ref()
@@ -241,7 +258,39 @@ pub fn validate_token(token: &str) -> Value {
     json!({ "ok": true, "login": login })
 }
 
-/// `checkToken(token?)`：给了就用给的，没给就用本机存的
+/// 判定这枚令牌能不能往索引仓库（在维护者名下）开 PR。
+///
+/// 依据是 `x-oauth-scopes`：classic 令牌会返回逗号分隔的 scope，勾了 `public_repo`
+/// 或 `repo` 就能读写公共仓库、建 fork、开 PR；fine-grained 令牌没有这个头，而且它的
+/// Repository access 只能覆盖「自己有权限的仓库」—— 索引仓库在别人名下，普通作者勾不到，
+/// 投稿必然 403 `Resource not accessible by personal access token`。
+fn submit_capability(token: &str, scopes: Option<&str>) -> (&'static str, Vec<String>, bool) {
+    let items: Vec<String> = scopes
+        .map(|list| {
+            list.split(',')
+                .map(str::trim)
+                .filter(|item| !item.is_empty())
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default();
+    if token.starts_with("github_pat_") {
+        return ("fine-grained", items, false);
+    }
+    if scopes.is_none() {
+        // 既没有 `github_pat_` 前缀也没有 scope 头：GitHub App / OAuth 令牌，同样覆盖不到索引仓库
+        return ("unknown", items, false);
+    }
+    let can_submit = items
+        .iter()
+        .any(|item| item == "public_repo" || item == "repo");
+    ("classic", items, can_submit)
+}
+
+/// `checkToken(token?)`：给了就用给的，没给就用本机存的。
+///
+/// 返回里除了登录名，还带上「这枚令牌能不能投稿」的判定（`tokenKind` / `scopes` /
+/// `canSubmit`）—— 界面在保存 / 校验时就能提前警告，而不是等作者提交到一半才吃 403。
 pub fn check_token(paths: &RuntimePaths, token: Option<&str>) -> Value {
     let value = match token {
         Some(text) if !text.is_empty() => text.to_string(),
@@ -250,13 +299,26 @@ pub fn check_token(paths: &RuntimePaths, token: Option<&str>) -> Value {
     if value.is_empty() {
         return json!({ "ok": false, "reason": "还没填 GitHub 令牌" });
     }
-    let reply = validate_token(&value);
+    let reply = user_reply(&value);
+    let login = reply
+        .data
+        .as_ref()
+        .map(|value| object_field(value, "login"))
+        .unwrap_or_default();
+    if !reply.ok || login.is_empty() {
+        return json!({ "ok": false, "reason": if reply.reason.is_empty() { "令牌无效".to_string() } else { reply.reason } });
+    }
     // 顺手把「这个令牌是谁」记下来：认领候选列表这类只读路径要按登录名排序，
     // 不能每次都再打一遍 GitHub（离线时还会白等一次 20s 超时）。
-    if let Some(login) = reply.get("login").and_then(Value::as_str) {
-        remember_login(paths, &value, login);
-    }
-    reply
+    remember_login(paths, &value, &login);
+    let (token_kind, scopes, can_submit) = submit_capability(&value, reply.scopes.as_deref());
+    json!({
+        "ok": true,
+        "login": login,
+        "tokenKind": token_kind,
+        "scopes": scopes,
+        "canSubmit": can_submit,
+    })
 }
 
 /* --------------------------- 登录名缓存 --------------------------- */
@@ -1211,5 +1273,41 @@ mod tests {
         assert_eq!(get_token(&paths), "");
         assert_eq!(token_status(&paths)["hasToken"], false);
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn submit_capability_tells_classic_from_fine_grained() {
+        // classic 且勾了 public_repo / repo：能碰别人名下的索引仓库
+        assert_eq!(
+            submit_capability("ghp_x", Some("public_repo, read:user")),
+            (
+                "classic",
+                vec!["public_repo".to_string(), "read:user".to_string()],
+                true
+            )
+        );
+        assert_eq!(
+            submit_capability("ghp_x", Some("repo")),
+            ("classic", vec!["repo".to_string()], true)
+        );
+        // classic 但没勾那两项：能发布，投稿会被拒
+        assert_eq!(
+            submit_capability("ghp_x", Some("workflow")),
+            ("classic", vec!["workflow".to_string()], false)
+        );
+        assert_eq!(
+            submit_capability("ghp_x", Some("")),
+            ("classic", Vec::new(), false)
+        );
+        // fine-grained：没有 scope 头，Repository access 覆盖不到索引仓库
+        assert_eq!(
+            submit_capability("github_pat_abc", None),
+            ("fine-grained", Vec::new(), false)
+        );
+        // 其它 GitHub App / OAuth 令牌同样覆盖不到
+        assert_eq!(
+            submit_capability("gho_x", None),
+            ("unknown", Vec::new(), false)
+        );
     }
 }

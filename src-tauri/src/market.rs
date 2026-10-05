@@ -18,7 +18,9 @@ use std::path::Path;
 use std::time::Duration;
 
 use crate::config::DEFAULT_MARKET_PORT;
+use crate::hotreload;
 use crate::net;
+use crate::runtime::RuntimePaths;
 use crate::sidecar;
 
 /// 侧车文件名（随包释放到 `<exe 同级>/_launcher/cli/`，见 seed.rs）。
@@ -496,6 +498,157 @@ pub async fn type_info(root: &Path, type_id: u32, lang: &str) -> Value {
     })
 }
 
+/* --------------------------- 属性编辑（写回静态表） --------------------------- */
+
+/// 一条属性改动：`(属性 id, 新值)`。
+pub type AttrEdit = (u16, f64);
+
+/// 把刚写进静态表的属性值同步到内存索引。
+///
+/// 为什么不整份重建索引：索引是侧车扫 144 MB SDE + 全量静态表折出来的（实测 1.5-2 s），
+/// 只为改几个数重建一次太亏。这里改的 id 一定在索引里出现过（界面就是照它渲染的），
+/// 就地覆盖即可；属性按 id 排序，值变了顺序不变，不用重排。
+async fn apply_edits_to_index(type_id: u32, edits: &[AttrEdit]) {
+    let mut guard = INFO_INDEX.lock().await;
+    let Some(index) = guard.as_mut() else {
+        return;
+    };
+    let Some(rows) = index.types.get_mut(&type_id) else {
+        return;
+    };
+    for (id, value) in edits {
+        if let Some(row) = rows.iter_mut().find(|(row_id, _)| row_id == id) {
+            row.1 = *value;
+        }
+    }
+}
+
+/// 改一个物品的 dogma 属性：写盘 → 热重载 → 就地更新内存索引。
+///
+/// 写的是服务端静态表 `typeDogma`；舰船属性还有第二份副本
+/// `shipDogmaAttributes.shipAttributesByTypeID`，侧车两份一起改（只改一份会让属性页与
+/// 装配各读各的）。写完用启动器注入主服务器的热重载 host 把新表换进内存、并清掉
+/// `referenceData` 读缓存 —— 服务端进程不用重启。
+///
+/// 生效边界（按服务端取值路径实测，不是猜的）：
+/// - **舰船**基础属性每次构建库存 / 装配数据都直读 `shipDogmaAttributes`
+///   （`liveFittingState.readShipBaseAttributes`、`dogmaService._buildShipBaseAttributes`），
+///   没有模块级缓存 → 保存后**离舰再登舰**就用新值；
+/// - **装备 / 其它物品**走 `liveFittingState.getNormalizedTypeAttributeMap`，那里按 typeID
+///   存了进程级永久缓存、且模块没有重置入口 → 多数情况要**重启主服务器**。
+///
+/// 所以回包里如实带 `needsRestart`，界面照它写提示，不把「重启才生效」说成「马上生效」。
+pub async fn set_type_attributes(
+    root: &Path,
+    runtime: &RuntimePaths,
+    type_id: u32,
+    edits: Vec<AttrEdit>,
+) -> Value {
+    if type_id == 0 {
+        return failed("typeId 必须是正整数".to_string(), true);
+    }
+    if edits.is_empty() {
+        return failed("没有要改的属性".to_string(), true);
+    }
+
+    // 1) 写盘前先留快照。时机是关键：apply 自己的快照照的是「写完之后」的文件，拿它当
+    //    回滚点等于把改坏的内容当成原始状态。快照失败就整个取消，不动任何文件。
+    let targets = vec!["typeDogma".to_string(), "shipDogmaAttributes".to_string()];
+    let Some(snapshot_id) = hotreload::snapshot_tables(root, runtime, &targets) else {
+        return failed("改动前快照失败，已取消（没有写任何文件）".to_string(), true);
+    };
+
+    // 2) 交给侧车：解析两张表 → 两份副本同值 → 原子写回（缩进与末尾换行跟原文件一致）
+    let payload = Value::Array(
+        edits
+            .iter()
+            .map(|(id, value)| json!({ "id": id, "value": value }))
+            .collect(),
+    );
+    let edits_arg = serde_json::to_string(&payload).unwrap_or_else(|_| "[]".to_string());
+    let text = match call_text(
+        root,
+        vec![
+            "settypeattributes".to_string(),
+            root_arg(root),
+            type_id.to_string(),
+            edits_arg,
+        ],
+    )
+    .await
+    {
+        Ok(text) => text,
+        Err(value) => return value,
+    };
+    let parsed = match serde_json::from_str::<Value>(&text) {
+        Ok(value) => value,
+        Err(err) => return parse_failed(&text, &err),
+    };
+    if parsed.get("ok").and_then(Value::as_bool) != Some(true) {
+        // 侧车自己回的失败（typeID 没有属性 / 值不是数字）原话透出
+        return parsed;
+    }
+    let changed = parsed.get("changed").and_then(Value::as_u64).unwrap_or(0);
+    let touched: Vec<String> = parsed
+        .get("tables")
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default();
+    let missing = parsed
+        .get("missing")
+        .cloned()
+        .unwrap_or(Value::Array(Vec::new()));
+    // 有第二份副本 = 这次改的是一艘船，走「离舰再登舰」那条快路径
+    let is_ship = touched.iter().any(|name| name == "shipDogmaAttributes");
+
+    // 3) 一个值都没变（提交的还是当前值）：不写内存、不重载，直接回成功
+    if changed == 0 {
+        return json!({
+            "ok": true,
+            "supported": true,
+            "typeId": type_id,
+            "changed": 0,
+            "missing": missing,
+            "tables": [],
+            "snapshotId": snapshot_id,
+            "needsRestart": false,
+            "armed": hotreload::armed(runtime),
+            "reload": Value::Null,
+        });
+    }
+
+    // 4) 内存索引就地更新：界面立刻显示新值，不用为重扫 SDE 再等两秒
+    apply_edits_to_index(type_id, &edits).await;
+
+    // 5) 热重载：新表换进服务端内存 + 清 referenceData 读缓存。with_snapshot = false，
+    //    因为「改前」那一份在第 1 步已经照过了。
+    let reload = hotreload::apply(root, runtime, Some(touched.clone()), false).await;
+    let armed = reload
+        .get("armed")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+
+    json!({
+        "ok": true,
+        "supported": true,
+        "typeId": type_id,
+        "changed": changed,
+        "missing": missing,
+        "tables": touched,
+        "snapshotId": snapshot_id,
+        // 舰船直读静态表，离舰再登舰即生效；装备有进程级缓存，要重启主服务器
+        "needsRestart": !is_ship,
+        "armed": armed,
+        "reload": reload,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -853,5 +1006,28 @@ mod tests {
         // 值不是类型 id 的时候别乱回名字
         let zero = info_attribute(&index, 182, 0.0);
         assert_eq!(zero["typeName"], Value::Null);
+    }
+
+    /// typeId = 0 是「没选物品」的哨兵，不能拿它去改表。
+    /// 这条必须在做快照 / 起 node 之前就挡掉 —— 否则写盘路径会被一个空 id 触发。
+    #[tokio::test]
+    async fn set_attributes_rejects_zero_type_id() {
+        let runtime =
+            RuntimePaths::from_root(std::env::temp_dir().join("evejs-attrs-guard"), false);
+        let value =
+            set_type_attributes(Path::new("E:\\nonexistent"), &runtime, 0, vec![(11, 1.0)]).await;
+        assert_eq!(value["ok"], json!(false));
+        assert_eq!(value["reason"], json!("typeId 必须是正整数"));
+    }
+
+    /// 一条改动都没给：本地直接回原因，不写盘也不起侧车
+    #[tokio::test]
+    async fn set_attributes_rejects_empty_edits() {
+        let runtime =
+            RuntimePaths::from_root(std::env::temp_dir().join("evejs-attrs-guard"), false);
+        let value =
+            set_type_attributes(Path::new("E:\\nonexistent"), &runtime, 34, Vec::new()).await;
+        assert_eq!(value["ok"], json!(false));
+        assert_eq!(value["reason"], json!("没有要改的属性"));
     }
 }

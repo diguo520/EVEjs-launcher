@@ -527,6 +527,16 @@ fn make_snapshot(root: &Path, runtime: &RuntimePaths, tables: &[String]) -> Opti
     Some(id)
 }
 
+/// 就地为这几张表留一份「改前快照」，返回快照 id（与 `apply` 共用同一批快照、同一个上限）。
+///
+/// 与 `apply(..., with_snapshot = true)` 的区别只在**时机**：属性编辑必须先把「改前」的文件
+/// 存下来、再往盘上写；而 apply 的快照发生在写盘之后（照的是新内容）。所以属性编辑走
+/// 「先 snapshot_tables、再写盘、最后 apply(with_snapshot = false)」这条顺序 ——
+/// 否则回滚点会变成改完的内容，等于没有回滚。
+pub fn snapshot_tables(root: &Path, runtime: &RuntimePaths, tables: &[String]) -> Option<String> {
+    make_snapshot(root, runtime, tables)
+}
+
 fn prune_snapshots(runtime: &RuntimePaths) {
     let mut list = snapshots(runtime);
     if list.len() <= MAX_SNAPSHOTS {

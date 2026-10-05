@@ -8,6 +8,8 @@ import {
   type RawMarketBook,
   type RawMarketCatalog,
   type RawMarketOverview,
+  type RawMarketSetAttrs,
+  type RawMarketAttrsInput,
   type RawMarketTrades,
   type RawMarketTypeInfo,
 } from "@/lib/ipc"
@@ -46,7 +48,15 @@ export interface MarketStore {
    * `typeId = 0` 只预热索引，用于打开页面时把那 ~1.5 s 的 SDE 扫描提前做掉。
    * 回包按 typeId 缓存，切语言整份失效 —— 简介与属性名都是 SDE 按语言给的。
    */
-  typeInfo: (typeId: number) => Promise<RawMarketTypeInfo | null>
+  typeInfo: (typeId: number, force?: boolean) => Promise<RawMarketTypeInfo | null>
+  /**
+   * 改一个物品的 dogma 属性（写服务端静态表 + 热重载）。
+   *
+   * 成功后调用方要重新拉一次 `typeInfo(typeId, true)`：Rust 侧那份内存索引已经就地更新，
+   * 但这里按 typeId 缓存的回包还留着旧值，不强制重拉界面不会变。
+   * `ok=false` 时 `reason` 是后端原话，直接给用户看。
+   */
+  setTypeAttributes: (input: RawMarketAttrsInput) => Promise<RawMarketSetAttrs | null>
 }
 
 /**
@@ -130,7 +140,7 @@ export function useMarket(locale: LocaleCode): MarketStore {
    * 换语言只丢缓存，下一次调用顺带把新语言的索引建起来。
    */
   const loadTypeInfo = useCallback(
-    async (typeId: number) => {
+    async (typeId: number, force = false) => {
       if (!ipc) return null
       const lang = locale
       if (infoLang.current !== lang) {
@@ -138,6 +148,8 @@ export function useMarket(locale: LocaleCode): MarketStore {
         infoCache.current.clear()
       }
       if (typeId !== 0) {
+        // force：改完属性要拿新值，把这一条的回包缓存丢掉重拉（索引本身在 Rust 侧已更新）
+        if (force) infoCache.current.delete(typeId)
         const cached = infoCache.current.get(typeId)
         if (cached) return cached
       }
@@ -188,6 +200,14 @@ export function useMarket(locale: LocaleCode): MarketStore {
     await loadTrades()
   }, [load, loadTrades])
 
+  const setTypeAttributes = useCallback(
+    async (input: RawMarketAttrsInput) => {
+      if (!ipc) return null
+      return await callOr<RawMarketSetAttrs>("marketSetTypeAttributes", null, input)
+    },
+    [ipc]
+  )
+
   useEffect(() => {
     void refresh()
   }, [refresh])
@@ -213,6 +233,7 @@ export function useMarket(locale: LocaleCode): MarketStore {
     refreshTrades: loadTrades,
     selectType,
     adjustStock,
+    setTypeAttributes,
     typeInfo: loadTypeInfo,
   }
 }

@@ -1,0 +1,41 @@
+{
+  "version": "0.3.8",
+  "changelog": {
+    "zh": [
+      {
+        "type": "new",
+        "text": "GitHub 令牌在保存 / 校验后立刻预检「能不能投稿」：索引仓库 EVEjs-mods 在维护者名下，细粒度令牌勾不到它，建 fork / 开 PR 必然 403。现在 classic 令牌按 x-oauth-scopes 看有没有 public_repo / repo，fine-grained 直接判不能，当场弹「令牌可用，但不能投稿」并给出改用 classic + public_repo 的办法；投稿链路的 403 也补上了 [方法 路径] 与权限提示（限流 403 不再被误报成权限问题）。"
+      },
+      {
+        "type": "fix",
+        "text": "模组制作规范（中英双份）第 3 步重写：不再教作者建 fine-grained 令牌并把 Repository access 选 All repositories（对别人名下的索引仓库无效），改成 classic 令牌勾 public_repo，并说明细粒度令牌投稿为什么必报 403、索引仓库协作者该怎么配；常见报错表同步改正。"
+      },
+      {
+        "type": "new",
+        "text": "物品市场「简介 / 属性」页签新增「编辑属性」：直接改物品（舰船 / 装备 / 弹药…）的 dogma 属性值，不用为此停服。写的是服务端静态表 typeDogma；舰船属性另有 shipDogmaAttributes 一份副本，两份一起改，避免「属性页变了、装配里没变」。写盘前自动快照（可在静态数据页一键还原），写完用启动器的热重载把新表换进服务端内存并清掉读缓存。生效边界如实提示、不夸大：舰船属性保存后离舰再登舰就能看到新值；装备 / 物品属性在服务端有进程级缓存，多数要重启主服务器；主服务器不是本启动器拉起时，改动只在盘上、下次启动生效。"
+      },
+      {
+        "type": "opt",
+        "text": "物品详情照游戏「属性」页签重排：「简介 / 属性」改名「属性」，整段是一张长表（分区标题带 + 图标 + 名称 + 右对齐的值），「装配」排到最前；标题带右侧给概要（护盾 / 装甲 / 结构是有效 HP，导航是朝向时间），护盾 / 装甲 / 结构下面一条电磁 / 热能 / 动能 / 爆炸四抗色块，感应强度改成雷达 / 光雷达 / 磁力 / 引力四格读数。舰船补上游戏里那三条只读属性 —— 质量、容量、体积（服务端静态表里没有，从 SDE 的类型数据取，「改属性」不会列出它们）。物品简介从页签里挪到标题栏的书页图标上（点开是弹窗），改属性也跟着挪成铅笔图标，与复制按钮并排。分区标题也补齐到全部在售物品：装备 / 无人机 / 舰载机用到的「炮台」「过热」「采矿」「目标标记」等分类不再露 SDE 的英文分类名（实测 49% 的在售物品原本会中一条），SDE 里没名字的分类 0 与 9（NULL）并进「其他属性」，空白标题带与 NULL 标题带都消失；四抗色块条只看抗性齐不齐 —— 损伤控制这类没有护盾容量 / 装甲值的装备照样画条，只是不给「有效 HP」读数。舰船面板的段序与改动前逐条一致。"
+      }
+    ],
+    "en": [
+      {
+        "type": "new",
+        "text": "The GitHub token panel now pre-checks whether a token can submit right after save / check: the EVEjs-mods index repository belongs to the maintainer, a fine-grained token cannot reach it, and fork + PR therefore always fail with 403. A classic token is inspected via its x-oauth-scopes header for public_repo / repo, a fine-grained one is flagged outright, and the launcher warns that the token works but submission is blocked with the classic + public_repo fix; the submit chain's 403 now carries the method/path and a permission hint too (rate-limit 403s are no longer mislabelled as a permission problem)."
+      },
+      {
+        "type": "fix",
+        "text": "Rewrote step 3 of the mod authoring guide (both languages): it no longer tells authors to create a fine-grained token with Repository access set to All repositories (useless for someone else's index repository) and now recommends a classic token with public_repo, explains why a fine-grained token always 403s on submission and how index-repository collaborators should configure it, and corrects the common-errors table."
+      },
+      {
+        "type": "new",
+        "text": "The market page's Info / Attributes tab now has Edit attributes, so item dogma values (ships, modules, charges...) can be changed without stopping the server. Values are written to the server's static typeDogma table; ships also have a copy in shipDogmaAttributes and both are updated together so the attribute panel and the fitting never disagree. A snapshot is taken before writing (restorable from the static-data page) and the launcher's hot reload swaps the new tables into the server's memory and clears its read caches. The effect is described honestly rather than oversold: ship attributes show up after undocking and boarding again, equipment / item attributes are cached per type in the server and usually need a main-server restart, and when the main server was not started by this launcher the change stays on disk and applies on the next start."
+      },
+      {
+        "type": "opt",
+        "text": "The item detail panel now follows the game's Attributes tab: the Description / Attributes tab is renamed Attributes and rendered as one long table (section header band + icon + name + right-aligned value) with Fitting first; each header carries a summary (effective HP for shield / armor / structure, align time for navigation), shield / armor / structure keep the EM / thermal / kinetic / explosive resist strip, and sensor strength became the four-cell readout (radar / ladar / magnetometric / gravimetric). Ships gained the three read-only values the game shows - mass, capacity and volume (missing from the server's static tables, read from the SDE type data; the attribute editor does not list them). The item description moved out of the tab onto a book icon in the header (opening a dialog), and Edit attributes became a pencil icon next to the copy button. Section titles now cover every listed item: the categories equipment, drones and fighters use (Turrets, Heat, Mining, Target painting and so on) no longer show the raw SDE English name (measured against the live market, 49% of listed items used to hit one), SDE's nameless categories 0 and 9 (NULL) fold into Other attributes so neither blank nor NULL header bands are drawn any more, and the resist strip now depends only on the four resistances being present - a damage control gets its shield / armor strip without a shield / armor value, just without the effective-HP readout. Ship panels keep exactly the section order they had."
+      }
+    ]
+  }
+}

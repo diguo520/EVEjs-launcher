@@ -380,6 +380,37 @@ async fn dispatch(
             .await?)
         }
 
+        // 改一个物品的 dogma 属性（舰船 / 装备 / 其它物品）。写服务端静态表 typeDogma，
+        // 舰船另有 shipDogmaAttributes 一份副本、由侧车一起改（值不一致会让装配与加成各读各的）；
+        // 改完用注入主服务器的热重载 host 把新表换进内存，服务端进程不用重启。
+        // 生效边界由回包的 needsRestart 带出：舰船离舰再登舰即生效，装备多数要重启。
+        "market:setTypeAttributes" => {
+            let input = args.first().cloned().unwrap_or(Value::Null);
+            let type_id = input
+                .get("typeId")
+                .and_then(Value::as_u64)
+                .map(|value| value.min(u32::MAX as u64) as u32)
+                .unwrap_or(0);
+            // 只收正整数 id + 有限数值：畸形输入在侧车里也会被拒，这里先挡掉免得白起一个 node 进程
+            let edits: Vec<market::AttrEdit> = input
+                .get("attributes")
+                .and_then(Value::as_array)
+                .map(|rows| {
+                    rows.iter()
+                        .filter_map(|row| {
+                            let id = row.get("id").and_then(Value::as_u64)?;
+                            let value = row.get("value").and_then(Value::as_f64)?;
+                            if id == 0 || id > u16::MAX as u64 || !value.is_finite() {
+                                return None;
+                            }
+                            Some((id as u16, value))
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+            Ok(market::set_type_attributes(&root, &state.runtime, type_id, edits).await)
+        }
+
         /* ------------------------------ 模组管理 ------------------------------ */
         "mods:list" => {
             let scan_result = mods::scan::scan_mods(&root, &state.runtime);

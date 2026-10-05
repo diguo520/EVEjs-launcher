@@ -1,6 +1,6 @@
 //! 由 scripts/gen-contract.mjs 生成 —— 请勿手改。源: contract/ipc-channels.json
 //! 抽取源: E:\Games\EveJS-v0.12.8\launcher\launcher
-//! 生成时间: 2026-10-04T22:15:30.852Z
+//! 生成时间: 2026-10-05T11:17:38.460Z
 
 #![allow(dead_code)]
 
@@ -18,7 +18,7 @@ pub struct ChannelSpec {
     pub kind: ChannelKind,
 }
 
-pub const REQUEST_COUNT: usize = 110;
+pub const REQUEST_COUNT: usize = 111;
 pub const EVENT_COUNT: usize = 7;
 
 #[rustfmt::skip]
@@ -71,6 +71,7 @@ pub const CHANNELS: &[ChannelSpec] = &[
     ChannelSpec { channel: "market:book", api: "marketBook", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "market:catalog", api: "marketCatalog", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "market:overview", api: "marketOverview", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "market:setTypeAttributes", api: "marketSetTypeAttributes", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "market:trades", api: "marketTrades", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "market:typeInfo", api: "marketTypeInfo", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "metrics:get", api: "metricsGet", kind: ChannelKind::Invoke },

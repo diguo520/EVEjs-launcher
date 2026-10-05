@@ -790,6 +790,12 @@ export interface RawTokenCheck {
   ok: boolean
   login?: string
   reason?: string
+  /** `classic` / `fine-grained` / `unknown`（没有 scope 头也不是 github_pat_ 的 App 令牌） */
+  tokenKind?: "classic" | "fine-grained" | "unknown"
+  /** classic 令牌在 GitHub 上勾选的 scope 列表（fine-grained 为空） */
+  scopes?: string[]
+  /** 这枚令牌能不能往索引仓库开 PR；false 时申请收录必然 403 */
+  canSubmit?: boolean
 }
 
 /** author:get */
@@ -1168,4 +1174,48 @@ export interface RawMarketTypeInfo {
   /** 属性分类 id → 名字（SDE 原话，英文） */
   categories?: Record<string, string>
   counts?: Record<string, number>
+}
+
+/** market:setTypeAttributes 的一条改动：属性 id + 新值（dogma 原始值，不是格式化后的显示值） */
+export interface RawMarketAttrEdit {
+  id: number
+  value: number
+}
+
+/** market:setTypeAttributes 的入参：一次改一个物品的若干条属性 */
+export interface RawMarketAttrsInput {
+  typeId: number
+  attributes: RawMarketAttrEdit[]
+}
+
+/**
+ * market:setTypeAttributes 的回包。
+ *
+ * 生效边界由 `armed` / `needsRestart` 两个字段决定，界面照它们如实写提示、不夸大：
+ * - `armed=false`：主服务器不是启动器拉起的（或压根没启动）→ 改动只在盘上，下次启动生效；
+ * - `armed=true && needsRestart=true`：已热重载，但装备 / 物品属性在服务端有进程级缓存 →
+ *   要重启主服务器；
+ * - `armed=true && needsRestart=false`：改的是舰船属性 → 离舰再登舰就能看到新值。
+ */
+export interface RawMarketSetAttrs {
+  ok: boolean
+  /** false = 缺侧车 / 缺静态表这类「环境不全」 */
+  supported?: boolean
+  /** ok=false 时是后端原话 */
+  reason?: string
+  typeId?: number
+  /** 真正写进去的属性条数；0 = 提交的值和当前一样，没写盘 */
+  changed?: number
+  /** 提交了但表里没有的属性 id（不会凭空造属性） */
+  missing?: number[]
+  /** 这次写到了哪些静态表（舰船是 typeDogma + shipDogmaAttributes） */
+  tables?: string[]
+  /** 写盘前的自动快照 id（静态数据页可一键还原） */
+  snapshotId?: string | null
+  /** true = 要重启主服务器才生效 */
+  needsRestart?: boolean
+  /** 主服务器是不是启动器带着热重载 host 起来的 */
+  armed?: boolean
+  /** 热重载那一步的原始回包（没武装 / 超时 / 失败时看它） */
+  reload?: unknown
 }

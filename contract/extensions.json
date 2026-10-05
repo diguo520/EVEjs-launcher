@@ -127,6 +127,16 @@
       "why": "现役版没有物品 / 市场浏览功能。这条通道直读服务端市场库 externalservices/market-server/data/generated/market.sqlite（只读 + WAL，服务跑着也能读），返回区域、星系、类型 / 站点 / 库存 / 成交行数、库文件大小与最近一次成交时间。库是活库：seed_stock.quantity 与 region_summaries 里的最优买卖价会随游戏内成交变化，所以这里刻意不走任何随包快照 —— 用户要的就是「跑着游戏读到的是当下数据，服务没启动也能读」。"
     },
     {
+      "api": "marketSetTypeAttributes",
+      "channel": "market:setTypeAttributes",
+      "kind": "invoke",
+      "signature": "input: { typeId: number; attributes: Array<{ id: number; value: number }> }",
+      "params": [
+        "input"
+      ],
+      "why": "物品市场页「简介 / 属性」里的改属性：改一个物品（舰船 / 装备 / 弹药…）的 dogma 属性值，服务端不用重启。写的是服务端静态表 _local/gameStore/data/typeDogma/data.json；舰船属性还有第二份副本 shipDogmaAttributes.shipAttributesByTypeID，两份必须同值（服务端读哪一份就按哪一份算装配与加成，只改一份会出现「属性页变了、装配里没变」），所以存在舰船条目时两份一起改。改的是**已存在的属性键**：不凭空造属性、不碰类型元数据，值必须是有限数字、id 必须是正整数。三件事必须按这个顺序做，缺一都不成立：(1) 写盘前先用 hotreload 的快照机制给这两张表留一份「改前」备份 —— apply 自己的快照照的是写盘之后的内容，拿它当回滚点等于没有回滚；(2) 改盘交给随包侧车 market-cli.js 的 settypeattributes 做，而不是在 Rust 里重排整份 JSON —— 这份表是 24 MB 的 2 空格缩进 JSON，serde_json 默认按 key 排序重排整库、且与 Node 的 JSON.stringify 逐字节不一致，侧车用 JSON.parse + JSON.stringify(obj,null,2)+换行 能做到「只有动过的那个数变了」，写入还走同目录临时文件 + rename 保证服务端不会读到半个 JSON；(3) 写完用启动器注入主服务器的热重载 host 把新表换进内存并清 referenceData 读缓存。生效边界按服务端取值路径实测给出、不夸大：舰船基础属性每次构建库存 / 装配数据都直读 shipDogmaAttributes（liveFittingState.readShipBaseAttributes、dogmaService._buildShipBaseAttributes），没有模块级缓存，所以**离舰再登舰**就用新值；装备 / 其它物品走 liveFittingState.getNormalizedTypeAttributeMap，那里按 typeID 存了进程级永久缓存且模块没有重置入口，多数情况要**重启主服务器**。回包带 needsRestart 与 armed 两个字段，界面照它们如实写提示（服务端不是启动器拉起的、或压根没启动时，改动只在盘上，下次启动才生效）。改完还会就地把启动器内存里的属性索引那几行覆盖成新值，省掉重建整份索引（要重扫 144 MB SDE，约 2 s）。现役版完全没有这个能力，改属性只能停服重启。"
+    },
+    {
       "api": "marketTrades",
       "channel": "market:trades",
       "kind": "invoke",

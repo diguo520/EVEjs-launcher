@@ -1,13 +1,13 @@
 {
   "generatedFrom": "E:\\Games\\EveJS-v0.12.8\\launcher\\launcher",
-  "generatedAt": "2026-10-04T22:15:30.852Z",
+  "generatedAt": "2026-10-05T11:17:38.460Z",
   "counts": {
-    "invoke": 104,
+    "invoke": 105,
     "send": 6,
     "events": 7,
-    "requests": 110,
+    "requests": 111,
     "registered": 82,
-    "apiTotal": 117
+    "apiTotal": 118
   },
   "invoke": [
     {
@@ -398,6 +398,15 @@
       "kind": "invoke",
       "signature": "",
       "params": []
+    },
+    {
+      "api": "marketSetTypeAttributes",
+      "channel": "market:setTypeAttributes",
+      "kind": "invoke",
+      "signature": "input: { typeId: number; attributes: Array<{ id: number; value: number }> }",
+      "params": [
+        "input"
+      ]
     },
     {
       "api": "marketTrades",
@@ -991,6 +1000,7 @@
       "market:book",
       "market:catalog",
       "market:overview",
+      "market:setTypeAttributes",
       "market:trades",
       "market:typeInfo",
       "mods:claimCandidates",

@@ -9,6 +9,7 @@
  *   node market-cli.js book     <服务端根目录> <typeID>
  *   node market-cli.js trades   <服务端根目录> [条数]
  *   node market-cli.js typeinfo <服务端根目录> [界面语言]
+ *   node market-cli.js settypeattributes <服务端根目录> <typeID> <改动 JSON>
  *
  * 为什么是「直接读 market.sqlite 文件」而不是问服务端要：
  *   1. 服务没起的时候也要能看（玩家开着启动器查价，市场服务不一定在跑）；
@@ -549,6 +550,25 @@ function bonusEntries(list, lang) {
 /** unitID=116 是「typeID」：属性值指向另一个物品（技能、弹药…），界面要显示名字而不是数字 */
 const TYPE_REF_UNIT = 116;
 
+/** 舰船的 SDE 类别 id（invCategories：6 = Ship） */
+const SHIP_CATEGORY = 6;
+
+/**
+ * 舰船要从**类型数据**补进属性列表的三条：质量（4）/ 容量（38）/ 体积（161）。
+ *
+ * 这三条在服务端的静态表 typeDogma 里一条都没有（实测 924 艘船，一条不落），客户端
+ * 是从类型的 mass / capacity / volume 取的。属性面板要跟游戏一样列出它们（「导航」
+ * 段里的质量与「仓库」段里的容量、体积），只能在这里照做。
+ *
+ * 侧车与界面共用一个口径：这三条**不是 dogma 属性**，写不回去，界面的「改属性」弹窗
+ * 会把它们滤掉（见 ui/src/lib/type-info-logic.ts 的 DERIVED_ATTR_IDS）。
+ */
+const DERIVED_TYPE_FIELDS = [
+  [4, "mass"],
+  [38, "capacity"],
+  [161, "volume"],
+];
+
 function readJsonlFile(file) {
   return fs.existsSync(file) ? readJsonl(file) : [];
 }
@@ -602,12 +622,14 @@ async function typeinfo(root, langArg) {
   // 3) 只做在售物品：全量 2.6 万个类型里有一半不在市场上
   const { db } = openMarketDb(root);
   let marketIds;
+  let shipIds;
   try {
-    marketIds = new Set(
-      db
-        .prepare("SELECT type_id FROM market_types WHERE published = 1")
-        .all()
-        .map((row) => num(row.type_id))
+    const rows = db
+      .prepare("SELECT type_id, category_id FROM market_types WHERE published = 1")
+      .all();
+    marketIds = new Set(rows.map((row) => num(row.type_id)));
+    shipIds = new Set(
+      rows.filter((row) => num(row.category_id) === SHIP_CATEGORY).map((row) => num(row.type_id))
     );
   } finally {
     db.close();
@@ -672,6 +694,7 @@ async function typeinfo(root, langArg) {
   // 6) 简介 + 「值指向的类型」的名字：流式扫 types.jsonl（144 MB，别整份读进内存）
   const descriptions = new Map();
   const names = new Map();
+  const shipMeta = new Map();
   await new Promise((resolve, reject) => {
     const reader = readline.createInterface({
       input: fs.createReadStream(path.join(sde, "types.jsonl")),
@@ -691,6 +714,14 @@ async function typeinfo(root, langArg) {
         const brief = cleanDescription(localized(row.description, lang));
         if (brief) descriptions.set(id, brief);
       }
+      // 舰船的 mass / capacity / volume：属性面板要照游戏列出这三条，见第 7 步
+      if (shipIds.has(id)) {
+        shipMeta.set(id, {
+          mass: Number(row.mass) || 0,
+          capacity: Number(row.capacity) || 0,
+          volume: Number(row.volume) || 0,
+        });
+      }
       if (referenced.has(id)) {
         const name = localized(row.name, lang);
         if (name) names.set(id, name);
@@ -700,6 +731,26 @@ async function typeinfo(root, langArg) {
     reader.on("error", reject);
   });
 
+  // 7) 舰船补三条类型字段（质量 / 容量 / 体积）：装上以后属性面板才能像游戏那样，
+  //    「导航」段里有质量、「仓库」段里有容量与体积 —— 它们不是 dogma 属性，只读。
+  let derivedRows = 0;
+  for (const [id, extra] of shipMeta) {
+    const rows = values.get(id) ?? [];
+    const have = new Set(rows.map((row) => row[0]));
+    for (const [attributeId, field] of DERIVED_TYPE_FIELDS) {
+      if (extra[field] > 0 && !have.has(attributeId)) {
+        rows.push([attributeId, extra[field]]);
+        derivedRows += 1;
+      }
+    }
+    if (rows.length === 0) continue;
+    rows.sort(
+      (left, right) =>
+        meta.get(left[0]).category - meta.get(right[0]).category || left[0] - right[0]
+    );
+    values.set(id, rows);
+  }
+
   return {
     ok: true,
     lang,
@@ -708,7 +759,7 @@ async function typeinfo(root, langArg) {
       marketTypes: marketIds.size,
       described: descriptions.size,
       attributed: values.size,
-      attributeRows,
+      attributeRows: attributeRows + derivedRows,
       bonused: bonuses.size,
       referencedTypes: names.size,
     },
@@ -727,6 +778,108 @@ async function typeinfo(root, langArg) {
   };
 }
 
+/* --------------------------- 属性写回（物品市场页的「改属性」用） --------------------------- */
+
+/** 静态表数据文件：`_local/gameStore/data/<表>/data.json` */
+function gameStoreTableFile(root, name) {
+  return path.join(root, "_local", "gameStore", "data", name, "data.json");
+}
+
+/**
+ * 原子写回：先写同目录临时文件再 rename。
+ *
+ * 服务端（以及启动器注入的热重载 host）随时可能读这份文件，直接覆写会读到半个 JSON。
+ * 缩进固定 2 空格 + 末尾换行 —— 与这批静态表原本的写法逐字节一致，只会改到我们动过的那几个数。
+ */
+function writeTableJsonAtomic(file, value) {
+  const temp = file + "." + process.pid + ".tmp";
+  fs.writeFileSync(temp, JSON.stringify(value, null, 2) + "\n", "utf8");
+  fs.renameSync(temp, file);
+}
+
+/**
+ * 改一个 typeID 的 dogma 属性。
+ *
+ * 舰船属性在静态表里有两份副本（typeDogma.typesByTypeID 与
+ * shipDogmaAttributes.shipAttributesByTypeID），值必须保持一致 —— 服务端读哪一份就按哪一份
+ * 算装配与加成，只改一份会出现「属性页变了、装配里没变」。所以存在 shipDogma 条目时两份一起改。
+ *
+ * 只改**已经存在**的属性键：不凭空造属性、不碰类型元数据（attributeTypesByID 等）。
+ * 值不是有限数字、id 不是正整数一律拒绝。
+ */
+function settypeattributes(root, typeIdArg, editsArg) {
+  const typeId = Number(typeIdArg);
+  if (!Number.isInteger(typeId) || typeId <= 0) {
+    throw new Error("typeID 必须是正整数");
+  }
+  let edits;
+  try {
+    edits = JSON.parse(text(editsArg) || "[]");
+  } catch (error) {
+    throw new Error("属性改动不是合法 JSON：" + text(error && error.message));
+  }
+  if (!Array.isArray(edits) || edits.length === 0) {
+    throw new Error("没有要改的属性");
+  }
+  const wanted = new Map();
+  for (const row of edits) {
+    const id = Number(row && row.id);
+    const value = Number(row && row.value);
+    if (!Number.isInteger(id) || id <= 0) {
+      throw new Error("属性 id 不合法：" + text(row && row.id));
+    }
+    if (!Number.isFinite(value)) {
+      throw new Error("属性 " + id + " 的值不是有限数字");
+    }
+    wanted.set(String(id), value);
+  }
+
+  const typeDogmaFile = gameStoreTableFile(root, "typeDogma");
+  if (!fs.existsSync(typeDogmaFile)) {
+    throw new Error("未找到静态表：" + typeDogmaFile + "（属性值就在它里面）");
+  }
+  const typeDogma = JSON.parse(fs.readFileSync(typeDogmaFile, "utf8"));
+  const record = typeDogma.typesByTypeID && typeDogma.typesByTypeID[String(typeId)];
+  if (!record || !record.attributes || typeof record.attributes !== "object") {
+    throw new Error("typeID " + typeId + " 在 typeDogma 里没有属性");
+  }
+
+  let changed = 0;
+  const missing = [];
+  for (const [id, value] of wanted) {
+    if (!Object.prototype.hasOwnProperty.call(record.attributes, id)) {
+      missing.push(Number(id));
+      continue;
+    }
+    if (Number(record.attributes[id]) !== value) changed += 1;
+    record.attributes[id] = value;
+  }
+  if (changed === 0) {
+    // 值跟当前一模一样：不写盘，免得把 mtime 弄脏、界面上多出一条「有改动待重载」
+    return { ok: true, typeId, changed: 0, missing, tables: [] };
+  }
+  const tables = ["typeDogma"];
+  writeTableJsonAtomic(typeDogmaFile, typeDogma);
+
+  const shipDogmaFile = gameStoreTableFile(root, "shipDogmaAttributes");
+  if (fs.existsSync(shipDogmaFile)) {
+    const shipDogma = JSON.parse(fs.readFileSync(shipDogmaFile, "utf8"));
+    const entry =
+      shipDogma.shipAttributesByTypeID && shipDogma.shipAttributesByTypeID[String(typeId)];
+    if (entry && entry.attributes && typeof entry.attributes === "object") {
+      for (const [id, value] of wanted) {
+        if (Object.prototype.hasOwnProperty.call(entry.attributes, id)) {
+          entry.attributes[id] = value;
+        }
+      }
+      writeTableJsonAtomic(shipDogmaFile, shipDogma);
+      tables.push("shipDogmaAttributes");
+    }
+  }
+
+  return { ok: true, typeId, changed, missing, tables };
+}
+
 /* ------------------------------ 入口 ------------------------------ */
 
 async function main() {
@@ -742,6 +895,8 @@ async function main() {
       return trades(root, arg1);
     case "typeinfo":
       return typeinfo(root, arg1);
+    case "settypeattributes":
+      return settypeattributes(root, arg1, process.argv[5]);
     default:
       throw new Error("未知子命令：" + text(cmd));
   }

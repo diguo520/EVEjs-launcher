@@ -169,10 +169,14 @@ export const SECTION_SENSOR = -6
 
 /**
  * 分区标题：SDE 的 `dogmaAttributeCategories` 只有英文原话，而游戏里这一段是本地化的。
- * 只给舰船身上那几段配标题，其余分类沿用 SDE 英文名 —— 编一张 37 条的对照表，
- * 只会多出一处会过期的翻译。
+ *
+ * 表里覆盖的是**在售物品真的会用到**的分类，不是 SDE 的全部 37 条：装备 / 无人机 /
+ * 舰载机那几段（炮台、过热、采矿、电子战…）SDE 同样只有英文名，不补的话中文用户与
+ * 外语用户会在同一张面板上看到半截英文表头 —— 实测 49% 的在售物品至少有一条这样的
+ * 表头，看着就像「没套上样式」。
  */
 const SECTION_TITLE: Record<number, string> = {
+  1: "装配",
   2: "护盾",
   3: "装甲",
   4: "结构",
@@ -181,25 +185,75 @@ const SECTION_TITLE: Record<number, string> = {
   17: "导航",
   36: "电子抗性",
   40: "仓库",
+  7: "其他属性",
+  10: "无人机",
+  8: "技能需求",
+  37: "加成",
+  // 装备 / 无人机 / 舰载机才会出现的分类（按实测出现频次排）
+  29: "炮台",
+  30: "导弹",
+  51: "采矿",
+  52: "过热",
+  34: "舰载机能力",
+  38: "舰载机属性",
+  39: "超级武器",
+  20: "远程协助",
+  21: "目标标记",
+  22: "能量中和",
+  24: "感应抑阻",
+  25: "目标干扰",
+  26: "跟踪干扰",
+  27: "跃迁扰频",
+  28: "停滞缠绕",
   [SECTION_SENSOR]: "感应强度",
 }
 
-const SENSOR_ATTRIBUTES = new Set([208, 209, 210, 211])
+/** 四格感应强度的顺序：雷达 / 光雷达 / 磁力 / 引力 —— 客户端就是这么排的 */
+export const SENSOR_ATTR_ORDER = [208, 209, 210, 211]
+
+const SENSOR_ATTRIBUTES = new Set(SENSOR_ATTR_ORDER)
 
 /**
  * 有几条属性客户端挂在别的分区下，SDE 的分类却不是 —— 照客户端挪一下：
- * 质量（4）与容量（38）在 SDE 里都属于「结构」，客户端把它们放在「导航」与「仓库」。
+ * 质量（4）在 SDE 里属于「结构」，客户端放在「导航」；容量（38）与体积（161）
+ * 同理，客户端放在「仓库」。
  */
 const SECTION_OVERRIDE: Record<number, number> = {
   4: 17,
   38: 40,
+  161: 40,
 }
 
 /**
- * 段落顺序照客户端：护盾 → 装甲 → 结构 → 电容器 → 导航 → 目标锁定 → 感应强度 →
- * 仓库 → 电子抗性；其余分类（装备、无人机、采矿…）按分类 id 接在后面。
+ * 没名字的遗留分类：SDE 的分类 0（压根没填 attributeCategoryID）与 9（字面就叫 NULL）
+ * 装的是 `angelCartelProjectileReloadingSpeed`、`freighterBonusO1`、`帝国区禁用`
+ * 这类散装属性，客户端不给它们单独起段，并进「其他属性」。
+ *
+ * 不并的话面板上会冒出一条**只有图标、一个字都没有**的标题带（分类 0；实测黄金富豪级
+ * 17720、鲍鱼级 34328 等 29 艘船），或者一条写着 `NULL` 的（分类 9，实测 663 个物品）。
  */
-const SECTION_ORDER = [2, 3, 4, 5, 17, 6, SECTION_SENSOR, 40, 36]
+const SECTION_CATEGORY: Record<number, number> = { 0: 7, 9: 7 }
+
+/**
+ * 质量（4）与惯性调整（70）：导航分区头部那条「朝向时间」由这两条算出来，
+ * 它本身不是 SDE 里的一条属性。
+ */
+const MASS_ATTR = 4
+const INERTIA_ATTR = 70
+
+/**
+ * 段落顺序照客户端：装配 → 护盾 → 装甲 → 结构 → 电容器 → 导航 → 目标锁定 →
+ * 感应强度，装备 / 无人机 / 舰载机那几段（炮台、过热、采矿、电子战…）接在后面，
+ * 再往后是仓库 → 电子抗性；其余分类（无人机、加成…）按分类 id 兜底排在最后。
+ *
+ * 显式列出来的都是**舰船身上没有**的分类（实测舰船只用到 0/1-10/17/36/37/38/40），
+ * 所以动这张表不会改变舰船面板的段序。
+ */
+const SECTION_ORDER = [
+  1, 2, 3, 4, 5, 17, 6, SECTION_SENSOR,
+  29, 30, 51, 52, 34, 39, 20, 21, 22, 24, 25, 26, 27, 28,
+  40, 36,
+]
 
 function sectionRank(id: number): number {
   const at = SECTION_ORDER.indexOf(id)
@@ -221,6 +275,17 @@ const DEFENCE_ATTRS: { section: number; hp: number; resists: number[]; fallback?
   { section: 4, hp: 9, resists: [974, 977, 976, 975], fallback: [113, 110, 109, 111] },
 ]
 
+/**
+ * 护盾 / 装甲 / 结构那几套四抗的属性 id（含结构的两套）。
+ *
+ * 面板把它们画成色块条，就不再当属性行重复列一遍 —— 服务端的结构抗性**两套 id 可能
+ * 同时有值**（实测裂谷级 587：109-113 是 0.67、974-977 是 1），都列出来会多出四条
+ * 同名行，其中一套还全是 0%。色块条本来只挑有真值的那一套，行里也就跟着只留挑中的那套。
+ */
+export const RESIST_ATTR_IDS = new Set(
+  DEFENCE_ATTRS.flatMap((spec) => [...spec.resists, ...(spec.fallback ?? [])])
+)
+
 export interface TypeInfoResist {
   id: number
   /** SDE 里那条抗性属性的本地化名字（护盾电磁伤害抗性…） */
@@ -230,10 +295,10 @@ export interface TypeInfoResist {
 }
 
 export interface TypeInfoDefence {
-  /** 护盾容量 / 装甲值 / 结构值 */
-  hp: number
-  /** 有效 HP */
-  effective: number
+  /** 护盾容量 / 装甲值 / 结构值；装备大多没有这三条，缺了就是 null */
+  hp: number | null
+  /** 有效 HP；没有 hp 时给 null（标题带右侧那截读数就不画） */
+  effective: number | null
   /** 电磁 / 热能 / 动能 / 爆炸，顺序与客户端一致 */
   resists: TypeInfoResist[]
 }
@@ -246,7 +311,17 @@ export interface TypeInfoSectionView {
   rows: RawMarketTypeInfoAttr[]
   /** 只有护盾 / 装甲 / 结构有：头部那一行「有效 HP」与四抗 */
   defence?: TypeInfoDefence
+  /** 只有导航有：头部右侧那条「朝向时间」（秒），由质量与惯性调整算出来 */
+  alignSeconds?: number
 }
+
+/**
+ * 侧车从**类型字段**补出来的三条属性：质量（4）/ 容量（38）/ 体积（161）在 typeDogma
+ * 里一条都没有，是侧车从 SDE 的类型数据（mass / capacity / volume）补进属性列表的，
+ * 让属性面板跟游戏一样能列出它们。**它们在 dogma 里不存在，写不回去** —— 改属性的
+ * 弹窗要跳过，否则用户改了会得到一个「写不进去」的失败提示。
+ */
+export const DERIVED_ATTR_IDS = new Set([MASS_ATTR, 38, 161])
 
 /**
  * 把属性折成游戏「属性」页签里的分区：顺序、标题、有效 HP。
@@ -262,14 +337,16 @@ export function attributeSections(
   const sections = new Map<number, TypeInfoSectionView>()
   for (const attr of attributes ?? []) {
     byId.set(attr.id, attr)
+    // 分类 0 / 9 先并进「其他属性」，再让分区的挪位表（质量、容量、体积）覆盖
+    const category = SECTION_CATEGORY[attr.category] ?? attr.category
     const id = SENSOR_ATTRIBUTES.has(attr.id)
       ? SECTION_SENSOR
-      : SECTION_OVERRIDE[attr.id] ?? attr.category
+      : SECTION_OVERRIDE[attr.id] ?? category
     let section = sections.get(id)
     if (!section) {
       section = {
         id,
-        title: SECTION_TITLE[id] ?? categories?.[String(attr.category)] ?? "",
+        title: SECTION_TITLE[id] ?? categories?.[String(category)] ?? "",
         rows: [],
       }
       sections.set(id, section)
@@ -282,8 +359,6 @@ export function attributeSections(
   for (const section of out) {
     const spec = DEFENCE_ATTRS.find((item) => item.section === section.id)
     if (!spec) continue
-    const hp = byId.get(spec.hp)
-    if (!hp || !(hp.value > 0)) continue
     // 一套抗性要么四条都在、要么整段不画：宁可没有，也不要画一个算错的「有效 HP」
     const pick = (ids: number[]): TypeInfoResist[] | null => {
       const rows: TypeInfoResist[] = []
@@ -297,11 +372,26 @@ export function attributeSections(
     }
     const resists = pick(spec.resists) ?? (spec.fallback ? pick(spec.fallback) : null)
     if (!resists) continue
+    // 这条色块只看抗性齐不齐：护盾容量 / 装甲值 / 结构值只有船体与少数装备（损伤控制、
+    // 会战模块）才有 —— 缺了照样画条，只是标题带右侧不给「有效 HP」那个读数。
+    // 否则同一件装备的护盾段有条、装甲段没条（损伤控制就是），看着像样式漏做了。
+    const hp = byId.get(spec.hp)
+    const hpValue = hp && hp.value > 0 ? hp.value : null
     const average = resists.reduce((sum, item) => sum + item.percent, 0) / resists.length / 100
     section.defence = {
-      hp: hp.value,
-      effective: average >= 1 ? hp.value : hp.value / (1 - average),
+      hp: hpValue,
+      effective: hpValue === null ? null : average >= 1 ? hpValue : hpValue / (1 - average),
       resists,
+    }
+  }
+  // 导航头部那条「朝向时间」是算出来的，不是 SDE 里的属性：ln(4) × 惯性调整 × 质量 ÷ 10⁶。
+  // 实测质量 997,000 kg、惯性 3.6 → 4.98 秒，与游戏显示一致；缺哪一条就不画。
+  const nav = out.find((section) => section.id === 17)
+  if (nav) {
+    const mass = byId.get(MASS_ATTR)
+    const inertia = byId.get(INERTIA_ATTR)
+    if (mass && inertia && mass.value > 0 && inertia.value > 0) {
+      nav.alignSeconds = (Math.log(4) * inertia.value * mass.value) / 1e6
     }
   }
   return out

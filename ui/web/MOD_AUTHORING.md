@@ -29,7 +29,7 @@
 | --- | --- | --- | --- | --- |
 | 1 | 确认环境（版本 / mods 目录） | 启动器 | 2 分钟 | ✅ |
 | 2 | 创建**作者身份**并导出 `.eve-key` | 启动器 | 2 分钟 | ✅ |
-| 3 | 创建 **GitHub 令牌**（fine-grained） | GitHub 网页 | 5 分钟 | ✅（发布时需要） |
+| 3 | 创建 **GitHub 令牌**（classic，勾 public_repo） | GitHub 网页 | 5 分钟 | ✅（发布与投稿都需要） |
 | 4 | **创建模组**（生成骨架） | 启动器 | 3 分钟 | ✅ |
 | 5 | 写你的逻辑（`loader.js`） | 编辑器 | 看需求 | ✅ |
 | 6 | 本地测试（启用 / 看日志） | 启动器 | 5 分钟 | 🟩 推荐 |
@@ -80,55 +80,44 @@
 
 ---
 
-## 步骤 3 ✅ 创建 GitHub 令牌（发布模组用）
+## 步骤 3 ✅ 创建 GitHub 令牌（发布与投稿都要用）
 
-发布模组是启动器**替你操作你自己的 GitHub 仓库**，所以需要一个令牌（Token）。
-共 6 小步：
+启动器要替你操作 GitHub：**发布**时往你自己的仓库写文件、建 Release、上传 ZIP；**申请收录**时还要往索引仓库 `diguo520/EVEjs-mods`（在维护者名下）建 fork、开 PR。用一个 **classic 令牌**就能同时覆盖这两件事。
 
 ### 3.1 打开正确的页面 🟨
 
 ```
 GitHub 右上角头像 → Settings → 左栏最底部 Developer settings
-  → Personal access tokens → Fine-grained tokens → Generate new token
+  → Personal access tokens → Tokens (classic) → Generate new token (classic)
 ```
 
-🟥 **别用 `Tokens (classic)`**：那一页只有 `repo` / `workflow` 这类 scope，**没有**下面要勾的 `Contents` / `Pull requests`。
+🟥 **别用 fine-grained（细粒度）令牌**：它的 Repository access 只能勾「你自己有权限的仓库」，勾不到维护者名下的索引仓库 `EVEjs-mods`；而建 fork 与开 PR 都需要在这个仓库上的写权限，所以细粒度令牌投稿必然报 `403 Resource not accessible by personal access token`。
 
 ### 3.2 填基本信息
 
 | 字段 | 填什么 |
 | --- | --- |
-| Token name | 随便，比如 `evejs-launcher` |
+| Note | 随便，比如 `evejs-launcher` |
 | Expiration | 建议 90 天或自定义（过期后要重新生成） |
-| Description | 选填 |
 
-### 3.3 选 Resource owner 与仓库范围
+### 3.3 勾 scope（关键）🟨
 
-- **Resource owner**：选**你自己的账号**
-- **Repository access**：🟩 选 **All repositories**（最省事；只选特定仓库时，新建的仓库不在列表里会报 404）
+| scope | 勾不勾 | 作用 |
+| --- | --- | --- |
+| **public_repo** | 🟩 必勾 | 读写公共仓库：发 Release、传 ZIP、建 fork、开 PR 全靠它 |
+| **repo** | 🟨 建议 | 包含 public_repo；还想让启动器自动建仓库 / 管私有仓库时勾上 |
 
-### 3.4 勾权限（关键）🟨
+### 3.4 生成并复制
 
-往下滚到 **Permissions** → 展开 **Repository permissions**（🟥 不是 Account permissions），勾这四项：
+点 **Generate token** → 复制那串 `ghp_...`（🟨 **只显示一次**，关掉页面就看不到了）。
 
-| 权限 | 设成 | 作用 | 不勾会怎样 |
-| --- | --- | --- | --- |
-| **Contents** | Read and write | 写 `evejs-mod.json`、建 Release、上传 ZIP | 写清单/发 Release 报 403 |
-| **Pull requests** | Read and write | 步骤 9 申请收录时开 PR | 申请收录报 403 |
-| **Administration** | Read and write | 步骤 8 自动**建仓库**用 | 建仓库报 `403 Resource not accessible` |
-| **Metadata** | Read-only | GitHub 自动勾上，不用管 | — |
+### 3.5 填进启动器
 
-> 🟦 只想手动提交、不想让启动器自动建仓库的：可以不勾 Administration，但要**先在 GitHub 建好仓库**，然后在启动器「我的仓库」里填 `owner/repo`。
+模组 / 插件 → **提交模组** → 找到 GitHub 令牌 → 粘贴 → 点 **保存**（会加密存在本机，保存后自动核验权限）→ 校验通过即可。
 
-### 3.5 生成并复制
+> 🟦 **为什么改成 classic？** 索引仓库在维护者名下，细粒度令牌给不了它写权限。只有被维护者加成**索引仓库协作者**的人，才可以用细粒度令牌：Repository access 勾上 `EVEjs-mods`，权限开 **Contents = Read and write** 与 **Pull requests = Read and write**。
 
-点 **Generate token** → 复制那串 `github_pat_...`（🟨 **只显示一次**，关掉页面就看不到了）。
-
-### 3.6 填进启动器
-
-模组 / 插件 → **提交模组** → 找到 GitHub 令牌 → 粘贴 → 点 **保存**（会加密存在本机）→ 点 **校验** 确认可用。
-
-🟨 **注意**：改过令牌权限或重新生成后，要把新令牌**重新粘贴保存**一次。
+🟨 **注意**：改过令牌 scope 或重新生成后，要把新令牌**重新粘贴保存**一次。
 
 ---
 
@@ -288,10 +277,10 @@ const hubPath = path.join(serverRoot, "src", "services", "chat", "chatHub.js");
 
 | 报错 | 原因 | 怎么解决 |
 | --- | --- | --- |
-| 🟥 `403 Resource not accessible by personal access token` | 令牌缺权限 | 补 **Administration = Read and write**（要自动建仓库）和 **Contents = Read and write**；Repository access 选 All repositories |
+| 🟥 `403 Resource not accessible by personal access token` | 令牌是 fine-grained，或 classic 没勾 public_repo | 改用 classic 令牌并勾 **public_repo**；索引仓库在维护者名下，细粒度令牌勾不到它。已被加成索引仓库协作者的：用细粒度令牌勾上 `EVEjs-mods` + Contents / Pull requests = Read and write |
 | 🟥 `net::ERR_INVALID_ARGUMENT` | 旧版启动器上传 ZIP 的 bug | 升级到 **0.1.20+** |
-| 🟥 `404` | 仓库不存在，或令牌没覆盖它 | 检查 owner/repo 拼写；把令牌的 Repository access 改成 All repositories |
-| 🟥 `还没有填 GitHub 令牌` | 没保存令牌 | 回到步骤 3.6 |
+| 🟥 `404` | 仓库不存在，或令牌没覆盖它 | 检查 owner/repo 拼写；投稿请用 classic 令牌（public_repo / repo） |
+| 🟥 `还没有填 GitHub 令牌` | 没保存令牌 | 回到步骤 3.5 |
 
 🟩 **成功之后**：弹窗会显示仓库地址和 Release 地址，可以点开看看 ZIP 在不在。
 

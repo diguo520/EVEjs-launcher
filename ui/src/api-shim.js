@@ -94,6 +94,7 @@
     marketBook: function (typeId) { return request("market:book", [typeId]); },
     marketCatalog: function () { return request("market:catalog", []); },
     marketOverview: function () { return request("market:overview", []); },
+    marketSetTypeAttributes: function (input) { return request("market:setTypeAttributes", [input]); },
     marketTrades: function (limit) { return request("market:trades", [limit]); },
     marketTypeInfo: function (typeId, lang) { return request("market:typeInfo", [typeId, lang]); },
     metricsGet: function () { return request("metrics:get", []); },

@@ -153,16 +153,16 @@ describe("属性分区（游戏属性页签）", () => {
     const sections = attributeSections(rifter, {})
     const shield = sections.find((section) => section.id === 2)!
     expect(shield.defence?.resists.map((row) => Math.round(row.percent))).toEqual([0, 20, 40, 50])
-    expect(formatAttrNumber(shield.defence!.effective)).toBe("620.69")
+    expect(formatAttrNumber(shield.defence!.effective!)).toBe("620.69")
     // 装甲 450、抗性 60/35/25/10% → 666.67
     const armor = sections.find((section) => section.id === 3)!
-    expect(formatAttrNumber(armor.defence!.effective)).toBe("666.67")
+    expect(formatAttrNumber(armor.defence!.effective!)).toBe("666.67")
   })
 
   it("结构抗性两套 id 只用填了真值的那一套（裂谷级船体那套全是 1）", () => {
     const structure = attributeSections(rifter, {}).find((section) => section.id === 4)!
     expect(structure.defence?.resists.map((row) => Math.round(row.percent))).toEqual([33, 33, 33, 33])
-    expect(formatAttrNumber(structure.defence!.effective)).toBe("522.39")
+    expect(formatAttrNumber(structure.defence!.effective!)).toBe("522.39")
   })
 
   it("少一条抗性就不给「有效 HP」，免得算出一个错的数", () => {
@@ -175,10 +175,86 @@ describe("属性分区（游戏属性页签）", () => {
     expect(shield.rows).toHaveLength(2)
   })
 
-  it("没配标题的分类用 SDE 英文名；查不到名就留空", () => {
-    const rows = [attr({ id: 11, name: "能量栅格输出", value: 41, category: 1 })]
-    expect(attributeSections(rows, { "1": "Fitting" })[0].title).toBe("Fitting")
+  it("装配（1）排在最前，标题是客户端那套中文名，不看 SDE 的英文分类名", () => {
+    const rows = [
+      attr({ id: 11, name: "能量栅格输出", value: 41, category: 1 }),
+      attr({ id: 263, name: "护盾容量", value: 450, category: 2 }),
+    ]
+    const sections = attributeSections(rows, { "1": "Fitting" })
+    expect(sections.map((section) => section.id)).toEqual([1, 2])
+    expect(sections[0].title).toBe("装配")
+  })
+
+  it("表里没登记的 SDE 分类仍然退成英文名；连名都没有就留空", () => {
+    // 31＝Graphics：实测市场目录里没有任何物品用到它，故意不配标题，留着兜底那条路
+    const rows = [attr({ id: 1, name: "图形", value: 1, category: 31 })]
+    expect(attributeSections(rows, { "31": "Graphics" })[0].title).toBe("Graphics")
     expect(attributeSections(rows, {})[0].title).toBe("")
+  })
+
+  /**
+   * 装备 / 无人机那几段以前只配了舰船身上的分类，SDE 的英文分类名就直接画在标题带上
+   * （实测 9139 个有属性的在售物品里 4474 个至少中一条，既有装备也有无人机）。
+   */
+  it("装备 / 无人机那几段走中文标题，不再露 SDE 英文分类名", () => {
+    // 125mm 自动加农炮：射击速度（分类 29 Turrets）、超载损耗（分类 52 Heat）
+    const rows = [
+      attr({ id: 51, name: "射击速度", value: 2100, unitId: 101, category: 29 }),
+      attr({ id: 1211, name: "超载损耗", value: 3.4, category: 52 }),
+    ]
+    const sections = attributeSections(rows, { "29": "Turrets", "52": "Heat" })
+    expect(sections.map((section) => section.id)).toEqual([29, 52])
+    expect(sections.map((section) => section.title)).toEqual(["炮台", "过热"])
+    // 段序：炮台 / 过热排在「其他属性」前面 —— 装备面板上最要紧的几条不该垫底
+    const withMisc = attributeSections(
+      [...rows, attr({ id: 422, name: "科技等级", value: 1, category: 7 })],
+      {}
+    )
+    expect(withMisc.map((section) => section.id)).toEqual([29, 52, 7])
+  })
+
+  it("SDE 里没名字的分类 0 / 9 并进「其他属性」，不冒空标题与 NULL 标题带", () => {
+    // 黄金富豪级 17720 的 angelCartelProjectileReloadingSpeed 是分类 0（标题会空），
+    // 损伤控制 II 的「该武器组所允许的最大装备数量」是分类 9（SDE 名叫 NULL）
+    const rows = [
+      attr({ id: 6203, name: "angelCartelProjectileReloadingSpeed", value: 1, category: 0 }),
+      attr({ id: 1544, name: "该武器组所允许的最大装备数量", value: 1, category: 9 }),
+      attr({ id: 422, name: "科技等级", value: 1, category: 7 }),
+    ]
+    const sections = attributeSections(rows, { "7": "Miscellaneous" })
+    expect(sections).toHaveLength(1)
+    expect(sections[0].id).toBe(7)
+    expect(sections[0].title).toBe("其他属性")
+    expect(sections[0].rows.map((row) => row.id)).toEqual([6203, 1544, 422])
+  })
+
+  it("四抗齐了就出条：缺护盾容量 / 装甲值也不挡（损伤控制那种装备）", () => {
+    // 损伤控制 II 的护盾四抗是 0.875（12.5%），但它没有「护盾容量」这条值属性；
+    // 以前这里直接跳过，于是同一件装备的护盾段是四行文字、结构段却是色块条
+    const rows = [
+      attr({ id: 271, name: "护盾电磁伤害抗性", value: 0.875, unitId: 108, category: 2 }),
+      attr({ id: 272, name: "护盾爆炸伤害抗性", value: 0.875, unitId: 108, category: 2 }),
+      attr({ id: 273, name: "护盾动能伤害抗性", value: 0.875, unitId: 108, category: 2 }),
+      attr({ id: 274, name: "护盾热能伤害抗性", value: 0.875, unitId: 108, category: 2 }),
+    ]
+    const shield = attributeSections(rows, {}).find((section) => section.id === 2)!
+    expect(shield.defence?.resists.map((row) => row.percent)).toEqual([12.5, 12.5, 12.5, 12.5])
+    // 没有值属性 → 不给「有效 HP」读数（界面上那截留空），但条照画
+    expect(shield.defence?.hp).toBeNull()
+    expect(shield.defence?.effective).toBeNull()
+  })
+
+  it("导航头部的「朝向时间」＝ ln(4) × 惯性调整 × 质量 ÷ 10⁶（缺一条就不给）", () => {
+    // 游戏里那组数：质量 997,000 kg、惯性调整 3.6 → 4.98 秒
+    const rows = [
+      attr({ id: 4, name: "质量", value: 997000, unitId: 2, unit: "kg", category: 4 }),
+      attr({ id: 70, name: "惯性调整", value: 3.6, unitId: 104, unit: "x", category: 17 }),
+    ]
+    const nav = attributeSections(rows, {}).find((section) => section.id === 17)!
+    expect(formatAttrNumber(nav.alignSeconds!)).toBe("4.98")
+    // 只有质量、没有惯性调整：整条不画，而不是画一个 0
+    const half = attributeSections([rows[0]], {}).find((section) => section.id === 17)!
+    expect(half.alignSeconds).toBeUndefined()
   })
 
   it("没有属性时回空数组（界面据此画空态）", () => {

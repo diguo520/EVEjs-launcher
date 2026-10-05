@@ -18,6 +18,15 @@ import { AUTHOR_NAME_PLACEHOLDER, signatureDraft } from "@/lib/mod-logic"
 import type { RawTokenCheck, RawTokenStatus } from "@/lib/ipc"
 import { cn, copyText } from "@/lib/utils"
 
+/**
+ * 令牌能发布、但碰不到索引仓库时的统一说明（保存与校验两处共用）。
+ *
+ * 索引仓库 `diguo520/EVEjs-mods` 在维护者名下：fine-grained 令牌的 Repository access
+ * 只能勾「自己有权限的仓库」，普通作者勾不到它，申请收录会 403 Resource not accessible。
+ */
+const CANNOT_SUBMIT_DESC =
+  "投稿会被 403：索引仓库 EVEjs-mods 在维护者名下，令牌必须有 classic 的 public_repo（或 repo）才能建 fork / 开 PR。请到 GitHub 令牌页补勾后重新粘贴保存；若你是索引仓库协作者，请确认 fine-grained 令牌已勾选该仓库的 Contents / Pull requests 写权限。"
+
 /** 毫秒时间戳 → 2026/4/18 21:07，跟身份创建那一栏的写法一致 */
 function formatStamp(ms: number): string {
   if (!ms || ms <= 0) return "—"
@@ -131,19 +140,27 @@ export function ModAuthorDialog({
     const trimmed = tokenDraft.trim()
     if (!trimmed) {
       toast.error("先粘贴令牌", {
-        description: "在 GitHub 设置里建一个只授权自己仓库的细粒度令牌，别用全权限的。",
+        description:
+          "在 GitHub 设置里建一个 classic 令牌（Tokens (classic)），勾选 public_repo 就能发布与投稿；还要让启动器建仓库 / 发 Release 就再勾 repo。",
       })
       return
     }
     setBusy("token")
     const reply = await onSaveToken(trimmed)
-    setBusy(null)
     if (!reply.ok) {
+      setBusy(null)
       toast.error("令牌没能保存", { description: reply.reason ?? "写入失败" })
       return
     }
     setTokenDraft("")
-    setCheck(null)
+    // 保存后立刻核验一次：能发布不等于能投稿，权限不够当场说清楚
+    const check = await onCheckToken()
+    setBusy(null)
+    setCheck(check)
+    if (check.ok && check.canSubmit === false) {
+      toast.warning("令牌可用，但不能投稿", { description: CANNOT_SUBMIT_DESC })
+      return
+    }
     toast.success("GitHub 令牌已保存", {
       description: reply.encrypted
         ? "已用当前 Windows 账户加密落盘，跟老启动器同一份存储格式。"
@@ -156,15 +173,20 @@ export function ModAuthorDialog({
     const reply = await onCheckToken()
     setBusy(null)
     setCheck(reply)
-    if (reply.ok) {
-      toast.success("令牌可用", {
-        description: reply.login
-          ? t("已通过 GitHub 校验，登录名 {login}", { login: reply.login })
-          : "已通过 GitHub 校验。",
-      })
-    } else {
+    if (!reply.ok) {
       toast.error("令牌不可用", { description: reply.reason ?? "GitHub 拒绝了这次校验" })
+      return
     }
+    if (reply.canSubmit === false) {
+      // 能发布 ≠ 能投稿：先把 403 的原因说清楚，别等作者提交到一半才发现
+      toast.warning("令牌可用，但不能投稿", { description: CANNOT_SUBMIT_DESC })
+      return
+    }
+    toast.success("令牌可用", {
+      description: reply.login
+        ? t("已通过 GitHub 校验，登录名 {login}", { login: reply.login })
+        : "已通过 GitHub 校验。",
+    })
   }
 
   function clearCredential() {
@@ -342,6 +364,10 @@ export function ModAuthorDialog({
                   : "通过"
                 : check.reason ?? "未通过"}
             </p>
+          ) : null}
+
+          {check?.ok && check.canSubmit === false ? (
+            <p className="text-[11px] leading-relaxed text-warning">{CANNOT_SUBMIT_DESC}</p>
           ) : null}
 
           <p className="text-[11px] leading-relaxed text-tertiary">

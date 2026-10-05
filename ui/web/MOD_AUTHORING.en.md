@@ -29,7 +29,7 @@
 | --- | --- | --- | --- | --- |
 | 1 | Check your environment (version / mods folder) | Launcher | 2 min | ✅ |
 | 2 | Create your **author identity** and export `.eve-key` | Launcher | 2 min | ✅ |
-| 3 | Create a **GitHub token** (fine-grained) | GitHub web | 5 min | ✅ (needed to publish) |
+| 3 | Create a **GitHub token** (classic, tick public_repo) | GitHub web | 5 min | ✅ (needed to publish and submit) |
 | 4 | **Create the mod** (scaffold) | Launcher | 3 min | ✅ |
 | 5 | Write your logic (`loader.js`) | Editor | depends | ✅ |
 | 6 | Test locally (enable / read logs) | Launcher | 5 min | 🟩 Recommended |
@@ -80,54 +80,44 @@ You get three things:
 
 ---
 
-## Step 3 ✅ Create a GitHub token (used when publishing)
+## Step 3 ✅ Create a GitHub token (needed to publish and to submit)
 
-Publishing means the launcher acts on **your own GitHub repository** on your behalf, so it needs a token. Six sub-steps:
+The launcher acts on GitHub for you: when **publishing** it writes files to your own repository, creates the Release and uploads the ZIP; when **requesting a listing** it must also fork the index repository `diguo520/EVEjs-mods` (owned by the maintainer) and open a PR. A single **classic token** covers both.
 
 ### 3.1 Open the right page 🟨
 
 ```
 GitHub top-right avatar -> Settings -> Developer settings at the very bottom of the left bar
-  -> Personal access tokens -> Fine-grained tokens -> Generate new token
+  -> Personal access tokens -> Tokens (classic) -> Generate new token (classic)
 ```
 
-🟥 **Do not use `Tokens (classic)`**: that page only has scopes like `repo` / `workflow` and **no** `Contents` / `Pull requests`.
+🟥 **Do not use a fine-grained token**: its Repository access can only include repositories you have access to, so it cannot include the maintainer-owned index repository `EVEjs-mods`; forking and opening a PR both need write permission on that repository, so a fine-grained token always fails the listing with `403 Resource not accessible by personal access token`.
 
 ### 3.2 Basic fields
 
 | Field | What to put |
 | --- | --- |
-| Token name | Anything, e.g. `evejs-launcher` |
+| Note | Anything, e.g. `evejs-launcher` |
 | Expiration | 90 days or custom (you regenerate it when it expires) |
-| Description | Optional |
 
-### 3.3 Resource owner and repository access
+### 3.3 Tick the scopes (the important bit) 🟨
 
-- **Resource owner**: your own account
-- **Repository access**: 🟩 **All repositories** (simplest; with selected repositories only, a newly created repo is not covered and you get 404)
+| Scope | Tick? | Purpose |
+| --- | --- | --- |
+| **public_repo** | 🟩 Required | Read/write public repositories: Releases, ZIP upload, fork and PR all need it |
+| **repo** | 🟨 Recommended | Includes public_repo; tick it if you also want the launcher to create repositories / manage private repos |
 
-### 3.4 Tick the permissions (the important bit) 🟨
+### 3.4 Generate and copy
 
-Scroll to **Permissions** -> expand **Repository permissions** (🟥 not Account permissions) and tick these four:
+Click **Generate token** -> copy the `ghp_...` string (🟨 it is shown **once only**).
 
-| Permission | Set to | Purpose | If you skip it |
-| --- | --- | --- | --- |
-| **Contents** | Read and write | Write `evejs-mod.json`, create the Release, upload the ZIP | 403 writing the listing / creating the Release |
-| **Pull requests** | Read and write | Open the listing PR in step 9 | 403 on Request listing |
-| **Administration** | Read and write | Let step 8 **create the repository** | `403 Resource not accessible` when creating the repo |
-| **Metadata** | Read-only | GitHub ticks it automatically | — |
+### 3.5 Paste it into the launcher
 
-> 🟦 If you prefer to create the repository manually, you can skip Administration — but create the repo on GitHub first and fill `owner/repo` into **My repo** in the launcher.
+Mod / Plugin -> **Submit mod** -> GitHub token -> paste -> **Save** (stored encrypted on this machine; permissions are checked automatically after saving) -> done once the check passes.
 
-### 3.5 Generate and copy
+> 🟦 **Why classic?** The index repository belongs to the maintainer, and a fine-grained token cannot be granted write access to it. Only authors added as a **collaborator on the index repository** can use a fine-grained token: set Repository access to `EVEjs-mods` and enable **Contents = Read and write** and **Pull requests = Read and write**.
 
-Click **Generate token** -> copy the `github_pat_...` string (🟨 it is shown **once only**).
-
-### 3.6 Paste it into the launcher
-
-Mod / Plugin -> **Submit mod** -> GitHub token -> paste -> **Save** (stored encrypted on this machine) -> **Check** to confirm it works.
-
-🟨 **Note**: after changing token permissions or generating a new one, paste and save the new value again.
+🟨 **Note**: after changing scopes or regenerating the token, paste and save the new value again.
 
 ---
 
@@ -287,10 +277,10 @@ It does four things for you (only touching **your own repository**, never the in
 
 | Error | Cause | Fix |
 | --- | --- | --- |
-| 🟥 `403 Resource not accessible by personal access token` | Token lacks permissions | Add **Administration = Read and write** (to auto-create the repo) and **Contents = Read and write**; set Repository access to All repositories |
+| 🟥 `403 Resource not accessible by personal access token` | Token is fine-grained, or classic without public_repo | Switch to a classic token and tick **public_repo**; the index repository belongs to the maintainer and a fine-grained token cannot reach it. If you were added as a collaborator on the index repository: use a fine-grained token with `EVEjs-mods` + Contents / Pull requests = Read and write |
 | 🟥 `net::ERR_INVALID_ARGUMENT` | Old launcher ZIP upload bug | Upgrade to **0.1.20+** |
-| 🟥 `404` | Repository missing, or the token does not cover it | Check the owner/repo spelling; set Repository access to All repositories |
-| 🟥 `GitHub token not set` | Token never saved | Back to step 3.6 |
+| 🟥 `404` | Repository missing, or the token does not cover it | Check the owner/repo spelling; for submissions use a classic token (public_repo / repo) |
+| 🟥 `GitHub token not set` | Token never saved | Back to step 3.5 |
 
 🟩 **On success** the dialog shows the repository and Release URLs — open them and check the ZIP is there.
 

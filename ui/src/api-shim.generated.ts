@@ -1,6 +1,6 @@
 /* 由 scripts/gen-contract.mjs 生成 —— 请勿手改。源: contract/ipc-channels.json */
 /* 抽取源: E:\Games\EveJS-v0.12.8\launcher\launcher */
-/* 生成时间: 2026-10-04T22:15:30.852Z */
+/* 生成时间: 2026-10-05T11:17:38.460Z */
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
@@ -83,6 +83,7 @@ export const api = {
   marketBook: (typeId: number): Promise<unknown> => request("market:book", [typeId]),
   marketCatalog: (): Promise<unknown> => request("market:catalog", []),
   marketOverview: (): Promise<unknown> => request("market:overview", []),
+  marketSetTypeAttributes: (input: { typeId: number; attributes: Array<{ id: number; value: number }> }): Promise<unknown> => request("market:setTypeAttributes", [input]),
   marketTrades: (limit?: number): Promise<unknown> => request("market:trades", [limit]),
   marketTypeInfo: (typeId: number, lang?: string): Promise<unknown> => request("market:typeInfo", [typeId, lang]),
   metricsGet: (): Promise<unknown> => request("metrics:get", []),
