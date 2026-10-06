@@ -1,6 +1,6 @@
 # EveJS Mod Authoring Guide (creator's view)
 
-> For **someone who wants to build a mod**: from zero to a mod that can be installed from the mod market, in **10 steps**.
+> For **someone who wants to build a mod**: from zero to a mod that can be installed from the mod market, in **8 steps**.
 > You **never modify any server file** — mods are mounted through a loader.
 
 **What you need**: Windows 10+, an EveJS server (0.12.8 or newer), EvEJS Launcher 0.1.20+ and a GitHub account.
