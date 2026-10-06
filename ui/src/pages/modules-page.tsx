@@ -33,6 +33,7 @@ import { ModOverlapPanel } from "@/components/modules/mod-overlap-panel"
 import { ModPreflightPanel } from "@/components/modules/mod-preflight-panel"
 import { useModDownloads, type DownloadTask } from "@/hooks/use-mod-downloads"
 import { shouldOfferClaim } from "@/lib/mod-claim"
+import { markAuthoringDocSeen, needsAuthoringDocPulse } from "@/lib/mod-doc-seen"
 import { useModSource, type PublishOutcome } from "@/hooks/use-mod-source"
 import {
   ALL_CATEGORY,
@@ -123,6 +124,8 @@ export function ModulesPage({
   /** 「找回旧模组」：只在真的有待认领的旧模组时才开这个入口 */
   const [claimOpen, setClaimOpen] = useState(false)
   const [docOpen, setDocOpen] = useState(false)
+  /** 规范文档有新内容时按钮旁边亮一圈脉冲，点开一次就灭（见 lib/mod-doc-seen） */
+  const [docPulse, setDocPulse] = useState(() => needsAuthoringDocPulse())
   const [submitOpen, setSubmitOpen] = useState(false)
   const [submitTarget, setSubmitTarget] = useState<string | null>(null)
   const [conflictDismissed, setConflictDismissed] = useState(false)
@@ -666,6 +669,15 @@ export function ModulesPage({
     })
   }
 
+  /** 规范弹窗：点开就算看过，脉冲提示不再亮 —— 只提示一次，别天天闪 */
+  function openAuthoringDoc() {
+    setDocOpen(true)
+    if (docPulse) {
+      markAuthoringDocSeen()
+      setDocPulse(false)
+    }
+  }
+
   function openSubmit(id: string | null) {
     // 从卡片或创建成功的提示进来时目标已经确定，只有工具栏那个入口需要先看看有没有可提交的
     if (id === null) {
@@ -956,9 +968,20 @@ export function ModulesPage({
               <span className="size-1.5 rounded-full bg-warning" aria-hidden />
             ) : null}
           </Button>
-          <Button variant="ghost" onClick={() => setDocOpen(true)}>
+          <Button
+            variant="ghost"
+            onClick={openAuthoringDoc}
+            title={docPulse ? t("规范文档有新内容，点开看看") : undefined}
+          >
             <BookOpen />
             模组制作规范
+            {docPulse ? (
+              /* 一圈向外扩散的光环 + 小点：沿用「有新版本」那套提示语言，点开即灭 */
+              <span className="relative ml-0.5 inline-flex size-1.5" aria-hidden="true">
+                <span className="mc-pulse size-1.5 rounded-full bg-primary" />
+                <span className="update-pulse-ring absolute -inset-1 rounded-full" />
+              </span>
+            ) : null}
           </Button>
         </div>
       </div>

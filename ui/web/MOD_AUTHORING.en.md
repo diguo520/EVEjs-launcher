@@ -33,12 +33,9 @@
 | 4 | **Create the mod** (scaffold) | Launcher | 3 min | ✅ |
 | 5 | Write your logic (`loader.js`) | Editor | depends | ✅ |
 | 6 | Test locally (enable / read logs) | Launcher | 5 min | 🟩 Recommended |
-| 7 | **1) Generate and pack** | Launcher | 1 min | ✅ |
-| 8 | **2) Publish to my repo** | Launcher | 1 min | ✅ |
-| 9 | **3) Request listing** (one-off PR) | Launcher | 1 min | ✅ |
-| 10 | Publish an update (bump version -> repeat 7, 8) | Launcher | 1 min | 🟩 Recommended |
-
-> 🟦 **Once vs every release**: steps 1-4 are once. For a new version you only repeat **7 -> 8** (the step 9 PR is a one-time thing).
+| 7 | **Publish** (pack -> push to your repo -> open the review PR, one click) | Launcher | 1 min | ✅ |
+| 8 | Publish an update (bump the version -> click Publish again) | Launcher | 1 min | 🟩 Recommended |
+> 🟦 **Once vs every release**: steps 1-4 are once. After that every release is just **step 7** (packing, pushing to your repo and opening the review PR all happen in one click - see Part 3).
 
 ---
 
@@ -48,7 +45,7 @@
 
 1. Open the launcher -> **Environment self-check**: Node.js / dependencies / client path and 6 more. Fix anything red first.
 2. Confirm your EveJS server root (the folder containing `server/` and `config/`). Launcher -> **Configuration centre** shows the path currently in use.
-3. Make sure the **`mods/` folder** exists. If not: Mod / Plugin -> **Create mods folder**.
+3. Make sure the **`mods/` folder** exists. If not: Mod / Plugin -> **Create mods/ automatically**.
 
 🟨 **Note**: the mod folder is always `<EveJS root>/mods/<mod id>/` — do **not** put mods anywhere else, and do not rename folders to non-ASCII names.
 
@@ -56,7 +53,7 @@
 
 ## Step 2 ✅ Create your author identity (this is "who you are")
 
-Mod / Plugin -> **Author identity** at the top:
+Mod / Plugin -> **Token settings** at the top (author identity and the GitHub token live in the same dialog):
 
 1. The Ed25519 key pair is **generated automatically** the first time you open it (there is no button)
 2. Change the **signature name** (the name people see, e.g. "Commander") -> click **Save name**
@@ -91,6 +88,18 @@ GitHub top-right avatar -> Settings -> Developer settings at the very bottom of 
   -> Personal access tokens -> Tokens (classic) -> Generate new token (classic)
 ```
 
+Follow the screenshot below (the numbers match the red circles on the page):
+
+![GitHub classic token page: (1) Tokens (classic) (2) Generate new token (classic) (3) Note (4) Expiration (5) tick repo](./github-token-classic.png)
+
+| # | Where to click / what to fill in |
+| --- | --- |
+| 1 | **Tokens (classic)** in the left bar - not Fine-grained tokens above it |
+| 2 | **Generate new token** -> **Generate new token (classic)** |
+| 3 | **Note**: anything, e.g. `evejs-launcher` |
+| 4 | **Expiration**: 90 days is fine (regenerate when it expires) |
+| 5 | Under **Select scopes** tick **repo** (`public_repo` is one of its sub-items, so ticking repo covers it) |
+
 🟥 **Do not use a fine-grained token**: its Repository access can only include repositories you have access to, so it cannot include the maintainer-owned index repository `EVEjs-mods`; forking and opening a PR both need write permission on that repository, so a fine-grained token always fails the listing with `403 Resource not accessible by personal access token`.
 
 ### 3.2 Basic fields
@@ -113,7 +122,7 @@ Click **Generate token** -> copy the `ghp_...` string (🟨 it is shown **once o
 
 ### 3.5 Paste it into the launcher
 
-Mod / Plugin -> **Submit mod** -> GitHub token -> paste -> **Save** (stored encrypted on this machine; permissions are checked automatically after saving) -> done once the check passes.
+Mod / Plugin -> **Token settings** -> GitHub token -> paste -> **Save** (stored encrypted on this machine; permissions are checked automatically after saving) -> done once the check passes.
 
 > 🟦 **Why classic?** The index repository belongs to the maintainer, and a fine-grained token cannot be granted write access to it. Only authors added as a **collaborator on the index repository** can use a fine-grained token: set Repository access to `EVEjs-mods` and enable **Contents = Read and write** and **Pull requests = Read and write**.
 
@@ -132,7 +141,7 @@ Mod / Plugin -> **Create mod**:
 | Template | ✅ | `Welcome Broadcast (Example)` (sends a welcome message, runnable) / `Blank Skeleton`. 🟩 Start with the example |
 | Display name | ✅ | What players see |
 | Id (folder name) | 🟩 | Generated from the name; only `a-z 0-9 - _ .`; **do not change it later** |
-| Version | ✅ | Defaults to `1.0.0`; must **increase** for a new release (step 10) |
+| Version | ✅ | Defaults to `1.0.0`; must **increase** for a new release (step 8) |
 | Category | ✅ | Gameplay / Economy / AI / Visuals / Tools (the market filters on this) |
 | Tags | ⭕ | Comma separated, e.g. `chat, beginner` |
 | Description | 🟩 | One sentence; shown on the market card |
@@ -224,54 +233,38 @@ const hubPath = path.join(serverRoot, "src", "services", "chat", "chatHub.js");
 
 # Part 3: Publishing to the market
 
-> This is exactly the `1) 2) 3)` steps inside the launcher's **Submit mod** dialog.
+> **Publishing is one click**: the launcher re-signs, packs the ZIP, pushes it to your own repository (creating the repo, the Release and the upload if needed) and opens a version-review PR against the index repository, all in one go - you just watch the progress bar.
+> That PR is opened for **every** version: the market only moves to your new version once it is merged.
 
-## Step 7 ✅ 1) Generate and pack (fully offline)
+## Step 7 ✅ Publish (one click)
 
-Mod / Plugin -> **Submit mod**:
+Mod / Plugin -> **Publish mod** (the "Submit for review / Resubmit" button on a card in **Created by me** opens the same dialog):
 
-1. **Select mod**: the dropdown **only lists your own mods** (other people's mods never appear)
-2. Fill in the **changelog** (goes into the index and the PR)
-3. Confirm **category / tags** (pre-filled from the manifest)
-4. **Source / project URL** ⭕ (optional, e.g. `https://github.com/you/your-mod`)
-5. **GitHub Releases direct link** ⭕ leave empty (step 8 generates the correct one)
-6. Click **`1) Generate and pack`**
+1. **Select mod**: the dropdown **only lists mods you created yourself** (other people's mods never appear, so you cannot submit them by mistake)
+2. Fill in the **version** and the **changelog** (the changelog goes into the index and the PR)
+3. Confirm **category / tags**; **source / project URL** ⭕ optional (e.g. `https://github.com/you/your-mod`), **GitHub Releases direct link** ⭕ leave empty (the correct URL is generated during publish)
+4. Tick the three declarations (your own work / no malicious code / you read the rules and listing terms)
+5. Click **Publish**
 
-What this does (**offline, no token needed**):
+Publish stays disabled until the gates at the top of the dialog are green: **author name** (step 2), **GitHub token** (step 3), **30 minutes between two submissions of the same mod** and **60 seconds between two publishes**. A missing item is highlighted in yellow with a button that takes you there.
 
-```
-re-sign -> pack the ZIP -> compute SHA256 -> build the listing
-```
+### The four stages in the progress list
 
-Outputs:
+| Stage | What it does | Where it happens |
+| --- | --- | --- |
+| Pack the package locally | Re-sign -> pack the ZIP -> compute SHA256 -> build the listing | **On your machine only**: offline, no token needed |
+| Prepare your source repository | Creates a public repository if you do not have one | Your own GitHub |
+| Publish the Release and upload the package | Writes `evejs-mod.json` (the file the market reads) -> creates a Release (tag `v<version>`) -> uploads `<id>-<version>.zip` | Your own GitHub |
+| Open the version-review PR | Opens a PR against the index repository: the first one also adds `sources.json` (the listing registration), later ones only update `mods/<id>.json` | Index repository `diguo520/EVEjs-mods` |
+
+Outputs and ledger:
 
 | Output | Location |
 | --- | --- |
-| ZIP | `_launcher/temp/export-<id>-<version>.zip` |
+| ZIP | `_launcher/temp/export-<id>-<version>.zip` (the same file is uploaded to your Release) |
 | Submission ledger | `_launcher/data/my-submissions.json` |
-| Index shard (JSON) | Shown in the dialog, copyable |
 
-🟨 **Note**: after changing code, click **`1)`** again — editing invalidates the signature and the launcher re-signs it for you.
-
----
-
-## Step 8 ✅ 2) Publish to my repo
-
-1. **My repo** (optional): leave empty and the launcher creates `evejs-mod-<id>`, or fill `owner/repo`
-2. Click **`2) Publish to my repo`**
-3. Watch the **progress bar**:
-
-```
-Verify GitHub token -> Prepare repo -> Write evejs-mod.json -> Create Release -> Upload ZIP (slowest) -> Done
-   5%                 20%             40%                    60%             75%                      100%
-```
-
-It does four things for you (only touching **your own repository**, never the index repo):
-
-1. Creates a public repository if needed
-2. Writes `evejs-mod.json` (this is the file the market reads)
-3. Creates a Release with tag `v<version>`
-4. Uploads the ZIP named `<id>-<version>.zip`
+🟨 **Changed the code? Click Publish again**: any edit invalidates the signature, and the launcher re-signs, re-packs and pushes a new version for you.
 
 ### 🔧 Common errors at this step
 
@@ -282,28 +275,27 @@ It does four things for you (only touching **your own repository**, never the in
 | 🟥 `404` | Repository missing, or the token does not cover it | Check the owner/repo spelling; for submissions use a classic token (public_repo / repo) |
 | 🟥 `GitHub token not set` | Token never saved | Back to step 3.5 |
 
-🟩 **On success** the dialog shows the repository and Release URLs — open them and check the ZIP is there.
+🟩 **On success** the dialog shows the repository and Release URLs (open them to check the ZIP is there) and the card switches to **In review**.
+
+### Review and merge
+
+- The maintainer reviews your mod in the PR (manifest fields, category, ZIP location, version number, ...)
+- **Approved (merged)**: the index CI rebuilds immediately, the market moves to your version and every launcher can find it
+- **Rejected**: the maintainer replies in the PR and the card under **Created by me** turns red with the **rejection reason**
+
+🟨 **At least 30 minutes between two submissions of the same mod**: clicking again sooner would push a duplicate Release and refresh the same PR over and over; the dialog tells you how many minutes are left and keeps the button grey until then.
+
+🟦 After submitting, the launcher **checks the PR once more** to confirm it really opened and records its number and state in the ledger:
+the card in **Created by me** shows `In review / Merged / PR closed` (this state is re-checked at most every 30 minutes, so GitHub is not hammered).
 
 ---
 
-## Step 9 ✅ 3) Request listing (once in your life)
-
-Click **`3) Request listing`** -> the launcher opens a PR against the index repository (adding one line to `sources.json`).
-
-- The maintainer reviews your mod in the PR (manifest fields, category, ZIP location, ...)
-- **Approved**: after the merge CI aggregates your mod into the market within tens of minutes
-- **Rejected**: the maintainer replies in the PR, and the card in your launcher's **My mods** turns red with the **rejection reason**
-
-🟦 Afterwards, **new versions need no further PR**: you push to your own repository and the index refreshes (step 10).
-
----
-
-## Step 10 🟩 Publish an update (repeat 7 -> 8)
+## Step 8 🟩 Publish an update (bump the version -> click Publish again)
 
 1. Bump the version: edit `"version"` in `mods/<id>/evejs-launcher.mod.json` (e.g. `1.0.1`)
-   🟨 You can also regenerate through **Create mod** with the same id — but **never change the id**
-2. Mod / Plugin -> **Submit mod** -> pick your mod -> **`1) Generate and pack`**
-3. **`2) Publish to my repo`** (same repository, new tag `v1.0.1`, new ZIP `<id>-1.0.1.zip`)
+   🟨 You can also regenerate through **Create mod** with the same id - but **never change the id**
+2. Mod / Plugin -> **Publish mod** -> pick your mod -> fill in the version and changelog -> click **Publish**
+   (same repository, new tag `v1.0.1`, new ZIP `<id>-1.0.1.zip`; the same `release/<id>` branch refreshes that PR)
 
 🟨 **Why the version must increase**: the market compares versions to decide whether an update exists. Same version = nobody is notified.
 
@@ -326,17 +318,17 @@ Click **`3) Request listing`** -> the launcher opens a PR against the index repo
 
 ## Where you see the result
 
-Launcher -> Mod / Plugin -> **My mods**:
+Launcher -> Mod / Plugin -> **Created by me**:
 
 | Card state | Meaning | What you can do |
 | --- | --- | --- |
 | 🟩 Listed | In the market | Publish an update |
-| 🟨 Update available / local is newer | Your local version is ahead | Follow step 10 |
+| 🟨 Update available / local is newer | Your local version is ahead | Follow step 8 |
 | 🟧 Delisted | Removed by the maintainer | The card shows the **reason**; fix it and click **Resubmit for review** |
 | 🟥 Not accepted | Failed review | The card shows the **reason**; fix it and click **Resubmit for review** |
-| ⬜ Local only / Draft | Not published yet | Follow steps 7 and 8 |
+| ⬜ Local only / Draft | Not published yet | Follow step 7 |
 
-🟦 **My mods** only shows entries whose local folder still exists or that are still installable from the market. Once you delete the local folder, entries that only exist as review records are hidden (the header shows "hidden N").
+🟦 **Created by me** only shows entries whose local folder still exists or that are still installable from the market. Once you delete the local folder, entries that only exist as review records are hidden (the header shows "hidden N").
 
 ---
 
@@ -349,7 +341,7 @@ Launcher -> Mod / Plugin -> **My mods**:
 | 3 | 🟥 Do not edit server files on disk | Your mod breaks on other machines / after every upgrade; patch in memory through `__evejsMods.register` (Appendix G) |
 | 4 | 🟥 Do not `require` huge server modules from a loader | Node memory explodes |
 | 5 | 🟨 Only ever increase the version | Nobody receives your update |
-| 6 | 🟨 For a new version redo `1)` (re-sign) and `2)` (re-upload) | Stale signature / the market keeps the old package |
+| 6 | 🟨 After editing the code click **Publish** again (it re-signs, re-packs and re-pushes for you) | Stale signature / the market keeps the old package |
 | 7 | 🟨 Do not change the `id` after creation | Existing users see an uninstall + fresh install |
 | 8 | 🟨 Keep the version in the ZIP file name | Otherwise a CDN cache may hand out the old package |
 | 9 | 🟨 Use only the five fixed categories | Your mod is invisible to the market filter |
@@ -583,8 +575,8 @@ const requireArgs = paths.map((p) => '--require "' + p.replace(/\\/g, "/") + '"'
 - [ ] The version is **higher than the previous one**
 - [ ] `.eve-key` is backed up (needed when changing machines)
 - [ ] `mods/<id>/` contains no private keys and no personal local paths
-- [ ] You ran `1) Generate and pack` -> `2) Publish to my repo` (the ZIP is downloadable from the Release page)
-- [ ] First release: you ran `3) Request listing` and saw the maintainer's reply in the PR
+- [ ] You clicked **Publish mod**, all four stages finished, and the ZIP is downloadable from your own Release page
+- [ ] The review PR this version opened in the index repository **has been merged** (unmerged = the market still serves the previous version)
 
 
 # Appendix G: patching server source - the `__evejsMods.register` bus

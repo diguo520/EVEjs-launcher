@@ -485,3 +485,29 @@ describe("物品改属性", () => {
     }
   })
 })
+
+/**
+ * 「令牌配置」里的创建步骤提示（截图折叠块）：按钮文案七种语言都要有条目，
+ * 少一条外语用户就会在令牌输入框下面看到一句中文。
+ */
+describe("令牌创建步骤提示", () => {
+  it("新文案七种语言都有条目", () => {
+    const keys = ["没有令牌？看创建步骤", "收起创建步骤"]
+    for (const code of ["en", "ja", "ko", "fr", "de", "nl", "ru"] as const) {
+      for (const key of keys) expect(hasEntry(code, key), code + " · " + key).toBe(true)
+    }
+  })
+})
+
+/**
+ * 「模组制作规范」按钮旁边的「有新内容」脉冲提示：文案七种语言都要有条目，
+ * 少一条外语用户悬停看到的就是一句中文。
+ */
+describe("规范文档新内容提示", () => {
+  it("提示文案七种语言都有条目", () => {
+    const keys = ["规范文档有新内容，点开看看"]
+    for (const code of ["en", "ja", "ko", "fr", "de", "nl", "ru"] as const) {
+      for (const key of keys) expect(hasEntry(code, key), code + " · " + key).toBe(true)
+    }
+  })
+})

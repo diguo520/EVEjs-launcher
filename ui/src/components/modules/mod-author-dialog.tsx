@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { t } from "@/lib/i18n"
 import { toast } from "sonner"
-import { Loader2 } from "lucide-react"
+import { BookOpen, Loader2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -101,6 +101,9 @@ export function ModAuthorDialog({
   /** 最近一次校验的结论：登录名或失败原因 */
   const [check, setCheck] = useState<RawTokenCheck | null>(null)
 
+  /** 令牌不会建？把 GitHub 官方页面的五步截图收在这里，展开才占版面 */
+  const [showTokenGuide, setShowTokenGuide] = useState(false)
+
   // 每次打开都按当前身份铺一遍，改到一半关掉再打开不会留着没保存的残留
   useEffect(() => {
     if (open) {
@@ -108,6 +111,7 @@ export function ModAuthorDialog({
       setTokenDraft("")
       setCheck(null)
       setBusy(null)
+      setShowTokenGuide(false)
     }
   }, [open, name])
 
@@ -349,6 +353,33 @@ export function ModAuthorDialog({
               </Button>
             </div>
           )}
+
+          {/* 「令牌怎么建」收在输入框下面：作者不用翻规范文档，照着截图点五步就行 */}
+          <div className="space-y-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 gap-1.5 px-2 text-[11px] text-primary hover:text-primary"
+              onClick={() => setShowTokenGuide((value) => !value)}
+              aria-expanded={showTokenGuide}
+            >
+              <BookOpen className="size-3.5" />
+              {showTokenGuide ? "收起创建步骤" : "没有令牌？看创建步骤"}
+            </Button>
+            {showTokenGuide ? (
+              <div className="space-y-2 rounded-md border border-border bg-secondary/30 p-2">
+                <p className="tabular text-[11px] leading-relaxed text-tertiary">
+                  ① Tokens (classic) → ② Generate new token (classic) → ③ Note → ④ Expiration →
+                  ⑤ repo
+                </p>
+                <img
+                  src="./github-token-classic.png"
+                  alt="GitHub classic 令牌的五步创建截图"
+                  className="w-full rounded-md border border-border"
+                />
+              </div>
+            ) : null}
+          </div>
 
           {check ? (
             <p

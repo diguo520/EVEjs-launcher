@@ -643,6 +643,25 @@ pub const DOC_LANGS: [&str; 2] = ["zh", "en"];
 const DOC_ZH: &str = include_str!("../../../ui/web/MOD_AUTHORING.md");
 const DOC_EN: &str = include_str!("../../../ui/web/MOD_AUTHORING.en.md");
 
+/// 规范文档（步骤 3）里引用的截图：GitHub classic 令牌页面，带 ①-⑤ 编号。
+/// 文档正文用相对路径 `./github-token-classic.png` 引用它 —— 启动器弹窗里由
+/// `ui/dist`（frontendDist）提供，盘上那份由这里一并释放到 `_launcher/mods/`，
+/// 两处都能显示；否则「用系统程序打开」看到的就是一张断图。
+const DOC_IMAGE_NAME: &str = "github-token-classic.png";
+const DOC_IMAGE: &[u8] = include_bytes!("../../../ui/web/github-token-classic.png");
+
+/// 把截图写到文档旁边。内容一致时不落盘（与文档同样的口径：启动不该产生无谓写入）。
+fn ensure_doc_image(dir: &Path) -> std::io::Result<()> {
+    let target = dir.join(DOC_IMAGE_NAME);
+    if fs::read(&target)
+        .map(|bytes| bytes == DOC_IMAGE)
+        .unwrap_or(false)
+    {
+        return Ok(());
+    }
+    fs::write(&target, DOC_IMAGE)
+}
+
 /// 现役版 `normalizeDocLang`：只有 "zh" 走中文，其余（含缺省）都算英文
 fn normalize_doc_lang(lang: Option<&str>) -> &'static str {
     match lang {
@@ -680,6 +699,8 @@ pub fn ensure_mod_authoring_doc(runtime: &RuntimePaths, lang: Option<&str>) -> V
     let outcome = (|| -> std::io::Result<bool> {
         if let Some(parent) = target.parent() {
             fs::create_dir_all(parent)?;
+            // 截图跟着文档走：文档没变、图丢了（比如用户手动删了）也要补回来
+            ensure_doc_image(parent)?;
         }
         if fs::read_to_string(&target).unwrap_or_default() == source {
             return Ok(false);

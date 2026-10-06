@@ -1,0 +1,33 @@
+{
+  "version": "0.4.0",
+  "changelog": {
+    "zh": [
+      {
+        "type": "opt",
+        "text": "模组制作规范按现在的一键发布重写：步骤总览收敛成「7 发布上架（一次点击）→ 8 发新版」，第三部分改成一次点击的完整流程 —— 选模组、填版本号与更新说明、勾三条声明、点「发布」，启动器连着做完「本地重新签名打包 → 建仓库 → 发 Release 传 ZIP → 提版本审核 PR」四个环节，作者只看进度条；文档里对不上的界面入口名（令牌配置 / 自动创建 mods/ / 提交审核 / 我创建的）也一并改对，并补上 GitHub classic 令牌创建的五步截图。"
+      },
+      {
+        "type": "new",
+        "text": "令牌配置弹窗新增「没有令牌？看创建步骤」折叠块：展开就是 GitHub「Tokens (classic) → Generate new token (classic) → Note → Expiration → repo」五步截图，作者不用再翻规范文档找这一段，照着截图点完把 ghp_ 粘回输入框即可。"
+      },
+      {
+        "type": "new",
+        "text": "「模组制作规范」按钮旁边新增「有新内容」脉冲提示：规范正文改版后按钮右侧会亮一圈向外扩散的光环加一个小点，点开一次就记住「看过了」，之后不再亮（标记存在 localStorage，清缓存顶多多亮一次）。下次正文再有大改动，会在代码里把修订号往上加，脉冲重新为所有人亮一次 —— 免得规范更新了老用户一直不知道。"
+      }
+    ],
+    "en": [
+      {
+        "type": "opt",
+        "text": "The mod authoring rules were rewritten around the current one-click publish flow: the step overview collapses to \"7 Publish (one click) -> 8 Ship an update\", and Part 3 now walks the single click - pick the mod, fill in version and changelog, tick the three declarations, click Publish - after which the launcher re-signs and packs, creates the repository, publishes the Release with the ZIP and opens the version-review PR on its own while you watch the progress bar. Stale UI entry names in the document (Token settings / Create mods automatically / Submit for review / Created by me) were corrected too, and the five-step GitHub classic token screenshot was added."
+      },
+      {
+        "type": "new",
+        "text": "The token settings dialog now has a collapsible \"No token yet? See the steps\" block: it expands to the five-step GitHub screenshot (Tokens (classic) -> Generate new token (classic) -> Note -> Expiration -> repo), so authors no longer have to dig through the authoring rules for that section - follow the screenshot and paste the ghp_ value back into the input."
+      },
+      {
+        "type": "new",
+        "text": "A \"new content\" pulse now sits next to the Mod authoring rules button: after the rules are revised, an expanding halo plus a small dot appear to the right of the button, and opening the rules once records that they have been seen, so the pulse goes away for good (the mark lives in localStorage, so clearing the cache only brings it back once). The next time the rules change meaningfully the revision string in code is bumped and the pulse lights up for everyone again."
+      }
+    ]
+  }
+}
