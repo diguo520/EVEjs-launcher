@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest"
 
 import {
+  accountScope,
+  accountsInScope,
   bloodlineFromId,
   formatIsk,
   genderFromCode,
@@ -9,6 +11,7 @@ import {
   missingStoredCredential,
   needsPasswordOnce,
   raceFromId,
+  simulationGroup,
   totalIsk,
   type Account,
   type Character,
@@ -68,6 +71,35 @@ describe("角色档案换算", () => {
     expect(formatIsk(3000000000)).toBe("3,000,000,000")
     // 脏数据不该把 footer 变成 NaN
     expect(formatIsk(Number.NaN)).toBe("0")
+  })
+})
+
+describe("账号分组", () => {
+  const account = (name: string) => ({ name } as Account)
+
+  it("faction_ 账号归模拟账号，其余归玩家账号", () => {
+    expect(accountScope(account("faction_red_tide"))).toBe("simulation")
+    expect(accountScope(account("faction_pool_pilots"))).toBe("simulation")
+    expect(accountScope(account("deepseek"))).toBe("player")
+  })
+
+  it("模拟账号细分公共池、势力驾驶员池和势力主账号", () => {
+    expect(simulationGroup(account("faction_pool_pilots"))).toBe("pool")
+    expect(simulationGroup(account("faction_red_tide_pilots"))).toBe("faction-pool")
+    expect(simulationGroup(account("faction_red_tide"))).toBe("faction-main")
+  })
+
+  it("按分组过滤账号", () => {
+    const all = [
+      account("deepseek"),
+      account("faction_pool_pilots"),
+      account("faction_red_tide"),
+    ]
+    expect(accountsInScope(all, "player").map((item) => item.name)).toEqual(["deepseek"])
+    expect(
+      accountsInScope(all, "simulation", "pool").map((item) => item.name)
+    ).toEqual(["faction_pool_pilots"])
+    expect(accountsInScope(all, "simulation").length).toBe(2)
   })
 })
 

@@ -507,6 +507,11 @@ export function credentialLabel(cred: PublishCredential, now: number): string {
  */
 export const AUTHOR_NAME_PLACEHOLDER = "指挥官"
 
+/** 名字是不是后端给「还没填写」身份用的默认署名。 */
+export function usesDefaultSignature(name: string): boolean {
+  return name.trim() === AUTHOR_NAME_PLACEHOLDER
+}
+
 /**
  * 输入框里该显示成什么：占位提示这串字不算真署名。
  *
@@ -515,7 +520,7 @@ export const AUTHOR_NAME_PLACEHOLDER = "指挥官"
  */
 export function signatureDraft(name: string): string {
   const trimmed = name.trim()
-  return trimmed === AUTHOR_NAME_PLACEHOLDER ? "" : trimmed
+  return usesDefaultSignature(trimmed) ? "" : trimmed
 }
 
 /** 署名填过没有：空白不算填，占位提示也不算 */
@@ -584,6 +589,10 @@ export function reviewPrStateLabel(state: string | undefined | null): string {
   return "状态未确认"
 }
 
+/** 默认署名只允许本地创建与测试，发布到市场前必须去改掉。 */
+export const DEFAULT_SIGNATURE_PUBLISH_HINT =
+  "默认署名「指挥官」只用于本地测试，不能发布到市场；请先改成你自己的署名。"
+
 /** 提交前必须解决的一件事：说清缺什么、去哪补 */
 export interface PublishBlocker {
   id: "signature" | "token" | "cooldown" | "interval"
@@ -637,11 +646,14 @@ export function publishBlockers({
     })
   }
   if (!hasOwnSignature(name)) {
+    const defaultSignature = usesDefaultSignature(name)
     blockers.push({
       id: "signature",
       label: "署名",
       title: "还没填署名",
-      hint: "署名会印在模组的作者栏上，先在「令牌配置」里填上你自己的署名。",
+      hint: defaultSignature
+        ? t(DEFAULT_SIGNATURE_PUBLISH_HINT)
+        : "署名会印在模组的作者栏上，先在「令牌配置」里填上你自己的署名。",
     })
   }
   if (!isCredentialLive(credential, now)) {
@@ -967,9 +979,14 @@ function parseCommaList(raw: string, limit?: number): string[] {
   return limit === undefined ? list : list.slice(0, limit)
 }
 
-/** 标签输入：英文或中文逗号分隔，去空去重，最多 5 个 */
+/** 标签输入：逗号、中文逗号或空白分隔，去空去重，最多 5 个 */
 export function parseTags(raw: string): string[] {
-  return parseCommaList(raw, 5)
+  const seen = new Set<string>()
+  for (const part of raw.split(/[,，\s]+/)) {
+    const item = part.trim()
+    if (item) seen.add(item)
+  }
+  return [...seen].slice(0, 5)
 }
 
 /** 冲突模组 id：逗号分隔，去空去重；不设上限，冲突本来就该照实写全 */

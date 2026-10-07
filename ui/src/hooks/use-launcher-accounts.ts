@@ -95,7 +95,11 @@ function toCharacter(role: RawRole, online: boolean): Character {
 
 function toAccount(raw: RawAccount, onlineId: string | null): Account {
   const roles = Array.isArray(raw.roles) ? raw.roles : []
-  const characters = roles.map((role) => toCharacter(role, String(role.characterId) === onlineId))
+  const characters = roles.map((role) => {
+    const onlineKnown = role.onlineKnown === true
+    const online = onlineKnown ? role.online === true : String(role.characterId) === onlineId
+    return toCharacter(role, online)
+  })
   const role: AccountRole = raw.isGM ? "GM" : "PLAYER"
   return {
     id: String(raw.accountId),
@@ -175,7 +179,7 @@ export function useLauncherAccounts(): LauncherAccountsState {
   /** 等着补密码的账号：本机没存过密文的号，输一次就能进，顺手补存到本机 */
   const [pendingCredential, setPendingCredential] = useState<PendingCredential | null>(null)
   const [hydrated, setHydrated] = useState(false)
-  /** 本启动器这轮拉起过的角色：accountId → characterId（后端不报「谁在线」） */
+  /** 本启动器这轮拉起过的角色：accountId → characterId；服务端在线状态不可用时的兜底 */
   const [onlineByAccount, setOnlineByAccount] = useState<Record<string, string>>({})
   /** 军团 / 联盟专属徽标：`kind:id` → data URL（null = 服务端没有专属徽标） */
   const [logotypes, setLogotypes] = useState<Record<string, string | null>>({})
@@ -381,7 +385,7 @@ export function useLauncherAccounts(): LauncherAccountsState {
   )
 
   /**
-   * 把某个角色标成在线：后端不报「谁在线」，本启动器这轮拉起的自己记。
+   * 把某个角色标成在线：服务端 host 还没写入真实 sessionRegistry 状态时，先按本机拉起记账兜底。
    * 「点角色进游戏」与「补完密码进游戏」两条路共用。
    */
   const markOnline = useCallback((accountId: string, characterId: string | null) => {

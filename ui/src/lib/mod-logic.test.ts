@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest"
 
 import {
+  AUTHOR_NAME_PLACEHOLDER,
+  DEFAULT_SIGNATURE_PUBLISH_HINT,
   PUBLISH_INTERVAL_MS,
   SAFE_DESC_LENGTH,
   SUBMIT_COOLDOWN_MS,
@@ -19,6 +21,7 @@ import {
   modByFolderOrId,
   overlapFlag,
   overlapReport,
+  parseTags,
   ratingFromReviews,
   reviewPrStateLabel,
   submitCooldownRemaining,
@@ -118,6 +121,18 @@ describe("intervalText", () => {
   })
 })
 
+describe("parseTags（标签输入）", () => {
+  it("逗号、中文逗号和空白都能分隔，并去空去重", () => {
+    expect(parseTags("AI, 陪玩 新手，AI\n经济")).toEqual(["AI", "陪玩", "新手", "经济"])
+    expect(parseTags("  alpha   beta\tgamma  ")).toEqual(["alpha", "beta", "gamma"])
+    expect(parseTags("聊天,聊天，，  聊天")).toEqual(["聊天"])
+  })
+
+  it("最多保留 5 个", () => {
+    expect(parseTags("1 2 3 4 5 6")).toEqual(["1", "2", "3", "4", "5"])
+  })
+})
+
 describe("reviewPrStateLabel", () => {
   it("把后端复查回来的 PR 状态说成人话", () => {
     expect(reviewPrStateLabel("open")).toBe("审核中")
@@ -145,6 +160,16 @@ describe("publishBlockers 的冷却门槛", () => {
       publishBlockers({ credential: liveCredential, name: "波坤太叔", now: NOW, cooldownMs: 0 })
     ).toEqual([])
     expect(publishBlockers({ credential: liveCredential, name: "波坤太叔", now: NOW })).toEqual([])
+  })
+
+  it("默认的「指挥官」署名只供本地测试，发布前必须改掉", () => {
+    const blockers = publishBlockers({
+      credential: liveCredential,
+      name: AUTHOR_NAME_PLACEHOLDER,
+      now: NOW,
+    })
+    expect(blockers.map((item) => item.id)).toEqual(["signature"])
+    expect(blockers[0]?.hint).toBe(DEFAULT_SIGNATURE_PUBLISH_HINT)
   })
 
   it("两次发布之间的 60 秒也挡发布：不同模组一样算", () => {

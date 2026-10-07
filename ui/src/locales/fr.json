@@ -137,7 +137,7 @@
   "NPC 生成与控制": "Génération et contrôle des PNJ",
   "NPC 终于会撤了，以前打异常空间它们排着队送，现在得认真打。": "Les NPC sauront enfin se replier, auparavant dans l’espace anormal ils se faisaient détruire en file, maintenant il faut combattre sérieusement.",
   "NPC 路径寻路失败 (星系 30000142) · 已回退直线航向": "Échec du cheminement NPC (système 30000142) · Retour à la trajectoire en ligne droite",
-  "Node v{version}（满足 ≥24）": "Node v{version} (satisfait ≥24)",
+  "Node v{version}（满足 ≥22）": "Node v{version} (satisfait ≥22)",
   "Node.js 运行时": "Environnement d'exécution Node.js",
   "POS 月球基地（Starbase）": "POS Base lunaire (Starbase)",
   "PR 已关闭": "PR fermée",
@@ -2207,7 +2207,7 @@
   "请填写模组标识": "Saisissez l'ID du mod",
   "请填写说明": "Saisissez une description",
   "请填写账号密码": "Saisissez le mot de passe du compte",
-  "请手动安装 Node.js 24+（LTS 版本即可）": "Veuillez installer manuellement Node.js 24 (version LTS)",
+  "请手动安装 Node.js 22+（推荐使用 22 LTS）": "Veuillez installer manuellement Node.js 22 (version LTS)",
   "请手动安装 Rust（官方 rustup 方式）": "Veuillez installer manuellement Rust (via rustup officiel)",
   "请求体序列化失败：{err}": "Échec de la sérialisation du corps de la requête : {err}",
   "请求超时（{}s）": "Délai dépassé de la requête ({}s)",
@@ -3009,5 +3009,9 @@
   "目标干扰": "Brouillage de cible",
   "跟踪干扰": "Perturbation de suivi",
   "跃迁扰频": "Brouillage de warp",
-  "停滞缠绕": "Toile"
+  "停滞缠绕": "Toile",
+  "标签（逗号或空格分隔）": "Tags (séparés par une virgule ou un espace)",
+  "最多 5 个；按逗号、空格或回车确认。": "Jusqu’à 5 ; appuyez sur une virgule, un espace ou Entrée pour valider.",
+  "删除标签「{tag}」": "Supprimer le tag « {tag} »",
+  "默认署名「指挥官」只用于本地测试，不能发布到市场；请先改成你自己的署名。": "La signature par défaut « Commandant » sert uniquement aux tests locaux et ne peut pas être publiée sur le marché ; remplacez-la d’abord par votre propre signature."
 }

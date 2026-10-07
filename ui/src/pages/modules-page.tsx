@@ -37,14 +37,17 @@ import { markAuthoringDocSeen, needsAuthoringDocPulse } from "@/lib/mod-doc-seen
 import { useModSource, type PublishOutcome } from "@/hooks/use-mod-source"
 import {
   ALL_CATEGORY,
+  DEFAULT_SIGNATURE_PUBLISH_HINT,
   activeConflicts,
   publishIntervalRemaining,
   reviewPrStateLabel,
   submitCooldownRemaining,
   collectConflictPairs,
   filterMods,
+  hasOwnSignature,
   hasUpdate,
   isPublished,
+  usesDefaultSignature,
   isReviewing,
   pendingConflicts,
   overlapFlag,
@@ -703,11 +706,13 @@ export function ModulesPage({
 
   function publishBlockersList() {
     const list: { id: string; label: string; hint: string }[] = []
-    if (!authorName.trim()) {
+    if (!hasOwnSignature(authorName)) {
       list.push({
         id: "signature",
         label: "署名",
-        hint: "署名会印在模组的作者栏上，先在「令牌配置」里填上你自己的署名。",
+        hint: usesDefaultSignature(authorName)
+          ? t(DEFAULT_SIGNATURE_PUBLISH_HINT)
+          : "署名会印在模组的作者栏上，先在「令牌配置」里填上你自己的署名。",
       })
     }
     if (!credential) {

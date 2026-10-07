@@ -1,0 +1,57 @@
+{
+  "version": "0.4.1",
+  "changelog": {
+    "zh": [
+      {
+        "type": "fix",
+        "text": "模组制作规范开头的步骤数改对：一次点击发布流程合并后总览是 8 步，不再写成 10 步；中英两份同步更新。"
+      },
+      {
+        "type": "new",
+        "text": "创建 / 编辑模组的标签输入改成可删除标签条：逗号、中文逗号和空格都能分隔，最多保留 5 个；最后一段还没按分隔符确认的标签也会随保存一起写入。"
+      },
+      {
+        "type": "fix",
+        "text": "默认的「指挥官」署名只允许本地创建与测试。发布模组到市场前，界面与后端都会拦住默认署名并提示先改成自己的署名，避免默认署名被上架。"
+      },
+      {
+        "type": "fix",
+        "text": "环境自检不再只看文件是否存在：会实际加载 better-sqlite3 检查 Node ABI 兼容性，并校验 gamestore.sqlite 是有效的 SQLite 数据库；数据库初始化结束后也会复核真实产物，失败不再显示“完成”。"
+      },
+      {
+        "type": "new",
+        "text": "账号管理的在线统计改为合并服务端 characterControlRuntime 与 faction-sim 活跃驾驶员：零售客户端、浏览器控号和正在占用舰船的模拟角色都会计入，账号页打开时会定时刷新。"
+      },
+      {
+        "type": "opt",
+        "text": "账号管理拆成玩家账号与模拟账号：模拟账号再分公共驾驶员池、势力驾驶员池、势力主账号，改用账号汇总加在线模拟角色紧凑视图，并采用 3 列并排和分页加载，避免几百个模拟角色把账号页撑爆。"
+      }
+    ],
+    "en": [
+      {
+        "type": "fix",
+        "text": "The mod authoring guide now states 8 steps, not 10, after the one-click publishing flow merged the original steps; both the Chinese and English copies were updated."
+      },
+      {
+        "type": "new",
+        "text": "The tag field in the create/edit mod form is now a removable chip input: commas, Chinese commas and spaces all separate tags, up to five are kept, and the final unconfirmed fragment is included when the form is saved."
+      },
+      {
+        "type": "fix",
+        "text": "The default “Commander” signature is now reserved for local creation and testing. The UI and backend both block marketplace publishing until the author changes it, so the default signature can no longer be uploaded."
+      },
+      {
+        "type": "fix",
+        "text": "Environment checks now load better-sqlite3 to verify Node ABI compatibility and validate that gamestore.sqlite is a real SQLite database. Database initialization also verifies the resulting files before reporting success, so a failed init no longer logs completion."
+      },
+      {
+        "type": "new",
+        "text": "Account online status now combines the server characterControlRuntime with active faction-sim pilots: retail clients, browser-controlled characters and simulated characters occupying ships are all counted, and the account page refreshes while it is open."
+      },
+      {
+        "type": "opt",
+        "text": "Account management is split into player accounts and simulation accounts. Simulation accounts are further grouped into the shared pilot pool, faction pilot pools and faction main accounts, with a compact account-and-online-character view, a three-column grid and paginated loading so hundreds of simulated characters no longer overwhelm the page."
+      }
+    ]
+  }
+}

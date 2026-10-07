@@ -263,6 +263,9 @@ export interface RawRole {
   allianceName?: string | null
   /** 联盟简称（shortName）；服务端没有专属徽标时界面画它 */
   allianceTicker?: string | null
+  /** 服务端 sessionRegistry 的真实在线状态；字段缺失或 onlineKnown=false 时由渲染层退回本机状态 */
+  online?: boolean
+  onlineKnown?: boolean
 }
 
 export interface RawAccount {

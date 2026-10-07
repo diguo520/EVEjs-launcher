@@ -23,7 +23,7 @@ const SHORT_LABEL: Record<string, string> = {
 
 /** 带变量的读数：正则抓出变量 → 按 `t()` 模板回填 */
 const DETAIL_RULES: { re: RegExp; key: string }[] = [
-  { re: /^Node v(.+)（满足 ≥24）$/, key: "Node v{version}（满足 ≥24）" },
+  { re: /^Node v(.+)（满足 ≥22）$/, key: "Node v{version}（满足 ≥22）" },
   { re: /^未检测到可用 Node（当前: (.+)）$/, key: "未检测到可用 Node（当前: {version}）" },
   { re: /^工具链不完整（仅检测到 (.+)）$/, key: "工具链不完整（仅检测到 {part}）" },
   { re: /^已安装：(.+)$/, key: "已安装：{path}" },

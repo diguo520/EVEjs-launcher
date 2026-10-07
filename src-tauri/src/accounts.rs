@@ -26,6 +26,7 @@ const LOGO_EXTS: [&str; 2] = ["png", "jpg"];
 struct Ctx {
     root: PathBuf,
     settings_file: PathBuf,
+    runtime: crate::runtime::RuntimePaths,
 }
 
 fn ctx(app: &AppHandle) -> Result<Ctx, String> {
@@ -33,6 +34,7 @@ fn ctx(app: &AppHandle) -> Result<Ctx, String> {
         .map(|state| Ctx {
             root: state.repo_root(),
             settings_file: state.runtime.settings_file(),
+            runtime: state.runtime.clone(),
         })
         .ok_or_else(|| "应用状态不可用".to_string())
 }
@@ -284,16 +286,28 @@ pub async fn list(app: &AppHandle) -> Value {
             })
         }
     };
-    decorate_accounts(&mut accounts, &ctx.settings_file, &ctx.root);
+    let online = crate::hotreload::online_character_ids(&ctx.runtime);
+    decorate_accounts(
+        &mut accounts,
+        &ctx.settings_file,
+        &ctx.root,
+        online.as_deref(),
+    );
     json!({ "ok": true, "data": accounts })
 }
 
-/// 给 CLI 返回的账号列表补两样东西（对齐现役版 listAccounts 的后处理）：
+/// 给 CLI 返回的账号列表补后处理字段：
 ///   1. `hasStoredCredential`：该账号是否存过 DPAPI 加密的密码；
-///   2. `roles[].avatar`：游戏内肖像 data URL（都没有时显式 null，渲染层据此回退默认图）。
+///   2. `roles[].avatar`：游戏内肖像 data URL（都没有时显式 null，渲染层据此回退默认图）；
+///   3. `roles[].online` / `onlineKnown`：服务端 sessionRegistry 的真实在线角色状态。
 ///
 /// 其余字段一律原样透传，不做裁剪。
-pub fn decorate_accounts(accounts: &mut [Value], settings_file: &Path, root: &Path) {
+pub fn decorate_accounts(
+    accounts: &mut [Value],
+    settings_file: &Path,
+    root: &Path,
+    online_ids: Option<&[String]>,
+) {
     for account in accounts.iter_mut() {
         let account_key = account
             .get("accountKey")
@@ -326,6 +340,11 @@ pub fn decorate_accounts(accounts: &mut [Value], settings_file: &Path, root: &Pa
                     "avatar".to_string(),
                     avatar.map(Value::String).unwrap_or(Value::Null),
                 );
+                object.insert("onlineKnown".to_string(), json!(online_ids.is_some()));
+                let online = online_ids
+                    .map(|ids| ids.iter().any(|id| id == &character_id))
+                    .unwrap_or(false);
+                object.insert("online".to_string(), json!(online));
             }
         }
     }
@@ -617,12 +636,20 @@ mod tests {
         let _ = std::fs::remove_file(&settings);
         assert!(secrets::remember(&settings, "test", "hunter2"));
 
-        decorate_accounts(&mut accounts, &settings, Path::new("Z:\\no-portraits"));
+        let online = vec!["140000001".to_string()];
+        decorate_accounts(
+            &mut accounts,
+            &settings,
+            Path::new("Z:\\no-portraits"),
+            Some(&online),
+        );
 
         let account = &accounts[0];
         assert_eq!(account["hasStoredCredential"], json!(true));
         assert_eq!(account["isGM"], json!(true));
         assert_eq!(account["roles"][0]["characterId"], json!("140000001"));
+        assert_eq!(account["roles"][0]["onlineKnown"], json!(true));
+        assert_eq!(account["roles"][0]["online"], json!(true));
         // 没有肖像文件时必须显式 null（渲染层据此回退默认图）
         assert_eq!(account["roles"][0]["avatar"], Value::Null);
         // 原字段一个都不能丢

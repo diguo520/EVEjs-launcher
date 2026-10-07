@@ -19,6 +19,7 @@ import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
+import { TagInput } from "@/components/modules/tag-input"
 import {
   Select,
   SelectContent,
@@ -142,7 +143,8 @@ export function ModFormDialog({
   const [id, setId] = useState("")
   const [version, setVersion] = useState("1.0.0")
   const [cat, setCat] = useState<string>(MOD_CATEGORIES[0])
-  const [tags, setTags] = useState("")
+  const [tags, setTags] = useState<string[]>([])
+  const [tagDraft, setTagDraft] = useState("")
   const [desc, setDesc] = useState("")
   const [readme, setReadme] = useState("")
   const [features, setFeatures] = useState("")
@@ -172,7 +174,8 @@ export function ModFormDialog({
     setIdIssue(null)
     setVersion(mod?.version ?? "1.0.0")
     setCat(mod?.cat ?? MOD_CATEGORIES[0])
-    setTags((mod?.tags ?? []).join(", "))
+    setTags(parseTags((mod?.tags ?? []).join(" ")))
+    setTagDraft("")
     setDesc(mod?.desc ?? "")
     const body = mod ? editableReadme(mod) : { intro: "", features: [] }
     setReadme(body.intro)
@@ -231,7 +234,7 @@ export function ModFormDialog({
       version: editing ? version : version.trim() || "1.0.0",
       cat,
       desc: desc.trim(),
-      tags: parseTags(tags),
+      tags: parseTags([...tags, tagDraft].join(" ")),
       template: picked.id,
       readme,
       features: parseLines(features),
@@ -519,14 +522,19 @@ export function ModFormDialog({
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="mod-form-tags">标签（逗号分隔）</Label>
-              <Input
+              <Label htmlFor="mod-form-tags">标签（逗号或空格分隔）</Label>
+              <TagInput
                 id="mod-form-tags"
                 value={tags}
-                onChange={(event) => setTags(event.target.value)}
-                placeholder="聊天, 新手"
+                draft={tagDraft}
+                onValueChange={setTags}
+                onDraftChange={setTagDraft}
+                placeholder="聊天 新手"
+                describedBy="mod-form-tags-help"
               />
-              <p className="text-[11px] text-tertiary">最多 5 个。</p>
+              <p id="mod-form-tags-help" className="text-[11px] text-tertiary">
+                最多 5 个；按逗号、空格或回车确认。
+              </p>
             </div>
 
             <div className="space-y-1.5">

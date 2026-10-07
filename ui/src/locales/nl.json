@@ -137,7 +137,7 @@
   "NPC 生成与控制": "NPC-generatie en -controle",
   "NPC 终于会撤了，以前打异常空间它们排着队送，现在得认真打。": "NPC’s trekken eindelijk terug, eerder stonden ze netjes in de rij bij anomalieruimte, nu moet je ze serieus bestrijden.",
   "NPC 路径寻路失败 (星系 30000142) · 已回退直线航向": "NPC padfinding mislukt (stelsel 30000142) · Teruggevallen op rechte koers",
-  "Node v{version}（满足 ≥24）": "Node v{version} (vereist ≥24)",
+  "Node v{version}（满足 ≥22）": "Node v{version} (vereist ≥22)",
   "Node.js 运行时": "Node.js runtime",
   "POS 月球基地（Starbase）": "POS Maanbasis (Starbase)",
   "PR 已关闭": "PR gesloten",
@@ -2207,7 +2207,7 @@
   "请填写模组标识": "Voer de mod-ID in",
   "请填写说明": "Voer een beschrijving in",
   "请填写账号密码": "Voer het accountwachtwoord in",
-  "请手动安装 Node.js 24+（LTS 版本即可）": "Installeer handmatig Node.js 24 (LTS-versie is voldoende)",
+  "请手动安装 Node.js 22+（推荐使用 22 LTS）": "Installeer handmatig Node.js 22 (LTS-versie is voldoende)",
   "请手动安装 Rust（官方 rustup 方式）": "Installeer handmatig Rust (via de officiële rustup methode)",
   "请求体序列化失败：{err}": "Verzoekbody serialisatie mislukt: {err}",
   "请求超时（{}s）": "Verzoek time-out ( {}s )",
@@ -3009,5 +3009,9 @@
   "目标干扰": "Doelstoring",
   "跟踪干扰": "Tracking-verstoring",
   "跃迁扰频": "Warp-scrambling",
-  "停滞缠绕": "Web"
+  "停滞缠绕": "Web",
+  "标签（逗号或空格分隔）": "Tags (komma- of spatiegescheiden)",
+  "最多 5 个；按逗号、空格或回车确认。": "Maximaal 5; bevestig met een komma, spatie of Enter.",
+  "删除标签「{tag}」": "Tag \"{tag}\" verwijderen",
+  "默认署名「指挥官」只用于本地测试，不能发布到市场；请先改成你自己的署名。": "De standaardnaam \"Commandant\" is alleen voor lokaal testen en kan niet op de markt worden gepubliceerd; wijzig deze eerst in je eigen naam."
 }

@@ -2,6 +2,7 @@
 //! 现役版第 4 步的注释值得保留：绝不允许探测失败时把日志/设置写到任意的当前目录
 //! （历史上曾导致日志落在 AppData 下）。
 use crate::runtime::RuntimePaths;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -325,11 +326,26 @@ pub async fn detect_env(repo_root: &Path) -> serde_json::Value {
     // 客户端配置只读一次（现役版也是 readClientConfig 调一次、派生两项检查）
     let (client_path_check, ca_cert_check) = client_config_checks(repo_root);
 
+    let deps_root = repo_root.to_path_buf();
+    let server_deps = match tokio::task::spawn_blocking(move || server_deps_check(&deps_root)).await
+    {
+        Ok(item) => item,
+        Err(_) => check_item(
+            "serverDeps",
+            "主服务器依赖",
+            false,
+            None,
+            "主服务器依赖检查失败（检查线程异常）".to_string(),
+            Some("重新打开环境自检；仍有问题就在 server 目录执行 npm ci"),
+            None,
+        ),
+    };
+
     let checks = vec![
         node_check(&node_version),
         rust_check().await,
         vs_build_tools_check().await,
-        server_deps_check(repo_root),
+        server_deps,
         local_db_check(repo_root),
         market_check(repo_root),
         client_path_check,
@@ -463,7 +479,7 @@ fn node_check(version: &str) -> serde_json::Value {
         .split('.')
         .next()
         .and_then(|major| major.parse::<u32>().ok())
-        .map(|major| major >= 24)
+        .map(|major| major >= 22)
         .unwrap_or(false);
     check_item(
         "node",
@@ -471,14 +487,14 @@ fn node_check(version: &str) -> serde_json::Value {
         ok,
         None,
         if ok {
-            format!("Node v{version}（满足 ≥24）")
+            format!("Node v{version}（满足 ≥22）")
         } else {
             format!("未检测到可用 Node（当前: {version}）")
         },
         if ok {
             None
         } else {
-            Some("请手动安装 Node.js 24+（LTS 版本即可）")
+            Some("请手动安装 Node.js 22+（推荐使用 22 LTS）")
         },
         if ok { None } else { Some("https://nodejs.org") },
     )
@@ -550,52 +566,159 @@ async fn vs_build_tools_check() -> serde_json::Value {
     )
 }
 
+fn first_output_line(text: &str) -> String {
+    text.lines()
+        .map(str::trim)
+        .find(|line| !line.is_empty())
+        .unwrap_or_default()
+        .to_string()
+}
+
+/// 在环境自检里真实加载 server 自带的 better-sqlite3。
+///
+/// 只看 express/package.json 不够：原生模块是按 Node ABI 编译的，用户升级 Node 后
+/// `require` 可能直接失败，但目录结构仍然“看起来就绪”。这里用实际加载结果作准，
+/// 把 ABI 不匹配挡在数据库初始化之前。
+pub(crate) fn better_sqlite_issue(repo_root: &Path) -> Option<String> {
+    let module_path = repo_root
+        .join("server")
+        .join("node_modules")
+        .join("better-sqlite3");
+    if !module_path.join("package.json").is_file() {
+        return Some("缺少 server/node_modules/better-sqlite3（SQLite 驱动未安装）".to_string());
+    }
+    let node = match crate::sidecar::node_executable() {
+        Ok(path) => path,
+        Err(reason) => return Some(format!("找不到可用于检查 SQLite 的 Node.js：{reason}")),
+    };
+    let script =
+        "const Database=require(process.argv[1]);const db=new Database(':memory:');db.close();";
+    let mut command = Command::new(node);
+    command
+        .arg("-e")
+        .arg(script)
+        .arg(&module_path)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
+    #[cfg(windows)]
+    command.creation_flags(CREATE_NO_WINDOW);
+    let output = match command.output() {
+        Ok(output) => output,
+        Err(err) => return Some(format!("无法执行 Node 检查 better-sqlite3：{err}")),
+    };
+    if output.status.success() {
+        return None;
+    }
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let raw = if stderr.trim().is_empty() {
+        stdout.as_ref()
+    } else {
+        stderr.as_ref()
+    };
+    let abi_line = raw
+        .lines()
+        .find(|line| line.contains("NODE_MODULE_VERSION") || line.contains("ERR_DLOPEN_FAILED"));
+    let detail = abi_line
+        .map(str::trim)
+        .map(str::to_string)
+        .unwrap_or_else(|| first_output_line(raw));
+    let label = if abi_line.is_some() {
+        "better-sqlite3 与当前 Node 的 ABI 不匹配"
+    } else {
+        "better-sqlite3 无法在当前 Node 下加载"
+    };
+    Some(if detail.is_empty() {
+        label.to_string()
+    } else {
+        format!("{label}：{detail}")
+    })
+}
+
 fn server_deps_check(repo_root: &Path) -> serde_json::Value {
-    let ok = repo_root
+    let express = repo_root
         .join("server")
         .join("node_modules")
         .join("express")
         .join("package.json")
-        .exists();
+        .is_file();
+    if !express {
+        return check_item(
+            "serverDeps",
+            "主服务器依赖",
+            false,
+            None,
+            "缺少 server/node_modules（express 未安装）".to_string(),
+            Some("在 server 目录执行 npm ci 安装依赖"),
+            None,
+        );
+    }
+    if let Some(issue) = better_sqlite_issue(repo_root) {
+        return check_item(
+            "serverDeps",
+            "主服务器依赖",
+            false,
+            None,
+            issue,
+            Some("先执行「主服务器依赖」修复以重新 npm ci；若仍失败，请改用 Node.js 22（项目随包的 better-sqlite3 由 Node 22 构建）"),
+            None,
+        );
+    }
     check_item(
         "serverDeps",
         "主服务器依赖",
-        ok,
+        true,
         None,
-        if ok {
-            "server/node_modules 已就绪".to_string()
-        } else {
-            "缺少 server/node_modules（express 未安装）".to_string()
-        },
-        if ok {
-            None
-        } else {
-            Some("在 server 目录执行 npm ci 安装依赖")
-        },
+        "server/node_modules 已就绪 · better-sqlite3 可加载".to_string(),
+        None,
         None,
     )
 }
 
-fn local_db_check(repo_root: &Path) -> serde_json::Value {
+/// 本地数据库真正可用的判据：manifest 存在，SQLite 文件存在且带标准文件头。
+/// 只查路径存在会把空文件 / 初始化中断留下的占位文件误报成已就绪。
+pub(crate) fn local_db_artifact_issue(repo_root: &Path) -> Option<String> {
     let store = repo_root.join("_local").join("gameStore");
-    let ok = store.join("manifest.json").exists() && store.join("gamestore.sqlite").exists();
-    check_item(
-        "localDb",
-        "本地数据库",
-        ok,
-        None,
-        if ok {
-            "_local/gameStore 已初始化".to_string()
-        } else {
-            "本地数据库缺失（manifest/sqlite 不存在）".to_string()
-        },
-        if ok {
-            None
-        } else {
-            Some("运行 tools\\DatabaseCreator\\CreateDatabase.bat 初始化数据库")
-        },
-        None,
-    )
+    let manifest = store.join("manifest.json");
+    if !manifest.is_file() {
+        return Some("本地数据库缺失：_local/gameStore/manifest.json 不存在".to_string());
+    }
+    let db = store.join("gamestore.sqlite");
+    let mut file = match std::fs::File::open(&db) {
+        Ok(file) => file,
+        Err(err) => return Some(format!("本地数据库缺失或无法读取 gamestore.sqlite：{err}")),
+    };
+    let mut header = [0u8; 16];
+    if file.read_exact(&mut header).is_err() || header != *b"SQLite format 3\0" {
+        return Some(
+            "gamestore.sqlite 不是有效的 SQLite 数据库（可能是空文件或初始化未完成）".to_string(),
+        );
+    }
+    None
+}
+
+fn local_db_check(repo_root: &Path) -> serde_json::Value {
+    match local_db_artifact_issue(repo_root) {
+        None => check_item(
+            "localDb",
+            "本地数据库",
+            true,
+            None,
+            "_local/gameStore 已初始化".to_string(),
+            None,
+            None,
+        ),
+        Some(issue) => check_item(
+            "localDb",
+            "本地数据库",
+            false,
+            None,
+            issue,
+            Some(r"运行 tools\DatabaseCreator\CreateDatabase.bat 初始化数据库"),
+            None,
+        ),
+    }
 }
 
 fn market_check(repo_root: &Path) -> serde_json::Value {
@@ -860,19 +983,34 @@ mod tests {
             "{}",
         )
         .unwrap();
+        // better-sqlite3 的真实探针会 require 这个模块；测试夹具只要能被 Node 加载即可。
+        let sqlite = root
+            .join("server")
+            .join("node_modules")
+            .join("better-sqlite3");
+        std::fs::create_dir_all(&sqlite).unwrap();
+        std::fs::write(sqlite.join("package.json"), "{}").unwrap();
+        std::fs::write(
+            sqlite.join("index.js"),
+            "module.exports = class { constructor() {} close() {} };",
+        )
+        .unwrap();
         std::fs::create_dir_all(root.join("_local").join("gameStore")).unwrap();
         std::fs::write(
             root.join("_local").join("gameStore").join("manifest.json"),
             "{}",
         )
         .unwrap();
-        std::fs::write(
-            root.join("_local")
-                .join("gameStore")
-                .join("gamestore.sqlite"),
-            "",
-        )
-        .unwrap();
+        let db_file = root
+            .join("_local")
+            .join("gameStore")
+            .join("gamestore.sqlite");
+        std::fs::write(&db_file, "").unwrap();
+        assert!(
+            local_db_artifact_issue(&root).is_some(),
+            "空 gamestore.sqlite 不能被当成已初始化"
+        );
+        std::fs::write(&db_file, b"SQLite format 3\0").unwrap();
         let market = market_binary(&root);
         std::fs::create_dir_all(market.parent().unwrap()).unwrap();
         std::fs::write(&market, "").unwrap();
@@ -892,6 +1030,57 @@ mod tests {
                 "就绪的检查项不该带 installUrl：{item}"
             );
         }
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn node_check_accepts_v22_and_rejects_older_runtime() {
+        let current = node_check("22.21.1");
+        assert_eq!(current["ok"], serde_json::json!(true), "{current}");
+        assert_eq!(
+            current["message"],
+            serde_json::json!("Node v22.21.1（满足 ≥22）")
+        );
+
+        let old = node_check("20.19.0");
+        assert_eq!(old["ok"], serde_json::json!(false), "{old}");
+        assert!(old["hint"].as_str().unwrap_or_default().contains("22"));
+    }
+
+    #[test]
+    fn better_sqlite_probe_reports_missing_driver() {
+        let root = temp_root("missing-better-sqlite");
+        std::fs::create_dir_all(root.join("server").join("node_modules").join("express")).unwrap();
+        std::fs::write(
+            root.join("server")
+                .join("node_modules")
+                .join("express")
+                .join("package.json"),
+            "{}",
+        )
+        .unwrap();
+        let issue = better_sqlite_issue(&root).expect("缺 better-sqlite3 时必须报未就绪");
+        assert!(issue.contains("better-sqlite3"), "{issue}");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn better_sqlite_probe_identifies_node_abi_mismatch() {
+        let root = temp_root("sqlite-abi-mismatch");
+        let sqlite = root
+            .join("server")
+            .join("node_modules")
+            .join("better-sqlite3");
+        std::fs::create_dir_all(&sqlite).unwrap();
+        std::fs::write(sqlite.join("package.json"), "{}").unwrap();
+        std::fs::write(
+            sqlite.join("index.js"),
+            "throw new Error('NODE_MODULE_VERSION 127 mismatch: compiled for Node 22');",
+        )
+        .unwrap();
+        let issue = better_sqlite_issue(&root).expect("ABI 不匹配必须被识别");
+        assert!(issue.contains("ABI 不匹配"), "{issue}");
+        assert!(issue.contains("NODE_MODULE_VERSION"), "{issue}");
         let _ = std::fs::remove_dir_all(&root);
     }
 

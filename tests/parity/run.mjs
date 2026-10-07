@@ -83,8 +83,8 @@ if (hashOk === fixture.vectors.length) {
 /* ---------- D) 通道级结构口径：条件键不进结构指纹 ---------- */
 
 // env:check 的检查项只在「未就绪 / 部分就绪」时才带 hint / installUrl（见 env.rs::check_item）。
-// CI runner 是 Node 22（低于 node_check 的 ≥24 门槛）、本机是 Node 26，两边键集合天生不同；
-// 结构比对必须对这种条件键免疫，否则 CI 第 11 步永远红（2026-09-28 实测）。
+// 不同机器的 Node / 依赖状态会让可选键出现或消失；结构比对必须对这种条件键免疫，
+// 否则同一份代码在不同机器上会得到不同的形状指纹。
 {
   const notReady = {
     ok: false,
@@ -95,8 +95,8 @@ if (hashOk === fixture.vectors.length) {
         key: "node",
         label: "Node.js 运行时",
         ok: false,
-        message: "未检测到可用 Node（当前: 22.0.0）",
-        hint: "请手动安装 Node.js 24+（LTS 版本即可）",
+        message: "未检测到可用 Node（当前: 20.0.0）",
+        hint: "请手动安装 Node.js 22+（推荐使用 22 LTS）",
         installUrl: "https://nodejs.org",
       },
     ],
@@ -105,7 +105,7 @@ if (hashOk === fixture.vectors.length) {
     ok: true,
     passCount: 1,
     sys: { level: "ok" },
-    checks: [{ key: "node", label: "Node.js 运行时", ok: true, message: "Node v26.5.0（满足 ≥24）" }],
+    checks: [{ key: "node", label: "Node.js 运行时", ok: true, message: "Node v26.5.0（满足 ≥22）" }],
   };
   const diff = compareChannel("env:check", notReady, ready);
   if (diff === null) pass("env:check：条件键（hint / installUrl / warn）不进结构指纹，未就绪与就绪两种机器形态同形");

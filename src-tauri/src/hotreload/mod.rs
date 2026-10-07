@@ -30,6 +30,7 @@ pub(crate) const HOST_JS: &str = include_str!("host.js");
 const HOST_FILE: &str = "host.js";
 const BOOT_FILE: &str = "boot.json";
 const SESSION_FILE: &str = "session.json";
+const ONLINE_FILE: &str = "online.json";
 const REQUEST_FILE: &str = "request.json";
 const PROCESSING_FILE: &str = "request.processing.json";
 const RESULT_FILE: &str = "result.json";
@@ -228,7 +229,13 @@ pub fn prepare(runtime: &RuntimePaths, root: &Path) -> Option<String> {
     std::fs::create_dir_all(&dir).ok()?;
     std::fs::write(dir.join(HOST_FILE), HOST_JS).ok()?;
     // 上一轮的请求 / 结果必须清掉：新进程不该读到旧请求，启动器也不该读到旧结果
-    for name in [REQUEST_FILE, PROCESSING_FILE, RESULT_FILE, SESSION_FILE] {
+    for name in [
+        REQUEST_FILE,
+        PROCESSING_FILE,
+        RESULT_FILE,
+        SESSION_FILE,
+        ONLINE_FILE,
+    ] {
         let _ = std::fs::remove_file(dir.join(name));
     }
     let boot_id = format!("{}-{}", epoch_ms(), std::process::id());
@@ -257,6 +264,39 @@ fn boot_id(runtime: &RuntimePaths) -> Option<String> {
         .get("bootId")?
         .as_str()
         .map(str::to_string)
+}
+
+/// 服务端 `sessionRegistry` 真实在线角色 ID；状态文件不新鲜 / 不是本轮服务端 / 接口不可用时返回 None。
+///
+/// 数据由 [`HOST_JS`] 在服务端进程内轮询后写到 `_launcher/hotreload/online.json`。
+/// 这里故意不把「没拿到」当空列表：账号页要能区分「确实 0 人在线」与「当前无法读取在线状态」。
+pub fn online_character_ids(runtime: &RuntimePaths) -> Option<Vec<String>> {
+    const MAX_STALE_MS: u64 = 10_000;
+    let value = read_json(&dir(runtime).join(ONLINE_FILE))?;
+    if value.get("supported").and_then(Value::as_bool) != Some(true) {
+        return None;
+    }
+    if value.get("bootId").and_then(Value::as_str) != boot_id(runtime).as_deref() {
+        return None;
+    }
+    let updated_at = value.get("updatedAt").and_then(Value::as_u64)?;
+    let now = epoch_ms() as u64;
+    if now.saturating_sub(updated_at) > MAX_STALE_MS {
+        return None;
+    }
+    Some(
+        value
+            .get("characters")
+            .and_then(Value::as_array)?
+            .iter()
+            .filter_map(|item| item.get("characterId"))
+            .map(|value| match value {
+                Value::String(text) => text.trim().to_string(),
+                other => other.to_string(),
+            })
+            .filter(|id| !id.is_empty())
+            .collect(),
+    )
 }
 
 /// 服务端是不是「这一轮由启动器带 host 起来的」。
@@ -797,6 +837,58 @@ mod tests {
         )
         .unwrap();
         assert!(!armed(&runtime), "上一轮服务端的 session 不算数");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn online_character_ids_require_fresh_matching_state() {
+        let root = fixture_root();
+        let runtime = RuntimePaths::from_root(root.join("_launcher"), false);
+        std::fs::create_dir_all(dir(&runtime)).unwrap();
+        write_json(
+            &dir(&runtime).join(BOOT_FILE),
+            &json!({ "bootId": "boot-1" }),
+        )
+        .unwrap();
+
+        let online = |updated_at: u64, boot: &str| {
+            json!({
+                "supported": true,
+                "bootId": boot,
+                "updatedAt": updated_at,
+                "characters": [
+                    { "characterId": "140000001", "onlineSince": updated_at },
+                    { "characterId": 140000002, "onlineSince": updated_at }
+                ]
+            })
+        };
+        let now = epoch_ms() as u64;
+        write_json(&dir(&runtime).join(ONLINE_FILE), &online(now, "boot-1")).unwrap();
+        assert_eq!(
+            online_character_ids(&runtime),
+            Some(vec!["140000001".to_string(), "140000002".to_string()])
+        );
+
+        write_json(&dir(&runtime).join(ONLINE_FILE), &online(now, "old")).unwrap();
+        assert_eq!(online_character_ids(&runtime), None, "旧 boot 不能复用");
+
+        write_json(
+            &dir(&runtime).join(ONLINE_FILE),
+            &online(now - 20_000, "boot-1"),
+        )
+        .unwrap();
+        assert_eq!(online_character_ids(&runtime), None, "过期状态不能复用");
+
+        write_json(
+            &dir(&runtime).join(ONLINE_FILE),
+            &json!({ "supported": false, "bootId": "boot-1", "updatedAt": now, "characters": [] }),
+        )
+        .unwrap();
+        assert_eq!(
+            online_character_ids(&runtime),
+            None,
+            "接口不可用要返回未知，而不是 0"
+        );
         let _ = std::fs::remove_dir_all(&root);
     }
 

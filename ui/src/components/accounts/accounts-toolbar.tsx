@@ -26,6 +26,7 @@ export function AccountsToolbar({
   refreshing,
   onRefresh,
   onCreate,
+  showCreate = true,
 }: {
   query: string
   onQueryChange: (v: string) => void
@@ -34,6 +35,8 @@ export function AccountsToolbar({
   refreshing: boolean
   onRefresh: () => void
   onCreate: () => void
+  /** 模拟账号由 faction-sim 管理，不显示「新建账号」。 */
+  showCreate?: boolean
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -65,10 +68,12 @@ export function AccountsToolbar({
         <RefreshCw className={refreshing ? "animate-spin" : undefined} />
         同步
       </Button>
-      <Button onClick={onCreate}>
-        <UserPlus />
-        新建账号
-      </Button>
+      {showCreate ? (
+        <Button onClick={onCreate}>
+          <UserPlus />
+          新建账号
+        </Button>
+      ) : null}
     </div>
   )
 }

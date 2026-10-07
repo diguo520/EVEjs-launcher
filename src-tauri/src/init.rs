@@ -268,6 +268,18 @@ pub fn run_init(app: &AppHandle, key: &str) -> Value {
 
     let root = state.repo_root();
     let label = label_of(key);
+    if key == "db" {
+        if let Some(issue) = env::better_sqlite_issue(&root) {
+            let reason = format!("数据库运行环境未就绪：{issue}");
+            push_colored(app, "31", &format!("[初始化] {reason}"));
+            push_colored(
+                app,
+                "33",
+                "[初始化] 先执行「主服务器依赖」修复重新 npm ci；若仍失败，请改用 Node.js 22。",
+            );
+            return json!({ "ok": false, "reason": reason });
+        }
+    }
     push(
         app,
         &format!("\r\n\x1b[33m════ [初始化] {label} 开始 ════\x1b[0m"),
@@ -346,6 +358,7 @@ pub fn run_init(app: &AppHandle, key: &str) -> Value {
 
     let app_wait = app.clone();
     let bat_cleanup = bat_file.clone();
+    let root_wait = root.clone();
     std::thread::spawn(move || {
         let code = match child.wait() {
             Ok(status) => status.code().unwrap_or(-1),
@@ -354,13 +367,23 @@ pub fn run_init(app: &AppHandle, key: &str) -> Value {
         for handle in handles {
             let _ = handle.join();
         }
-        if code == 0 {
+        let db_issue = if code == 0 && key_owned == "db" {
+            env::local_db_artifact_issue(&root_wait)
+        } else {
+            None
+        };
+        if code == 0 && db_issue.is_none() {
             push_colored(&app_wait, "32", &format!("════ [初始化] {label} 完成 ✓"));
         } else {
+            let detail = db_issue
+                .map(|issue| format!("：{issue}"))
+                .unwrap_or_default();
             push_colored(
                 &app_wait,
                 "31",
-                &format!("════ [初始化] {label} 结束（exit {code}）—— 未完成，请查看上方日志"),
+                &format!(
+                    "════ [初始化] {label} 结束（exit {code}）—— 未完成{detail}，请查看上方日志"
+                ),
             );
         }
         let _ = std::fs::remove_file(&bat_cleanup);

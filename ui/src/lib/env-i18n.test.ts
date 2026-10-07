@@ -28,8 +28,8 @@ describe("localizeEnvItem", () => {
     expect(localizeEnvItem(item("Rust / Cargo 工具链", "工具链不完整（仅检测到 cargo）")).detail).toBe(
       "工具链不完整（仅检测到 cargo）"
     )
-    expect(localizeEnvItem(item("Node.js 运行时", "Node v24.4.1（满足 ≥24）")).detail).toBe(
-      "Node v24.4.1（满足 ≥24）"
+    expect(localizeEnvItem(item("Node.js 运行时", "Node v24.4.1（满足 ≥22）")).detail).toBe(
+      "Node v24.4.1（满足 ≥22）"
     )
   })
 

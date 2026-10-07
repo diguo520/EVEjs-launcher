@@ -137,7 +137,7 @@
   "NPC 生成与控制": "NPC generation and control",
   "NPC 终于会撤了，以前打异常空间它们排着队送，现在得认真打。": "NPCs finally retreat; previously, in anomaly space, they used to line up and die, now you have to fight seriously.",
   "NPC 路径寻路失败 (星系 30000142) · 已回退直线航向": "NPC pathfinding failed (System 30000142) · Reverted to a straight course",
-  "Node v{version}（满足 ≥24）": "Node v{version} (meets ≥24)",
+  "Node v{version}（满足 ≥22）": "Node v{version} (meets ≥22)",
   "Node.js 运行时": "Node.js runtime",
   "POS 月球基地（Starbase）": "POS Lunar Base (Starbase)",
   "PR 已关闭": "PR closed",
@@ -2207,7 +2207,7 @@
   "请填写模组标识": "Enter the mod id",
   "请填写说明": "Enter a description",
   "请填写账号密码": "Enter the account password",
-  "请手动安装 Node.js 24+（LTS 版本即可）": "Please manually install Node.js 24 (LTS version is fine)",
+  "请手动安装 Node.js 22+（推荐使用 22 LTS）": "Please manually install Node.js 22 (LTS version is fine)",
   "请手动安装 Rust（官方 rustup 方式）": "Please manually install Rust (official rustup method)",
   "请求体序列化失败：{err}": "Request body serialization failed: {err}",
   "请求超时（{}s）": "Request timed out ({}s)",
@@ -3009,5 +3009,9 @@
   "目标干扰": "Target jamming",
   "跟踪干扰": "Tracking disruption",
   "跃迁扰频": "Warp scrambling",
-  "停滞缠绕": "Webbing"
+  "停滞缠绕": "Webbing",
+  "标签（逗号或空格分隔）": "Tags (comma- or space-separated)",
+  "最多 5 个；按逗号、空格或回车确认。": "Up to 5; press comma, space, or Enter to confirm.",
+  "删除标签「{tag}」": "Delete tag \"{tag}\"",
+  "默认署名「指挥官」只用于本地测试，不能发布到市场；请先改成你自己的署名。": "The default signature “Commander” is for local testing only and cannot be published to the market; change it to your own signature first."
 }

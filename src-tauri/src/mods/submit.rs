@@ -304,6 +304,26 @@ fn text_field(value: &Value, key: &str) -> String {
         .to_string()
 }
 
+/// 待提交记录里的作者署名。
+fn submission_author_name(item: &Value) -> &str {
+    item.get("indexDraft")
+        .and_then(|draft| draft.get("author"))
+        .and_then(|author| author.get("name"))
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+}
+
+/// 未修改的默认署名只允许本地创建 / 测试，不能发布到市场。
+fn default_signature_rejection(name: &str) -> Option<Value> {
+    if crate::author::is_publishable_name(name) {
+        return None;
+    }
+    Some(json!({
+        "ok": false,
+        "reason": "默认署名「指挥官」只用于本机创建与测试，发布到市场前必须先在「令牌配置」里改成你自己的署名。",
+    }))
+}
+
 /// 读缓存里的索引，把同一个模组的历史版本带过来（避免覆盖时丢掉 history）。
 ///
 /// ⚠️ 这里**故意复刻现役版的空结果**：现役版 previousHistory() 读缓存文件的**顶层**
@@ -547,6 +567,9 @@ pub fn prepare_submission(repo_root: &Path, runtime: &RuntimePaths, input: &Valu
             return json!({ "ok": false, "reason": format!("读不到本机作者身份：{reason}") })
         }
     };
+    if let Some(reply) = default_signature_rejection(&identity.name) {
+        return reply;
+    }
     let author_id = identity.id.clone();
 
     // 清单里声明了别的作者时不能替他提交
@@ -865,6 +888,9 @@ pub fn publish_own_repo(
         return json!({ "ok": false, "reason": "找不到待提交记录（请先执行「① 生成并打包」）" });
     };
     let item = file["items"][index].clone();
+    if let Some(reply) = default_signature_rejection(submission_author_name(&item)) {
+        return reply;
+    }
 
     let token = github::get_token(runtime);
     if token.is_empty() {
@@ -1256,6 +1282,9 @@ pub fn submit_to_github(runtime: &RuntimePaths, id: &str, version: &str) -> Valu
     };
     let index = find_item_index(&file, id, version).unwrap_or(0);
     let item = file["items"][index].clone();
+    if let Some(reply) = default_signature_rejection(submission_author_name(&item)) {
+        return reply;
+    }
 
     let token = github::get_token(runtime);
     if token.is_empty() {
@@ -1666,6 +1695,19 @@ mod tests {
         .unwrap();
         assert!(previous_history(&runtime, "demo").is_empty());
         let _ = std::fs::remove_dir_all(&runtime.root);
+    }
+
+    #[test]
+    fn default_signature_is_rejected_before_publish() {
+        let rejected = default_signature_rejection("指挥官").expect("默认署名必须被拒绝");
+        assert_eq!(rejected["ok"], false);
+        assert!(rejected["reason"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("令牌配置"));
+        assert!(default_signature_rejection(" 指挥官 ").is_some());
+        assert!(default_signature_rejection("").is_some());
+        assert!(default_signature_rejection("影歌").is_none());
     }
 
     #[test]

@@ -14,7 +14,12 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { AUTHOR_NAME_PLACEHOLDER, signatureDraft } from "@/lib/mod-logic"
+import {
+  AUTHOR_NAME_PLACEHOLDER,
+  DEFAULT_SIGNATURE_PUBLISH_HINT,
+  signatureDraft,
+  usesDefaultSignature,
+} from "@/lib/mod-logic"
 import type { RawTokenCheck, RawTokenStatus } from "@/lib/ipc"
 import { cn, copyText } from "@/lib/utils"
 
@@ -238,6 +243,11 @@ export function ModAuthorDialog({
               署名会印在模组的作者栏和你发表的评价上，发布模组前必须填；
               输入框里那串「{AUTHOR_NAME_PLACEHOLDER}」只是提示，不是替你填好的名字。
             </p>
+            {usesDefaultSignature(name) ? (
+              <p className="text-[10px] leading-relaxed text-warning">
+                {t(DEFAULT_SIGNATURE_PUBLISH_HINT)}
+              </p>
+            ) : null}
           </div>
 
           <div className="space-y-1.5">

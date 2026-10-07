@@ -440,6 +440,35 @@ export interface AccountStats {
   avg: string
 }
 
+/** 账号管理的第一层分组：真人账号 vs 模拟体系账号。 */
+export type AccountScope = "player" | "simulation"
+
+/** 模拟账号内部的二级分组。 */
+export type SimulationGroup = "all" | "pool" | "faction-pool" | "faction-main"
+
+/** `faction_*` 是 EveJS 势力模拟使用的账号命名空间；其余账号按玩家账号处理。 */
+export function accountScope(account: Account): AccountScope {
+  return account.name.trim().toLowerCase().startsWith("faction_") ? "simulation" : "player"
+}
+
+/** 模拟账号二级分组：公共池 / 势力驾驶员池 / 势力主账号。 */
+export function simulationGroup(account: Account): Exclude<SimulationGroup, "all"> {
+  const name = account.name.trim().toLowerCase()
+  if (name === "faction_pool_pilots") return "pool"
+  if (name.endsWith("_pilots")) return "faction-pool"
+  return "faction-main"
+}
+
+export function accountsInScope(
+  accounts: Account[],
+  scope: AccountScope,
+  group: SimulationGroup = "all"
+): Account[] {
+  const scoped = accounts.filter((account) => accountScope(account) === scope)
+  if (scope !== "simulation" || group === "all") return scoped
+  return scoped.filter((account) => simulationGroup(account) === group)
+}
+
 export function accountStats(accounts: Account[]): AccountStats {
   const characters = accounts.reduce((n, a) => n + a.characters.length, 0)
   const online = accounts.reduce(

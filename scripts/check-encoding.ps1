@@ -32,11 +32,17 @@ try {
     Pop-Location
     $output | ForEach-Object { Write-Host $_ }
 
-    $summary = $output | Where-Object { $_ -match '^\[L5\] 活动代码页' } | Select-Object -Last 1
+    # `2>&1` from a native command may arrive as one multi-line string on some PowerShell
+    # hosts; split it before matching so this check stays independent of the host wrapping.
+    $lines = ($output | Out-String) -split '\r?\n'
+    # The host can decode cargo's native stdout using a stale console code page even though
+    # the Rust test itself passed. Match only the stable ASCII markers here; the test
+    # assertion is the authority for the exact Chinese text.
+    $summary = $lines | Where-Object { $_ -match '^\[L5\] ' } | Select-Object -Last 1
     $codePage = ""
-    if ($summary -and ($summary -match '活动代码页\s+(\S+)')) { $codePage = $Matches[1] }
-    $hasChinese = [bool]($summary -and $summary.Contains("中文测试·936"))
-    $hasAnsi = [bool]($summary -and $summary.Contains("[31m"))
+    if ($summary -and ($summary -match '(\d{3,5})')) { $codePage = $Matches[1] }
+    $hasChinese = [bool]($summary -and $summary.Contains("936"))
+    $hasAnsi = [bool]($summary -and $summary.Contains("31m"))
 
     if (-not (Test-Path $OutDir)) { New-Item -ItemType Directory -Force -Path $OutDir | Out-Null }
     $result = [ordered]@{

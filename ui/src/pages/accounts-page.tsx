@@ -1,24 +1,36 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 
 import { AccountCard } from "@/components/accounts/account-card"
 import { AccountsToolbar } from "@/components/accounts/accounts-toolbar"
+import { SimulationAccountsPanel } from "@/components/accounts/simulation-accounts-panel"
 import {
   CreateAccountDialog,
   type NewAccountPayload,
 } from "@/components/accounts/create-account-dialog"
 import { PasswordPromptDialog } from "@/components/accounts/password-prompt-dialog"
 import { Panel, SectionHeading, StatTile } from "@/components/common/panel"
+import { Button } from "@/components/ui/button"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useLocale } from "@/components/shell/locale-provider"
 import { useNow } from "@/hooks/use-now"
 import type { LauncherAccountsState } from "@/hooks/use-launcher-accounts"
 import {
   MAX_CHARACTERS_PER_ACCOUNT,
+  accountStats,
+  accountsInScope,
   filterAccounts,
   type Account,
+  type AccountScope,
   type Character,
+  type SimulationGroup,
   type StatusFilter,
 } from "@/lib/launcher-logic"
+
+/** 账号页打开时的在线状态刷新节拍；服务端 host 每 2 秒写一次，这里 5 秒读一次足够实时也不刷屏。 */
+const ONLINE_REFRESH_MS = 5000
+const PAGE_SIZE = 24
 
 /**
  * 账号数据来自外壳：建号要等客户端几秒，这期间切走去别页也不该把角色弄丢。
@@ -28,16 +40,43 @@ export function AccountsPage({ store }: { store: LauncherAccountsState }) {
   const { t } = useLocale()
   const [query, setQuery] = useState("")
   const [status, setStatus] = useState<StatusFilter>("ALL")
+  const [scope, setScope] = useState<AccountScope>("player")
+  const [simulationFilter, setSimulationFilter] = useState<SimulationGroup>("all")
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
   const [accountOpen, setAccountOpen] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
 
-  const { accounts, stats } = store
-  const filtered = useMemo(
-    () => filterAccounts(accounts, query, status),
-    [accounts, query, status]
+  const allAccounts = store.accounts
+  const playerAccounts = useMemo(
+    () => accountsInScope(allAccounts, "player"),
+    [allAccounts]
   )
+  const simulationAccounts = useMemo(
+    () => accountsInScope(allAccounts, "simulation"),
+    [allAccounts]
+  )
+  const scopedAccounts = useMemo(
+    () => accountsInScope(allAccounts, scope, simulationFilter),
+    [allAccounts, scope, simulationFilter]
+  )
+  const stats = useMemo(() => accountStats(scopedAccounts), [scopedAccounts])
+  const filtered = useMemo(
+    () => filterAccounts(scopedAccounts, query, status),
+    [scopedAccounts, query, status]
+  )
+  const visibleAccounts = filtered.slice(0, visibleCount)
   /** 在线时长要自己往上走，页面给一个统一的节拍，卡片只管读 */
   const now = useNow()
+
+  // 账号页可见时刷新真在线状态；切走后 interval 自动清掉，不在后台反复查库。
+  useEffect(() => {
+    const timer = window.setInterval(() => store.reload(), ONLINE_REFRESH_MS)
+    return () => window.clearInterval(timer)
+  }, [store.reload])
+
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE)
+  }, [scope, simulationFilter, query, status])
 
   function refresh() {
     setRefreshing(true)
@@ -116,9 +155,52 @@ export function AccountsPage({ store }: { store: LauncherAccountsState }) {
         }
       />
 
+      <div className="flex flex-wrap items-center gap-2">
+        <Tabs
+          value={scope}
+          onValueChange={(value) => {
+            setScope(value as AccountScope)
+            setSimulationFilter("all")
+          }}
+        >
+          <TabsList>
+            <TabsTrigger value="player">
+              {t("玩家账号")}
+              <span className="tabular text-[10px] text-tertiary">{playerAccounts.length}</span>
+            </TabsTrigger>
+            <TabsTrigger value="simulation">
+              {t("模拟账号")}
+              <span className="tabular text-[10px] text-tertiary">{simulationAccounts.length}</span>
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+        {scope === "simulation" ? (
+          <Select
+            value={simulationFilter}
+            onValueChange={(value) => setSimulationFilter(value as SimulationGroup)}
+          >
+            <SelectTrigger className="w-[180px]" aria-label={t("模拟账号分组")}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("全部模拟账号")}</SelectItem>
+              <SelectItem value="pool">{t("公共驾驶员池")}</SelectItem>
+              <SelectItem value="faction-pool">{t("势力驾驶员池")}</SelectItem>
+              <SelectItem value="faction-main">{t("势力主账号")}</SelectItem>
+            </SelectContent>
+          </Select>
+        ) : null}
+        <span className="tabular text-[11px] text-muted-foreground">
+          {t("当前分组 {accounts} 个账号 · {characters} 个角色", {
+            accounts: scopedAccounts.length,
+            characters: stats.characters,
+          })}
+        </span>
+      </div>
+
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile
-          label="账号总数"
+          label={scope === "player" ? t("玩家账号") : t("模拟账号")}
           value={stats.accounts}
           tone="primary"
           delta={
@@ -130,7 +212,7 @@ export function AccountsPage({ store }: { store: LauncherAccountsState }) {
           }
         />
         <StatTile
-          label="角色总数"
+          label={scope === "player" ? t("玩家角色") : t("模拟角色")}
           value={stats.characters}
           delta={
             stats.characters === 0
@@ -160,41 +242,58 @@ export function AccountsPage({ store }: { store: LauncherAccountsState }) {
         refreshing={refreshing}
         onRefresh={refresh}
         onCreate={() => setAccountOpen(true)}
+        showCreate={scope === "player"}
       />
 
       {filtered.length > 0 ? (
-        /* 账号卡片两列并排：一屏能看全更多账号。
-           1280 以下每张卡放不下三个角色槽，回落到单列 */
-        <div className="grid gap-3 xl:grid-cols-2">
-          {filtered.map((account) => (
-            <AccountCard
-              key={account.id}
-              account={account}
-              creating={store.creating}
-              now={now}
-              logotypes={store.logotypes}
-              onEnter={enterGame}
-              onExit={exitGame}
-              onDelete={deleteCharacter}
-              onDeleteAccount={deleteAccount}
-              onCreate={createInGame}
-            />
-          ))}
-        </div>
+        scope === "simulation" ? (
+          <SimulationAccountsPanel accounts={visibleAccounts} />
+        ) : (
+          /* 玩家账号保持原来的卡片视图；模拟账号走紧凑视图，避免几百个角色被截成前三个。 */
+          <div className="grid gap-3 xl:grid-cols-2">
+            {visibleAccounts.map((account) => (
+              <AccountCard
+                key={account.id}
+                account={account}
+                creating={store.creating}
+                now={now}
+                logotypes={store.logotypes}
+                onEnter={enterGame}
+                onExit={exitGame}
+                onDelete={deleteCharacter}
+                onDeleteAccount={deleteAccount}
+                onCreate={createInGame}
+              />
+            ))}
+          </div>
+        )
       ) : (
         <Panel tag="// ACCOUNTS" title="账号列表">
           <p className="py-8 text-center text-[12px] text-tertiary">
-            {accounts.length === 0
+            {allAccounts.length === 0
               ? "还没有账号，点右上角「新建账号」开始"
               : "没有匹配的账号或角色"}
           </p>
         </Panel>
       )}
 
+      {filtered.length > visibleAccounts.length ? (
+        <div className="flex justify-center">
+          <Button
+            variant="outline"
+            onClick={() => setVisibleCount((count) => count + PAGE_SIZE)}
+          >
+            {t("加载更多（剩余 {count} 个账号）", {
+              count: filtered.length - visibleAccounts.length,
+            })}
+          </Button>
+        </div>
+      ) : null}
+
       <CreateAccountDialog
         open={accountOpen}
         onOpenChange={setAccountOpen}
-        accounts={accounts}
+        accounts={allAccounts}
         onSubmit={createAccount}
       />
 
@@ -202,7 +301,7 @@ export function AccountsPage({ store }: { store: LauncherAccountsState }) {
       <PasswordPromptDialog
         pending={store.pendingCredential}
         accountName={
-          accounts.find((a) => a.id === store.pendingCredential?.accountId)?.name ?? ""
+          allAccounts.find((a) => a.id === store.pendingCredential?.accountId)?.name ?? ""
         }
         open={store.pendingCredential !== null}
         onOpenChange={(v) => {

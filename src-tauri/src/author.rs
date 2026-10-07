@@ -581,6 +581,12 @@ pub fn read_identity_at(paths: &RuntimePaths) -> Result<AuthorIdentity, String> 
     })
 }
 
+/// 当前署名是不是允许发布到市场：空名与未修改的默认名都只留给本地创建 / 测试。
+pub(crate) fn is_publishable_name(name: &str) -> bool {
+    let trimmed = name.trim();
+    !trimmed.is_empty() && trimmed != DEFAULT_NAME
+}
+
 /// 用进程级运行时路径读身份（签名 / 验签路径上没有 `AppState` 可用）
 pub fn read_identity() -> Result<AuthorIdentity, String> {
     read_identity_at(crate::runtime::active())

@@ -35,6 +35,7 @@
     const API = 1;
     const HOST_VERSION = "1.0.0";
     const POLL_MS = 400;
+    const ONLINE_POLL_MS = 2000;
 
     const dir = String(process.env.EVEJS_HOTRELOAD_DIR || "").trim();
     if (!dir) return;
@@ -73,6 +74,7 @@
     const processingFile = path.join(dir, "request.processing.json");
     const resultFile = path.join(dir, "result.json");
     const sessionFile = path.join(dir, "session.json");
+    const onlineFile = path.join(dir, "online.json");
     const bootFile = path.join(dir, "boot.json");
 
     function readJson(file) {
@@ -111,6 +113,136 @@
       bootId: bootId,
       armedAt: Date.now(),
     });
+
+    /**
+     * 真在线角色端口：只读服务端内存里的 characterControlRuntime，不碰数据库、不改服务端文件。
+     * 遍历 characterState.listCharacterIDs() 并逐个取 control snapshot，能同时覆盖零售客户端
+     * 与浏览器/网页控号；拿不到运行时或版本接口不兼容时写 supported:false。
+     */
+    function startOnlineTracker() {
+      const controlPath = path.join(serverDir, "src", "services", "online", "characterControlRuntime.js");
+      const statePath = path.join(serverDir, "src", "services", "character", "characterState.js");
+      const firstSeenAt = new Map();
+      let lastSupported = null;
+
+      function writeState(supported, characters) {
+        writeJsonAtomic(onlineFile, {
+          api: API,
+          hostVersion: HOST_VERSION,
+          pid: process.pid,
+          bootId: bootId,
+          updatedAt: Date.now(),
+          supported: supported,
+          source: "characterControlRuntime+factionSim",
+          characters: characters,
+        });
+        if (lastSupported !== supported) {
+          lastSupported = supported;
+          if (supported) safeLog("在线角色追踪已就绪 · characterControlRuntime");
+          else safeLog("在线角色追踪等待角色运行时…");
+        }
+      }
+
+      function loadCached(file) {
+        try {
+          const resolved = require.resolve(file);
+          return require.cache[resolved] ? require(resolved) : null;
+        } catch (error) {
+          return null;
+        }
+      }
+
+      function factionSimPilotIDs() {
+        const modulePath = path.join(serverDir, "node_modules", "better-sqlite3");
+        const dbPath = path.resolve(serverDir, "..", "_local", "faction-sim", "faction.sqlite");
+        if (!fs.existsSync(dbPath) || !fs.existsSync(path.join(modulePath, "package.json"))) {
+          return [];
+        }
+        let Database = null;
+        try {
+          Database = require(modulePath);
+        } catch (error) {
+          return [];
+        }
+        let db = null;
+        try {
+          db = new Database(dbPath, { readonly: true });
+          return db
+            .prepare("SELECT character_id FROM pilot WHERE unit_id IS NOT NULL")
+            .all()
+            .map((row) => String(row.character_id || "").trim())
+            .filter(Boolean);
+        } catch (error) {
+          return [];
+        } finally {
+          try {
+            if (db) db.close();
+          } catch (error) {
+            /* read-only best effort */
+          }
+        }
+      }
+
+      function snapshot() {
+        const control = loadCached(controlPath);
+        const state = loadCached(statePath);
+        if (
+          !control ||
+          typeof control.getCharacterControlSnapshot !== "function" ||
+          !state ||
+          typeof state.listCharacterIDs !== "function"
+        ) {
+          writeState(false, []);
+          return;
+        }
+
+        let ids;
+        try {
+          ids = state.listCharacterIDs() || [];
+        } catch (error) {
+          writeState(false, []);
+          return;
+        }
+
+        const now = Date.now();
+        const active = new Set();
+        const characters = [];
+        const add = (rawID) => {
+          const key = String(rawID || "").trim();
+          if (!key || active.has(key)) return;
+          active.add(key);
+          if (!firstSeenAt.has(key)) firstSeenAt.set(key, now);
+          characters.push({ characterId: key, onlineSince: firstSeenAt.get(key) });
+        };
+
+        for (const rawID of ids) {
+          const key = String(rawID || "").trim();
+          if (!key) continue;
+          let online = false;
+          try {
+            online = control.getCharacterControlSnapshot(key).online === true;
+          } catch (error) {
+            online = false;
+          }
+          if (online) add(key);
+        }
+        // faction-sim 直接驱动角色，不一定经过 characterControlRuntime 的登录租约；
+        // unit_id 非空就是当前占用舰船的活跃模拟驾驶员。
+        for (const id of factionSimPilotIDs()) add(id);
+
+        for (const key of Array.from(firstSeenAt.keys())) {
+          if (!active.has(key)) firstSeenAt.delete(key);
+        }
+        writeState(true, characters);
+      }
+
+      writeState(false, []);
+      snapshot();
+      const timer = setInterval(snapshot, ONLINE_POLL_MS);
+      if (timer && typeof timer.unref === "function") timer.unref();
+    }
+
+    startOnlineTracker();
     safeLog("已就绪 · 静态数据可直接重载（pid " + process.pid + "）");
 
     /**
