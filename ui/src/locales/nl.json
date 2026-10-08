@@ -720,10 +720,10 @@
   "冰矿异常": "IJs-anomalie",
   "冲突": "Conflict",
   "冲突: {list}": "Conflict: {list}",
-  "冲突列表里写了自己，这条声明没有意义，去掉即可。": "De conflictlijst bevat zichzelf; deze opgave heeft geen zin - verwijder hem.",
+  "关联列表里写了自己，这条声明没有意义，去掉即可。": "De koppellijst bevat zichzelf; deze opgave heeft geen zin - verwijder hem.",
   "冲突已解除，重启对应服务后生效。": "Conflict opgelost; herstart de betreffende service om toe te passen.",
   "冲突数": "Conflicten",
-  "冲突模组 id（逗号分隔，可留空）": "Conflicterende mod-ID's (komma-gescheiden)",
+  "关联模组 id（逗号或空格分隔，可留空）": "Gerelateerde mod-ID's (komma- of spatiegescheiden, optioneel)",
   "冲突的模组同时启用时会互相覆盖钩子，可能导致功能失效或数据丢失。": "Conflicterende mods overschrijven elkaars hooks als ze samen aanstaan; dat kan functies breken of gegevensverlies veroorzaken.",
   "准备仓库": "Voorbereiden van de repository",
   "准备你的源码仓库": "Bronrepository voorbereiden",
@@ -3063,5 +3063,13 @@
   "重试": "Opnieuw proberen",
   "GitHub classic 令牌的五步创建截图": "Screenshot van vijf stappen voor het aanmaken van een GitHub classic-token",
   "JSON 解析失败：{error}": "JSON-parsing mislukt: {error}",
-  "JSON 里没有 sponsors 数组": "JSON bevat geen sponsors-array"
+  "JSON 里没有 sponsors 数组": "JSON bevat geen sponsors-array",
+  "ISK": "ISK",
+  "坐标": "Coördinaten",
+  "舰船": "Schip",
+  "长按进入": "Ingedrukt houden om te starten",
+  "可关联多个模组；按逗号、空格或回车确认，最后一段未确认的内容也会随保存写入。": "Je kunt meerdere mods koppelen; bevestig met een komma, spatie of Enter - het laatste onbevestigde stuk wordt ook bij opslaan meegeschreven.",
+  "删除关联模组「{id}」": "Gekoppelde mod \"{id}\" verwijderen",
+  "关联模组": "Gekoppelde mods",
+  "未找到": "Niet gevonden"
 }

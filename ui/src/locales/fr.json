@@ -720,10 +720,10 @@
   "冰矿异常": "Anomalie de glace",
   "冲突": "Conflit",
   "冲突: {list}": "Conflit : {list}",
-  "冲突列表里写了自己，这条声明没有意义，去掉即可。": "La liste des conflits se cite elle-même ; cette déclaration n'a pas de sens, il suffit de la retirer.",
+  "关联列表里写了自己，这条声明没有意义，去掉即可。": "La liste des liens se cite elle-même ; cette déclaration n'a pas de sens, il suffit de la retirer.",
   "冲突已解除，重启对应服务后生效。": "Conflit résolu ; redémarrez le service concerné pour appliquer.",
   "冲突数": "Conflits",
-  "冲突模组 id（逗号分隔，可留空）": "ID des mods en conflit (séparés par des virgules)",
+  "关联模组 id（逗号或空格分隔，可留空）": "ID des mods liés (séparés par une virgule ou un espace)",
   "冲突的模组同时启用时会互相覆盖钩子，可能导致功能失效或数据丢失。": "Des mods en conflit écrasent leurs hooks respectifs lorsqu'ils sont activés ensemble, ce qui peut casser des fonctions ou perdre des données.",
   "准备仓库": "Préparation du dépôt",
   "准备你的源码仓库": "Préparez votre dépôt source",
@@ -3063,5 +3063,13 @@
   "重试": "Réessayer",
   "GitHub classic 令牌的五步创建截图": "Capture d'écran en cinq étapes pour créer un jeton GitHub classic",
   "JSON 解析失败：{error}": "Échec de l'analyse JSON : {error}",
-  "JSON 里没有 sponsors 数组": "Le JSON ne contient pas de tableau sponsors"
+  "JSON 里没有 sponsors 数组": "Le JSON ne contient pas de tableau sponsors",
+  "ISK": "ISK",
+  "坐标": "Coordonnées",
+  "舰船": "Vaisseau",
+  "长按进入": "Maintenir pour entrer",
+  "可关联多个模组；按逗号、空格或回车确认，最后一段未确认的内容也会随保存写入。": "Vous pouvez lier plusieurs mods ; validez avec une virgule, un espace ou Entrée — le dernier fragment non validé est aussi enregistré.",
+  "删除关联模组「{id}」": "Supprimer le mod lié « {id} »",
+  "关联模组": "Mods liés",
+  "未找到": "Introuvable"
 }

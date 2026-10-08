@@ -19,7 +19,10 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ModCard } from "@/components/modules/mod-card"
 import { ModToolbar } from "@/components/modules/mod-toolbar"
-import { ModDetailDialog } from "@/components/modules/mod-detail-dialog"
+import {
+  ModDetailDialog,
+  type ModRelation,
+} from "@/components/modules/mod-detail-dialog"
 import { ModFormDialog } from "@/components/modules/mod-form-dialog"
 import { ModAuthorDialog } from "@/components/modules/mod-author-dialog"
 import { ModAuthoringDialog } from "@/components/modules/mod-authoring-dialog"
@@ -729,6 +732,18 @@ export function ModulesPage({
   const detailTask = downloads.tasks.find((task) => task.modId === detailId)
 
   /**
+   * 详情页的关联模组：把作者写的 id 逐个对回列表里的记录；对不上号的保留成 `mod: null`，
+   * 详情页显式标「未找到」，不静默丢掉这条声明。
+   */
+  const detailRelations = useMemo<ModRelation[]>(() => {
+    if (!detailMod) return []
+    return (detailMod.conflicts ?? []).map((id) => ({
+      id,
+      mod: mods.find((item) => item.id === id) ?? null,
+    }))
+  }, [detailMod, mods])
+
+  /**
    * 评论正文按需拉：聚合分跟着市场索引一起回来（卡片上的分数、排序、评分分档都吃它），
    * 正文更大，所以等真的打开详情弹窗再拉一次。
    *
@@ -1135,6 +1150,7 @@ export function ModulesPage({
         task={detailTask}
         conflicts={detailMod ? activeConflicts(mods, detailMod) : []}
         pendingConflicts={detailMod ? pendingConflicts(mods, detailMod) : []}
+        relations={detailRelations}
         onInstall={() => detailMod && installMod(detailMod)}
         onUpdate={() => detailMod && updateMod(detailMod)}
         onUninstall={() => {

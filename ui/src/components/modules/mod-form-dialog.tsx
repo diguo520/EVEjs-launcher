@@ -19,7 +19,7 @@ import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
-import { TagInput } from "@/components/modules/tag-input"
+import { ModIdInput, TagInput } from "@/components/modules/tag-input"
 import {
   Select,
   SelectContent,
@@ -148,7 +148,8 @@ export function ModFormDialog({
   const [desc, setDesc] = useState("")
   const [readme, setReadme] = useState("")
   const [features, setFeatures] = useState("")
-  const [conflicts, setConflicts] = useState("")
+  const [conflicts, setConflicts] = useState<string[]>([])
+  const [conflictDraft, setConflictDraft] = useState("")
   const [build, setBuild] = useState<ModBuildOptions>(DEFAULT_BUILD_OPTIONS)
   /** 提交时标识推不出来 / 撞名，留给标识下面的内联红字 */
   const [idIssue, setIdIssue] = useState<NewModError | null>(null)
@@ -180,7 +181,8 @@ export function ModFormDialog({
     const body = mod ? editableReadme(mod) : { intro: "", features: [] }
     setReadme(body.intro)
     setFeatures(body.features.join("\n"))
-    setConflicts((mod?.conflicts ?? []).join(", "))
+    setConflicts(parseIdList((mod?.conflicts ?? []).join(" ")))
+    setConflictDraft("")
     setBuild(DEFAULT_BUILD_OPTIONS)
     setBuilding(false)
     setBuildStep(0)
@@ -238,7 +240,7 @@ export function ModFormDialog({
       template: picked.id,
       readme,
       features: parseLines(features),
-      conflicts: parseIdList(conflicts),
+      conflicts: parseIdList([...conflicts, conflictDraft].join(" ")),
       build,
     }
 
@@ -264,7 +266,11 @@ export function ModFormDialog({
   const showIdPrefix = !editing || hasEvejsPrefix(mod?.id ?? "")
   /** 拼上前缀之后的完整标识，冲突自检要用它 */
   const fullId = editing ? (mod?.id ?? "") : id.trim() ? withEvejsPrefix(id.trim()) : ""
-  const conflictCheck = checkConflicts(parseIdList(conflicts), fullId, existingIds)
+  const conflictCheck = checkConflicts(
+    parseIdList([...conflicts, conflictDraft].join(" ")),
+    fullId,
+    existingIds
+  )
   // 名字里一个可用字符都推不出来（纯符号 / emoji）—— 内联提示换个名字
   const nameUnusable = !editing && name.trim() !== "" && id.trim() === ""
 
@@ -580,18 +586,23 @@ export function ModFormDialog({
 
             <div className="space-y-1.5">
               <Label htmlFor="mod-form-conflicts">
-                冲突模组 id（逗号分隔，可留空）
+                关联模组 id（逗号或空格分隔，可留空）
               </Label>
-              <Input
+              <ModIdInput
                 id="mod-form-conflicts"
                 value={conflicts}
-                onChange={(event) => setConflicts(event.target.value)}
-                placeholder="other-mod"
-                className="tabular"
+                draft={conflictDraft}
+                onValueChange={setConflicts}
+                onDraftChange={setConflictDraft}
+                placeholder="other-mod other-mod-2"
+                describedBy="mod-form-conflicts-help"
               />
+              <p id="mod-form-conflicts-help" className="text-[11px] leading-relaxed text-tertiary">
+                可关联多个模组；按逗号、空格或回车确认，最后一段未确认的内容也会随保存写入。
+              </p>
               {conflictCheck.self ? (
                 <p className="text-[11px] text-warning">
-                  冲突列表里写了自己，这条声明没有意义，去掉即可。
+                  关联列表里写了自己，这条声明没有意义，去掉即可。
                 </p>
               ) : null}
               {conflictCheck.unknown.length > 0 ? (

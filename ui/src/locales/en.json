@@ -720,10 +720,10 @@
   "冰矿异常": "Ice anomaly",
   "冲突": "Conflict",
   "冲突: {list}": "Conflict: {list}",
-  "冲突列表里写了自己，这条声明没有意义，去掉即可。": "The conflict list includes itself; that declaration is meaningless - just remove it.",
+  "关联列表里写了自己，这条声明没有意义，去掉即可。": "The related list includes itself; that declaration is meaningless - just remove it.",
   "冲突已解除，重启对应服务后生效。": "Conflict resolved; restart the matching service to apply.",
   "冲突数": "Conflicts",
-  "冲突模组 id（逗号分隔，可留空）": "Conflicting mod ids (comma-separated, may be empty)",
+  "关联模组 id（逗号或空格分隔，可留空）": "Related mod ids (comma or space separated, may be empty)",
   "冲突的模组同时启用时会互相覆盖钩子，可能导致功能失效或数据丢失。": "Conflicting mods overwrite each other's hooks when both are enabled, which can break features or lose data.",
   "准备仓库": "Preparing repository",
   "准备你的源码仓库": "Prepare your source repository",
@@ -3063,5 +3063,13 @@
   "重试": "Retry",
   "GitHub classic 令牌的五步创建截图": "Five-step screenshot for creating a GitHub classic token",
   "JSON 解析失败：{error}": "JSON parsing failed: {error}",
-  "JSON 里没有 sponsors 数组": "JSON has no sponsors array"
+  "JSON 里没有 sponsors 数组": "JSON has no sponsors array",
+  "ISK": "ISK",
+  "坐标": "Coordinates",
+  "舰船": "Ship",
+  "长按进入": "Hold to enter",
+  "可关联多个模组；按逗号、空格或回车确认，最后一段未确认的内容也会随保存写入。": "You can link several mods; press comma, space, or Enter to confirm - the last unconfirmed chunk is also saved with the form.",
+  "删除关联模组「{id}」": "Remove related mod \"{id}\"",
+  "关联模组": "Related mods",
+  "未找到": "Not found"
 }

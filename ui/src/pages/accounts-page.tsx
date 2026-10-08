@@ -249,8 +249,9 @@ export function AccountsPage({ store }: { store: LauncherAccountsState }) {
         scope === "simulation" ? (
           <SimulationAccountsPanel accounts={visibleAccounts} />
         ) : (
-          /* 玩家账号保持原来的卡片视图；模拟账号走紧凑视图，避免几百个角色被截成前三个。 */
-          <div className="grid gap-3 xl:grid-cols-2">
+          /* 玩家账号自身三列并排；账号内的角色卡纵向排列，避免窄列里再塞三张卡。
+             模拟账号仍走紧凑视图，避免几百个角色被截成前三个。 */
+          <div className="grid gap-3 lg:grid-cols-2">
             {visibleAccounts.map((account) => (
               <AccountCard
                 key={account.id}

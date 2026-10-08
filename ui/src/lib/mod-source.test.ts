@@ -104,6 +104,19 @@ describe("fromMarket / applyLocal / applyMine", () => {
     expect(merged.sizeMB).toBe(1)
   })
 
+  it("声明的冲突列表优先于运行时子集（不然没启用的关联会消失）", () => {
+    const merged = applyLocal(entry, {
+      id: "demo",
+      folder: "demo-folder",
+      version: "1.1.0",
+      enabled: true,
+      // 清单里声明了三条关联；activeConflicts 只是「当前两边都启用」的那一条
+      conflicts: ["installed-on", "not-installed", "disabled-mod"],
+      activeConflicts: ["installed-on"],
+    } as unknown as RawMod)
+    expect(merged.conflicts).toEqual(["installed-on", "not-installed", "disabled-mod"])
+  })
+
   it("我的条目叠加审核状态与驳回原因", () => {
     const merged = applyMine(entry, {
       id: "demo",

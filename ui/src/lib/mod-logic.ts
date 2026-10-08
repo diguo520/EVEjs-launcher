@@ -968,17 +968,6 @@ export function validateNewMod(
   return null
 }
 
-/** 逗号分隔的输入 → 去空去重的列表；limit 给标签这类有上限的字段用 */
-function parseCommaList(raw: string, limit?: number): string[] {
-  const seen = new Set<string>()
-  for (const part of raw.split(/[,，]/)) {
-    const item = part.trim()
-    if (item) seen.add(item)
-  }
-  const list = [...seen]
-  return limit === undefined ? list : list.slice(0, limit)
-}
-
 /** 标签输入：逗号、中文逗号或空白分隔，去空去重，最多 5 个 */
 export function parseTags(raw: string): string[] {
   const seen = new Set<string>()
@@ -989,9 +978,14 @@ export function parseTags(raw: string): string[] {
   return [...seen].slice(0, 5)
 }
 
-/** 冲突模组 id：逗号分隔，去空去重；不设上限，冲突本来就该照实写全 */
+/** 关联模组 id：逗号、中文逗号或空白分隔，去空去重；不设上限。 */
 export function parseIdList(raw: string): string[] {
-  return parseCommaList(raw)
+  const seen = new Set<string>()
+  for (const part of raw.split(/[,，\s]+/)) {
+    const item = part.trim()
+    if (item) seen.add(item)
+  }
+  return [...seen]
 }
 
 /**

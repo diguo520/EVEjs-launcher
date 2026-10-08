@@ -1,0 +1,33 @@
+{
+  "version": "0.4.3",
+  "changelog": {
+    "zh": [
+      {
+        "type": "new",
+        "text": "创建模组表单的「冲突模组 id」改为「关联模组 id」：支持逗号、中文逗号或空格分隔，输入后即时变成可单个删除的标签；模组详情新增「关联模组」区块，多个关联按网格展示名称、版本与安装状态，对不上号的 id 会明确标出「未找到」。"
+      },
+      {
+        "type": "fix",
+        "text": "修好「关联模组 id 保存后提示成功、详情却看不到」的问题：清单里已声明的关联 id 以前被运行时的冲突子集覆盖，对方没安装或没启用时整条关系就凭空消失；现在按清单的声明列表展示，编辑表单也能正确回显。"
+      },
+      {
+        "type": "opt",
+        "text": "账号管理的账号卡改为两列并排、账号内角色卡三列并排：角色卡使用横向圆角布局，圆形头像支持长按进度登录，卡片显示角色名、军团 / 联盟徽标与删除入口；鼠标悬停时用 Tooltip 显示 ISK、坐标和舰船，ISK 统计改用 K / M / B / T 国际短单位。"
+      }
+    ],
+    "en": [
+      {
+        "type": "new",
+        "text": "The mod form's \"conflicting mod ids\" field is now \"related mod ids\": split on commas, Chinese commas or spaces and turned into individually removable chips as you type. Mod details gained a \"Related mods\" section that lays several relations out in a grid with name, version and install state, and flags ids it cannot resolve as \"Not found\"."
+      },
+      {
+        "type": "fix",
+        "text": "Fixed saved relations disappearing. Declared relation ids were being overwritten by the runtime conflict subset, so any relation whose target was not installed or not enabled vanished right after a successful save. The declared list is now shown as-is and the edit form prefills correctly."
+      },
+      {
+        "type": "opt",
+        "text": "Account cards in account management are now two per row with character cards three per row inside each account. Character cards use a horizontal rounded layout, a circular avatar with press-and-hold login progress, character name, corp / alliance badges and a delete action; hovering shows ISK, location and ship in a tooltip, and ISK uses the international K / M / B / T short units."
+      }
+    ]
+  }
+}

@@ -126,7 +126,7 @@ export function AccountCard({
         </div>
       }
     >
-      <div className="grid gap-2.5 p-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-3 gap-2 p-3">
         {slots.map((slot) => (
           <CharacterSlot
             key={slot.character?.id ?? `empty-${slot.index}`}

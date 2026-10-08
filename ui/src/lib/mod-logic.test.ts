@@ -21,6 +21,7 @@ import {
   modByFolderOrId,
   overlapFlag,
   overlapReport,
+  parseIdList,
   parseTags,
   ratingFromReviews,
   reviewPrStateLabel,
@@ -130,6 +131,35 @@ describe("parseTags（标签输入）", () => {
 
   it("最多保留 5 个", () => {
     expect(parseTags("1 2 3 4 5 6")).toEqual(["1", "2", "3", "4", "5"])
+  })
+})
+
+describe("parseIdList（关联模组 id）", () => {
+  it("逗号、中文逗号和空白都能分隔，并去空去重", () => {
+    expect(parseIdList("alpha beta,gamma，delta")).toEqual([
+      "alpha",
+      "beta",
+      "gamma",
+      "delta",
+    ])
+    expect(parseIdList("  evejs-a   evejs-b\t evejs-c\n")).toEqual([
+      "evejs-a",
+      "evejs-b",
+      "evejs-c",
+    ])
+    expect(parseIdList("alpha alpha beta")).toEqual(["alpha", "beta"])
+  })
+
+  it("不设数量上限（关联本来就该照实写全）", () => {
+    expect(parseIdList("1 2 3 4 5 6 7")).toEqual([
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+    ])
   })
 })
 

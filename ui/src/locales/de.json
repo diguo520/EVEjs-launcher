@@ -720,10 +720,10 @@
   "冰矿异常": "Eis-Anomalie",
   "冲突": "Konflikt",
   "冲突: {list}": "Konflikt: {list}",
-  "冲突列表里写了自己，这条声明没有意义，去掉即可。": "Die Konfliktliste enthält sich selbst; diese Angabe ist sinnlos - einfach entfernen.",
+  "关联列表里写了自己，这条声明没有意义，去掉即可。": "Die Verknüpfungsliste enthält sich selbst; diese Angabe ist sinnlos - einfach entfernen.",
   "冲突已解除，重启对应服务后生效。": "Konflikt behoben; zum Wirksamwerden den passenden Dienst neu starten.",
   "冲突数": "Konflikte",
-  "冲突模组 id（逗号分隔，可留空）": "Konflikt-Mod-IDs (durch Komma getrennt)",
+  "关联模组 id（逗号或空格分隔，可留空）": "Verwandte Mod-IDs (durch Komma oder Leerzeichen getrennt, optional)",
   "冲突的模组同时启用时会互相覆盖钩子，可能导致功能失效或数据丢失。": "Konfliktierende Mods überschreiben sich gegenseitig die Hooks, wenn beide aktiv sind; das kann Funktionen lahmlegen oder Datenverlust verursachen.",
   "准备仓库": "Repository vorbereiten",
   "准备你的源码仓库": "Quell-Repository vorbereiten",
@@ -3063,5 +3063,13 @@
   "重试": "Erneut versuchen",
   "GitHub classic 令牌的五步创建截图": "Screenshot der fünf Schritte zum Erstellen eines GitHub-Classic-Tokens",
   "JSON 解析失败：{error}": "JSON-Verarbeitung fehlgeschlagen: {error}",
-  "JSON 里没有 sponsors 数组": "JSON enthält kein sponsors-Array"
+  "JSON 里没有 sponsors 数组": "JSON enthält kein sponsors-Array",
+  "ISK": "ISK",
+  "坐标": "Koordinaten",
+  "舰船": "Schiff",
+  "长按进入": "Zum Beitreten gedrückt halten",
+  "可关联多个模组；按逗号、空格或回车确认，最后一段未确认的内容也会随保存写入。": "Du kannst mehrere Mods verknüpfen; mit Komma, Leerzeichen oder Enter bestätigen - der letzte unbestätigte Teil wird beim Speichern mitgeschrieben.",
+  "删除关联模组「{id}」": "Verknüpften Mod „{id}“ entfernen",
+  "关联模组": "Verknüpfte Mods",
+  "未找到": "Nicht gefunden"
 }

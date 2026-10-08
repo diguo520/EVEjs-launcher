@@ -17,18 +17,21 @@ export function CharacterAvatar({
   race,
   avatar,
   size = "md",
+  shape = "square",
   className,
 }: {
   name: string
   race?: RaceId
   /** 游戏内肖像 data URL（后端 accounts:list 提供） */
   avatar?: string | null
-  size?: "sm" | "md"
+  size?: "sm" | "md" | "lg"
+  shape?: "square" | "circle"
   className?: string
 }) {
   const box = cn(
-    "flex shrink-0 select-none items-center justify-center overflow-hidden rounded-md border font-semibold",
-    size === "md" ? "size-10 text-[13px]" : "size-8 text-[11px]",
+    "flex shrink-0 select-none items-center justify-center overflow-hidden border font-semibold",
+    shape === "circle" ? "rounded-full" : "rounded-md",
+    size === "lg" ? "size-14 text-base" : size === "md" ? "size-10 text-[13px]" : "size-8 text-[11px]",
     className
   )
 

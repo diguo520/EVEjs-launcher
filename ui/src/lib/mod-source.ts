@@ -213,10 +213,15 @@ export function applyLocal(entry: ModEntry, mod: RawMod): ModEntry {
     installed: true,
     enabled: mod.enabled === true,
     sizeMB: mod.sizeBytes ? toMB(mod.sizeBytes) : entry.sizeMB,
+    // 清单里声明的关联 / 互斥 id 要原样带上：`activeConflicts` 只是「当前两边都启用」的
+    // 子集，把它当声明列表会让「关联了但对方没装 / 没启用」的关系凭空消失 —— 表单里
+    // 明明存过、详情却看不到，还提示保存成功（2026-10-09 报障）。
     conflicts:
-      mod.activeConflicts && mod.activeConflicts.length > 0
-        ? mod.activeConflicts
-        : entry.conflicts,
+      mod.conflicts && mod.conflicts.length > 0
+        ? mod.conflicts
+        : mod.activeConflicts && mod.activeConflicts.length > 0
+          ? mod.activeConflicts
+          : entry.conflicts,
     updatedAt: entry.updatedAt || isoDate(mod.updatedAt),
   }
 }

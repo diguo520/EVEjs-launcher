@@ -544,9 +544,24 @@ export function logotypeTick(short: string | null | undefined): string {
   return text ? text.slice(0, 4).toUpperCase() : "?"
 }
 
-/** ISK 合计按千分位原样展示：钱包数字要能一眼对上，不做 K/M/B 缩写 */
+/** ISK 统计使用国际短单位：K / M / B / T，保留最多两位小数。 */
 export function formatIsk(isk: number): string {
-  return Math.round(Number.isFinite(isk) ? isk : 0).toLocaleString("en-US")
+  const value = Number.isFinite(isk) ? isk : 0
+  const abs = Math.abs(value)
+  const units: [number, string][] = [
+    [1_000_000_000_000, "T"],
+    [1_000_000_000, "B"],
+    [1_000_000, "M"],
+    [1_000, "K"],
+  ]
+  for (const [unit, suffix] of units) {
+    if (abs < unit) continue
+    const scaled = value / unit
+    const decimals = abs >= unit * 100 ? 0 : abs >= unit * 10 ? 1 : 2
+    const text = scaled.toFixed(decimals)
+    return `${text.includes(".") ? text.replace(/\.?0+$/, "") : text}${suffix}`
+  }
+  return Math.round(value).toLocaleString("en-US")
 }
 
 export function formatSp(sp: number): string {

@@ -577,6 +577,7 @@ function modOf(folder: string, extra: Partial<RawMod> = {}): RawMod {
     loadAfter: [],
     loadBefore: [],
     missingRequires: [],
+    conflicts: [],
     activeConflicts: [],
     modules: [],
     source: "local",

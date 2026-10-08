@@ -65,10 +65,12 @@ describe("角色档案换算", () => {
     expect(logotypeTick(undefined)).toBe("?")
   })
 
-  it("ISK 合计按千分位原样展示，不缩写", () => {
+  it("ISK 统计按 K / M / B / T 国际单位缩写", () => {
     expect(formatIsk(0)).toBe("0")
-    expect(formatIsk(100000)).toBe("100,000")
-    expect(formatIsk(3000000000)).toBe("3,000,000,000")
+    expect(formatIsk(100000)).toBe("100K")
+    expect(formatIsk(1234567)).toBe("1.23M")
+    expect(formatIsk(3000000000)).toBe("3B")
+    expect(formatIsk(4500000000000)).toBe("4.5T")
     // 脏数据不该把 footer 变成 NaN
     expect(formatIsk(Number.NaN)).toBe("0")
   })

@@ -4,6 +4,7 @@ import {
   FileText,
   FolderOpen,
   History,
+  Link2,
   ListChecks,
   Pencil,
   Send,
@@ -108,6 +109,54 @@ function Section({
   )
 }
 
+/**
+ * 一条关联声明：`id` 是作者写的原始 id，`mod` 是本地/市场里能对上号的那条；
+ * 对不上号时值为 null，照样把 id 显示出来，不能默默吞掉。
+ */
+export interface ModRelation {
+  id: string
+  mod: ModEntry | null
+}
+
+/**
+ * 关联模组一行。已知模组显示名字、版本和安装/启用状态；未知 id 只留原始 id 与「未找到」，
+ * 让作者一眼看出自己是不是拼错了。多模组关联时这几张卡按网格并排换行。
+ */
+function RelationCard({ id, mod: related }: ModRelation) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1.5 rounded-md border border-input bg-background/40 px-2.5 py-2">
+      <div className="flex min-w-0 items-baseline justify-between gap-2">
+        <span className="min-w-0 truncate text-[12px] font-semibold text-foreground">
+          {related ? related.name : id}
+        </span>
+        {related ? (
+          <span className="tabular shrink-0 text-[10px] text-tertiary">
+            {related.version}
+          </span>
+        ) : null}
+      </div>
+      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+        {related ? (
+          <>
+            <span className="tabular min-w-0 truncate text-[10px] text-tertiary">
+              {related.id}
+            </span>
+            {related.installed ? (
+              <Badge variant={related.enabled ? "success" : "secondary"}>
+                {related.enabled ? "已启用" : "已停用"}
+              </Badge>
+            ) : (
+              <Badge variant="secondary">未安装</Badge>
+            )}
+          </>
+        ) : (
+          <span className="text-[10px] text-warning">{t("未找到")}</span>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export interface ModDetailDialogProps {
   mod: ModEntry | null
   open: boolean
@@ -115,6 +164,7 @@ export interface ModDetailDialogProps {
   task?: DownloadTask
   conflicts: ModEntry[]
   pendingConflicts: ModEntry[]
+  relations: ModRelation[]
   onInstall: () => void
   onUpdate: () => void
   onUninstall: () => void
@@ -138,6 +188,7 @@ export function ModDetailDialog({
   task,
   conflicts,
   pendingConflicts,
+  relations,
   onInstall,
   onUpdate,
   onUninstall,
@@ -291,6 +342,20 @@ export function ModDetailDialog({
                 />
               </div>
             </Section>
+
+            {/* 作者声明的关联模组：一条可能对应本地/市场里的模组，也可能只是一串 id */}
+            {relations.length > 0 ? (
+              <Section
+                icon={<Link2 className="size-3.5 text-tertiary" />}
+                title="关联模组"
+              >
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {relations.map((relation) => (
+                    <RelationCard key={relation.id} {...relation} />
+                  ))}
+                </div>
+              </Section>
+            ) : null}
 
             {/* 作者没写要点（正文只有一句话）时整节不出现，不留一个空标题 */}
             {features.length > 0 ? (
