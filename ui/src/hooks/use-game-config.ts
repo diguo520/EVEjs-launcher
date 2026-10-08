@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 
+import { t } from "@/lib/i18n"
 import { call, hasIpc } from "@/lib/ipc"
 import {
   draftDiff,
@@ -61,7 +62,7 @@ export function useGameConfig(): GameConfigState {
 
   const reload = useCallback(() => {
     if (!live) {
-      setError("当前不在启动器窗口里，读不到服务端配置")
+      setError(t("当前不在启动器窗口里，读不到服务端配置"))
       return
     }
     setLoading(true)
@@ -108,16 +109,20 @@ export function useGameConfig(): GameConfigState {
   const pending = draftDiff(definitions, draft, values)
 
   const save = useCallback(async (): Promise<GameConfigSaveReply> => {
-    if (!live) return { ok: false, reason: "当前不在启动器窗口里" }
+    if (!live) return { ok: false, reason: t("当前不在启动器窗口里") }
     const diff = draftDiff(definitions, draft, values)
     const invalid = Object.values(diff.errors)
     if (invalid.length > 0) return { ok: false, reason: invalid[0] }
-    if (Object.keys(diff.patch).length === 0) return { ok: false, reason: "没有需要保存的改动" }
+    if (Object.keys(diff.patch).length === 0) {
+      return { ok: false, reason: t("没有需要保存的改动") }
+    }
     setSaving(true)
     try {
       const reply = await call<GameConfigSnapshot>("gameConfigSave", diff.patch)
       if (!reply) return { ok: false, reason: "后端没有回包" }
-      if (reply.ok !== true) return { ok: false, reason: reply.reason ?? "服务端拒绝了这次写入" }
+      if (reply.ok !== true) {
+        return { ok: false, reason: reply.reason ?? t("服务端拒绝了这次写入") }
+      }
       // 写成功后用服务端回读的值当新基准：磁盘才是真相，界面不自己猜
       setSnapshot((prev) => (prev ? { ...prev, values: reply.values ?? prev.values, sources: reply.sources ?? prev.sources } : prev))
       setDraft(draftOf(reply.values ?? values))

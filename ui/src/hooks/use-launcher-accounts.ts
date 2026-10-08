@@ -6,6 +6,7 @@ import { t } from "@/lib/i18n"
 import type {
   RawAccount,
   RawAccountList,
+  RawAccountOnline,
   RawAck,
   RawLogotypeList,
   RawRole,
@@ -155,6 +156,8 @@ export interface LauncherAccountsState {
   cancelCredential: () => void
   /** 重新从后端读一遍账号列表 */
   reload: () => void
+  /** 只刷新 host 写入的在线角色快照，不启动 Node、不读完整账号库 */
+  reloadOnline: () => void
   /**
    * 军团 / 联盟的**专属**徽标（data URL），键为 `kind:id`（如 `alliances:99000000`）。
    *
@@ -196,6 +199,53 @@ export function useLauncherAccounts(): LauncherAccountsState {
   creatingRef.current = creating
   const timers = useRef<number[]>([])
 
+  /**
+   * 用 host 的在线角色快照就地更新列表。
+   *
+   * `null` = known=false，保留当前状态；`[]` = 明确知道当前没有角色在线。
+   */
+  const applyOnline = useCallback((ids: string[] | null) => {
+    if (ids === null) return
+    const known = new Set(ids)
+    const now = Date.now()
+
+    setOnlineByAccount(() => {
+      const next: Record<string, string> = {}
+      for (const account of accountsRef.current) {
+        const character = account.characters.find((item) => known.has(item.id))
+        if (character) next[account.id] = character.id
+      }
+      return next
+    })
+
+    setAccounts((prev) =>
+      prev.map((account) => {
+        let changed = false
+        const characters = account.characters.map((character) => {
+          const online = known.has(character.id)
+          if (character.online === online && (!online || character.onlineSince != null)) {
+            return character
+          }
+          changed = true
+          return {
+            ...character,
+            online,
+            onlineSince: online ? character.onlineSince ?? now : undefined,
+          }
+        })
+        return changed ? { ...account, characters } : account
+      })
+    )
+  }, [])
+
+  const reloadOnline = useCallback(() => {
+    if (!ipc) return
+    void callOr<RawAccountOnline>("accountsOnline", null).then((reply) => {
+      if (!reply?.ok || !Array.isArray(reply.ids)) return
+      applyOnline(reply.known ? reply.ids.map(String) : null)
+    })
+  }, [applyOnline, ipc])
+
   const load = useCallback(async () => {
     if (!ipc) {
       setHydrated(true)
@@ -212,8 +262,11 @@ export function useLauncherAccounts(): LauncherAccountsState {
   }, [ipc])
 
   useEffect(() => {
-    void load()
-  }, [load])
+    void (async () => {
+      await load()
+      reloadOnline()
+    })()
+  }, [load, reloadOnline])
 
   /**
    * 军团 / 联盟徽标：外壳直接从服务端图片目录读盘（服务端关着也能画），
@@ -596,7 +649,7 @@ export function useLauncherAccounts(): LauncherAccountsState {
   const submitCredential = useCallback<LauncherAccountsState["submitCredential"]>(
     async (password, remember) => {
       const pending = pendingCredential
-      if (!pending) return { ok: false, reason: "没有待补密码的账号" }
+      if (!pending) return { ok: false, reason: t("没有待补密码的账号") }
       const account = accountsRef.current.find((a) => a.id === pending.accountId)
       if (!account) return { ok: false, reason: "账号不存在" }
       const reply = await callOr<RawAck>(
@@ -652,6 +705,7 @@ export function useLauncherAccounts(): LauncherAccountsState {
     submitCredential,
     cancelCredential,
     reload,
+    reloadOnline,
     logotypes,
   }
 }

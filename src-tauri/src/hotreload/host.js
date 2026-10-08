@@ -1,6 +1,6 @@
 "use strict";
 /**
- * EveJS 静态数据热重载 host（启动器自带功能，不是模组，也不改服务端任何文件）。
+ * EveJS 进程内桥接 host（启动器自带功能，不是模组，也不改服务端任何文件）。
  *
  * 由启动器写进 `<exe 同级>/_launcher/hotreload/host.js`，并作为 `NODE_OPTIONS`
  * 里的第二条 `--require` 注入主服务器（第一条是模组总线 mod-host.js）。
@@ -23,8 +23,9 @@
  *   - JSON 解析失败的表直接跳过并报 INVALID_JSON，不会动内存里的旧副本；
  *   - `EVEJS_HOTRELOAD=0` 可以整体关闭。
  *
- * 通道：请求 / 结果都走文件（`<dir>/request.json` → `<dir>/result.json`），
- * 不开监听端口，方向与「只允许本机」一致。轮询是 400ms 一次的 statSync，开销可忽略。
+ * 通道：请求 / 结果都走文件（静态重载 `<dir>/request.json` → `<dir>/result.json`，
+ * 建号 `<dir>/account-request.json` → `<dir>/account-result.json`），不开监听端口，
+ * 方向与「只允许本机」一致。轮询是 400ms 一次的 statSync，开销可忽略。
  */
 (function bootstrap() {
   try {
@@ -33,7 +34,7 @@
 
     const TAG = "[EveJS-HOTRELOAD]";
     const API = 1;
-    const HOST_VERSION = "1.0.0";
+    const HOST_VERSION = "1.1.0";
     const POLL_MS = 400;
     const ONLINE_POLL_MS = 2000;
 
@@ -73,6 +74,9 @@
     const requestFile = path.join(dir, "request.json");
     const processingFile = path.join(dir, "request.processing.json");
     const resultFile = path.join(dir, "result.json");
+    const accountRequestFile = path.join(dir, "account-request.json");
+    const accountProcessingFile = path.join(dir, "account-processing.json");
+    const accountResultFile = path.join(dir, "account-result.json");
     const sessionFile = path.join(dir, "session.json");
     const onlineFile = path.join(dir, "online.json");
     const bootFile = path.join(dir, "boot.json");
@@ -111,6 +115,7 @@
       entry: entry,
       serverDir: serverDir.replace(/\\/g, "/"),
       bootId: bootId,
+      features: ["hotreload", "accountCreate"],
       armedAt: Date.now(),
     });
 
@@ -304,6 +309,147 @@
       } catch (error) {
         return [];
       }
+    }
+
+    /* ------------------------------ 账号创建 ------------------------------ */
+
+    const ACCOUNT_USERNAME_PATTERN = /^[A-Za-z0-9_.@-]{1,64}$/;
+    const SHA1_HEX_PATTERN = /^[a-f0-9]{40}$/i;
+
+    function accountCreateError(code, message) {
+      const error = new Error(message);
+      error.code = code;
+      return error;
+    }
+
+    function handleAccountCreate(request) {
+      const startedAt = Date.now();
+      const out = {
+        api: API,
+        hostVersion: HOST_VERSION,
+        pid: process.pid,
+        entry: entry,
+        requestId: String((request && request.requestId) || ""),
+        bootId: bootId,
+        ok: false,
+        startedAt: startedAt,
+        finishedAt: 0,
+        elapsedMs: 0,
+        account: null,
+        reason: "",
+        message: "",
+      };
+
+      function finish() {
+        out.finishedAt = Date.now();
+        out.elapsedMs = out.finishedAt - out.startedAt;
+        try {
+          writeJsonAtomic(accountResultFile, out);
+        } catch (error) {
+          safeLog("账号结果写盘失败：" + ((error && error.message) || error));
+        }
+        safeLog(
+          out.ok
+            ? "账号创建完成 · id=" + String(out.account && out.account.id)
+            : "账号创建失败 · " + String(out.reason || "UNKNOWN"),
+        );
+      }
+
+      try {
+        if (!request || Number(request.api) !== API) {
+          throw accountCreateError("INVALID_REQUEST", "账号创建请求格式不受支持");
+        }
+        if (String(request.bootId || "") !== bootId) {
+          throw accountCreateError(
+            "STALE_REQUEST",
+            "这次账号创建请求属于上一轮服务端进程，已忽略",
+          );
+        }
+
+        const username = String(request.username || "").trim();
+        if (!ACCOUNT_USERNAME_PATTERN.test(username)) {
+          throw accountCreateError(
+            "ACCOUNT_INVALID",
+            "账号名只能用 1–64 位字母、数字、下划线、点、@ 或连字符",
+          );
+        }
+
+        const passwordhash = String(request.passwordhash || "").trim();
+        if (!SHA1_HEX_PATTERN.test(passwordhash)) {
+          throw accountCreateError(
+            "PASSWORD_HASH_INVALID",
+            "密码哈希格式不合法，账号未创建",
+          );
+        }
+
+        const accountStore = require(path.join(
+          serverDir,
+          "src",
+          "services",
+          "login",
+          "accountStore",
+        ));
+        if (accountStore.getAccountByUserName(username)) {
+          throw accountCreateError("ACCOUNT_EXISTS", '账号 "' + username + '" 已存在');
+        }
+
+        const {
+          buildPersistedAccountRoleRecord,
+        } = require(path.join(
+          serverDir,
+          "src",
+          "services",
+          "account",
+          "accountRoleProfiles",
+        ));
+        const { reserveAccountID } = require(path.join(
+          serverDir,
+          "src",
+          "services",
+          "_shared",
+          "identityAllocator",
+        ));
+
+        const record = buildPersistedAccountRoleRecord({
+          passwordhash: passwordhash.toLowerCase(),
+          id: reserveAccountID(),
+          isGM: request.isGM === true,
+          banned: false,
+        });
+        const written = accountStore.writeAccountRecord(username, record);
+        if (!written || written.success !== true) {
+          throw accountCreateError(
+            "ACCOUNT_CREATE_FAILED",
+            "服务端内存账号写入失败" +
+              (written && written.errorMsg ? "：" + written.errorMsg : ""),
+          );
+        }
+
+        const flushed = accountStore.flushAccounts();
+        if (!flushed || flushed.success !== true) {
+          throw accountCreateError(
+            "ACCOUNT_FLUSH_FAILED",
+            "账号已写入服务端内存，但持久化到 SQLite 失败；请重启主服务器后重试",
+          );
+        }
+
+        out.ok = true;
+        out.account = {
+          id: record.id,
+          username: username,
+          isGM: record.isGM === true,
+          role: String(record.role || "0"),
+          chatRole: String(record.chatRole || "0"),
+          banned: record.banned === true,
+        };
+      } catch (error) {
+        out.reason = String((error && error.code) || "ACCOUNT_CREATE_ERROR");
+        out.message = String(
+          (error && error.message) || error || "服务端创建账号失败",
+        );
+      }
+
+      finish();
     }
 
     function handle(request) {
@@ -507,46 +653,65 @@
 
     /* ------------------------------ 轮询 ------------------------------ */
 
-    let lastSignature = "";
-    function requestSignature() {
+    const lastSignatures = {
+      hotreload: "",
+      account: "",
+    };
+
+    function requestSignature(file) {
       try {
-        const stat = fs.statSync(requestFile);
+        const stat = fs.statSync(file);
         return stat.size + ":" + stat.mtimeMs;
       } catch (error) {
         return "";
       }
     }
 
-    function drain() {
+    function drainOne(file, processing, handler) {
       for (;;) {
         try {
-          fs.renameSync(requestFile, processingFile);
+          fs.renameSync(file, processing);
         } catch (error) {
           return;
         }
-        const request = readJson(processingFile);
+        const request = readJson(processing);
         try {
-          fs.unlinkSync(processingFile);
+          fs.unlinkSync(processing);
         } catch (error) {
           /* 删不掉也无所谓，下次 rename 会覆盖 */
         }
-        if (request) handle(request);
+        if (request) handler(request);
+      }
+    }
+
+    function drainIfChanged(file, processing, handler, key) {
+      const signature = requestSignature(file);
+      if (!signature) {
+        lastSignatures[key] = "";
+        return;
+      }
+      if (signature === lastSignatures[key]) return;
+      lastSignatures[key] = signature;
+      try {
+        drainOne(file, processing, handler);
+      } catch (error) {
+        safeLog("轮询出错：" + ((error && error.message) || error));
       }
     }
 
     const timer = setInterval(function () {
-      const signature = requestSignature();
-      if (!signature) {
-        lastSignature = "";
-        return;
-      }
-      if (signature === lastSignature) return;
-      lastSignature = signature;
-      try {
-        drain();
-      } catch (error) {
-        safeLog("轮询出错：" + ((error && error.message) || error));
-      }
+      drainIfChanged(
+        requestFile,
+        processingFile,
+        handle,
+        "hotreload",
+      );
+      drainIfChanged(
+        accountRequestFile,
+        accountProcessingFile,
+        handleAccountCreate,
+        "account",
+      );
     }, POLL_MS);
     if (timer && typeof timer.unref === "function") timer.unref();
   } catch (error) {

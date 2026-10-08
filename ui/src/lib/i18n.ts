@@ -10,14 +10,6 @@
  * 目录（catalog）以**中文原文为键**：`zh` 是源语言不需要目录，其余 7 种各一份
  * `ui/src/locales/<code>.json`。缺条目一律回退中文原文（宁可显示中文，也不显示 key）。
  */
-import en from "@/locales/en.json"
-import ja from "@/locales/ja.json"
-import ko from "@/locales/ko.json"
-import fr from "@/locales/fr.json"
-import de from "@/locales/de.json"
-import nl from "@/locales/nl.json"
-import ru from "@/locales/ru.json"
-
 /** 语言清单（顺序与老版下拉一致，名称按各自母语显示，永不翻译） */
 export const LOCALES = [
   { code: "zh", name: "中文", flagCode: "CN" },
@@ -40,15 +32,50 @@ export const FALLBACK_LOCALE: LocaleCode = "en"
 
 type Catalog = Record<string, string>
 
-/** 非中文目录；中文是源语言，直接回原文 */
-const CATALOGS: Partial<Record<LocaleCode, Catalog>> = {
-  en: en as Catalog,
-  ja: ja as Catalog,
-  ko: ko as Catalog,
-  fr: fr as Catalog,
-  de: de as Catalog,
-  nl: nl as Catalog,
-  ru: ru as Catalog,
+type NonChineseLocale = Exclude<LocaleCode, "zh">
+
+/**
+ * 目录按需加载：启动时只加载当前语言，切换时再加载目标语言。
+ * `translate()` 仍保持同步；未加载的目录暂时回退中文原文，调用方在首屏渲染前
+ * 先 `await loadCatalog(initialLocale)` 即可保证首屏不会闪中文。
+ */
+const CATALOG_LOADERS = {
+  en: () => import("@/locales/en.json"),
+  ja: () => import("@/locales/ja.json"),
+  ko: () => import("@/locales/ko.json"),
+  fr: () => import("@/locales/fr.json"),
+  de: () => import("@/locales/de.json"),
+  nl: () => import("@/locales/nl.json"),
+  ru: () => import("@/locales/ru.json"),
+} satisfies Record<NonChineseLocale, () => Promise<{ default: Catalog }>>
+
+const CATALOGS: Partial<Record<LocaleCode, Catalog>> = {}
+const CATALOG_PROMISES = new Map<LocaleCode, Promise<Catalog>>()
+
+/** 加载并缓存一个语言的目录；同一语言并发调用只读一次磁盘。 */
+export async function loadCatalog(code: LocaleCode): Promise<Catalog> {
+  if (code === "zh") return {}
+  const cached = CATALOGS[code]
+  if (cached) return cached
+  const pending = CATALOG_PROMISES.get(code)
+  if (pending) return pending
+
+  const task = CATALOG_LOADERS[code]()
+    .then((module) => {
+      const catalog = module.default as Catalog
+      CATALOGS[code] = catalog
+      return catalog
+    })
+    .finally(() => {
+      CATALOG_PROMISES.delete(code)
+    })
+  CATALOG_PROMISES.set(code, task)
+  return task
+}
+
+/** 当前目录是否已加载；`zh` 是源语言，永远视为已就绪。 */
+export function isCatalogLoaded(code: LocaleCode): boolean {
+  return code === "zh" || Boolean(CATALOGS[code])
 }
 
 export function isLocaleCode(value: unknown): value is LocaleCode {

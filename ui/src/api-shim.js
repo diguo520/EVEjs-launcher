@@ -54,6 +54,7 @@
     accountsLaunch: function (user, characterId) { return request("accounts:launch", [user, characterId]); },
     accountsList: function () { return request("accounts:list", []); },
     accountsLogotypes: function (requests) { return request("accounts:logotypes", [requests]); },
+    accountsOnline: function () { return request("accounts:online", []); },
     accountsSetPassword: function (user, oldPw, newPw) { return request("accounts:setPassword", [user, oldPw, newPw]); },
     accountsVerify: function (user, password) { return request("accounts:verify", [user, password]); },
     appInfo: function () { return request("app:info", []); },

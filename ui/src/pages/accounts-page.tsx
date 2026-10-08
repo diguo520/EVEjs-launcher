@@ -68,11 +68,11 @@ export function AccountsPage({ store }: { store: LauncherAccountsState }) {
   /** 在线时长要自己往上走，页面给一个统一的节拍，卡片只管读 */
   const now = useNow()
 
-  // 账号页可见时刷新真在线状态；切走后 interval 自动清掉，不在后台反复查库。
+  // 账号页可见时只刷新轻量在线状态；切走后 interval 自动清掉，不在后台反复查库。
   useEffect(() => {
-    const timer = window.setInterval(() => store.reload(), ONLINE_REFRESH_MS)
+    const timer = window.setInterval(() => store.reloadOnline(), ONLINE_REFRESH_MS)
     return () => window.clearInterval(timer)
-  }, [store.reload])
+  }, [store.reloadOnline])
 
   useEffect(() => {
     setVisibleCount(PAGE_SIZE)

@@ -1,0 +1,57 @@
+{
+  "version": "0.4.2",
+  "changelog": {
+    "zh": [
+      {
+        "type": "fix",
+        "text": "服务端运行时，启动器创建账号改走服务端进程内写入：不勾选「授予 GM 权限」会真正创建普通玩家账号，不再在首次登录时被服务端自动补建成 GM；勾选后才获得管理权限。"
+      },
+      {
+        "type": "fix",
+        "text": "补齐账号管理、启动器更新、市场、热重载、模组与设置等 49 条遗漏的多语言文案，并新增源码 AST 门禁，防止界面新增中文却忘记同步到七种外语。"
+      },
+      {
+        "type": "opt",
+        "text": "界面语言目录改为按当前语言懒加载：React 首屏主包从约 3.38 MB 降到约 1.44 MB，启动解析和初始内存占用明显下降，切换语言时只加载目标语言并缓存。"
+      },
+      {
+        "type": "opt",
+        "text": "账号页的 5 秒在线刷新改用轻量 accounts:online 通道，只读取 host 写出的在线角色 ID 快照，不再反复启动 Node 和读取完整账号库。"
+      },
+      {
+        "type": "new",
+        "text": "物品市场改属性支持还原：弹窗会把与服务端原厂值（SDE）不一致的属性标出来（原值加删除线排在现值前面），行尾一个还原图标、底部整件还原；还原走原来的保存路径，照旧先留快照再热重载。"
+      },
+      {
+        "type": "fix",
+        "text": "修好「主服务器已经停了、但上一轮会话还留在盘上」时改物品属性会僵住的问题：以前每次保存要等满 5 分钟热重载超时（看着就是点了没反应，随后再存同样的值又回「没有改动」），现在改成先用短握手确认有没有服务端接收，没有就 5 秒内返回并提示「改动已写盘、下次启动生效」。"
+      }
+    ],
+    "en": [
+      {
+        "type": "fix",
+        "text": "When the server is running, launcher-created accounts are now written inside the server process. Clearing \"Grant GM\" creates a real player account instead of one that is silently promoted to GM on first login; checking it grants staff permissions."
+      },
+      {
+        "type": "fix",
+        "text": "Filled in 49 missing localized strings across account management, launcher updates, market, hot reload, mods and settings, and added a source AST gate so UI text cannot ship without matching all seven foreign catalogs."
+      },
+      {
+        "type": "opt",
+        "text": "Locale catalogs are now loaded on demand. The React startup bundle dropped from about 3.38 MB to 1.44 MB, cutting initial parsing and memory use; switching languages loads and caches only the selected catalog."
+      },
+      {
+        "type": "opt",
+        "text": "The account page now refreshes online status through the lightweight accounts:online channel every five seconds. It only reads the online character ID snapshot written by the host instead of starting Node and reading the entire account database again."
+      },
+      {
+        "type": "new",
+        "text": "Market attribute editing now supports restoring original values: the dialog marks attributes that differ from the server's SDE baseline (original value struck through before the current value), offers a per-row restore action and a restore-all action, and uses the existing save path so snapshots and hot reload still apply."
+      },
+      {
+        "type": "fix",
+        "text": "Fixed attribute saves hanging when the main server had stopped but a stale session file remained. Previously each save waited the full five-minute hot-reload timeout, looking like a no-op until a second identical save reported \"no changes\"; a short handshake now returns within five seconds with the accurate \"written to disk, effective on next start\" result."
+      }
+    ]
+  }
+}

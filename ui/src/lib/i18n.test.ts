@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { beforeAll, describe, expect, it } from "vitest"
 
 import de from "@/locales/de.json"
 import en from "@/locales/en.json"
@@ -17,6 +17,7 @@ import {
   detectLocale,
   getActiveLocale,
   hasEntry,
+  loadCatalog,
   localeName,
   matchLocale,
   resolveLocale,
@@ -24,6 +25,13 @@ import {
   translate,
   translateInline,
 } from "@/lib/i18n"
+
+beforeAll(async () => {
+  // 语言目录现在是懒加载的；目录文案测试先把 7 种外文加载齐。
+  await Promise.all(
+    (["en", "ja", "ko", "fr", "de", "nl", "ru"] as const).map(loadCatalog)
+  )
+})
 
 /**
  * 多语言口径与老 Electron 启动器一致（语言集合、系统语言兜底英文、共用存储键），

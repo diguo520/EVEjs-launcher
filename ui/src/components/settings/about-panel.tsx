@@ -50,7 +50,7 @@ export function AboutPanel() {
     // 桥上的入口名是契约里的 api 名（openExternal），不是通道名（shell:openExternal）：
     // 写成通道名 api[name] 是 undefined，call 直接抛错，按钮永远打不开
     const reply = await callOr<boolean>("openExternal", null, LAUNCHER_META.repoUrl)
-    if (reply !== true) toast.error("没能打开仓库地址")
+    if (reply !== true) toast.error(t("没能打开仓库地址"))
   }
 
   /**

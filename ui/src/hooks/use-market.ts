@@ -13,7 +13,7 @@ import {
   type RawMarketTrades,
   type RawMarketTypeInfo,
 } from "@/lib/ipc"
-import type { LocaleCode } from "@/lib/i18n"
+import { t, type LocaleCode } from "@/lib/i18n"
 import { EMPTY_CATALOG, toCatalog, type MarketCatalog } from "@/lib/market-logic"
 
 /** 成交流水一次拉多少条：够证明「库在动」就行，再多是白占内存 */
@@ -114,7 +114,7 @@ export function useMarket(locale: LocaleCode): MarketStore {
     const head = await loadOverview()
     if (head && head.ok === false) {
       // 库缺失是服务端还没建种子，不是启动器坏了：把侧车给的原话直接透给用户
-      setReason(head.reason ?? "市场库不可用")
+      setReason(t(head.reason ?? "市场库不可用"))
       setCatalog(EMPTY_CATALOG)
       setCatalogLoaded(false)
       setLoading(false)
@@ -123,7 +123,7 @@ export function useMarket(locale: LocaleCode): MarketStore {
 
     const head2 = await callOr<RawMarketCatalog>("marketCatalog", null)
     if (head2 && head2.ok === false) {
-      setReason(head2.reason ?? "市场库不可用")
+      setReason(t(head2.reason ?? "市场库不可用"))
       setCatalog(EMPTY_CATALOG)
       setCatalogLoaded(false)
     } else {

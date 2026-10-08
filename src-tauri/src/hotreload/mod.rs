@@ -1,5 +1,9 @@
-//! 静态数据热重载：把 `_local/gameStore/data/<表>/data.json` 的改动直接送进**正在运行**的
-//! 服务端进程内存，不用停服、玩家不掉线。
+//! 服务端进程内桥接：静态数据热重载 + 账号创建。
+//!
+//! 静态数据热重载会把 `_local/gameStore/data/<表>/data.json` 的改动直接送进**正在运行**的
+//! 服务端进程内存，不用停服、玩家不掉线。账号创建也走同一注入宿主：服务端启动时已把
+//! `accounts` 表预加载进内存，启动器若只改 SQLite，首次登录仍会命中服务端的
+//! `devAutoCreateAccounts` 并默认补成 GM；因此建号必须在服务端进程内完成。
 //!
 //! 为什么需要它：服务端启动时 `preloadAll()` 把所有表读进内存，之后只读内存
 //! （`index.js` L1208 第一行 `if (preloaded) return`）。改文件不重启，游戏里看不到。
@@ -16,11 +20,13 @@
 //!   - 装不了 host（写盘失败 / 目录不是服务端）时整条链路安静降级，界面如实说明；
 //!   - `EVEJS_HOTRELOAD=0` 可整体关闭。
 //!
-//! 请求与结果都走文件（`request.json` → `result.json`），不开监听端口。
+//! 请求与结果都走文件（静态重载 `request.json` → `result.json`，建号
+//! `account-request.json` → `account-result.json`），不开监听端口。
 
 use serde_json::{json, Value};
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 use std::time::{Duration, UNIX_EPOCH};
 
 use crate::runtime::RuntimePaths;
@@ -34,14 +40,28 @@ const ONLINE_FILE: &str = "online.json";
 const REQUEST_FILE: &str = "request.json";
 const PROCESSING_FILE: &str = "request.processing.json";
 const RESULT_FILE: &str = "result.json";
+const ACCOUNT_REQUEST_FILE: &str = "account-request.json";
+const ACCOUNT_PROCESSING_FILE: &str = "account-processing.json";
+const ACCOUNT_RESULT_FILE: &str = "account-result.json";
 const BASELINE_FILE: &str = "baseline.json";
 const SNAPSHOT_DIR: &str = "snapshots";
 /// 保留多少份「重载前快照」
 const MAX_SNAPSHOTS: usize = 10;
 /// 写请求后等 host 回结果的上限：全量重载含 246MB 的 celestials，给足余量
 const APPLY_TIMEOUT: Duration = Duration::from_secs(300);
+/// 「有没有活着的 host 来拿这份请求」的握手窗口。
+///
+/// host 每 400ms 轮询一次，5 秒够它来回十几趟；超时说明**根本没有 host 在听**。
+/// 为什么必须先握手再进 300 秒的长等：`session.json` 只证明「这一轮曾经是启动器带 host
+/// 起来的」，服务端退出后它仍留在盘上（`armed` 只比 bootId 对不对，不知道进程还在不在），
+/// 于是没有这一步时，一份残留的 session.json 能让这里傻等满 APPLY_TIMEOUT。
+const PICKUP_TIMEOUT: Duration = Duration::from_secs(5);
+/// 建号是进程内的一次同步写 + flush；15s 足够覆盖慢盘与 host 轮询。
+const ACCOUNT_TIMEOUT: Duration = Duration::from_secs(15);
 /// 轮询间隔
 const POLL_MS: u64 = 200;
+/// 同一启动器进程内的建号请求串行化，避免两个调用争用同一个请求文件。
+static ACCOUNT_BRIDGE_LOCK: OnceLock<tokio::sync::Mutex<()>> = OnceLock::new();
 
 /// 「改了必须重启主服务器才生效」的静态表。
 ///
@@ -206,6 +226,16 @@ fn read_json(path: &Path) -> Option<Value> {
     serde_json::from_str(&text).ok()
 }
 
+/// 读回包并确认它就是我们这一次请求的：`requestId` 与 `bootId` 都要对上。
+///
+/// host 可能还在写上一条请求的结果，盘上那份旧 `result.json` 不能当成本次的结果。
+fn matching_result(dir: &Path, request_id: &str, boot: &str) -> Option<Value> {
+    let value = read_json(&dir.join(RESULT_FILE))?;
+    let matching = value.get("requestId").and_then(Value::as_str) == Some(request_id)
+        && value.get("bootId").and_then(Value::as_str) == Some(boot);
+    matching.then_some(value)
+}
+
 fn file_stamp(path: &Path) -> Option<(u64, i64)> {
     let meta = std::fs::metadata(path).ok()?;
     let mtime = meta
@@ -233,6 +263,9 @@ pub fn prepare(runtime: &RuntimePaths, root: &Path) -> Option<String> {
         REQUEST_FILE,
         PROCESSING_FILE,
         RESULT_FILE,
+        ACCOUNT_REQUEST_FILE,
+        ACCOUNT_PROCESSING_FILE,
+        ACCOUNT_RESULT_FILE,
         SESSION_FILE,
         ONLINE_FILE,
     ] {
@@ -308,6 +341,22 @@ pub fn armed(runtime: &RuntimePaths) -> bool {
         Some(session) => session.get("bootId").and_then(Value::as_str) == Some(boot.as_str()),
         None => false,
     }
+}
+
+/// 当前挂牌的 host 是否支持进程内建号。
+///
+/// host 只在主服务器启动时写入，因此启动器热更新后，已经运行的服务端可能仍是
+/// 旧 host；此时应立即给出「重启主服务器」的可操作提示，而不是等请求超时。
+fn host_supports_account_create(runtime: &RuntimePaths) -> bool {
+    read_json(&dir(runtime).join(SESSION_FILE))
+        .and_then(|session| session.get("features").cloned())
+        .and_then(|features| features.as_array().cloned())
+        .map(|features| {
+            features
+                .iter()
+                .any(|item| item.as_str() == Some("accountCreate"))
+        })
+        .unwrap_or(false)
 }
 
 /* ------------------------------ 表清单 ------------------------------ */
@@ -598,6 +647,18 @@ pub async fn apply(
     tables: Option<Vec<String>>,
     with_snapshot: bool,
 ) -> Value {
+    apply_with_pickup(root, runtime, tables, with_snapshot, PICKUP_TIMEOUT).await
+}
+
+/// [`apply`] 的主体。握手时长做成参数只有一个理由：单测要能把它压到毫秒级 ——
+/// 「没有 host 时必须**快速**返回」正是用户踩过的那条（曾经白等满 300 秒）。
+async fn apply_with_pickup(
+    root: &Path,
+    runtime: &RuntimePaths,
+    tables: Option<Vec<String>>,
+    with_snapshot: bool,
+    pickup_timeout: Duration,
+) -> Value {
     if !server_has_gamestore(root) {
         return json!({
             "ok": false,
@@ -658,17 +719,41 @@ pub async fn apply(
         return json!({ "ok": false, "supported": true, "reason": "请求写盘失败" });
     }
 
+    // 先等一次「有人来拿这份请求」的握手。
+    //
+    // host 的 drainOne 拿到请求的第一件事就是把它 rename 成 request.processing.json，
+    // 所以「request.json 不见了」= 有活的 host 在听。**必须**有这一步：`armed()` 只比
+    // session.json 与 boot.json 的 bootId，服务端退出后 session.json 还留在盘上，于是
+    // 一份残留的会话会让下面白等满 APPLY_TIMEOUT（300 秒）—— 用户看到的是「点了保存
+    // 毫无反应」，而属性其实早就写进磁盘了。
+    let pickup_deadline = std::time::Instant::now() + pickup_timeout;
+    let mut picked_up = false;
+    while std::time::Instant::now() < pickup_deadline {
+        let taken = !dir.join(REQUEST_FILE).exists() || dir.join(PROCESSING_FILE).exists();
+        if taken || matching_result(&dir, &request_id, &boot).is_some() {
+            picked_up = true;
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(POLL_MS)).await;
+    }
+    if !picked_up {
+        let _ = std::fs::remove_file(dir.join(REQUEST_FILE));
+        return json!({
+            "ok": false,
+            "supported": true,
+            "armed": false,
+            "requestId": request_id,
+            "snapshotId": snapshot_id,
+            "reason": "热重载请求没有服务端应答：主服务器没在运行，或不是本启动器启动的。改动已经写进磁盘，下次启动主服务器时生效。",
+        });
+    }
+
     let deadline = std::time::Instant::now() + APPLY_TIMEOUT;
     let mut outcome: Option<Value> = None;
     while std::time::Instant::now() < deadline {
-        if let Some(value) = read_json(&dir.join(RESULT_FILE)) {
-            let matching = value.get("requestId").and_then(Value::as_str)
-                == Some(request_id.as_str())
-                && value.get("bootId").and_then(Value::as_str) == Some(boot.as_str());
-            if matching {
-                outcome = Some(value);
-                break;
-            }
+        if let Some(value) = matching_result(&dir, &request_id, &boot) {
+            outcome = Some(value);
+            break;
         }
         let _ = std::fs::remove_file(dir.join(PROCESSING_FILE));
         tokio::time::sleep(Duration::from_millis(POLL_MS)).await;
@@ -702,6 +787,92 @@ pub async fn apply(
         refresh_baseline_for(root, runtime, &names);
     }
     result
+}
+
+/// 在正在运行的服务端进程内创建账号。
+///
+/// 调用方必须先把密码用 `account-cli.js hash` 转成客户端同款哈希；这里只传哈希，
+/// 不把明文密码落进请求文件。host 会通过服务端自己的 `accountStore` 写入内存，
+/// 再同步 flush 到 SQLite，因此首次登录不会再被 `devAutoCreateAccounts` 补建成 GM。
+pub async fn create_account_via_host(
+    runtime: &RuntimePaths,
+    username: &str,
+    password_hash: &str,
+    is_gm: bool,
+) -> Result<Value, String> {
+    if !armed(runtime) {
+        return Err("主服务器热重载宿主未就绪，无法安全创建账号".to_string());
+    }
+    if !host_supports_account_create(runtime) {
+        return Err(
+            "当前主服务器仍在使用旧版启动器宿主，无法安全创建账号；请重启主服务器后再试"
+                .to_string(),
+        );
+    }
+    let Some(boot) = boot_id(runtime) else {
+        return Err("读不到本轮启动标记（boot.json）".to_string());
+    };
+    let directory = dir(runtime);
+    std::fs::create_dir_all(&directory).map_err(|err| format!("创建账号桥接目录失败: {err}"))?;
+
+    let lock = ACCOUNT_BRIDGE_LOCK.get_or_init(|| tokio::sync::Mutex::new(()));
+    let _guard = lock.lock().await;
+
+    // 同一时间只允许一个请求；清掉上一轮残留，避免 host / 启动器读到旧结果。
+    for name in [
+        ACCOUNT_REQUEST_FILE,
+        ACCOUNT_PROCESSING_FILE,
+        ACCOUNT_RESULT_FILE,
+    ] {
+        let _ = std::fs::remove_file(directory.join(name));
+    }
+
+    let request_id = format!("{}-{}-account", epoch_ms(), std::process::id());
+    let request = json!({
+        "api": 1,
+        "requestId": request_id,
+        "bootId": boot,
+        "username": username,
+        "passwordhash": password_hash,
+        "isGM": is_gm,
+        "requestedAt": epoch_ms() as u64,
+    });
+    write_json(&directory.join(ACCOUNT_REQUEST_FILE), &request)
+        .map_err(|err| format!("账号创建请求写盘失败: {err}"))?;
+
+    let deadline = std::time::Instant::now() + ACCOUNT_TIMEOUT;
+    let mut outcome: Option<Value> = None;
+    while std::time::Instant::now() < deadline {
+        if let Some(value) = read_json(&directory.join(ACCOUNT_RESULT_FILE)) {
+            let matching = value.get("requestId").and_then(Value::as_str)
+                == Some(request_id.as_str())
+                && value.get("bootId").and_then(Value::as_str) == Some(boot.as_str());
+            if matching {
+                outcome = Some(value);
+                break;
+            }
+        }
+        tokio::time::sleep(Duration::from_millis(POLL_MS)).await;
+    }
+    let _ = std::fs::remove_file(directory.join(ACCOUNT_REQUEST_FILE));
+    let _ = std::fs::remove_file(directory.join(ACCOUNT_PROCESSING_FILE));
+
+    let Some(result) = outcome else {
+        return Err(format!(
+            "账号创建超时（{} 秒内没有回结果）；请确认主服务器仍在运行，必要时重启后再试",
+            ACCOUNT_TIMEOUT.as_secs()
+        ));
+    };
+    if result.get("ok").and_then(Value::as_bool) == Some(true) {
+        return Ok(result);
+    }
+    let reason = result
+        .get("message")
+        .and_then(Value::as_str)
+        .filter(|text| !text.trim().is_empty())
+        .or_else(|| result.get("reason").and_then(Value::as_str))
+        .unwrap_or("服务端拒绝创建账号，未返回原因");
+    Err(reason.to_string())
 }
 
 fn refresh_baseline_for(root: &Path, runtime: &RuntimePaths, names: &[String]) {
@@ -840,6 +1011,74 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
     }
 
+    /// 没有 host 在听的时候，`apply` 必须**快速**返回，不能傻等满 `APPLY_TIMEOUT`。
+    ///
+    /// 这正是用户实测踩到的坑：主服务早停了，但 `session.json` 还留在盘上（`armed` 只比
+    /// bootId 对不对，不知道进程还在不在），于是点一次「保存」在界面上要僵 5 分钟 ——
+    /// 属性其实早就写进磁盘了，用户看到的是「保存毫无反应」，回过头再存一次同样的数，
+    /// 后端只会回「没有改动」。
+    #[tokio::test]
+    async fn apply_fails_fast_when_no_host_is_listening() {
+        let root = fixture_root();
+        let runtime = RuntimePaths::from_root(root.join("_launcher"), false);
+
+        // 假服务端：有 gameStore 才算「支持热重载」，静态表清单也只认这个目录
+        let store = root.join("server").join("src").join("gameStore");
+        std::fs::create_dir_all(&store).unwrap();
+        let mut names = String::new();
+        for index in 0..30 {
+            names.push_str(&format!("  \"runtime{index}\",\n"));
+        }
+        std::fs::write(
+            store.join("index.js"),
+            format!("const SQLITE_TABLES = new Set([\n{names}]);\n"),
+        )
+        .unwrap();
+        let table = root
+            .join("_local")
+            .join("gameStore")
+            .join("data")
+            .join("itemTypes");
+        std::fs::create_dir_all(&table).unwrap();
+        std::fs::write(table.join("data.json"), "{}").unwrap();
+
+        // 残留会话：boot.json 与 session.json 对得上，所以 `armed` 为 true —— 但没有任何
+        // 进程在听。这一行就是整个坑的来源，所以先断言它确实为 true。
+        std::fs::create_dir_all(dir(&runtime)).unwrap();
+        write_json(&dir(&runtime).join(BOOT_FILE), &json!({ "bootId": "gone" })).unwrap();
+        write_json(
+            &dir(&runtime).join(SESSION_FILE),
+            &json!({ "bootId": "gone", "pid": 1 }),
+        )
+        .unwrap();
+        assert!(armed(&runtime), "会话残留时 armed 仍然为 true，正是要防的情形");
+
+        let started = std::time::Instant::now();
+        let reply = apply_with_pickup(
+            &root,
+            &runtime,
+            Some(vec!["itemTypes".to_string()]),
+            false,
+            Duration::from_millis(300),
+        )
+        .await;
+
+        assert_eq!(reply["ok"], json!(false));
+        assert_eq!(reply["armed"], json!(false), "没人在听就不能说已武装");
+        assert!(
+            reply["reason"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("没有服务端应答"),
+            "原因要能说清是「没有服务端在听」：{reply}"
+        );
+        assert!(
+            started.elapsed() < Duration::from_secs(3),
+            "必须快速返回，不能等满 APPLY_TIMEOUT"
+        );
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     #[test]
     fn online_character_ids_require_fresh_matching_state() {
         let root = fixture_root();
@@ -888,6 +1127,86 @@ mod tests {
             online_character_ids(&runtime),
             None,
             "接口不可用要返回未知，而不是 0"
+        );
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// 建号桥必须把用户名、哈希和 GM 标志送到 host，并把 host 结果原样交回。
+    #[tokio::test]
+    async fn account_bridge_round_trips_request_and_result() {
+        let root = fixture_root();
+        let runtime = RuntimePaths::from_root(root.join("_launcher"), false);
+        let directory = dir(&runtime);
+        std::fs::create_dir_all(&directory).unwrap();
+        write_json(
+            &directory.join(BOOT_FILE),
+            &json!({ "bootId": "account-boot" }),
+        )
+        .unwrap();
+        write_json(
+            &directory.join(SESSION_FILE),
+            &json!({
+                "bootId": "account-boot",
+                "pid": 42,
+                "features": ["hotreload", "accountCreate"]
+            }),
+        )
+        .unwrap();
+
+        let responder_runtime = runtime.clone();
+        let responder = tokio::spawn(async move {
+            let directory = dir(&responder_runtime);
+            let deadline = std::time::Instant::now() + Duration::from_secs(2);
+            loop {
+                if let Some(request) = read_json(&directory.join(ACCOUNT_REQUEST_FILE)) {
+                    let request_id = request["requestId"].as_str().unwrap_or_default();
+                    let boot_id = request["bootId"].as_str().unwrap_or_default();
+                    write_json(
+                        &directory.join(ACCOUNT_RESULT_FILE),
+                        &json!({
+                            "api": 1,
+                            "requestId": request_id,
+                            "bootId": boot_id,
+                            "ok": true,
+                            "account": {
+                                "id": 77,
+                                "username": request["username"],
+                                "isGM": request["isGM"]
+                            }
+                        }),
+                    )
+                    .unwrap();
+                    return request;
+                }
+                if std::time::Instant::now() >= deadline {
+                    return Value::Null;
+                }
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        });
+
+        let hash = "a".repeat(40);
+        let call = tokio::time::timeout(
+            Duration::from_secs(3),
+            create_account_via_host(&runtime, "pilot", &hash, false),
+        )
+        .await;
+        let result = match call {
+            Ok(result) => result.expect("host 应返回成功结果"),
+            Err(_) => {
+                responder.abort();
+                panic!("建号桥等待 host 结果超时");
+            }
+        };
+        let request = responder.await.expect("host 模拟器不应 panic");
+        assert_eq!(request["username"], json!("pilot"));
+        assert_eq!(request["passwordhash"], json!(hash));
+        assert_eq!(request["isGM"], json!(false));
+        assert_eq!(result["account"]["id"], json!(77));
+        assert_eq!(result["account"]["isGM"], json!(false));
+        assert!(
+            !directory.join(ACCOUNT_REQUEST_FILE).exists(),
+            "调用结束后应清掉请求文件"
         );
         let _ = std::fs::remove_dir_all(&root);
     }

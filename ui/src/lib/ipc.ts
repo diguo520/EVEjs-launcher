@@ -283,6 +283,14 @@ export interface RawAccountList {
   data?: RawAccount[]
 }
 
+/** accounts:online：host 写入的轻量在线角色 ID 快照；known=false 时保留前端已有状态。 */
+export interface RawAccountOnline {
+  ok: boolean
+  known: boolean
+  ids: string[]
+  reason?: string
+}
+
 /**
  * accounts:logotypes 的一条：军团 / 联盟的**专属**徽标。
  * dataUrl 为 null = 服务端没有这个实体的专属徽标（界面画短标识，不画兜底图）。
@@ -1129,6 +1137,13 @@ export interface RawMarketTypeInfoAttr {
   category: number
   /** unitId = 116 且那个物品在 SDE 里有名字时给名字（技能需求、弹药…） */
   typeName: string | null
+  /**
+   * SDE 原厂值。**只有这条属性确实被改过时才有值**（null = 没改过，或这条属性在 SDE
+   * 里查不到 —— 那也就写不回去）。弹窗拿它画「原值 / 现值」的差异并做「还原」。
+   */
+  originalValue?: number | null
+  /** true = 现值与 SDE 原厂值不一致（界面据此标「已修改」并画「还原」） */
+  modified?: boolean
 }
 
 /**

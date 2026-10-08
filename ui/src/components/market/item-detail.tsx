@@ -32,7 +32,7 @@ import {
   touchedStockRows,
   type MarketCatalog,
 } from "@/lib/market-logic"
-import type { LocaleCode } from "@/lib/i18n"
+import { t, type LocaleCode } from "@/lib/i18n"
 import { buildItemCommand } from "@/lib/manual-logic"
 
 /** 价格图逻辑尺寸；渲染时按容器宽度缩（viewBox + w-full） */
@@ -90,7 +90,7 @@ export function ItemDetail({
   if (loading && !book) {
     return (
       <div className={cn("p-3", className)}>
-        <LoadingHint label="盘口" />
+        <LoadingHint label={t("盘口")} />
       </div>
     )
   }
@@ -198,7 +198,7 @@ export function ItemDetail({
           icon={<Store className="size-3" />}
           label="全站库存"
           value={formatQty(summary?.askQty ?? 0)}
-          hint={`${stock.length} 个空间站`}
+          hint={t("{count} 个空间站", { count: stock.length })}
           tone="foreground"
         />
         <MiniStat
@@ -381,7 +381,11 @@ function StockTable({
               <span className="tabular shrink-0">库存 {formatQty(row.quantity)}</span>
               <span
                 className={cn("tabular shrink-0", sold ? "text-warning" : "text-tertiary")}
-                title={sold ? `种子 ${formatQty(row.initialQuantity)}` : "未被买过"}
+                title={
+                  sold
+                    ? t("种子 {quantity}", { quantity: formatQty(row.initialQuantity) })
+                    : t("未被买过")
+                }
               >
                 {sold ? `-${formatQty(row.initialQuantity - row.quantity)}` : "—"}
               </span>

@@ -1,4 +1,5 @@
 import { useMemo, useState, type FormEvent } from "react"
+import { RotateCcw } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -17,7 +18,14 @@ import type {
   RawMarketSetAttrs,
   RawMarketTypeInfo,
 } from "@/lib/ipc"
-import { attributeSections, DERIVED_ATTR_IDS, formatAttrValue } from "@/lib/type-info-logic"
+import {
+  attributeSections,
+  attrOriginalValue,
+  DERIVED_ATTR_IDS,
+  formatAttrValue,
+  formatOriginalValue,
+  restorableAttrs,
+} from "@/lib/type-info-logic"
 import { cn } from "@/lib/utils"
 
 /**
@@ -35,6 +43,18 @@ import { cn } from "@/lib/utils"
  *
  * **质量 / 容量 / 体积不在这个弹窗里**：它们不在 typeDogma 里，是侧车从类型字段补进
  * 属性列表的（见 `DERIVED_ATTR_IDS`），改不动，列出来只会让人白填一遍。
+ *
+ * 「原值 / 现值」的差异与「还原」：这一行**已经改过、已经落盘**（跟 SDE 原厂值不一样）时，
+ * 现值前面多一个**加删除线的原值**，行尾出现一个还原图标按钮（一整行一个，密集列表里放
+ * 文字按钮会把输入框挤走），底部另给一个带字的「还原」做整件还原。
+ *
+ * 判定**只看已保存的改动，不看草稿**：刚输入还没保存的行不冒还原图标 —— 否则用户一边打字
+ * 一边看着图标闪出来，会以为哪里出错了（用户明确要求过这一条）。
+ *
+ * 差异刻意**不写字**（只有删除线 + 数字）：一是密集列表里每个改过的行都挂一句「原值」
+ * 会把真正的差异淹掉，二是为一个图标提示去七份语言目录里各加一条不划算。还原只是把草稿
+ * 填回原值，**仍然要点保存才写盘** —— 走的还是普通保存那条路（同样的快照、热重载与生效
+ * 提示），不用另开一条写盘路径。
  */
 export function AttributeEditDialog({
   typeId,
@@ -94,6 +114,24 @@ export function AttributeEditDialog({
     }
     return out
   }, [sections, draft])
+
+  // 只有**已经保存过的**改动才画「原值 …」与「还原」—— 输入过程中不冒出来，见
+  // restorableAttrs 的注释。这是这一屏里唯一不跟着草稿走的状态。
+  const restorable = useMemo(
+    () => sections.flatMap((section) => restorableAttrs(section.rows)),
+    [sections]
+  )
+
+  const restorableIds = useMemo(() => new Set(restorable.map((row) => row.id)), [restorable])
+
+  /** 把已经改过的那几行填回原值；写盘仍由「保存」那一步完成 */
+  function restoreAll() {
+    setDraft((prev) => {
+      const next = { ...prev }
+      for (const row of restorable) next[row.id] = String(row.original)
+      return next
+    })
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault()
@@ -180,6 +218,8 @@ export function AttributeEditDialog({
                 <div className="divide-y divide-input/30">
                   {section.rows.map((attr) => {
                     const raw = draft[attr.id]
+                    const differs = restorableIds.has(attr.id)
+                    const original = attrOriginalValue(attr)
                     return (
                       <div key={attr.id} className="flex items-center gap-2 px-2 py-1">
                         <span
@@ -189,11 +229,22 @@ export function AttributeEditDialog({
                         >
                           {attr.name}
                         </span>
+                        {/* 与原厂值不同时，原值加删除线排在现值前面。不写字：一个数字加删除线
+                            已经说得清「原来的值是它」，为它多养七份翻译不划算 */}
                         <span
                           data-i18n-skip
-                          className="tabular w-24 shrink-0 truncate text-right text-[10px] text-tertiary"
-                          title={formatAttrValue(attr)}
+                          className="tabular w-32 shrink-0 truncate text-right text-[10px] text-tertiary"
+                          title={
+                            differs
+                              ? formatOriginalValue(attr) + " → " + formatAttrValue(attr)
+                              : formatAttrValue(attr)
+                          }
                         >
+                          {differs ? (
+                            <span className="mr-1 line-through opacity-60">
+                              {formatOriginalValue(attr)}
+                            </span>
+                          ) : null}
                           {formatAttrValue(attr)}
                         </span>
                         <Input
@@ -209,6 +260,24 @@ export function AttributeEditDialog({
                             invalid.has(attr.id) ? "border-destructive" : ""
                           )}
                         />
+                        {/* 不改的行用 invisible 占位：留着这一格，整列输入框才不会错开 */}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          tabIndex={differs ? 0 : -1}
+                          aria-hidden={!differs}
+                          aria-label={t("还原")}
+                          title={
+                            differs ? t("还原") + " " + formatOriginalValue(attr) : undefined
+                          }
+                          className={cn("shrink-0", differs ? "" : "invisible")}
+                          onClick={() =>
+                            setDraft((prev) => ({ ...prev, [attr.id]: String(original) }))
+                          }
+                        >
+                          <RotateCcw />
+                        </Button>
                       </div>
                     )
                   })}
@@ -218,6 +287,18 @@ export function AttributeEditDialog({
           </div>
 
           <DialogFooter>
+            {restorable.length > 0 ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={restoreAll}
+                disabled={saving}
+                className="sm:mr-auto"
+              >
+                <RotateCcw />
+                {t("还原")}
+              </Button>
+            ) : null}
             <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
               取消
             </Button>

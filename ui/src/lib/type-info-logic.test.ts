@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import type { RawMarketTypeInfo, RawMarketTypeInfoAttr } from "@/lib/ipc"
 import {
+  attrOriginalValue,
   attributeSections,
   bonusPlan,
   bonusValue,
@@ -11,8 +12,10 @@ import {
   enumUnitLabel,
   formatAttrNumber,
   formatAttrValue,
+  formatOriginalValue,
   RESIST_BONUS_TITLE,
   RESIST_ATTR_IDS,
+  restorableAttrs,
   SECTION_SENSOR,
   tooltipPlan,
   type TypeInfoQuad,
@@ -117,6 +120,76 @@ describe("属性值格式化", () => {
     expect(enumUnitLabel("1=小型  2=中型  3=大型", 3)).toBe("大型")
     expect(enumUnitLabel("m/s", 3)).toBeNull()
     expect(enumUnitLabel("1=唯一", 1)).toBeNull()
+  })
+})
+
+/**
+ * 原厂值（「还原」的目标）：后端只在**确实被改过**时才回 `originalValue`，没回就说明
+ * 现值就是原厂值 —— 这条口径决定弹窗会不会把没改过的行也标成「已修改」。
+ */
+describe("原厂值与还原", () => {
+  it("没被改过时原厂值就是现值（后端不会回 originalValue）", () => {
+    const untouched = attr({ id: 37, name: "最大速度", value: 365 })
+    expect(attrOriginalValue(untouched)).toBe(365)
+    expect(formatOriginalValue(untouched)).toBe("365")
+  })
+
+  it("被改过时取后端回的原厂值，显示与现值同一套单位规则", () => {
+    // 护盾回充时间：unitId 101 以毫秒存，625000 → 10分25秒
+    const recharged = attr({
+      id: 479,
+      name: "护盾回充时间",
+      value: 500000,
+      unitId: 101,
+      unit: "s",
+      originalValue: 625000,
+      modified: true,
+    })
+    expect(attrOriginalValue(recharged)).toBe(625000)
+    expect(formatAttrValue(recharged)).toBe("8分20秒")
+    expect(formatOriginalValue(recharged)).toBe("10分25秒")
+  })
+
+  it("modified=true 但原值缺失（SDE 里查不到这条）：退回现值，不画出一个假的差异", () => {
+    const orphan = attr({ id: 9999, name: "野生属性", value: 7, modified: true })
+    expect(attrOriginalValue(orphan)).toBe(7)
+  })
+
+  it("引用型属性的原值不带上按现值解析出来的名字", () => {
+    const skill = attr({
+      id: 182,
+      name: "主技能需求",
+      value: 3329,
+      unitId: 116,
+      unit: "typeID",
+      typeName: "米玛塔尔护卫舰",
+      originalValue: 3300,
+      modified: true,
+    })
+    expect(formatAttrValue(skill)).toBe("米玛塔尔护卫舰")
+    // 名字是按现值 3329 解析的，原值 3300 可能是别的物品 —— 宁可印数字
+    expect(formatOriginalValue(skill)).toBe("3,300")
+  })
+
+  it("可还原的判定只看后端标记，不自己拿现值跟原值比（草稿不算）", () => {
+    // 用户刚在草稿里输了 999：数值上确实跟原值不同，但后端还没标 modified → 不进列表，
+    // 否则每敲一个字行尾都会冒出一个还原图标
+    const draftOnly = attr({ id: 37, name: "最大速度", value: 999, originalValue: 365 })
+    expect(restorableAttrs([draftOnly])).toEqual([])
+
+    // 已经保存过的改动（后端标了 modified）→ 用后端给的原值
+    const saved = attr({
+      id: 148,
+      name: "装甲值加成",
+      value: 2,
+      originalValue: 1,
+      modified: true,
+    })
+    expect(restorableAttrs([saved])).toEqual([{ id: 148, original: 1 }])
+
+    // 属性缺省（还没拉到 info）时不炸
+    expect(restorableAttrs(undefined)).toEqual([])
+    expect(restorableAttrs([])).toEqual([])
   })
 })
 

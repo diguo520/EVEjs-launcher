@@ -98,7 +98,7 @@ void main() {
     for ( int i = 0; i < 16; i ++ ) {
       float step = ( float( i ) + 0.5 ) / 16.0;
       float angle = float( i ) * 2.399963229728653;
-      // 半径按 step 线性铺开（不是 sqrt）：抽样点往中心略密，糊得更像高斯、边缘更柔
+      // Linear radius sampling (not sqrt): denser near the center, softer high-gaussian-like blur.
       vec2 offset = vec2( cos( angle ), sin( angle ) ) * step * uRadius;
       accum += textureLod( uMap, vUv + offset * uTexel, uLod );
     }

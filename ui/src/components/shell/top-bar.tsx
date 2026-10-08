@@ -110,7 +110,7 @@ export function TopBar({
           <DropdownMenuLabel>界面语言</DropdownMenuLabel>
           <DropdownMenuSeparator />
           {languages.map((item) => (
-            <DropdownMenuItem key={item.code} onClick={() => setLocale(item.code)}>
+            <DropdownMenuItem key={item.code} onClick={() => void setLocale(item.code)}>
               {/* 语言名按各自母语显示，永不翻译：data-i18n-skip 挡住翻译桥 */}
               <PlayerFlag country={item.flagCode} className="mr-2" />
               <span data-i18n-skip>{item.name}</span>

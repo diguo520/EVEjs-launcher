@@ -18,6 +18,8 @@ export default mergeConfig(
       environment: "node",
       include: ["src/**/*.test.ts"],
       reporters: ["default"],
+      // 生产入口只加载当前语言；测试统一预加载所有目录，供 i18n / 日志 / 环境自检断言。
+      setupFiles: ["./src/test/i18n-setup.ts"],
     },
   }),
 );

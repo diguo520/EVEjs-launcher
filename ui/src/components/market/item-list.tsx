@@ -11,7 +11,7 @@ import {
   type MarketCatalog,
   type MarketSortKey,
 } from "@/lib/market-logic"
-import type { LocaleCode } from "@/lib/i18n"
+import { t, type LocaleCode } from "@/lib/i18n"
 
 /** 列表一页多少行：够密（一屏能扫）又够轻（DOM 只多 60 行） */
 export const PAGE_SIZE = 60
@@ -161,11 +161,11 @@ export function ItemList({
       <div className="min-h-0 flex-1 overflow-y-auto">
         {loading ? (
           <div className="p-3">
-            <LoadingHint label="市场清单" />
+            <LoadingHint label={t("市场清单")} />
           </div>
         ) : failed ? (
           <div className="p-3">
-            <LoadingHint failed label="市场清单" />
+            <LoadingHint failed label={t("市场清单")} />
           </div>
         ) : rows.length === 0 ? (
           <div className="p-3">

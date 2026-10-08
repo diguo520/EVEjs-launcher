@@ -292,6 +292,9 @@ struct InfoIndex {
     categories: HashMap<u16, String>,
     attributes: HashMap<u16, InfoAttrMeta>,
     types: HashMap<u32, Vec<(u16, f64)>>,
+    /// typeID → { 属性 id: 原厂值 }，侧车只回**与 SDE 不一致**的那几条（见 typeinfo 第 5 步）。
+    /// 改属性时**不动这份**：它就是「还原」要写回去的目标值。
+    modified: HashMap<u32, HashMap<u16, f64>>,
     descriptions: HashMap<u32, String>,
     names: HashMap<u32, String>,
     bonuses: HashMap<u32, Vec<InfoBonusSection>>,
@@ -340,6 +343,8 @@ struct InfoPayload {
     #[serde(default)]
     types: HashMap<u32, Vec<(u16, f64)>>,
     #[serde(default)]
+    modified: HashMap<u32, HashMap<u16, f64>>,
+    #[serde(default)]
     descriptions: HashMap<u32, String>,
     #[serde(default)]
     names: HashMap<u32, String>,
@@ -364,8 +369,11 @@ fn sde_lang(value: &str) -> String {
 
 /// 一条属性：原始数值 + 单位符号；「值是 typeID」的那种额外给一个解析出来的名字。
 ///
+/// `original` 是 SDE 原厂值 —— **只在这一条确实被改过时才有**：界面要在弹窗里画
+/// 「原值 / 现值」的差异，并给一个「还原」。
+///
 /// 数值的格式化（千分位、小数位、单位拼接）刻意留在渲染层：那里才有当前语言。
-fn info_attribute(index: &InfoIndex, id: u16, value: f64) -> Value {
+fn info_attribute(index: &InfoIndex, id: u16, value: f64, original: Option<f64>) -> Value {
     let meta = index.attributes.get(&id);
     let unit_id = meta.and_then(|meta| meta.unit);
     let unit = unit_id.and_then(|unit| index.units.get(&unit).cloned());
@@ -378,6 +386,10 @@ fn info_attribute(index: &InfoIndex, id: u16, value: f64) -> Value {
         "id": id,
         "name": meta.map(|meta| meta.name.clone()).unwrap_or_default(),
         "value": value,
+        // 原厂值（SDE）：null = 没改过，或这条属性在 SDE 里查不到（那也写不回去）
+        "originalValue": original,
+        // true = 现值与原厂值不同；界面据此标「已修改」并画「还原」
+        "modified": original.is_some(),
         // unitId 交给渲染层定格式：101 的「秒」实际以毫秒存、108 是抗性共振系数、
         // 115 / 116 是「值指向另一个对象」，只靠本地化后的单位符号分不出来
         "unitId": unit_id,
@@ -452,6 +464,7 @@ pub async fn type_info(root: &Path, type_id: u32, lang: &str) -> Value {
                     categories: payload.categories,
                     attributes: payload.attributes,
                     types: payload.types,
+                    modified: payload.modified,
                     descriptions: payload.descriptions,
                     names: payload.names,
                     bonuses: payload.bonuses,
@@ -474,12 +487,21 @@ pub async fn type_info(root: &Path, type_id: u32, lang: &str) -> Value {
             "counts": index.counts,
         });
     }
+    // 已改动的属性：现值取自 `types`，原厂值取自 `modified`（两侧同一趟回包，键一定对得上）
+    let originals = index.modified.get(&type_id);
     let attributes: Vec<Value> = index
         .types
         .get(&type_id)
         .map(|rows| {
             rows.iter()
-                .map(|(id, value)| info_attribute(index, *id, *value))
+                .map(|(id, value)| {
+                    info_attribute(
+                        index,
+                        *id,
+                        *value,
+                        originals.and_then(|map| map.get(id)).copied(),
+                    )
+                })
                 .collect()
         })
         .unwrap_or_default();
@@ -503,23 +525,58 @@ pub async fn type_info(root: &Path, type_id: u32, lang: &str) -> Value {
 /// 一条属性改动：`(属性 id, 新值)`。
 pub type AttrEdit = (u16, f64);
 
-/// 把刚写进静态表的属性值同步到内存索引。
+/// 把刚写进静态表的属性值同步到内存索引 —— **现值与原厂值一起**。
 ///
 /// 为什么不整份重建索引：索引是侧车扫 144 MB SDE + 全量静态表折出来的（实测 1.5-2 s），
 /// 只为改几个数重建一次太亏。这里改的 id 一定在索引里出现过（界面就是照它渲染的），
 /// 就地覆盖即可；属性按 id 排序，值变了顺序不变，不用重排。
+///
+/// 原厂值从哪来：侧车只在**确实改过**时才把原值放进 `modified`，所以
+/// - 这条之前就改过 → `modified` 里记着的那份就是原厂值，照抄；
+/// - 这条之前没改过 → 它**改之前**的现值本来就等于原厂值，在覆盖前取下来。
+///
+/// 改完与原厂值相等时（用户点了「还原」）要把记录删掉，否则界面会一直挂着一个并不存在的
+/// 「已修改」。只更新现值不更新这份，就会导致「刚保存完、还原图标反而消失」。
 async fn apply_edits_to_index(type_id: u32, edits: &[AttrEdit]) {
     let mut guard = INFO_INDEX.lock().await;
     let Some(index) = guard.as_mut() else {
         return;
     };
-    let Some(rows) = index.types.get_mut(&type_id) else {
+    // 拆成两个互不相干的借用：改现值要 `types` 可变，读原值要 `modified` 不可变
+    let InfoIndex {
+        types, modified, ..
+    } = index;
+    let Some(rows) = types.get_mut(&type_id) else {
         return;
     };
+
+    let mut planned: Vec<(u16, f64, f64)> = Vec::new(); // (属性 id, 新值, 原厂值)
     for (id, value) in edits {
-        if let Some(row) = rows.iter_mut().find(|(row_id, _)| row_id == id) {
-            row.1 = *value;
+        let Some(row) = rows.iter_mut().find(|(row_id, _)| row_id == id) else {
+            continue;
+        };
+        let original = modified
+            .get(&type_id)
+            .and_then(|known| known.get(id))
+            .copied()
+            .unwrap_or(row.1);
+        row.1 = *value;
+        planned.push((*id, *value, original));
+    }
+
+    let emptied = {
+        let originals = modified.entry(type_id).or_default();
+        for (id, value, original) in planned {
+            if value == original {
+                originals.remove(&id);
+            } else {
+                originals.insert(id, original);
+            }
         }
+        originals.is_empty()
+    };
+    if emptied {
+        modified.remove(&type_id);
     }
 }
 
@@ -843,6 +900,7 @@ mod tests {
             "categories": { "28": "Propulsion" },
             "attributes": { "30": { "name": "最大速度加成", "unit": 105, "highIsGood": true, "category": 28 } },
             "types": { "587": [[30, 55.0], [9, 350]] },
+            "modified": { "587": { "30": 50.0 } },
             "descriptions": { "587": "裂谷级是一种非常强大的战斗护卫舰。" },
             "names": { "3329": "米玛塔尔护卫舰" },
             "bonuses": { "587": [[3329, [[7.5, 105, "小型射弹炮台射速加成"]]], [0, [[null, null, "可以安装拦截泡发射器"]]]] }
@@ -857,6 +915,8 @@ mod tests {
             payload.types[&587u32],
             vec![(30u16, 55.0f64), (9u16, 350.0)]
         );
+        // 改过的属性：键是 typeID → 属性 id，值是**原厂值**（现值仍在 types 里）
+        assert_eq!(payload.modified[&587u32][&30u16], 50.0);
         assert_eq!(
             payload.descriptions[&587u32],
             "裂谷级是一种非常强大的战斗护卫舰。"
@@ -915,6 +975,8 @@ mod tests {
                 ),
             ]),
             types: HashMap::from([(587u32, vec![(30u16, 55.0f64), (182u16, 3329.0)])]),
+            // 30 已被改过（现值 55、原厂 50）：界面要能画出这个差异
+            modified: HashMap::from([(587u32, HashMap::from([(30u16, 50.0f64)]))]),
             descriptions: HashMap::from([(
                 587u32,
                 "裂谷级是一种非常强大的战斗护卫舰。".to_string(),
@@ -989,23 +1051,55 @@ mod tests {
     #[test]
     fn info_attribute_joins_units_and_type_names() {
         let index = sample_info_index();
-        let speed = info_attribute(&index, 30, 55.0);
+        let speed = info_attribute(&index, 30, 55.0, Some(50.0));
         assert_eq!(speed["name"], json!("最大速度加成"));
         assert_eq!(speed["unit"], json!("%"));
         assert_eq!(speed["unitId"], json!(105));
         assert_eq!(speed["highIsGood"], json!(true));
         assert_eq!(speed["category"], json!(28));
         assert_eq!(speed["value"], json!(55.0));
+        // 改过的属性：原厂值一起回，界面据此画「原值 / 现值」并给「还原」
+        assert_eq!(speed["originalValue"], json!(50.0));
+        assert_eq!(speed["modified"], json!(true));
+
+        // 没改过的属性：原值缺省，界面不画那一段，也不会画「还原」
+        let untouched = info_attribute(&index, 30, 50.0, None);
+        assert_eq!(untouched["originalValue"], Value::Null);
+        assert_eq!(untouched["modified"], json!(false));
 
         // 技能需求：值是技能 id，界面显示「米玛塔尔护卫舰」而不是 3329
-        let skill = info_attribute(&index, 182, 3329.0);
+        let skill = info_attribute(&index, 182, 3329.0, None);
         assert_eq!(skill["unit"], json!("typeID"));
         assert_eq!(skill["unitId"], json!(116));
         assert_eq!(skill["typeName"], json!("米玛塔尔护卫舰"));
 
         // 值不是类型 id 的时候别乱回名字
-        let zero = info_attribute(&index, 182, 0.0);
+        let zero = info_attribute(&index, 182, 0.0, None);
         assert_eq!(zero["typeName"], Value::Null);
+    }
+
+    /// 保存之后内存索引要同时更新**现值**与**原厂值**。
+    ///
+    /// 只更新现值的话，用户刚存完再打开弹窗就看不到「还原」了 —— 而那正是这个功能唯一的
+    /// 存在理由。反过来，把值改回原厂值时（点了「还原」）还得把记录清掉，不然界面会一直
+    /// 挂着一个并不存在的「已修改」。
+    #[tokio::test]
+    async fn applied_edits_refresh_both_value_and_original() {
+        *INFO_INDEX.lock().await = Some(sample_info_index());
+        // 30 在 fixture 里是「已改过」的（现值 55、原厂 50）；182 没改过（现值 3329，无原值）
+        apply_edits_to_index(587, &[(30u16, 50.0f64), (182u16, 9.0f64)]).await;
+
+        let guard = INFO_INDEX.lock().await;
+        let index = guard.as_ref().expect("刚设过索引");
+        let rows = &index.types[&587u32];
+        let value_of = |id: u16| rows.iter().find(|(row_id, _)| *row_id == id).unwrap().1;
+        assert_eq!(value_of(30), 50.0);
+        assert_eq!(value_of(182), 9.0);
+
+        let modified = &index.modified[&587u32];
+        // 30 改回了原厂值 → 记录删掉；182 从 3329 改成 9 → 记下它的原厂值 3329
+        assert!(!modified.contains_key(&30u16));
+        assert_eq!(modified[&182u16], 3329.0);
     }
 
     /// typeId = 0 是「没选物品」的哨兵，不能拿它去改表。

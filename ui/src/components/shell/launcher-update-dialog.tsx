@@ -203,7 +203,7 @@ export function LauncherUpdateDialog({
             {/* 下载 / 安装失败的原因由后端 update:state 的 message 带回来，优先显示它 */}
             <span>
               {updateMessage
-                ? `更新失败：${updateMessage}`
+                ? t("更新失败：{message}", { message: updateMessage })
                 : `没查到更新信息：${check?.reason ?? "更新通道没有给出原因"}`}
             </span>
           </p>

@@ -1,7 +1,9 @@
 //! 账号与角色直登：对齐现役版 `src/main/accountManager.ts`。
 //!
 //! 与现役版一致的两个关键点：
-//!   1. 账号 CRUD **不重写**，照旧调仓库自带的 `account-cli.js`（同一套哈希算法与库表结构）；
+//!   1. 账号 CRUD **不重写**：服务端未运行时照旧调仓库自带的 `account-cli.js`；
+//!      服务端运行时则通过 hotreload host 在服务端进程内写入，避免只改 SQLite
+//!      而让服务端内存继续按 `devAutoCreateAccounts` 把首次登录补建成 GM；
 //!   2. 密码存 `launcher-settings.json` 的 `accountCredentials`（DPAPI 密文 base64），
 //!      由 `crate::secrets` 负责，格式与现役版 `safeStorage` 兼容。
 use crate::process::{self, ClientLogin};
@@ -89,6 +91,46 @@ async fn run_cli_password(
     password: &str,
 ) -> Result<CliOutcome, String> {
     sidecar::run_with_password(&ctx.root, ACCOUNT_CLI, args, password, ACCOUNT_CLI_TIMEOUT).await
+}
+
+/// 先让随包 CLI 生成客户端同款密码哈希。
+///
+/// 建号桥只接收哈希，不接收明文密码；这样磁盘上的 `account-request.json`
+/// 即使被同机其他进程读到，也不会泄露用户密码。
+async fn account_password_hash(ctx: &Ctx, user: &str, password: &str) -> Result<String, String> {
+    let args = vec![
+        "hash".to_string(),
+        user.to_string(),
+        sidecar::PASSWORD_SLOT.to_string(),
+    ];
+    let outcome = run_cli_password(ctx, args, password).await?;
+    if !outcome.success {
+        return Err(fail_reason(&outcome, "密码哈希失败"));
+    }
+    let hash = outcome
+        .stdout
+        .trim()
+        .lines()
+        .next()
+        .unwrap_or_default()
+        .trim()
+        .to_ascii_lowercase();
+    if hash.len() != 40 || !hash.chars().all(|ch| ch.is_ascii_hexdigit()) {
+        return Err("密码哈希输出格式异常".to_string());
+    }
+    Ok(hash)
+}
+
+/// 主服务器状态是否说明它可能正在持有内存里的账号缓存。
+fn main_server_may_hold_accounts(app: &AppHandle) -> bool {
+    app.try_state::<AppState>()
+        .map(|state| {
+            matches!(
+                state.services.state_of(process::MAIN_SERVER).as_str(),
+                "starting" | "running" | "stopping"
+            )
+        })
+        .unwrap_or(false)
 }
 
 /// B6：角色 ID 直接参与文件名校拼接（`<id>_<size>.<ext>`），必须是纯标识符。
@@ -296,6 +338,20 @@ pub async fn list(app: &AppHandle) -> Value {
     json!({ "ok": true, "data": accounts })
 }
 
+/// 轻量在线角色轮询：只读 host 写的 `online.json`，不启动 Node、不读完整账号库。
+///
+/// `known=false` 表示当前拿不到可信的在线状态（host 未启动、状态过期或服务端不在运行）。
+/// 前端遇到这种回包必须保留已有状态，不能把 `ids` 当成「所有人已离线」。
+pub fn online(app: &AppHandle) -> Value {
+    let Ok(ctx) = ctx(app) else {
+        return json!({ "ok": false, "known": false, "ids": [] });
+    };
+    match crate::hotreload::online_character_ids(&ctx.runtime) {
+        Some(ids) => json!({ "ok": true, "known": true, "ids": ids }),
+        None => json!({ "ok": true, "known": false, "ids": [] }),
+    }
+}
+
 /// 给 CLI 返回的账号列表补后处理字段：
 ///   1. `hasStoredCredential`：该账号是否存过 DPAPI 加密的密码；
 ///   2. `roles[].avatar`：游戏内肖像 data URL（都没有时显式 null，渲染层据此回退默认图）；
@@ -355,6 +411,54 @@ pub async fn create(app: &AppHandle, user: &str, password: &str, is_gm: bool) ->
     let Ok(ctx) = ctx(app) else {
         return json!({ "ok": false, "reason": "应用状态不可用" });
     };
+
+    // 服务端在启动时把 accounts 表预加载进内存。只要它可能正在运行，
+    // 就不能仅凭 CLI 直接改 SQLite，否则新账号会继续走服务端
+    // devAutoCreateAccounts 的 GM 补建路径。
+    let state_running = main_server_may_hold_accounts(app);
+    let port_running = if state_running {
+        false
+    } else {
+        check_running(app)
+            .await
+            .get("running")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+    };
+    if state_running || port_running {
+        if !crate::hotreload::armed(&ctx.runtime) {
+            let state = app
+                .try_state::<AppState>()
+                .map(|state| state.services.state_of(process::MAIN_SERVER))
+                .unwrap_or_else(|| "idle".to_string());
+            let reason = if state == "starting" {
+                "主服务器正在启动，账号创建桥接尚未就绪，请稍候重试。"
+            } else {
+                "主服务器正在运行，但不是由当前启动器注入启动的，无法安全创建账号。请在启动器的「主控台」重启主服务器后再创建。"
+            };
+            return json!({ "ok": false, "reason": reason });
+        }
+
+        let password_hash = match account_password_hash(&ctx, user, password).await {
+            Ok(hash) => hash,
+            Err(reason) => return json!({ "ok": false, "reason": reason }),
+        };
+        return match crate::hotreload::create_account_via_host(
+            &ctx.runtime,
+            user,
+            &password_hash,
+            is_gm,
+        )
+        .await
+        {
+            Ok(result) => {
+                secrets::remember(&ctx.settings_file, user, password);
+                json!({ "ok": true, "output": result })
+            }
+            Err(reason) => json!({ "ok": false, "reason": reason }),
+        };
+    }
+
     let mut args = vec![
         "create".to_string(),
         root_text(&ctx),

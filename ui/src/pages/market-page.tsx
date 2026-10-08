@@ -26,7 +26,7 @@ import { filterTypeRows, marketTiles, sortTypeRows, type MarketSortKey } from "@
  */
 export function MarketPage() {
   // 物品名 / 分类名是数据，不走翻译桥，得自己按当前语言取（见 namePair）
-  const { locale } = useLocale()
+  const { locale, t } = useLocale()
   const store = useMarket(locale)
   // 中文名与指令手册共用同一份 items.json（模块级缓存，切页不会重复解析）
   const { rows: items } = useManualData("items")
@@ -56,9 +56,12 @@ export function MarketPage() {
   const saveAttrs = useCallback(
     async (input: RawMarketAttrsInput) => {
       const reply = await setTypeAttributes(input)
-      if (reply && reply.ok === true && (reply.changed ?? 0) > 0) {
+      // `changed === 0` 也要重拉：界面手上那份可能是旧的（保存卡在热重载超时里、或者写盘成功
+      // 但回包没等到），不重拉就会一直显示旧值 —— 用户再存一次同样的数，后端只会回「没有
+      // 改动」，看着就像「保存没反应」。重拉是内存查表，代价可以忽略。
+      if (reply && reply.ok === true) {
         const fresh = await loadTypeInfo(input.typeId, true)
-        setTypeInfo({ typeId: input.typeId, info: fresh })
+        if (fresh) setTypeInfo({ typeId: input.typeId, info: fresh })
       }
       return reply
     },
@@ -163,7 +166,10 @@ export function MarketPage() {
         title="物品 / 市场浏览器"
         meta={
           store.catalogLoaded
-            ? `${store.catalog.region.name || "?"} · ${store.catalog.stations.length} 站`
+            ? t("{region} · {count} 站", {
+                region: store.catalog.region.name || "?",
+                count: store.catalog.stations.length,
+              })
             : undefined
         }
         className="min-h-[560px]"

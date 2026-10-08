@@ -87,7 +87,7 @@ export function ParamRow({
               {def.key}
               {description ? "\n" + description : ""}
               {def.validValues ? "\n" + def.validValues : ""}
-              {def.envVar ? "\n环境变量：" + def.envVar : ""}
+              {def.envVar ? "\n" + t("环境变量：{name}", { name: def.envVar }) : ""}
             </TooltipContent>
           </Tooltip>
         </div>

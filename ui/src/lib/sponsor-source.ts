@@ -58,6 +58,8 @@
 /** 默认币种：名单里不写 `currency` 就是它（随包那份 txt 全是人民币） */
 export const DEFAULT_CURRENCY = "CNY"
 
+import { t } from "@/lib/i18n"
+
 export interface SponsorEntry {
   /** 稳定 id：动画层拿它做 key 与去重 */
   id: string
@@ -190,7 +192,12 @@ export function parseSponsorsJson(text: string): SponsorParseResult {
   try {
     parsed = JSON.parse(text)
   } catch (error) {
-    return { entries: [], skipped: [`JSON 解析失败：${(error as Error).message}`] }
+    return {
+      entries: [],
+      skipped: [
+        t("JSON 解析失败：{error}", { error: (error as Error).message }),
+      ],
+    }
   }
 
   const rows = Array.isArray(parsed)

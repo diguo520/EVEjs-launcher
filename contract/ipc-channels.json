@@ -2,12 +2,12 @@
   "generatedFrom": "E:\\Games\\EveJS-v0.12.8\\launcher\\launcher",
   "generatedAt": "2026-10-05T11:17:38.460Z",
   "counts": {
-    "invoke": 105,
+    "invoke": 106,
     "send": 6,
     "events": 7,
-    "requests": 111,
+    "requests": 112,
     "registered": 82,
-    "apiTotal": 118
+    "apiTotal": 119
   },
   "invoke": [
     {
@@ -73,6 +73,13 @@
       "params": [
         "requests"
       ]
+    },
+    {
+      "api": "accountsOnline",
+      "channel": "accounts:online",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
     },
     {
       "api": "accountsSetPassword",
@@ -988,6 +995,7 @@
     "invoke": [
       "accounts:deleteCharacter",
       "accounts:logotypes",
+      "accounts:online",
       "danger:clearCache",
       "danger:eraseWorld",
       "danger:resetConfig",

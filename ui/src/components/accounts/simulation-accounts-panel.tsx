@@ -18,11 +18,12 @@ export function SimulationAccountsPanel({ accounts }: { accounts: Account[] }) {
         const online = account.characters.filter((character) => character.online)
         const shown = online.slice(0, 24)
         const group = simulationGroup(account)
+        const groupLabel = t(GROUP_LABEL[group])
         return (
           <Panel
             key={account.id}
             flush
-            tag={`// ${GROUP_LABEL[group]}`}
+            tag={`// ${groupLabel}`}
             title={account.name}
             actions={
               <div className="flex items-center gap-1.5">
@@ -35,7 +36,7 @@ export function SimulationAccountsPanel({ accounts }: { accounts: Account[] }) {
           >
             <div className="space-y-2 p-3">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-tertiary">
-                <span>{GROUP_LABEL[group]}</span>
+                <span>{groupLabel}</span>
                 <span className="tabular">
                   {t("角色 {characters} · 在线 {online}", {
                     characters: account.characters.length,

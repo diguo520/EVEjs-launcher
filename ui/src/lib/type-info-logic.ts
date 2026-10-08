@@ -91,6 +91,48 @@ export function formatAttrValue(attr: RawMarketTypeInfoAttr): string {
   return withUnit(attr.value, attr.unit)
 }
 
+/* ------------------------ 原厂值（属性被改过时的「还原」目标） ------------------------ */
+
+/**
+ * 一条属性的 SDE 原厂值。
+ *
+ * 后端只在**确实被改过**时才回 `originalValue`（见 market.rs 的 `info_attribute`），
+ * 没回就说明现值就是原厂值 —— 所以这里不用 `attr.value` 兜底也不会错。这条口径很重要：
+ * 弹窗要拿它判断「这一行跟原厂值到底差没差」，判错了会把没改过的行也标成「已修改」。
+ */
+export function attrOriginalValue(attr: RawMarketTypeInfoAttr): number {
+  return attr.modified === true && attr.originalValue != null ? attr.originalValue : attr.value
+}
+
+/**
+ * 原厂值的显示串：与现值同一套折算规则（毫秒 / 共振系数 / 枚举单位都能对上）。
+ *
+ * 引用型属性（unitId 115 / 116，值是别的物品的 typeID）要把 `typeName` 清掉 ——
+ * 那个名字是按**现值**解析出来的，原值可能指向另一个物品，留着就会印出一个错名字。
+ */
+export function formatOriginalValue(attr: RawMarketTypeInfoAttr): string {
+  return formatAttrValue({ ...attr, value: attrOriginalValue(attr), typeName: null })
+}
+
+/**
+ * 「可还原」的行：现值与 SDE 原厂值**已经不一致** —— 也就是后端在 `modified` 上标出来的
+ * 那些（改过、并且已经落盘）。
+ *
+ * 刻意**不看草稿**：刚输入还没保存的改动不算。用户要的是「还原已经改掉的东西」，输入过程
+ * 中行尾冒出一个还原图标只会让人以为哪里出错了。反过来说，没被改过的行原值本来就等于现值，
+ * 所以「只给已保存的改动画原值」不会少显示任何信息。
+ */
+export function restorableAttrs(
+  attributes: RawMarketTypeInfoAttr[] | undefined
+): { id: number; original: number }[] {
+  const out: { id: number; original: number }[] = []
+  for (const attr of attributes ?? []) {
+    if (attr.modified !== true) continue
+    out.push({ id: attr.id, original: attrOriginalValue(attr) })
+  }
+  return out
+}
+
 /** 简介折成一行：原文里有换行，悬停卡里一行一行排会占掉半屏 */
 export function clampDescription(
   text: string | undefined,

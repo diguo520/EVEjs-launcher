@@ -3,6 +3,7 @@ import * as React from "react"
 import {
   getActiveLocale,
   LOCALES,
+  loadCatalog,
   readStoredLocale,
   setActiveLocale,
   translate,
@@ -13,7 +14,7 @@ import {
 
 interface LocaleContextValue {
   locale: LocaleCode
-  setLocale: (code: LocaleCode) => void
+  setLocale: (code: LocaleCode) => Promise<void>
   /** 取一条带插值的文案（静态文案不用它，翻译桥会处理） */
   t: (text: string, vars?: Record<string, string | number>) => string
   languages: typeof LOCALES
@@ -142,14 +143,34 @@ function LocaleBridge({ locale }: { locale: LocaleCode }) {
   return null
 }
 
-export function LocaleProvider({ children }: { children: React.ReactNode }) {
-  const [locale, setLocaleState] = React.useState<LocaleCode>(() => readStoredLocale())
+export function LocaleProvider({
+  children,
+  initialLocale,
+}: {
+  children: React.ReactNode
+  /** `main.tsx` 已提前加载好的首屏语言；单测 / 嵌入场景不传时仍按存储与系统语言自己解析 */
+  initialLocale?: LocaleCode
+}) {
+  const [locale, setLocaleState] = React.useState<LocaleCode>(
+    () => initialLocale ?? readStoredLocale()
+  )
+  const switchSeq = React.useRef(0)
 
   // 渲染期同步模块级语言：非 React 代码（日志、toast、事件回调）里的 `t()` 靠它取当前语言。
   // 必须在子节点渲染前生效，所以放在这里而不是 useEffect 里。
   setActiveLocale(locale)
 
-  const setLocale = React.useCallback((code: LocaleCode) => {
+  const setLocale = React.useCallback(async (code: LocaleCode) => {
+    if (code === getActiveLocale()) return
+    const seq = switchSeq.current + 1
+    switchSeq.current = seq
+    try {
+      await loadCatalog(code)
+    } catch {
+      // 本地 chunk 读取失败时保持旧语言，不让界面进入半翻译状态。
+      return
+    }
+    if (seq !== switchSeq.current) return
     writeStoredLocale(code)
     setLocaleState(code)
   }, [])

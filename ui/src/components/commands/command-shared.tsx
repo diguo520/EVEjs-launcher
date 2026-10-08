@@ -405,15 +405,20 @@ export function EmptyHint({ text }: { text: string }) {
 
 /** 大表加载中 / 加载失败 */
 export function LoadingHint({ failed = false, label }: { failed?: boolean; label: string }) {
+  const localizedLabel = t(label)
   if (failed) {
     return (
-      <EmptyHint text={t("{label}加载失败，切到别的标签页再回来可重试", { label })} />
+      <EmptyHint
+        text={t("{label}加载失败，切到别的标签页再回来可重试", {
+          label: localizedLabel,
+        })}
+      />
     )
   }
   return (
     <div className="flex items-center justify-center gap-2 rounded-md border border-input bg-background/40 px-4 py-10 text-[12px] text-tertiary">
       <Loader2 className="size-3.5 animate-spin" />
-      正在载入{label}…
+      正在载入{localizedLabel}…
     </div>
   )
 }

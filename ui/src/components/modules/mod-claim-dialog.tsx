@@ -161,12 +161,16 @@ export function ModClaimDialog({
       return
     }
     if (reply.needsToken) {
-      toast.error(reply.reason ?? "认领要核验仓库归属", {
+      toast.error(reply.reason ?? t("认领要核验仓库归属"), {
         action: { label: t("去配置令牌"), onClick: onOpenToken },
       })
       return
     }
-    toast.error(t("认领失败：{reason}", { reason: reply.reason ?? "仓库归属核验没通过" }))
+    toast.error(
+      t("认领失败：{reason}", {
+        reason: reply.reason ?? t("仓库归属核验没通过"),
+      })
+    )
   }
 
   return (

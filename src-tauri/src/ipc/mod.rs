@@ -253,6 +253,7 @@ async fn dispatch(
 
         /* ------------------------------ 账号管理 ------------------------------ */
         "accounts:list" => Ok(accounts::list(app).await),
+        "accounts:online" => Ok(accounts::online(app)),
         "accounts:create" => Ok(accounts::create(
             app,
             &accounts::text_arg(args, 0),

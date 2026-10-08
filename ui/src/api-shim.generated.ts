@@ -43,6 +43,7 @@ export const api = {
   accountsLaunch: (user: string, characterId?: string | number): Promise<unknown> => request("accounts:launch", [user, characterId]),
   accountsList: (): Promise<unknown> => request("accounts:list", []),
   accountsLogotypes: (requests: Array<{ kind: "corporations" | "alliances"; id: number }>): Promise<unknown> => request("accounts:logotypes", [requests]),
+  accountsOnline: (): Promise<unknown> => request("accounts:online", []),
   accountsSetPassword: (user: string, oldPw: string, newPw: string): Promise<unknown> => request("accounts:setPassword", [user, oldPw, newPw]),
   accountsVerify: (user: string, password: string): Promise<unknown> => request("accounts:verify", [user, password]),
   appInfo: (): Promise<unknown> => request("app:info", []),

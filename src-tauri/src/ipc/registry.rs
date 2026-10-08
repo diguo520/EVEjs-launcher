@@ -20,6 +20,7 @@ pub const HANDLED: &[&str] = &[
     "accounts:deleteCharacter",
     "accounts:launch",
     "accounts:list",
+    "accounts:online",
     "accounts:logotypes",
     "accounts:setPassword",
     "accounts:verify",

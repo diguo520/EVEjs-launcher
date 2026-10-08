@@ -6,6 +6,7 @@
  */
 import { useCallback, useEffect, useState } from "react"
 
+import { t } from "@/lib/i18n"
 import { call, hasIpc } from "@/lib/ipc"
 
 /** hotreload:state 里的一张静态表 */
@@ -114,7 +115,7 @@ export function useHotReload(): HotReloadStore {
 
   const reload = useCallback(() => {
     if (!live) {
-      setError("当前不在启动器窗口里，读不到静态数据清单")
+      setError(t("当前不在启动器窗口里，读不到静态数据清单"))
       return
     }
     setLoading(true)
@@ -122,7 +123,9 @@ export function useHotReload(): HotReloadStore {
       try {
         const reply = await call<HotReloadState>("hotreloadState")
         setState(reply ?? null)
-        setError(reply && reply.supported === false ? "这台机器的服务端没有 gameStore" : null)
+        setError(
+          reply && reply.supported === false ? t("这台机器的服务端没有 gameStore") : null
+        )
       } catch (reason) {
         setError(reason instanceof Error ? reason.message : String(reason))
       } finally {
@@ -137,7 +140,7 @@ export function useHotReload(): HotReloadStore {
 
   const apply = useCallback(
     async (tables: string[], snapshot = true): Promise<HotReloadResult> => {
-      if (!live) return { ok: false, reason: "当前不在启动器窗口里" }
+      if (!live) return { ok: false, reason: t("当前不在启动器窗口里") }
       setApplying(true)
       try {
         const reply = await call<HotReloadResult>("hotreloadApply", {
@@ -157,7 +160,7 @@ export function useHotReload(): HotReloadStore {
 
   const restore = useCallback(
     async (snapshotId?: string): Promise<HotReloadResult> => {
-      if (!live) return { ok: false, reason: "当前不在启动器窗口里" }
+      if (!live) return { ok: false, reason: t("当前不在启动器窗口里") }
       setApplying(true)
       try {
         const reply = await call<HotReloadResult>("hotreloadRestore", snapshotId)

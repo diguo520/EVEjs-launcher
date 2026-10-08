@@ -23,6 +23,14 @@
       "why": "军团 / 联盟徽标此前只能走本地图片服务（HTTP 26001）：服务端没起就整块不画；而服务端对「没有专属徽标」的军团与联盟回的是同一张兜底图（evejscorp.png 与 alliance-default.png 是同一张画，只差底部一行小字），缩到 20px 就是两个一模一样的图标。这条通道直接从服务端图片目录读专属徽标（`<id>_<size>.png`，运行时目录优先、legacy 次之），拿不到就回 null，界面改画军团 ticker / 联盟简称，服务关着也能看见。"
     },
     {
+      "api": "accountsOnline",
+      "channel": "accounts:online",
+      "kind": "invoke",
+      "signature": "",
+      "params": [],
+      "why": "账号页每 5 秒刷新在线角色。完整 accounts:list 会启动 Node、全量读账号库并把所有角色用 JSON 回传；账号和模拟角色多时这是持续 CPU / 内存抖动。这条通道只读取注入 host 已经写好的 _launcher/hotreload/online.json，返回在线角色 ID 列表；known=false 表示 host 暂不可用，前端保持已有状态，不误报全体离线。"
+    },
+    {
       "api": "dangerClearCache",
       "channel": "danger:clearCache",
       "kind": "invoke",

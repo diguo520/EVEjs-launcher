@@ -574,6 +574,38 @@ function readJsonlFile(file) {
 }
 
 /**
+ * 流式扫一遍 jsonl，逐行交给回调；文件不在就回 false。
+ *
+ * `typeDogma.jsonl` 有 27 MB：整份 `readFileSync` 再 split 会在内存里同时留下原文、
+ * 行数组与每一行的对象，只为挑几个数不值得。`types.jsonl`（144 MB）另有自己的一份
+ * 流式读法，因为那条路还要按原始行做快筛，解析之前就得先丢掉大部分行。
+ */
+function scanJsonl(file, onRow) {
+  return new Promise((resolve, reject) => {
+    if (!fs.existsSync(file)) {
+      resolve(false);
+      return;
+    }
+    const reader = readline.createInterface({
+      input: fs.createReadStream(file),
+      crlfDelay: Infinity,
+    });
+    reader.on("line", (line) => {
+      if (!line) return;
+      let row;
+      try {
+        row = JSON.parse(line);
+      } catch {
+        return; // 单行坏了不影响整份
+      }
+      onRow(row);
+    });
+    reader.on("close", () => resolve(true));
+    reader.on("error", reject);
+  });
+}
+
+/**
  * 悬停提示用的索引：简介（SDE 的 `types.jsonl`）+ 属性（服务端静态表 `typeDogma` 的值、
  * SDE 的属性元数据与单位符号）。
  *
@@ -635,7 +667,7 @@ async function typeinfo(root, langArg) {
     db.close();
   }
 
-  // 4) 每个物品的属性值（服务端自己的静态表：服务端升级后启动器不用跟着发版）
+  // 4) 读服务端自己的静态表 typeDogma（服务端升级后启动器不用跟着发版）
   const dogmaFile = path.join(root, "_local", "gameStore", "data", "typeDogma", "data.json");
   let dogma;
   try {
@@ -644,12 +676,40 @@ async function typeinfo(root, langArg) {
     throw new Error("未找到服务端静态表：" + dogmaFile + "（属性值读它）");
   }
   const byType = (dogma && dogma.typesByTypeID) || {};
+
+  // 5) 原厂值（SDE 的 `typeDogma.jsonl`）：属性改过之后要能「还原」，界面还得显示
+  //    「原值 / 现值」的差异，所以原值必须跟现值一起回来。
+  //
+  //    为什么以 SDE 为准、而不是启动器自己存一份「首次见到的基线」：现网静态表自带
+  //    `source.authority` / `source.buildNumber`，指的就是这份 SDE；跟着它走，SDE 换
+  //    版本时基准自动跟上，也不会出现「基线比表还旧」的漂移。取的是**在售 × 有属性
+  //    元数据**的交集，与下一步列属性的口径逐条对齐，多存的都是马上要丢的。
+  const originalByType = new Map();
+  await scanJsonl(path.join(sde, "typeDogma.jsonl"), (row) => {
+    const id = Number(row && row._key);
+    if (!id || !marketIds.has(id)) return;
+    const attrs = {};
+    for (const item of Array.isArray(row.dogmaAttributes) ? row.dogmaAttributes : []) {
+      const attributeId = Number(item && item.attributeID);
+      const value = Number(item && item.value);
+      if (!attributeId || !meta.has(attributeId) || !Number.isFinite(value)) continue;
+      attrs[attributeId] = value;
+    }
+    originalByType.set(id, attrs);
+  });
+
+  // 6) 把静态表折成界面要的属性行：只留在售、有属性元数据、且该显示的那些。
+  //    顺带挑出与 SDE 不一致的，收进 `modified`（值是**原厂值**）—— 未改动时整块是空的，
+  //    否则这份回包要多背一倍体积。
   const values = new Map();
+  const modified = new Map();
   const referenced = new Set();
   let attributeRows = 0;
   for (const id of marketIds) {
     const entry = byType[String(id)];
     if (!entry || !entry.attributes) continue;
+    const original = originalByType.get(id) || {};
+    const changed = {};
     const rows = [];
     for (const key of Object.keys(entry.attributes)) {
       const attributeId = Number(key);
@@ -657,12 +717,17 @@ async function typeinfo(root, langArg) {
       if (!info) continue;
       const value = Number(entry.attributes[key]);
       if (!Number.isFinite(value)) continue;
-      // 值为 0 且属性标了 displayWhenZero=false 的不列出来（与客户端同一条规则）
-      if (value === 0 && !info.displayWhenZero) continue;
+      const before = original[attributeId];
+      const isModified = before !== undefined && before !== value;
+      // 值为 0 且属性标了 displayWhenZero=false 的不列出来（与客户端同一条规则）；
+      // 但**改过的**要留下 —— 否则把某条改成 0 之后整行消失，界面上再也还原不了它。
+      if (value === 0 && !info.displayWhenZero && !isModified) continue;
+      if (isModified) changed[attributeId] = before;
       if (info.unit === TYPE_REF_UNIT && value > 0) referenced.add(value);
       rows.push([attributeId, value]);
     }
     if (rows.length === 0) continue;
+    if (Object.keys(changed).length > 0) modified.set(id, changed);
     // 先按分类、再按属性 id：界面拿到就能分组，不用自己再排一遍
     rows.sort(
       (left, right) =>
@@ -672,7 +737,7 @@ async function typeinfo(root, langArg) {
     attributeRows += rows.length;
   }
 
-  // 5) 加成（技能加成 / 特有加成）：SDE 的 typeBonus.jsonl 只有 650 种类型，整份读很快。
+  // 7) 加成（技能加成 / 特有加成）：SDE 的 typeBonus.jsonl 只有 650 种类型，整份读很快。
   //    技能名（「小型射弹炮台每升一级：」）也要一起给，所以技能 typeID 也进 referenced。
   const bonuses = new Map();
   for (const row of readJsonlFile(path.join(sde, "typeBonus.jsonl"))) {
@@ -691,7 +756,7 @@ async function typeinfo(root, langArg) {
     if (sections.length) bonuses.set(id, sections);
   }
 
-  // 6) 简介 + 「值指向的类型」的名字：流式扫 types.jsonl（144 MB，别整份读进内存）
+  // 8) 简介 + 「值指向的类型」的名字：流式扫 types.jsonl（144 MB，别整份读进内存）
   const descriptions = new Map();
   const names = new Map();
   const shipMeta = new Map();
@@ -731,7 +796,7 @@ async function typeinfo(root, langArg) {
     reader.on("error", reject);
   });
 
-  // 7) 舰船补三条类型字段（质量 / 容量 / 体积）：装上以后属性面板才能像游戏那样，
+  // 9) 舰船补三条类型字段（质量 / 容量 / 体积）：装上以后属性面板才能像游戏那样，
   //    「导航」段里有质量、「仓库」段里有容量与体积 —— 它们不是 dogma 属性，只读。
   let derivedRows = 0;
   for (const [id, extra] of shipMeta) {
@@ -772,6 +837,8 @@ async function typeinfo(root, langArg) {
       ])
     ),
     types: Object.fromEntries(values),
+    // typeID → { 属性 id: 原厂值 }：只有与 SDE 不一致的属性才在这里（见第 6 步）
+    modified: Object.fromEntries(modified),
     descriptions: Object.fromEntries(descriptions),
     names: Object.fromEntries(names),
     bonuses: Object.fromEntries(bonuses),
