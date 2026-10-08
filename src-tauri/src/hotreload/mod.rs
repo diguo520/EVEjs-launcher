@@ -1051,7 +1051,10 @@ mod tests {
             &json!({ "bootId": "gone", "pid": 1 }),
         )
         .unwrap();
-        assert!(armed(&runtime), "会话残留时 armed 仍然为 true，正是要防的情形");
+        assert!(
+            armed(&runtime),
+            "会话残留时 armed 仍然为 true，正是要防的情形"
+        );
 
         let started = std::time::Instant::now();
         let reply = apply_with_pickup(
