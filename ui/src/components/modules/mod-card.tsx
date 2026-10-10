@@ -130,7 +130,9 @@ export function ModCard({
   return (
     <div
       className={cn(
-        "relative flex flex-col overflow-hidden rounded-lg border bg-card transition-colors",
+        // h-full：卡片永远填满外层给它的大小。这一条让"同一行卡片等高"不依赖调用方
+        // 用的是 grid（默认 stretch）还是 flex —— 换布局时不会又缩回自然高度。
+        "relative flex h-full flex-col overflow-hidden rounded-lg border bg-card transition-colors",
         conflicts.length
           ? "border-destructive/55 shadow-[0_0_0_1px_hsl(var(--destructive)_/_0.25)]"
           : reviewing

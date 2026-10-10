@@ -885,6 +885,52 @@ export interface RawAuthoringDoc {
   text: string
 }
 
+/**
+ * `mods:plan` 的「生效顺序」一条。
+ *
+ * `index` 是**最终生效**的名次（0 起），`baseIndex` 是这条在**用户手动顺序**里的名次；
+ * 两者不一致（`reordered`）说明它被清单里的 `loadAfter` / `loadBefore` 挪过位置。
+ */
+export interface RawModPlanEntry {
+  id: string
+  folder: string
+  name: string
+  index: number
+  baseIndex?: number | null
+  reordered: boolean
+  /** 它自己声明的前置（只在已启用的模组里能对上号的才回传） */
+  loadAfter: string[]
+  /** 它自己声明的后置 */
+  loadBefore: string[]
+}
+
+/** 被整条跳过的模组：清单校验失败 / 签名被篡改 / 缺依赖 / 冲突 / 没有 loader.js */
+export interface RawModPlanSkipped {
+  id: string
+  reason: string
+}
+
+/** 被忽略的顺序声明：目标不在已启用模组里，或手动顺序里记着已经删掉的目录 */
+export interface RawModPlanIgnored {
+  /** loadAfter | loadBefore | order */
+  field: string
+  /** 声明方；order 那一类没有声明方 */
+  id?: string | null
+  target: string
+  reason: string
+}
+
+/** `mods:plan` */
+export interface RawModPlan {
+  /** 真正注入的 loader 路径（正斜杠，有序） */
+  paths: string[]
+  order: RawModPlanEntry[]
+  skipped: RawModPlanSkipped[]
+  ignored: RawModPlanIgnored[]
+  /** true = 检测到循环依赖，本次完全按用户手动顺序加载 */
+  cycle: boolean
+}
+
 /** settings:get（返回设置文件里的键值，没有任何键时是 {}） */
 export type RawSettings = Record<string, unknown>
 

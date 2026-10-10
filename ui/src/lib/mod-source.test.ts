@@ -117,6 +117,42 @@ describe("fromMarket / applyLocal / applyMine", () => {
     expect(merged.conflicts).toEqual(["installed-on", "not-installed", "disabled-mod"])
   })
 
+  /**
+   * 「用户拖的加载顺序」要能被已安装页读到，但**不能靠改数组顺序**：
+   * `mods` 数组的次序就是市场页签的默认排序（sortMods default 直接返回原顺序），
+   * 之前把数组改成「本地在前」，市场页签的列表跟着一起变了（2026-10-10 报障）。
+   * 现在的口径：数组照旧按市场索引，本地位次单独记在 `localRank` 上。
+   */
+  it("本地扫描位次记在 localRank 上，数组顺序仍按市场索引", () => {
+    const mods = buildMods({
+      // 本地扫描顺序 = 用户拖的顺序：c → a → b
+      list: localMods([
+        { id: "c", displayName: "C" },
+        { id: "a", displayName: "A" },
+        { id: "b", displayName: "B" },
+      ]),
+      // 市场索引给另一个先后（a → b → c）
+      market: market([{ id: "a" }, { id: "b" }, { id: "c" }]),
+    })
+    // 数组顺序 = 市场索引顺序（市场页签的口径）
+    expect(mods.map((item) => item.id)).toEqual(["a", "b", "c"])
+    // 本地位次 = 用户拖出来的加载顺序（已安装页的口径）
+    expect(Object.fromEntries(mods.map((item) => [item.id, item.localRank]))).toEqual({
+      a: 1,
+      b: 2,
+      c: 0,
+    })
+
+    // 只在市场里挂着、本地没装的那批没有 localRank
+    const withMarketOnly = buildMods({
+      list: localMods([{ id: "b", displayName: "B" }]),
+      market: market([{ id: "a" }, { id: "b" }]),
+    })
+    expect(withMarketOnly.map((item) => item.id)).toEqual(["a", "b"])
+    expect(withMarketOnly.find((item) => item.id === "b")?.localRank).toBe(0)
+    expect(withMarketOnly.find((item) => item.id === "a")?.localRank).toBeUndefined()
+  })
+
   it("我的条目叠加审核状态与驳回原因", () => {
     const merged = applyMine(entry, {
       id: "demo",

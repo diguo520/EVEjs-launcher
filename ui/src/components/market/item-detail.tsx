@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CopyButton, EmptyHint, LoadingHint } from "@/components/commands/command-shared"
 import { StockEditDialog } from "@/components/market/stock-edit-dialog"
+import { BestPriceDialog } from "@/components/market/best-price-dialog"
 import { AttributeEditDialog } from "@/components/market/attribute-edit-dialog"
 import { DescriptionDialog } from "@/components/market/description-dialog"
 import { TypeInfoPanel } from "@/components/market/item-tooltip"
@@ -85,6 +86,8 @@ export function ItemDetail({
   const [editingAttrs, setEditingAttrs] = useState(false)
   // 物品简介弹窗：简介从页签里挪到了标题栏那个书页图标上
   const [showDescription, setShowDescription] = useState(false)
+  // 修改最优价格弹窗（两列：最优买价只读 / 最优卖价可改）
+  const [editingBestPrice, setEditingBestPrice] = useState(false)
   const { t } = useLocale()
 
   if (loading && !book) {
@@ -186,6 +189,7 @@ export function ItemDetail({
           value={formatIsk(summary?.bestAsk ?? 0)}
           hint={summary ? stallName(summary.askStation) : "无卖单"}
           tone="success"
+          onClick={() => setEditingBestPrice(true)}
         />
         <MiniStat
           icon={<Gauge className="size-3" />}
@@ -193,6 +197,7 @@ export function ItemDetail({
           value={formatIsk(summary?.bestBid ?? 0)}
           hint={summary ? stallName(summary.bidStation) : "无买单"}
           tone="destructive"
+          onClick={() => setEditingBestPrice(true)}
         />
         <MiniStat
           icon={<Store className="size-3" />}
@@ -284,6 +289,17 @@ export function ItemDetail({
         />
       ) : null}
 
+      {editingBestPrice ? (
+        <BestPriceDialog
+          typeId={type.typeId}
+          typeName={pair.main}
+          summary={summary}
+          stock={stock}
+          onClose={() => setEditingBestPrice(false)}
+          onSubmit={onAdjust}
+        />
+      ) : null}
+
       {editingAttrs && info?.ok === true ? (
         <AttributeEditDialog
           typeId={type.typeId}
@@ -311,12 +327,15 @@ function MiniStat({
   value,
   hint,
   tone,
+  onClick,
 }: {
   icon: ReactNode
   label: string
   value: string
   hint: string
   tone: "success" | "destructive" | "foreground" | "telemetry"
+  /** 给了就是可点的：用来打开「修改最优价格」弹窗 */
+  onClick?: () => void
 }) {
   const toneClass = {
     success: "text-success",
@@ -324,8 +343,8 @@ function MiniStat({
     foreground: "text-foreground",
     telemetry: "text-telemetry",
   }[tone]
-  return (
-    <div className="rounded-md border border-input bg-background/40 px-2.5 py-2">
+  const body = (
+    <>
       <div className="flex items-center gap-1 text-tertiary">
         {icon}
         <span className="panel-label">{label}</span>
@@ -334,7 +353,23 @@ function MiniStat({
       <div data-i18n-skip className="truncate text-[10px] text-tertiary">
         {hint}
       </div>
-    </div>
+    </>
+  )
+
+  if (!onClick) {
+    return (
+      <div className="rounded-md border border-input bg-background/40 px-2.5 py-2">{body}</div>
+    )
+  }
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title="修改最优价格"
+      className="rounded-md border border-input bg-background/40 px-2.5 py-2 text-left transition-colors hover:border-primary/50 hover:bg-secondary/40 focus-visible:outline-none focus-visible:shadow-focus"
+    >
+      {body}
+    </button>
   )
 }
 

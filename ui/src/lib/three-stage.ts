@@ -1,13 +1,11 @@
 /**
  * three.js 的公共入口与收尾。
  *
- * 启动器里有两处要画 WebGL：开机动画（components/shell/boot/boot-three-fx.tsx）与
- * 设置页的「补给线」面板（components/settings/sponsor-flow.tsx）。两处必须守同样三条
- * 纪律，所以抽到这里 —— 免得哪一处漏掉，尤其是最后那条归还上下文。
+ * 启动器里要画 WebGL 的地方是开机动画（components/shell/boot/boot-three-fx.tsx）。
+ * 三条纪律都收在这里，尤其是最后那条归还上下文。
  *
  *   1) **懒加载**。three 单独一块（719 KB，随 exe 嵌入，不联网），只有真要画的时候才
- *      `import("three")`；解析过一次之后模块常驻，第二次是缓存命中（所以第二处用它
- *      的真实增量成本是 0，而不是再吃一次 719 KB）。
+ *      `import("three")`；解析过一次之后模块常驻，切页回来是缓存命中，不会重复吃这 719 KB。
  *   2) **先探上下文**。three 的 WebGLRenderer 拿不到上下文会抛，提前判掉，别在控制台
  *      留一条无意义的异常；探不到就整块不画，交给上层降级。
  *   3) **显式归还 GL 上下文**。`dispose()` 只还掉 three 自己创建的东西（几何、纹理、

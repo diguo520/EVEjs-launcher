@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react"
 import {
+  ArrowDownToLine,
   ArrowUpCircle,
   BadgeCheck,
   BookOpen,
+  GripVertical,
   History,
   Loader2,
   MessageSquare,
@@ -15,9 +17,11 @@ import { toast } from "sonner"
 import { SectionHeading, StatTile } from "@/components/common/panel"
 import { useLocale } from "@/components/shell/locale-provider"
 import { listSeparator } from "@/lib/i18n"
+import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ModCard } from "@/components/modules/mod-card"
+import { ModLoadOrderPanel } from "@/components/modules/mod-load-order-panel"
 import { ModToolbar } from "@/components/modules/mod-toolbar"
 import {
   ModDetailDialog,
@@ -47,9 +51,12 @@ import {
   submitCooldownRemaining,
   collectConflictPairs,
   filterMods,
+  groupByEnabled,
   hasOwnSignature,
   hasUpdate,
   isPublished,
+  mergeEnabledOrder,
+  moveWithin,
   usesDefaultSignature,
   isReviewing,
   pendingConflicts,
@@ -70,6 +77,17 @@ import { formatMB, type ModEntry } from "@/lib/mock"
 import type { ViewId } from "@/components/shell/nav-config"
 
 const MOD_TABS: ModTab[] = ["installed", "preflight", "mine", "market"]
+
+/**
+ * 按**本地扫描位次**排（= 用户拖出来的加载顺序）。
+ *
+ * 不能拿共享 `mods` 数组的次序来排：那个数组按市场索引在前（市场页签的默认排序吃它）。
+ * 序号 / 拖拽落位 / 已安装页显示都吃它的话，就会出现「列表按用户顺序显示、左上角序号
+ * 却是市场顺序」这种对不上（2026-10-10 报障）。
+ */
+function byLocalRank(a: ModEntry, b: ModEntry): number {
+  return (a.localRank ?? Number.MAX_SAFE_INTEGER) - (b.localRank ?? Number.MAX_SAFE_INTEGER)
+}
 
 const TAB_LABEL: Record<ModTab, string> = {
   installed: "已安装",
@@ -267,7 +285,12 @@ export function ModulesPage({
       rating: ratingFilter,
       tag: activeTag,
     })
-    return tab === "market" ? sortMods(pool, sort) : pool
+    if (tab === "market") return sortMods(pool, sort)
+    // 已安装页：先按**本地扫描位次**排（那就是用户拖出来的加载顺序），再按「启用在前、
+    // 停用在后」分组。顺序只在这里用，不去动共享 `mods` 数组 —— 市场页签的默认排序
+    // 就是吃那个数组的顺序，动它会连市场页一起带跑（2026-10-10 报障）。
+    if (tab !== "installed") return pool
+    return groupByEnabled([...pool].sort(byLocalRank))
   }, [
     mods,
     tab,
@@ -302,6 +325,204 @@ export function ModulesPage({
   /** 本地 mods/ 下的目录名；写通道要的是它，缺失时回落到 id */
   const keyOf = (mod: ModEntry) => mod.folder ?? mod.id
 
+  /* ---------------- 加载顺序（已安装页拖拽） ---------------- */
+
+  /**
+   * 能拖的前提：在「已安装」页签、且没有搜索词 / 分类 / 标签筛选。
+   * 筛选态下卡片只是一个子集，拖出来的顺序会缺项，写回去等于把没显示出来的模组挤到别处。
+   */
+  const canReorder =
+    tab === "installed" && query.trim() === "" && category === ALL_CATEGORY && activeTag === null
+
+  /** 顺序文件里存的是**本地文件夹名**（不是市场 id） */
+  const orderKeyOf = (mod: ModEntry) => mod.folder ?? mod.id
+
+  /** 完整顺序 + 启用段；拖拽合并时用 */
+  const orderState = useMemo(() => {
+    // 必须按**本地扫描位次**排（= 用户拖出来的加载顺序），不能拿共享 `mods` 数组的次序：
+    // 那个数组按市场索引在前（市场页签的默认顺序吃它）。序号和拖拽落位都吃它的话，就会出现
+    // 「列表按用户顺序显示、左上角序号却是市场顺序」这种对不上（2026-10-10 报障）。
+    const locals = mods.filter((mod) => mod.installed).slice().sort(byLocalRank)
+    return {
+      all: locals.map(orderKeyOf),
+      enabled: locals.filter((mod) => mod.enabled).map(orderKeyOf),
+    }
+  }, [mods])
+
+  /**
+   * 正在拖的 key 用 ref 存：`dragstart` → `dragover` → `drop` 只隔几个事件 tick，
+   * 走 state 的话 drop 里可能还读着上一次渲染的旧值（null），表现就是「拖了没反应」。
+   * 另一个 state 只负责画「拖拽中」的半透明提示。
+   */
+  const dragKey = useRef<string | null>(null)
+  const [draggingKey, setDraggingKey] = useState<string | null>(null)
+  /**
+   * 拖拽落点提示：`key` 是鼠标正压着的卡片，`after` 表示插到它后面。
+   * 靠它在卡片上画一条主色分割条 —— 拖的时候看得见"会落在哪"，不用松手试。
+   */
+  const [dropHint, setDropHint] = useState<{ key: string; after: boolean } | null>(null)
+
+  /**
+   * 落盘：停用的条目在原位不动，只把启用段按新顺序填回槽位 —— 这样关掉模组不用重排，
+   * 重新打开也会回到原来的位置。
+   */
+  async function applyOrder(nextEnabled: string[]) {
+    if (nextEnabled.join("|") === orderState.enabled.join("|")) return
+    const reply = await source.setOrder(
+      mergeEnabledOrder(orderState.all, orderState.enabled, nextEnabled)
+    )
+    if (!reply.ok) {
+      toast.error(t("加载顺序没保存"), { description: reply.reason ?? t("后端没说明原因") })
+      return
+    }
+    await source.reload()
+    toast.success(t("加载顺序已更新"), { description: t("重启服务端后生效。") })
+  }
+
+  function dragOverCard(event: DragEvent<HTMLDivElement>, targetKey: string) {
+    const from = dragKey.current
+    if (!from || from === targetKey) {
+      setDropHint(null)
+      return
+    }
+    event.preventDefault()
+    event.dataTransfer.dropEffect = "move"
+    // 落在卡片上半 ⇒ 插到它前面，下半 ⇒ 插到它后面
+    const rect = event.currentTarget.getBoundingClientRect()
+    const after = event.clientY > rect.top + rect.height / 2
+    setDropHint((current) =>
+      current && current.key === targetKey && current.after === after
+        ? current
+        : { key: targetKey, after }
+    )
+  }
+
+  function dropOnCard(event: DragEvent<HTMLDivElement>, targetKey: string) {
+    event.preventDefault()
+    const from = dragKey.current
+    dragKey.current = null
+    setDraggingKey(null)
+    setDropHint(null)
+    if (!from || from === targetKey) return
+    // 落在卡片上半 ⇒ 插到它前面，下半 ⇒ 插到它后面
+    const rect = event.currentTarget.getBoundingClientRect()
+    const after = event.clientY > rect.top + rect.height / 2
+    void applyOrder(moveWithin(orderState.enabled, from, targetKey, after))
+  }
+
+  /** 一键排到启用段最后 —— 写 loadAfter 排不开的冲突模组最常用这个 */
+  function moveToEnd(key: string) {
+    void applyOrder([...orderState.enabled.filter((item) => item !== key), key])
+  }
+
+  /**
+   * 一屏卡片。已安装页调两次（启用段 / 停用段），其它页签调一次。
+   *
+   * 为什么启用 / 停用要分成两块、而不是只按顺序排一遍：三列网格里「最后一张已启用 +
+   * 两张已停用」会落在同一行，光看顺序根本看不出分界，像是顺序没生效（2026-10-10 反馈）。
+   */
+  function renderCards(list: ModEntry[]) {
+    return (
+      // items-stretch 是 grid 默认值，显式写出来：同一行卡片等高靠它
+      <div className="grid items-stretch gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {list.map((mod) => {
+          const key = orderKeyOf(mod)
+          // 只有「已安装页 + 无筛选 + 已启用」的卡片参与排序：停用的不加载，拖它没有意义
+          const reorderable = canReorder && mod.installed && mod.enabled
+          const rank = reorderable ? orderState.enabled.indexOf(key) : -1
+          return (
+            <div
+              key={mod.id}
+              // 这里**不能**用 flex：flex 容器里卡片变成 flex 子项，主轴（横向）会按内容收缩，
+              // 窄内容的卡就比同行的窄（2026-10-10 反馈）。保持普通块级：宽度自动 100% 铺满格子，
+              // 高度交给卡片自己的 `h-full`（ModCard 根节点上）——两条边都不依赖隐式行为。
+              className={cn("relative", reorderable && "cursor-grab active:cursor-grabbing")}
+              draggable={reorderable}
+              onDragStart={(event) => {
+                dragKey.current = key
+                setDraggingKey(key)
+                event.dataTransfer.effectAllowed = "move"
+                // Firefox 不设 data 就不启动拖拽
+                event.dataTransfer.setData("text/plain", key)
+              }}
+              onDragEnd={() => {
+                dragKey.current = null
+                setDraggingKey(null)
+                setDropHint(null)
+              }}
+              onDragOver={(event) => dragOverCard(event, key)}
+              onDrop={(event) => dropOnCard(event, key)}
+            >
+              {/* 落点分割条：拖到哪就在那张卡的上/下边缘亮一条主色 */}
+              {dropHint?.key === key ? (
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    "pointer-events-none absolute inset-x-0 z-20 h-[3px] rounded-full bg-primary shadow-[0_0_10px_hsl(var(--primary)_/_0.85)]",
+                    dropHint.after ? "-bottom-1.5" : "-top-1.5"
+                  )}
+                />
+              ) : null}
+              {reorderable ? (
+                <div
+                  className={cn(
+                    "absolute -left-1.5 -top-1.5 z-10 flex items-center gap-0.5 rounded-full border border-primary/40 bg-card py-0.5 pl-1 pr-0.5 shadow-sm",
+                    draggingKey === key && "opacity-50"
+                  )}
+                >
+                  <GripVertical className="size-3 shrink-0 text-tertiary" />
+                  <span
+                    className="tabular text-[10px] font-semibold text-primary"
+                    title={t("加载顺序")}
+                  >
+                    #{rank + 1}
+                  </span>
+                  <button
+                    type="button"
+                    className="rounded-full p-0.5 text-tertiary transition-colors hover:bg-secondary hover:text-primary focus-visible:outline-none focus-visible:shadow-focus"
+                    title={t("移到最后")}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      moveToEnd(key)
+                    }}
+                  >
+                    <ArrowDownToLine className="size-3" />
+                  </button>
+                </div>
+              ) : null}
+              <ModCard
+                mod={mod}
+                task={downloads.tasks.find((task) => task.modId === mod.id)}
+                conflicts={activeConflicts(mods, mod)}
+                pendingConflicts={pendingConflicts(mods, mod)}
+                overlap={overlapFlag(overlaps, mod)}
+                onToggle={(next) => void toggleMod(mod, next)}
+                onInstall={() => installMod(mod)}
+                onUpdate={() => updateMod(mod)}
+                onDetail={() => setDetailId(mod.id)}
+                onSubmit={() => openSubmit(mod.id)}
+                onUninstall={() => void uninstallMod(mod)}
+                onForget={() => void forgetSubmission(mod)}
+                onCancelDownload={() => downloads.cancel(mod.id)}
+                onResolveConflict={(other) => void disableMod(other)}
+                activeTag={activeTag}
+                onTagClick={(tag) =>
+                  setActiveTag((current) => (current === tag ? null : tag))
+                }
+              />
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
+  /**
+   * 一屏卡片。已安装页会调两次（启用段 / 停用段），其它页签调一次。
+   *
+   * 为什么启用 / 停用要分成两块、而不是只按顺序排一遍：三列网格里「最后一张已启用 +
+   * 两张已停用」会落在同一行，光看顺序根本看不出分界，像是顺序没生效（2026-10-10 反馈）。
+   */
   async function toggleMod(mod: ModEntry, next: boolean) {
     setMods((prev) =>
       prev.map((item) => (item.id === mod.id ? { ...item, enabled: next } : item))
@@ -1091,15 +1312,24 @@ export function ModulesPage({
       )}
 
       {tab === "preflight" ? (
-        <>
-          <ModOverlapPanel report={overlaps} mods={mods} onDisable={disableMod} />
-          <ModPreflightPanel
-            report={source.preflight}
-            dryRun={source.preflightDryRun}
-            running={source.preflightRunning}
-            onRun={(dryRun) => void source.runPreflight(dryRun)}
+        /* 两列并排：左边是「会按什么顺序加载」，右边是「这些模组有没有问题」。
+           窄屏自动叠成一列（lg 断点以下）。 */
+        <div className="grid items-start gap-3 lg:grid-cols-2">
+          <ModLoadOrderPanel
+            plan={source.plan}
+            enabledOrder={orderState.enabled}
+            onReorder={(next) => void applyOrder(next)}
           />
-        </>
+          <div className="space-y-3">
+            <ModOverlapPanel report={overlaps} mods={mods} onDisable={disableMod} />
+            <ModPreflightPanel
+              report={source.preflight}
+              dryRun={source.preflightDryRun}
+              running={source.preflightRunning}
+              onRun={(dryRun) => void source.runPreflight(dryRun)}
+            />
+          </div>
+        </div>
       ) : visible.length === 0 ? (
         <div className="rounded-lg border border-dashed border-border py-12 text-center">
           <p className="text-[13px] text-tertiary">没有匹配的模组</p>
@@ -1114,30 +1344,27 @@ export function ModulesPage({
           </p>
         </div>
       ) : (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {visible.map((mod) => (
-            <ModCard
-              key={mod.id}
-              mod={mod}
-              task={downloads.tasks.find((task) => task.modId === mod.id)}
-              conflicts={activeConflicts(mods, mod)}
-              pendingConflicts={pendingConflicts(mods, mod)}
-              overlap={overlapFlag(overlaps, mod)}
-              onToggle={(next) => void toggleMod(mod, next)}
-              onInstall={() => installMod(mod)}
-              onUpdate={() => updateMod(mod)}
-              onDetail={() => setDetailId(mod.id)}
-              onSubmit={() => openSubmit(mod.id)}
-              onUninstall={() => void uninstallMod(mod)}
-              onForget={() => void forgetSubmission(mod)}
-              onCancelDownload={() => downloads.cancel(mod.id)}
-              onResolveConflict={(other) => void disableMod(other)}
-              activeTag={activeTag}
-              onTagClick={(tag) =>
-                setActiveTag((current) => (current === tag ? null : tag))
-              }
-            />
-          ))}
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="panel-label text-success">已启用</span>
+              <span className="text-[11px] text-tertiary/80">
+                按加载顺序排列，可拖拽调整
+              </span>
+            </div>
+            {renderCards(visible.filter((mod) => mod.enabled))}
+          </div>
+          {visible.some((mod) => !mod.enabled) ? (
+            <div className="space-y-2 border-t border-input pt-3">
+              <div className="flex items-center gap-2">
+                <span className="panel-label text-tertiary">已停用</span>
+                <span className="text-[11px] text-tertiary/80">
+                  不参与加载，打开开关后才会排进上面的顺序
+                </span>
+              </div>
+              {renderCards(visible.filter((mod) => !mod.enabled))}
+            </div>
+          ) : null}
         </div>
       )}
 

@@ -138,9 +138,14 @@ describe("serviceCards", () => {
     expect(cards.every((c) => c.state === "running")).toBe(true)
   })
 
-  it("starting 按运行中画（转圈由 busy 管）", () => {
+  it("starting 保留为启动中，不冒充运行成功", () => {
     const cards = serviceCards([svc("mainServer", "starting")], null, null)
-    expect(cards.find((c) => c.id === "node")!.state).toBe("running")
+    expect(cards.find((c) => c.id === "node")!.state).toBe("starting")
+  })
+
+  it("stopping 保留为停止中，不提前回到未启动", () => {
+    const cards = serviceCards([svc("mainServer", "stopping")], null, null)
+    expect(cards.find((c) => c.id === "node")!.state).toBe("stopping")
   })
 
   it("探测不到也不算错：未启动就是 ready，不是 error", () => {

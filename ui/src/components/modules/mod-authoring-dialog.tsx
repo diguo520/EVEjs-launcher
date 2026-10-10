@@ -15,14 +15,33 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { callOr, hasIpc, type RawAck, type RawAuthoringDoc } from "@/lib/ipc"
+import { getActiveLocale } from "@/lib/i18n"
 
-/** 内置规范文档有中英两份，内容一致 */
-type DocLang = "zh" | "en"
+/** 内置规范文档的语言：中文母版 + 七种翻译，内容逐行对齐 */
+const DOC_LANGS = ["zh", "en", "ja", "ko", "fr", "de", "ru", "es"] as const
 
+type DocLang = (typeof DOC_LANGS)[number]
+
+/** 语言名按各自母语显示，跟设置里的界面语言同一口径，不翻译 */
 const DOC_TABS: { id: DocLang; label: string }[] = [
   { id: "zh", label: "中文" },
   { id: "en", label: "English" },
+  { id: "ja", label: "日本語" },
+  { id: "ko", label: "한국어" },
+  { id: "fr", label: "Français" },
+  { id: "de", label: "Deutsch" },
+  { id: "ru", label: "Русский" },
+  { id: "es", label: "Español" },
 ]
+
+/**
+ * 打开时默认看当前界面语言那一份（界面语言不在文档语言里，比如荷兰语，就退回英文），
+ * 省掉每次手动切一次的动作。
+ */
+function initialDocLang(): DocLang {
+  const active = getActiveLocale()
+  return (DOC_LANGS as readonly string[]).includes(active) ? (active as DocLang) : "en"
+}
 
 /**
  * 「模组制作规范」弹窗：在启动器里直接渲染 Markdown，中英可切换。
@@ -40,7 +59,7 @@ export function ModAuthoringDialog({
   /** 「用系统程序打开」：走 mods:openAuthoringDoc，把盘上的 md 交给默认编辑器 */
   onOpenExternal: () => Promise<RawAck>
 }) {
-  const [lang, setLang] = useState<DocLang>("zh")
+  const [lang, setLang] = useState<DocLang>(initialDocLang)
   const [texts, setTexts] = useState<Partial<Record<DocLang, string>>>({})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -91,7 +110,7 @@ export function ModAuthoringDialog({
             <span>模组制作规范</span>
           </DialogTitle>
           <DialogDescription className="text-[11px] leading-relaxed">
-            从零到一个能上架市场的模组，全程不用改服务端文件。中英两份内容一致，按需切换。
+            从零到一个能上架市场的模组，全程不用改服务端文件。八种语言内容一致，按需切换。
           </DialogDescription>
         </DialogHeader>
 

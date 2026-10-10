@@ -510,7 +510,9 @@ Interfaces can change between EveJS versions — check what your version exports
 | Shared server module | Several loaders require the same server module | They may affect each other (the launcher warns) |
 | Missing dependency | A mod listed in `requires` is not installed | That mod is not loaded |
 
-🟦 Load order: drag cards in **Installed** to reorder; the order is stored in `_launcher/mods/mod-order.json`. `loadAfter` / `loadBefore` in the manifest take priority.
+🟦 Load order: drag cards in **Installed** to reorder, or hit the "⤓ move to last" button on a card. The list is grouped with enabled mods first and disabled ones after, each group in your saved order - turning a mod off needs no re-dragging, and turning it back on returns it to its old slot.
+🟨 `loadAfter` / `loadBefore` in the manifest **take priority** and fine-tune the order you dragged; a mod that got moved is marked "moved by a manifest constraint" in the Load order panel.
+🟦 The Load order panel shows the order that **actually takes effect**, plus the mods that **will not load** this time (broken manifest / missing dependency / conflict / no loader.js) and the ordering declarations that **had no effect** (target not installed or disabled, stale folder in the saved order). Restart the server to apply changes.
 
 ## 🟥 Several mods patching the same server file (solved by the new launcher)
 

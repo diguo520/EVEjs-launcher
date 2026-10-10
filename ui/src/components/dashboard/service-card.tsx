@@ -15,6 +15,8 @@ import { SERVICE_STATE_LABEL, type Service, type ServiceState } from "@/lib/mock
  */
 const stateTone: Record<ServiceState, DotTone> = {
   running: "success",
+  starting: "warning",
+  stopping: "warning",
   ready: "idle",
   stopped: "destructive",
   error: "destructive",
@@ -22,13 +24,20 @@ const stateTone: Record<ServiceState, DotTone> = {
 
 const stateBar: Record<ServiceState, string> = {
   running: "bg-success",
+  starting: "bg-warning",
+  stopping: "bg-warning",
   ready: "bg-border",
   stopped: "bg-destructive",
   error: "bg-destructive",
 }
 
-const stateBadge: Record<ServiceState, "default" | "success" | "secondary" | "destructive"> = {
+const stateBadge: Record<
+  ServiceState,
+  "default" | "success" | "warning" | "secondary" | "destructive"
+> = {
   running: "success",
+  starting: "warning",
+  stopping: "warning",
   ready: "secondary",
   stopped: "destructive",
   error: "destructive",
@@ -49,6 +58,10 @@ export function ServiceCard({
 }) {
   const { t } = useLocale()
   const isRunning = service.state === "running"
+  const isTransitioning =
+    service.state === "starting" || service.state === "stopping"
+  const canStart = !isRunning && !isTransitioning
+  const canStop = isRunning || service.state === "starting"
 
   const readouts = [
     { k: "PID", v: service.pid ?? "—" },
@@ -66,14 +79,16 @@ export function ServiceCard({
           <div className="flex min-w-0 items-center gap-2">
             <StatusDot
               tone={stateTone[service.state]}
-              pulse={service.state === "running"}
+              pulse={isRunning || isTransitioning}
             />
             <span className="truncate text-[13px] font-semibold text-foreground">
               {service.name}
             </span>
           </div>
           <Badge variant={stateBadge[service.state]}>
-            {busy ? <Loader2 className="animate-spin" /> : null}
+            {busy || isTransitioning ? (
+              <Loader2 className="animate-spin" />
+            ) : null}
             {SERVICE_STATE_LABEL[service.state]}
           </Badge>
         </div>
@@ -107,7 +122,7 @@ export function ServiceCard({
         <Button
           size="sm"
           variant={isRunning ? "secondary" : "default"}
-          disabled={busy || isRunning}
+          disabled={busy || !canStart}
           onClick={onStart}
           className="flex-1"
         >
@@ -127,7 +142,7 @@ export function ServiceCard({
         <Button
           size="sm"
           variant="outline"
-          disabled={busy || !isRunning}
+          disabled={busy || !canStop}
           onClick={onStop}
           className="flex-1 hover:border-destructive/60 hover:text-destructive"
         >

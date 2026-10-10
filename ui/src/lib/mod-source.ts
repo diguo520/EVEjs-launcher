@@ -331,12 +331,15 @@ export function buildMods(input: {
     byId.set(mod.id, fromMarket(mod))
   }
 
-  for (const mod of input.list?.mods ?? []) {
+  input.list?.mods?.forEach((mod, index) => {
     const id = mod.id || mod.folder
-    if (!id) continue
+    if (!id) return
     const previous = byId.get(id) ?? { ...baseEntry(id), inMarket: false }
-    byId.set(id, applyLocal(previous, mod))
-  }
+    // localRank 就是「本地扫描里的位次」= 用户拖出来的加载顺序。已安装页按它自己排；
+    // **数组本身仍旧按市场索引在前**，市场页签的默认顺序（sortMods default = 原顺序）
+    // 才不会被这层改动带跑（2026-10-10 报障）。
+    byId.set(id, { ...applyLocal(previous, mod), localRank: index })
+  })
 
   for (const item of input.mine?.items ?? []) {
     if (!item?.id) continue

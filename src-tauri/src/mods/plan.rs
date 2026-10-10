@@ -13,7 +13,7 @@ use crate::mods::{safe_folder_name, sanitize_folder_name};
 use crate::runtime::RuntimePaths;
 use crate::shell;
 use serde_json::{json, Value};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -81,6 +81,13 @@ struct Skip {
 /// 计算要注入的 loader 顺序（loadAfter/loadBefore 拓扑排序，成环则退回目录顺序）
 pub fn plan_loaders(repo_root: &Path, runtime: &RuntimePaths) -> Value {
     let scan_result = scan::scan_mods(repo_root, runtime);
+    // 顺序文件里可能记着已经删掉的目录名：先留一份「本地都有哪些目录」，
+    // 待会儿用它把「找不到对应模组」的那些条目如实报出来（以前是静默忽略）
+    let all_folders: Vec<String> = scan_result
+        .mods
+        .iter()
+        .map(|item| item.folder.clone())
+        .collect();
     let mut skipped: Vec<Skip> = Vec::new();
 
     let mut candidates: Vec<ModRecord> = Vec::new();
@@ -196,8 +203,78 @@ pub fn plan_loaders(repo_root: &Path, runtime: &RuntimePaths) -> Value {
         .map(|path| path.replace('\\', "/"))
         .collect();
 
+    // ---- 给界面看的「生效顺序」：每一位是你拖的，还是清单约束排的 ----
+    //
+    // `index_of` 的下标就是**用户手动顺序**（candidates 来自 scan，已按 mod-order.json 排过），
+    // 所以 baseIndex 与 index 不一致就说明「这一位被清单里的 loadAfter / loadBefore 挪过」。
+    let enabled_ids: BTreeSet<String> = index_of.keys().cloned().collect();
+    let order: Vec<Value> = final_order
+        .iter()
+        .enumerate()
+        .map(|(position, index)| {
+            let item = &candidates[*index];
+            let key = item.id.to_lowercase();
+            let declared = |ids: &[String]| -> Vec<String> {
+                ids.iter()
+                    .filter(|id| enabled_ids.contains(&id.to_lowercase()))
+                    .cloned()
+                    .collect()
+            };
+            let base = index_of.get(&key).copied();
+            json!({
+                "id": item.id,
+                "folder": item.folder,
+                "name": item.display_name,
+                "index": position,
+                "baseIndex": base,
+                // 位置与手动顺序不同 ⇒ 被清单里的约束挪过，界面上单独标一下
+                "reordered": base != Some(position),
+                "loadAfter": declared(&item.load_after),
+                "loadBefore": declared(&item.load_before),
+            })
+        })
+        .collect();
+
+    // ---- 被忽略的顺序声明：以前静默丢掉，现在如实报出来 ----
+    let mut ignored: Vec<Value> = Vec::new();
+    for item in &candidates {
+        for (field, ids) in [
+            ("loadAfter", &item.load_after),
+            ("loadBefore", &item.load_before),
+        ] {
+            for id in ids {
+                if enabled_ids.contains(&id.to_lowercase()) {
+                    continue;
+                }
+                ignored.push(json!({
+                    "field": field,
+                    "id": item.id,
+                    "target": id,
+                    "reason": format!(
+                        "{id} 不在已启用的模组里（没安装或已停用），这条顺序声明本次不生效"
+                    ),
+                }));
+            }
+        }
+    }
+    for folder in read_mod_order(runtime) {
+        if all_folders.iter().any(|name| name == &folder) {
+            continue;
+        }
+        ignored.push(json!({
+            "field": "order",
+            "id": Value::Null,
+            "target": folder,
+            "reason": "手动顺序里记着的这个目录已经不存在了（重新装回来它会回到原来的位置）",
+        }));
+    }
+
     json!({
         "paths": paths,
+        "order": order,
+        "ignored": ignored,
+        // 成环时下面这行会退回「完全按用户手动顺序」，界面要把这件事说清楚
+        "cycle": cycle,
         "skipped": skipped
             .iter()
             .map(|item| json!({ "id": item.id, "reason": item.reason }))
@@ -596,6 +673,55 @@ mod tests {
             "注入路径必须是正斜杠：{paths:?}"
         );
         assert_eq!(plan["skipped"].as_array().unwrap().len(), 0);
+        // 给界面看的生效顺序：手动顺序（按显示名）本来是 b,a；b 声明 loadAfter a
+        // 之后两者都被挪过，所以两条都标 reordered，并带上各自的 baseIndex
+        let order = plan["order"].as_array().unwrap();
+        assert_eq!(order.len(), 2);
+        assert_eq!(order[0]["id"], json!("a"));
+        assert_eq!(order[0]["index"], json!(0));
+        assert_eq!(order[0]["baseIndex"], json!(1));
+        assert_eq!(order[0]["reordered"], json!(true));
+        assert_eq!(order[1]["id"], json!("b"));
+        assert_eq!(order[1]["baseIndex"], json!(0));
+        assert_eq!(order[1]["reordered"], json!(true));
+        assert_eq!(order[1]["loadAfter"], json!(["a"]));
+        assert_eq!(plan["cycle"], json!(false));
+        assert_eq!(plan["ignored"].as_array().unwrap().len(), 0);
+    }
+
+    #[test]
+    fn plan_reports_ignored_declarations_and_stale_order_entries() {
+        let repo = repo_for("plan-ignored");
+        write_mod(
+            &repo,
+            "a",
+            manifest(
+                "a",
+                json!({ "loadAfter": ["ghost"], "loadBefore": ["also-ghost"] }),
+            ),
+            Some("// a"),
+        );
+        let runtime = runtime_for("plan-ignored");
+        // 顺序文件里留一条已经删掉的目录名：以前静默忽略，现在要报出来
+        set_mod_order(&runtime, &["gone-forever".to_string(), "a".to_string()]);
+
+        let plan = plan_loaders(&repo, &runtime);
+        let ignored = plan["ignored"].as_array().unwrap();
+        let fields: Vec<&str> = ignored
+            .iter()
+            .map(|item| item["field"].as_str().unwrap())
+            .collect();
+        assert!(fields.contains(&"loadAfter"), "{ignored:?}");
+        assert!(fields.contains(&"loadBefore"), "{ignored:?}");
+        assert!(fields.contains(&"order"), "{ignored:?}");
+        let stale = ignored
+            .iter()
+            .find(|item| item["field"] == json!("order"))
+            .unwrap();
+        assert_eq!(stale["target"], json!("gone-forever"));
+        // 目标不在已启用模组里 ⇒ 声明本次不生效，但模组本身照常加载
+        assert_eq!(plan["skipped"].as_array().unwrap().len(), 0);
+        assert_eq!(plan["order"].as_array().unwrap().len(), 1);
     }
 
     #[test]

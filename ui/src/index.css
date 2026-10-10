@@ -285,6 +285,14 @@ body {
   }
 }
 
+/* 赞助人弹幕：每个名字一条独立弹幕，动画参数由 Web Animations 控制 */
+.sponsor-danmaku-bullet {
+  position: absolute;
+  left: 0;
+  width: max-content;
+  will-change: transform, opacity;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

@@ -1,0 +1,65 @@
+{
+  "version": "0.4.4",
+  "changelog": {
+    "zh": [
+      {
+        "type": "new",
+        "text": "已安装的模组列表支持按加载顺序排序：卡片左上角显示加载序号，可拖到任意位置，也可一键「移到最后」（写 loadAfter 排不开的冲突模组最常用）；列表按「已启用在前、已停用在后」分两块展示，两段内部都保持用户设定的顺序，关掉模组不会打乱已排好的顺序。改完重启服务端生效。"
+      },
+      {
+        "type": "new",
+        "text": "模组页新增「加载顺序」面板，把真正生效的加载次序摊开：每一名标出来源（手动顺序，或已被清单里的 loadAfter / loadBefore 调整过位置，并列出具体前置后置），并单独列出本次不会加载的模组（清单坏了、缺依赖、冲突、没有 loader.js）与没生效的顺序声明（目标没装或已停用、顺序记录里的目录已被删除）。检测到循环依赖时会说明本次退回完全按手动顺序加载。"
+      },
+      {
+        "type": "new",
+        "text": "模组制作规范扩到八种语言：除原有中文 / 英文外新增日语、韩语、法语、德语、俄语、西班牙语；弹窗默认打开当前界面语言那一份（界面语言没有对应翻译时回落英文），可随时切换。"
+      },
+      {
+        "type": "new",
+        "text": "第一次启动弹出法律声明：说明本项目仅供个人学习研究，禁止用于架设面向公众或半公开的私服、对外提供游戏服务或以任何形式获利，并提示由此产生的法律责任自负；关掉后缩到窗口底部状态栏，随时可以再看，文案跟随系统语言。"
+      },
+      {
+        "type": "new",
+        "text": "物品市场新增「修改最优价格」弹窗：点盘口里的最优买价 / 最优卖价两格即可打开，两列并排。最优卖价可改（改的是当前持有该价的空间站的种子价，走市场服务现有管理接口，保存后立刻生效）；最优买价一列目前只读，因为服务端没有开放种子买单的写入接口。"
+      },
+      {
+        "type": "opt",
+        "text": "赞助人名单改为从右向左飘过的弹幕轨道，名单增长时不再挤在同一屏。"
+      },
+      {
+        "type": "fix",
+        "text": "主服务器还在启动时不再显示为运行成功的绿灯，顶栏与卡片改用「启动中」状态。"
+      }
+    ],
+    "en": [
+      {
+        "type": "new",
+        "text": "Installed mods can now be reordered by load order: each card shows its load number in the top-left corner, can be dragged anywhere, and offers a one-click \"move to last\" (handy for conflict mods that loadAfter cannot express). The list is split into an enabled-first and a disabled-after section, each keeping your own order, and turning a mod off no longer disturbs the order you set. Restart the server to apply."
+      },
+      {
+        "type": "new",
+        "text": "A new \"Load order\" panel shows the order that actually takes effect: every row is labelled with its source (your manual order, or moved by a loadAfter / loadBefore declaration in the manifest, listing the specific prerequisites), plus separate lists of the mods that will not load this time (broken manifest, missing dependency, conflict, no loader.js) and the ordering declarations that had no effect (target not installed or disabled, stale folder in the saved order). It also explains when a circular dependency makes the run fall back to your manual order."
+      },
+      {
+        "type": "new",
+        "text": "The mod authoring guide now ships in eight languages: Japanese, Korean, French, German, Russian and Spanish join Chinese and English. The dialog opens in your current UI language (falling back to English when there is no match) and you can switch at any time."
+      },
+      {
+        "type": "new",
+        "text": "A legal notice now appears on first launch: this project is for personal study and research only, running a public or semi-public private server, providing game services or profiting in any form is prohibited, and any resulting legal liability rests with the user. Closing it shrinks it to an entry in the bottom status bar where you can reopen it anytime; the text follows your system language."
+      },
+      {
+        "type": "new",
+        "text": "The item market gained an \"Edit best prices\" dialog: click either the best bid or the best ask tile in the order-book panel to open it, both side by side. The best ask is editable (it changes the seed price of the station currently holding that price, through the market service's existing admin API, and takes effect immediately); the best bid column is read-only for now because the server exposes no write interface for seed buy orders."
+      },
+      {
+        "type": "opt",
+        "text": "The sponsor list now scrolls right-to-left as a danmaku track, so a growing list no longer crowds onto one screen."
+      },
+      {
+        "type": "fix",
+        "text": "While the main server is still starting, the launcher no longer shows a green \"running\" light; the top bar and the service card now use a \"starting\" state."
+      }
+    ]
+  }
+}

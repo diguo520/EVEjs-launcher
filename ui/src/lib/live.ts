@@ -122,13 +122,15 @@ export function portsOf(ports: { game: number; images: number; gateway: number }
 
 /**
  * 卡片状态：
- *   error / starting → 直接照搬（启动中按运行中画，转圈图标由 busy 管）
+ *   error / starting / stopping → 直接照搬
  *   运行中（进程态或端口活着）→ running
  *   其他 → ready（原型的「未启动」，启动按钮可点）
  */
 function stateOf(rawState: string | undefined, alive: boolean | undefined): ServiceState {
   if (rawState === "error") return "error"
-  if (rawState === "running" || rawState === "starting") return "running"
+  if (rawState === "starting") return "starting"
+  if (rawState === "stopping") return "stopping"
+  if (rawState === "running") return "running"
   if (alive === true) return "running"
   return "ready"
 }

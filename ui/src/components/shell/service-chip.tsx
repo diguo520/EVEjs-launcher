@@ -5,6 +5,8 @@ import { SERVICE_STATE_LABEL, type Service, type ServiceState } from "@/lib/mock
 
 const stateTone: Record<ServiceState, DotTone> = {
   running: "success",
+  starting: "warning",
+  stopping: "warning",
   ready: "idle",
   stopped: "destructive",
   error: "destructive",
@@ -12,6 +14,8 @@ const stateTone: Record<ServiceState, DotTone> = {
 
 const stateText: Record<ServiceState, string> = {
   running: "text-success",
+  starting: "text-warning",
+  stopping: "text-warning",
   ready: "text-muted-foreground",
   stopped: "text-destructive",
   error: "text-destructive",
@@ -41,7 +45,11 @@ export function ServiceChip({
     >
       <StatusDot
         tone={stateTone[service.state]}
-        pulse={service.state === "running"}
+        pulse={
+          service.state === "running" ||
+          service.state === "starting" ||
+          service.state === "stopping"
+        }
       />
       <span className="font-mono text-[10px] tracking-[0.08em] text-muted-foreground">
         {service.en}

@@ -25,7 +25,7 @@
       "phase": "3-4",
       "platform": "win32",
       "repoRoot": "<abs-path>",
-      "version": "0.4.3"
+      "version": "0.4.4"
     },
     "config:get": {
       "client": {
@@ -172,10 +172,10 @@
       "supported": true
     },
     "metrics:get": {
-      "cpuPercent": 24.890869140625,
+      "cpuPercent": 25.208213806152344,
       "diskRoot": "<abs-path>",
       "diskTotalGB": 976.5624961853028,
-      "diskUsedGB": 860.8126258850098,
+      "diskUsedGB": 864.9513092041016,
       "gpuDedicatedTotalGB": null,
       "gpuDedicatedUsedGB": null,
       "gpuMemoryTotalGB": null,
@@ -183,31 +183,31 @@
       "gpuPercent": null,
       "gpuSharedUsedGB": null,
       "memTotalGB": 31.855934143066406,
-      "memUsedGB": 13.13479232788086,
+      "memUsedGB": 24.703933715820312,
       "netBytesPerSec": 0,
-      "virtualMemTotalGB": 34.075923919677734,
-      "virtualMemUsedGB": 18.492740631103516,
+      "virtualMemTotalGB": 38.26716995239258,
+      "virtualMemUsedGB": 32.70891571044922,
       "volumes": [
         {
-          "freeGB": 52.1151008605957,
-          "percent": 76.57007823904969,
+          "freeGB": 48.45018005371094,
+          "percent": 78.21775437029392,
           "root": "<abs-path>",
           "totalGB": 222.4296836853027,
-          "usedGB": 170.31458282470703
+          "usedGB": 173.9795036315918
         },
         {
-          "freeGB": 145.67850875854492,
-          "percent": 50.275068362956624,
+          "freeGB": 144.7687950134277,
+          "percent": 50.5855839919998,
           "root": "<abs-path>",
           "totalGB": 292.96874618530273,
-          "usedGB": 147.2902374267578
+          "usedGB": 148.199951171875
         },
         {
-          "freeGB": 115.74987030029295,
-          "percent": 88.14721323495004,
+          "freeGB": 111.61118698120116,
+          "percent": 88.57101440848052,
           "root": "<abs-path>",
           "totalGB": 976.5624961853028,
-          "usedGB": 860.8126258850098
+          "usedGB": 864.9513092041016
         },
         {
           "freeGB": 355.5537910461426,
@@ -251,6 +251,9 @@
       "ok": true
     },
     "mods:plan": {
+      "cycle": false,
+      "ignored": [],
+      "order": [],
       "paths": [],
       "skipped": []
     },
@@ -333,7 +336,7 @@
     "terminal:input": null,
     "terminal:resize": null,
     "update:state": {
-      "currentVersion": "0.4.3",
+      "currentVersion": "0.4.4",
       "state": "idle"
     }
   }

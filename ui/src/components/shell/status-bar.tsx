@@ -1,3 +1,5 @@
+import { ShieldAlert } from "lucide-react"
+
 import { cn } from "@/lib/utils"
 import { StatusDot } from "@/components/common/status-dot"
 import { useLauncherVersion } from "@/components/shell/launcher-version"
@@ -41,10 +43,13 @@ export function StatusBar({
   env,
   services,
   session,
+  onOpenLegalNotice,
 }: {
   env: EnvCheckState
   services: Service[]
   session: SessionReadout
+  /** 法律声明缩到底部后的入口；没确认过之前不显示（那时弹窗还在） */
+  onOpenLegalNotice?: () => void
 }) {
   const { evejsVersion, repoRoot } = useLauncherVersion()
   const running = services.filter((s) => s.state === "running").length
@@ -89,8 +94,20 @@ export function StatusBar({
       <Cell
         value={`© ${LAUNCHER_META.sponsor}`}
         tone="warn"
-        className="border-r-0"
+        // 底部入口在它右边时，右边框交给入口那条收尾
+        className={onOpenLegalNotice ? undefined : "border-r-0"}
       />
+      {onOpenLegalNotice ? (
+        <button
+          type="button"
+          onClick={onOpenLegalNotice}
+          title="查看法律声明"
+          className="flex shrink-0 items-center gap-1.5 whitespace-nowrap border-r-0 border-input px-3 py-1.5 text-[11px] text-warning transition-colors hover:bg-warning/10 focus-visible:outline-none focus-visible:shadow-focus"
+        >
+          <ShieldAlert className="size-3.5" />
+          法律声明
+        </button>
+      ) : null}
     </footer>
   )
 }

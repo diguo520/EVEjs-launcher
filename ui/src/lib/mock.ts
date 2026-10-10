@@ -5,7 +5,13 @@
 
 /* ---------------- 服务 ---------------- */
 
-export type ServiceState = "running" | "ready" | "stopped" | "error"
+export type ServiceState =
+  | "running"
+  | "starting"
+  | "stopping"
+  | "ready"
+  | "stopped"
+  | "error"
 
 export interface Service {
   id: string
@@ -79,6 +85,8 @@ export const SERVICES: Service[] = [
 
 export const SERVICE_STATE_LABEL: Record<ServiceState, string> = {
   running: "RUNNING",
+  starting: "STARTING",
+  stopping: "STOPPING",
   ready: "IDLE",
   stopped: "STOPPED",
   error: "FAULT",
@@ -450,6 +458,12 @@ export interface ModEntry {
   conflictReason?: Record<string, string>
   /** 本地作者创建的模组 */
   mine?: boolean
+  /**
+   * 本地扫描里的位次（0 起）—— 也就是**用户拖出来的加载顺序**。
+   * 只有「装在本机」的条目有；列表数组本身按市场索引排（那是市场页签的口径），
+   * 已安装页要按用户顺序排，就靠这个字段自己排，不去动共享数组的次序。
+   */
+  localRank?: number
   /** 审核状态，仅 mine 模组有 */
   review?: ModReviewState
   /** 提交审核的时间 */

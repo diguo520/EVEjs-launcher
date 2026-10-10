@@ -635,13 +635,21 @@ pub fn create_mod(
 
 /* ------------------------------ 内置制作规范文档 ------------------------------ */
 
-/// 支持中/英两份：zh → `MOD_AUTHORING.md`，其它语言 → `MOD_AUTHORING.en.md`
-pub const DOC_LANGS: [&str; 2] = ["zh", "en"];
+/// 内置规范文档的语言集合：中文是母版，其余七种各有翻译。
+/// zh → `MOD_AUTHORING.md`，其余 → `MOD_AUTHORING.<语言码>.md`（文件名保持 ASCII）。
+pub const DOC_LANGS: [&str; 8] = ["zh", "en", "ja", "ko", "fr", "de", "ru", "es"];
 
 /// 正文直接内嵌进二进制：现役版是从 `dist/renderer/` 读文件，
 /// 内嵌后没有「文件丢了 → 文档打不开」这条路径，也不会随打包漏拷。
+/// 八份文档逐行对齐（617 行 / 38 个标题 / 16 个代码块），改动母版时其余七份要同步。
 const DOC_ZH: &str = include_str!("../../../ui/web/MOD_AUTHORING.md");
 const DOC_EN: &str = include_str!("../../../ui/web/MOD_AUTHORING.en.md");
+const DOC_JA: &str = include_str!("../../../ui/web/MOD_AUTHORING.ja.md");
+const DOC_KO: &str = include_str!("../../../ui/web/MOD_AUTHORING.ko.md");
+const DOC_FR: &str = include_str!("../../../ui/web/MOD_AUTHORING.fr.md");
+const DOC_DE: &str = include_str!("../../../ui/web/MOD_AUTHORING.de.md");
+const DOC_RU: &str = include_str!("../../../ui/web/MOD_AUTHORING.ru.md");
+const DOC_ES: &str = include_str!("../../../ui/web/MOD_AUTHORING.es.md");
 
 /// 规范文档（步骤 3）里引用的截图：GitHub classic 令牌页面，带 ①-⑤ 编号。
 /// 文档正文用相对路径 `./github-token-classic.png` 引用它 —— 启动器弹窗里由
@@ -662,27 +670,44 @@ fn ensure_doc_image(dir: &Path) -> std::io::Result<()> {
     fs::write(&target, DOC_IMAGE)
 }
 
-/// 现役版 `normalizeDocLang`：只有 "zh" 走中文，其余（含缺省）都算英文
+/// 语言码归一：认得的内置语言返回自身，其余（含缺省、大小写变体）都算英文。
+/// 缺省语言是英文（对齐现役版 `normalizeDocLang`）。
 fn normalize_doc_lang(lang: Option<&str>) -> &'static str {
-    match lang {
-        Some(value) if value.to_lowercase() == "zh" => "zh",
+    match lang.unwrap_or("").to_lowercase().as_str() {
+        "zh" => "zh",
+        "ja" => "ja",
+        "ko" => "ko",
+        "fr" => "fr",
+        "de" => "de",
+        "ru" => "ru",
+        "es" => "es",
         _ => "en",
     }
 }
 
 fn doc_file_name(lang: Option<&str>) -> &'static str {
-    if normalize_doc_lang(lang) == "zh" {
-        "MOD_AUTHORING.md"
-    } else {
-        "MOD_AUTHORING.en.md"
+    match normalize_doc_lang(lang) {
+        "zh" => "MOD_AUTHORING.md",
+        "ja" => "MOD_AUTHORING.ja.md",
+        "ko" => "MOD_AUTHORING.ko.md",
+        "fr" => "MOD_AUTHORING.fr.md",
+        "de" => "MOD_AUTHORING.de.md",
+        "ru" => "MOD_AUTHORING.ru.md",
+        "es" => "MOD_AUTHORING.es.md",
+        _ => "MOD_AUTHORING.en.md",
     }
 }
 
 fn doc_source(lang: Option<&str>) -> &'static str {
-    if normalize_doc_lang(lang) == "zh" {
-        DOC_ZH
-    } else {
-        DOC_EN
+    match normalize_doc_lang(lang) {
+        "zh" => DOC_ZH,
+        "ja" => DOC_JA,
+        "ko" => DOC_KO,
+        "fr" => DOC_FR,
+        "de" => DOC_DE,
+        "ru" => DOC_RU,
+        "es" => DOC_ES,
+        _ => DOC_EN,
     }
 }
 
@@ -723,10 +748,10 @@ pub fn ensure_mod_authoring_doc(runtime: &RuntimePaths, lang: Option<&str>) -> V
     }
 }
 
-/// `mods:authoringDocText`：英文文档缺失时回退中文，至少让用户看到内容
+/// `mods:authoringDocText`：目标语言落盘失败时回退中文母版，至少让用户看到内容
 pub fn read_mod_authoring_doc_text(runtime: &RuntimePaths, lang: Option<&str>) -> Value {
     let mut doc = ensure_mod_authoring_doc(runtime, lang);
-    if doc.get("ok").and_then(Value::as_bool) != Some(true) && normalize_doc_lang(lang) == "en" {
+    if doc.get("ok").and_then(Value::as_bool) != Some(true) && normalize_doc_lang(lang) != "zh" {
         doc = ensure_mod_authoring_doc(runtime, Some("zh"));
     }
     if doc.get("ok").and_then(Value::as_bool) != Some(true) {
@@ -747,7 +772,7 @@ pub fn read_mod_authoring_doc_text(runtime: &RuntimePaths, lang: Option<&str>) -
     }
 }
 
-/// 启动时把中/英两份都释放到 `_launcher/mods/`（单份失败不影响启动）
+/// 启动时把八份都释放到 `_launcher/mods/`（单份失败不影响启动）
 pub fn ensure_all_mod_authoring_docs(runtime: &RuntimePaths) {
     for lang in DOC_LANGS {
         let _ = ensure_mod_authoring_doc(runtime, Some(lang));
@@ -1352,44 +1377,70 @@ mod tests {
     }
 
     #[test]
-    fn authoring_docs_release_both_languages_idempotently() {
+    fn authoring_docs_release_every_language_idempotently() {
         let root = temp_dir("docs");
         let runtime = runtime_at(&root);
 
+        // 八种语言都要落盘，文件名互不重复
         ensure_all_mod_authoring_docs(&runtime);
-        let zh_path = runtime.root.join("mods").join("MOD_AUTHORING.md");
-        let en_path = runtime.root.join("mods").join("MOD_AUTHORING.en.md");
-        assert!(zh_path.is_file());
-        assert!(en_path.is_file());
+        for lang in DOC_LANGS {
+            let path = mod_authoring_doc_path(&runtime, Some(lang));
+            assert!(path.is_file(), "{lang} 的文档没有落盘：{path:?}");
+            let body = fs::read_to_string(&path).unwrap();
+            assert!(body.starts_with("# "), "{lang} 的文档不像 Markdown 正文");
+            assert!(body.contains("EveJS"), "{lang} 的文档缺 EveJS 字样");
+            // 内容一致 → 不重复写盘
+            let again = ensure_mod_authoring_doc(&runtime, Some(lang));
+            assert_eq!(again["ok"], json!(true), "{lang}");
+            assert_eq!(again["written"], json!(false), "{lang} 内容一致时不该重写");
+        }
+        let mut names: Vec<&str> = DOC_LANGS
+            .iter()
+            .map(|lang| doc_file_name(Some(lang)))
+            .collect();
+        names.sort_unstable();
+        names.dedup();
+        assert_eq!(names.len(), DOC_LANGS.len(), "语言文件名有重复：{names:?}");
 
-        // 内容一致 → 不重复写盘
-        let again = ensure_mod_authoring_doc(&runtime, Some("zh"));
-        assert_eq!(again["written"], json!(false));
-        assert_eq!(again["ok"], json!(true));
+        // 八份逐行对齐：改母版时漏翻一份，行数/标题数就会对不上
+        let zh = fs::read_to_string(mod_authoring_doc_path(&runtime, Some("zh"))).unwrap();
+        let lines = zh.lines().count();
+        let headings = zh.lines().filter(|line| line.starts_with('#')).count();
+        for lang in DOC_LANGS {
+            let body = fs::read_to_string(mod_authoring_doc_path(&runtime, Some(lang))).unwrap();
+            assert_eq!(body.lines().count(), lines, "{lang} 的行数与中文母版不一致");
+            assert_eq!(
+                body.lines().filter(|line| line.starts_with('#')).count(),
+                headings,
+                "{lang} 的标题数与中文母版不一致"
+            );
+        }
 
         // 文件被改坏 → 重新写回
+        let zh_path = mod_authoring_doc_path(&runtime, Some("zh"));
         fs::write(&zh_path, "坏了").unwrap();
         let rewritten = ensure_mod_authoring_doc(&runtime, Some("zh"));
         assert_eq!(rewritten["written"], json!(true));
 
-        let text = read_mod_authoring_doc_text(&runtime, Some("zh"));
+        let text = read_mod_authoring_doc_text(&runtime, Some("ja"));
         assert_eq!(text["ok"], json!(true));
         assert!(text["text"].as_str().unwrap().starts_with("# "));
-        assert!(text["text"].as_str().unwrap().contains("EveJS"));
 
-        // 缺省语言是英文（对齐现役版 normalizeDocLang：只有 "zh" 算中文）
-        let default_doc = ensure_mod_authoring_doc(&runtime, None);
-        assert!(default_doc["path"]
-            .as_str()
-            .unwrap()
-            .ends_with("MOD_AUTHORING.en.md"));
-        assert_eq!(
-            mod_authoring_doc_path(&runtime, None),
-            mod_authoring_doc_path(&runtime, Some("en"))
-        );
+        // 缺省与认不出的语言都回落到英文（对齐现役版 normalizeDocLang）
+        for alias in [None, Some("en"), Some("EN"), Some("klingon")] {
+            assert_eq!(
+                mod_authoring_doc_path(&runtime, alias),
+                mod_authoring_doc_path(&runtime, Some("en")),
+                "{alias:?} 应该回落到英文"
+            );
+        }
         assert_eq!(
             mod_authoring_doc_path(&runtime, Some("ZH")),
             mod_authoring_doc_path(&runtime, Some("zh"))
         );
+        assert!(ensure_mod_authoring_doc(&runtime, None)["path"]
+            .as_str()
+            .unwrap()
+            .ends_with("MOD_AUTHORING.en.md"));
     }
 }

@@ -19,6 +19,7 @@ import type {
   RawModList,
   RawModPreflightDryRun,
   RawModPreflightReport,
+  RawModPlan,
   RawMyMods,
   RawMySubmissions,
   RawPublishProgress,
@@ -168,12 +169,16 @@ export interface ModSourceState {
   preflightRunning: boolean
   /** 跑一次预检；`dryRun` 会真的在一个一次性 Node 进程里 require 一遍 loader */
   runPreflight: (dryRun?: boolean) => Promise<RawModPreflightReport | RawModPreflightDryRun | null>
+  /** 生效的加载顺序（含来源、被跳过的模组、被忽略的声明），随 reload 一起刷新 */
+  plan: RawModPlan | null
   /** 转成发布凭据：老用户升级过来时，这一步是无感的（令牌已在盘上） */
   credential: PublishCredential | null
   /** 市场索引里的原始条目（安装时整条回传给后端） */
   marketById: Record<string, RawMarketMod>
   reload: () => Promise<void>
   setEnabled: (folder: string, enabled: boolean) => Promise<RawAck>
+  /** 写用户自定义加载顺序（mod-order.json），重启服务端后生效 */
+  setOrder: (folders: string[]) => Promise<RawAck>
   uninstall: (folder: string) => Promise<RawAck>
   sign: (folder: string) => Promise<RawAck>
   createFolder: () => Promise<RawAck>
@@ -239,6 +244,8 @@ export function useModSource(): ModSourceState {
   const [templates, setTemplates] = useState<RawModTemplate[]>([])
   /** 启动前预检：静态部分随 load() 一起来，干跑只在用户点按钮时才跑 */
   const [preflight, setPreflight] = useState<RawModPreflightReport | null>(null)
+  /** 生效顺序面板的数据（`mods:plan`），跟其它只读数据一起在 load() 里刷 */
+  const [plan, setPlan] = useState<RawModPlan | null>(null)
   const [preflightDryRun, setPreflightDryRun] = useState<RawModPreflightDryRun | null>(null)
   const [preflightRunning, setPreflightRunning] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -398,7 +405,7 @@ export function useModSource(): ModSourceState {
   const load = useCallback(async () => {
     if (!ipc) return
     setLoading(true)
-    const [nextList, nextMarket, nextMine, nextSubs, nextAuthor, nextToken, nextTemplates, nextClaims, nextPreflight] =
+    const [nextList, nextMarket, nextMine, nextSubs, nextAuthor, nextToken, nextTemplates, nextClaims, nextPreflight, nextPlan] =
       await Promise.all([
         callOr<RawModList>("modsList", null),
         callOr<RawMarketList>("modsMarketList", null),
@@ -415,6 +422,8 @@ export function useModSource(): ModSourceState {
           scope: "all",
         }),
         callOr<RawModPreflightReport>("modsPreflight", null),
+        // 生效顺序（给「加载顺序」面板看）：算起来便宜（一次 scan），跟着每次 reload 一起刷
+        callOr<RawModPlan>("modsPlan", null),
       ])
     setList(nextList)
     applyMarket(nextMarket)
@@ -425,6 +434,7 @@ export function useModSource(): ModSourceState {
     setTemplates(nextTemplates?.templates ?? [])
     setClaims(nextClaims)
     setPreflight(nextPreflight)
+    setPlan(nextPlan)
     setLoaded(true)
     setLoading(false)
   }, [ipc, applyMarket])
@@ -535,6 +545,8 @@ export function useModSource(): ModSourceState {
     (folder: string, enabled: boolean) => act("modsSetEnabled", folder, enabled),
     [act]
   )
+  /** 写用户自定义加载顺序（`_launcher/mods/mod-order.json`），重启服务端后生效 */
+  const setOrder = useCallback((folders: string[]) => act("modsSetOrder", folders), [act])
   const uninstall = useCallback((folder: string) => act("modsUninstall", folder), [act])
   const sign = useCallback((folder: string) => act("modsSign", folder), [act])
   const createFolder = useCallback(() => act("modsCreateFolder"), [act])
@@ -802,6 +814,8 @@ export function useModSource(): ModSourceState {
     importZip,
     openFolder,
     openModFolder,
+    setOrder,
+    plan,
     readme,
     saveText,
     installFromMarket,

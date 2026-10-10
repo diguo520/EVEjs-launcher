@@ -11,6 +11,7 @@ import { TopBar } from "@/components/shell/top-bar"
 import { SideNav } from "@/components/shell/side-nav"
 import { AppContextMenu } from "@/components/shell/app-menu"
 import { BootSplash } from "@/components/shell/boot-splash"
+import { LegalNoticeDialog } from "@/components/shell/legal-notice-dialog"
 import { useLocale } from "@/components/shell/locale-provider"
 import { StatusBar } from "@/components/shell/status-bar"
 import type { NavBadges, ViewId } from "@/components/shell/nav-config"
@@ -18,6 +19,7 @@ import { useLauncher } from "@/hooks/use-launcher"
 import { useLauncherAccounts } from "@/hooks/use-launcher-accounts"
 import { useEnvCheck } from "@/hooks/use-env-check"
 import { callOr, hasIpc, type RawModList } from "@/lib/ipc"
+import { markLegalNoticeSeen, needsLegalNotice } from "@/lib/legal-notice"
 import { DashboardPage } from "@/pages/dashboard-page"
 import { ConsolePage } from "@/pages/console-page"
 import { GameConfigPage } from "@/pages/game-config-page"
@@ -88,10 +90,30 @@ export function App() {
   const [bootReady, setBootReady] = useState(() => !hasIpc())
   const [splashMounted, setSplashMounted] = useState(true)
 
+  /**
+   * 法律声明：第一次启动自动弹一次；关掉之后缩成状态栏底部的一个入口，之后随时能再打开。
+   * `legalAcknowledged` 既决定还要不要自动弹，也决定底部入口出不出现。
+   */
+  const [legalAcknowledged, setLegalAcknowledged] = useState(() => !needsLegalNotice())
+  const [legalOpen, setLegalOpen] = useState(false)
+
+  function closeLegalNotice() {
+    setLegalOpen(false)
+    if (legalAcknowledged) return
+    markLegalNoticeSeen()
+    setLegalAcknowledged(true)
+  }
+
   useEffect(() => {
     const timer = window.setTimeout(() => setBootMinPassed(true), BOOT_MIN_MS)
     return () => window.clearTimeout(timer)
   }, [])
+
+  // 等开机画面收掉再弹：盖在开机画面底下弹出来，看着像没弹
+  useEffect(() => {
+    if (splashMounted || legalAcknowledged) return
+    setLegalOpen(true)
+  }, [splashMounted, legalAcknowledged])
 
   // 第一次握手：app:info 回来就算接上；纯浏览器里没有 IPC，一上来就算就绪
   useEffect(() => {
@@ -119,7 +141,14 @@ export function App() {
     toast.info(t("{name} · {desc}", { name: t(svc.name), desc: t(svc.desc) }), {
       description: t("端口 {port} · {state} · PID {pid}", {
         port: svc.port,
-        state: svc.state === "running" ? t("运行中") : t("未启动"),
+        state:
+          svc.state === "running"
+            ? t("运行中")
+            : svc.state === "starting"
+              ? t("启动中")
+              : svc.state === "stopping"
+                ? t("正在停止…")
+                : t("未启动"),
         pid: svc.pid ?? "—",
       }),
     })
@@ -198,8 +227,18 @@ export function App() {
               </main>
             </div>
 
-            <StatusBar env={env} services={launcher.services} session={launcher.session} />
+            <StatusBar
+              env={env}
+              services={launcher.services}
+              session={launcher.session}
+              onOpenLegalNotice={legalAcknowledged ? () => setLegalOpen(true) : undefined}
+            />
           </div>
+
+          <LegalNoticeDialog
+            open={legalOpen}
+            onOpenChange={(next) => (next ? setLegalOpen(true) : closeLegalNotice())}
+          />
 
           {/* 开机画面：纯前端覆盖层，G1 自检认的那个根节点原样不动 */}
           {splashMounted ? (

@@ -988,6 +988,62 @@ export function parseIdList(raw: string): string[] {
   return [...seen]
 }
 
+/* ---------------- 加载顺序（已安装页） ---------------- */
+
+/**
+ * 已安装页的展示分组：启用的排在前面、停用的排在后面，两段内部都保持用户设定的顺序。
+ *
+ * 只影响「怎么显示」。**加载顺序永远取用户那一份完整顺序**，跟启不启用无关 ——
+ * 所以关掉一个模组不用手动重排，重新打开它还会回到原来的位置。
+ */
+export function groupByEnabled(mods: ModEntry[]): ModEntry[] {
+  const enabled: ModEntry[] = []
+  const disabled: ModEntry[] = []
+  for (const mod of mods) (mod.enabled ? enabled : disabled).push(mod)
+  return [...enabled, ...disabled]
+}
+
+/**
+ * 拖拽落位：把 `id` 挪到 `targetId` 的前面或后面，其余保持原序。
+ * 任一 id 不在列表里就原样返回 —— 不猜、不吞。
+ */
+export function moveWithin(
+  list: string[],
+  id: string,
+  targetId: string,
+  after: boolean
+): string[] {
+  if (id === targetId) return list
+  const target = list.indexOf(targetId)
+  if (!list.includes(id) || target < 0) return list
+  const next = list.filter((item) => item !== id)
+  const at = next.indexOf(targetId)
+  next.splice(after ? at + 1 : at, 0, id)
+  return next
+}
+
+/**
+ * 把「启用段拖过之后的新顺序」合并回完整顺序。
+ *
+ * 做法：停用的条目**留在原位不动**，只把启用段按新顺序填回它原来占的那些槽位。
+ * 这样两个诉求同时成立：
+ *   - 关掉一个模组不用重排（它的槽位还在，重新打开就回原位）；
+ *   - 也不会因为"停用的都排到末尾"把用户已经拖过的顺序冲掉。
+ *
+ * 长度对不上（调用方拿到的启用列表已经过期）就原样返回，宁可不改也不猜。
+ */
+export function mergeEnabledOrder(
+  allIds: string[],
+  enabledIds: string[],
+  newEnabledOrder: string[]
+): string[] {
+  if (enabledIds.length !== newEnabledOrder.length) return allIds
+  if (enabledIds.length === 0) return allIds
+  const pool = [...newEnabledOrder]
+  const enabled = new Set(enabledIds)
+  return allIds.map((id) => (enabled.has(id) ? (pool.shift() ?? id) : id))
+}
+
 /**
  * 冲突声明的检查结果。都不拦提交——冲突对象可能还没建出来，
  * 也不排除将来由别人发布——所以在表单里只做提示。

@@ -194,6 +194,11 @@ pub fn run() {
                 .background_color(tauri::window::Color(5, 8, 13, 255))
                 .visible(false)
                 .center()
+                // 必须关掉：Tauri 默认开着 WebView 的原生拖放（接文件拖进来那套），
+                // 在 Windows 上它会把 WebView 内的 HTML5 拖拽整个吃掉 ——
+                // 表现就是「卡片按住拖不动」（2026-10-10 报障）。启动器没有任何
+                // 拖文件进来的功能（导入 ZIP 走的是按钮 + 文件对话框），关掉不影响别的。
+                .disable_drag_drop_handler()
                 .initialization_script(API_SHIM);
             if self_test {
                 shell = shell.initialization_script(SELF_TEST_SHIM);

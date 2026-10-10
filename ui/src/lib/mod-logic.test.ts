@@ -21,6 +21,9 @@ import {
   modByFolderOrId,
   overlapFlag,
   overlapReport,
+  groupByEnabled,
+  mergeEnabledOrder,
+  moveWithin,
   parseIdList,
   parseTags,
   ratingFromReviews,
@@ -160,6 +163,60 @@ describe("parseIdList（关联模组 id）", () => {
       "6",
       "7",
     ])
+  })
+})
+
+describe("加载顺序（已安装页）", () => {
+  const mod = (id: string, enabled: boolean) => ({ id, enabled }) as unknown as ModEntry
+
+  it("启用的排前面、停用的排后面，两段内部保持原序", () => {
+    const list = groupByEnabled([
+      mod("a", false),
+      mod("b", true),
+      mod("c", false),
+      mod("d", true),
+    ])
+    expect(list.map((item) => item.id)).toEqual(["b", "d", "a", "c"])
+  })
+
+  it("拖到某个卡片前面 / 后面", () => {
+    expect(moveWithin(["a", "b", "c", "d"], "d", "b", false)).toEqual(["a", "d", "b", "c"])
+    expect(moveWithin(["a", "b", "c", "d"], "a", "c", true)).toEqual(["b", "c", "a", "d"])
+    // 拖到自己身上、或目标不存在：原样返回
+    expect(moveWithin(["a", "b"], "a", "a", true)).toEqual(["a", "b"])
+    expect(moveWithin(["a", "b"], "a", "ghost", true)).toEqual(["a", "b"])
+  })
+
+  it("合并回完整顺序：停用的条目留在原位，启用段按新顺序填回槽位", () => {
+    // 完整顺序 a b c d，其中 b/d 启用；把 d 拖到 b 前面
+    const merged = mergeEnabledOrder(["a", "b", "c", "d"], ["b", "d"], ["d", "b"])
+    expect(merged).toEqual(["a", "d", "c", "b"])
+    // 停用的 a / c 没有被挤到末尾，也没有换位
+    expect(merged[0]).toBe("a")
+    expect(merged[2]).toBe("c")
+  })
+
+  it("关掉再打开回到原来的位置：只要不动顺序文件，槽位就还在", () => {
+    const saved = ["a", "b", "c", "d"]
+    // b 被停用：展示分组把它挪到后面，但顺序文件不动
+    expect(groupByEnabled(saved.map((id) => mod(id, id !== "b"))).map((m) => m.id)).toEqual([
+      "a",
+      "c",
+      "d",
+      "b",
+    ])
+    // 重新启用：展示顺序回到 a b c d
+    expect(groupByEnabled(saved.map((id) => mod(id, true))).map((m) => m.id)).toEqual([
+      "a",
+      "b",
+      "c",
+      "d",
+    ])
+  })
+
+  it("长度对不上（调用方的启用列表已过期）就不动", () => {
+    expect(mergeEnabledOrder(["a", "b", "c"], ["a", "b"], ["b"])).toEqual(["a", "b", "c"])
+    expect(mergeEnabledOrder(["a", "b"], [], [])).toEqual(["a", "b"])
   })
 })
 
