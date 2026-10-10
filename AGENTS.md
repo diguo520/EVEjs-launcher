@@ -101,6 +101,10 @@ node scripts/release-channel.mjs pin-legacy --tag v0.1.28  # 回滚：把 Latest
 
 1. 提版本号（4 个文件）+ `release-notes/vX.Y.Z.json` + `pending.json` 归零。
 2. `pwsh -File scripts/build.ps1` —— **同一个 commit 只跑一次**，跑过就别重跑。
+   ⚠️ `build.ps1` **不跑 rustfmt / clippy**，而 `ci.yml` 的第 1 步是
+   `cargo fmt --check` + `clippy --all-targets -- -D warnings`。所以**动手写/改过 Rust 之后，
+   先单独跑这两条再做门禁**，否则会「本地 12 分钟全绿、CI 一上来就红」——
+   2026-10-11 发 v0.4.5 时就是这么白跑了一轮。
 3. `pwsh -File scripts/package.ps1 -SkipBuild -SignKey .keys/update-key.pem -KeyId evejs-release-2026-09-28`
 4. commit + `git tag -a` + push（提交信息**英文在前**）。
 5. `node --use-system-ca scripts/make-release.mjs --version X.Y.Z --watch-ci`
