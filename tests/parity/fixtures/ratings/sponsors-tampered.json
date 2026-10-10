@@ -4,25 +4,25 @@
   "sponsors": [
     {
       "id": "sponsor-01",
-      "name": "星海孤舟",
-      "amount": 666,
+      "name": "Fixture Alpha",
+      "amount": 10,
       "currency": "CNY"
     },
     {
-      "id": "sponsor-15",
-      "name": "Cmdr. Nova",
-      "amount": 51,
+      "id": "sponsor-02",
+      "name": "Fixture Bravo",
+      "amount": 21,
       "currency": "USD"
     },
     {
-      "id": "sponsor-07",
-      "name": "星尘补给",
+      "id": "sponsor-03",
+      "name": "Fixture Charlie",
       "amount": 32.66,
       "currency": "CNY"
     },
     {
-      "id": "sponsor-16",
-      "name": "Star Drifter",
+      "id": "sponsor-04",
+      "name": "Fixture Delta",
       "amount": 12.5,
       "currency": "USD"
     }
@@ -30,6 +30,6 @@
   "signature": {
     "alg": "ed25519",
     "keyId": "evejs-ratings-parity-fixture",
-    "sig": "a2qateQEwQPRtj+2eGmVTmLEmNKhnb7EquZA0jDC3OkdYt5A8MOgTdmIv71ohgAwvgWOBMpL1VQ8Qe16hY/LDA=="
+    "sig": "l5sLjpGKTxNlZKbV+v/qv0Sfw5hcn74v7veHF6g2i60bYYpctKa8ZfhFhdKSTaoePet0MZ40EtP/k7wQgJNiBQ=="
   }
 }

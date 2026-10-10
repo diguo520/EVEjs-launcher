@@ -25,6 +25,7 @@ use crate::market;
 use crate::mods;
 use crate::process;
 use crate::sponsors;
+use crate::storeeditor;
 use crate::updater;
 use crate::AppState;
 use serde_json::{json, Map, Value};
@@ -133,6 +134,28 @@ async fn dispatch(
                 .cloned()
                 .unwrap_or_default();
             Ok(gameconfig::save(&root, &patch).await)
+        }
+
+        /* ---------------------------- 伊甸币商城 ---------------------------- */
+        // 同 gameConfig：目录形状 / PLEX 定价 / 发货规则都在服务端 storeState 里，本层只搬运。
+        // 读随时可以；写必须在服务停下来之后 —— 服务端进程自己持有商城缓存并对同一张表写入
+        // （购买结算会追加流水），两边同时写必然互相覆盖。
+        "storeEditor:read" => Ok(storeeditor::snapshot(&root).await),
+        "storeEditor:save" => {
+            if let Some(reason) = danger::blocked_by_services(&state) {
+                return Ok(json!({ "ok": false, "supported": true, "reason": reason }));
+            }
+            let authority = args.first().cloned().unwrap_or(Value::Null);
+            Ok(storeeditor::save(&root, &authority).await)
+        }
+        // 上架向导查物品：校验 typeID + 解析图标路径。纯读，服务在跑也能查。
+        "storeEditor:itemLookup" => {
+            let type_ids = args
+                .first()
+                .and_then(|value| value.as_array())
+                .cloned()
+                .unwrap_or_default();
+            Ok(storeeditor::item_lookup(&root, &type_ids).await)
         }
 
         /* --------------------------- 静态数据热重载 --------------------------- */

@@ -1,13 +1,13 @@
 /**
- * 补给线（赞助人）名单：**优先读远端，拿不到就退回随包那份**。
+ * 补给线（赞助人）名单：**只信远端签名快照**。
  *
  * 远端那份由 `infra/` 那个 Cloudflare 服务定时签出来（`GET /v1/sponsors.json`），
  * 走 Rust 侧的 `sponsors:snapshot`（多镜像 + 本地缓存 + 验签），所以改名单不用发版。
  *
  * 这里只做两件事：
  *   1) 把回包过一遍 `sponsorEntriesFrom`（与写名单的人共用一套校验口径）；
- *   2) 一条都没剩下（没网 / 服务还没上 / 验签没过 / 回包形状不对）时退回随包的
- *      `SPONSORS` —— 这块面板不能开天窗。
+ *   2) 一条都没剩下（没网 / 服务还没上 / 验签没过 / 回包形状不对）时保持空名单 ——
+ *      宁可不开天窗，也不展示随包的演示数据。
  *
  * 浏览器里（没有桥）`callOr` 直接给兜底值，原型预览照常显示随包名单。
  */
@@ -32,7 +32,7 @@ export function useSponsors(): SponsorEntry[] {
       const raw = await callOr<RawSponsorsSnapshot>("sponsorsSnapshot", null, false)
       if (!alive) return
       const live = sponsorEntriesFrom(raw)
-      // 空名单不动 state：宁可用随包那份，也不让面板变成空的
+      // 空名单不动 state：远端还没回来时保持当前内容，不闪回空面板
       if (live.length) setEntries(live)
     })()
     return () => {

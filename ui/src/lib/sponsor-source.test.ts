@@ -216,16 +216,8 @@ describe("赞助人名单 · 共用校验与现有名单", () => {
     expect(toSponsorEntry("s1", "甲", Number.POSITIVE_INFINITY)).toBeNull()
   })
 
-  it("随包的 sponsors.txt 能解析出非空名单（改坏了当场红）", () => {
-    expect(SPONSORS.length).toBeGreaterThan(0)
-    for (const entry of SPONSORS) {
-      expect(entry.name.trim()).toBe(entry.name)
-      expect(entry.name.length).toBeGreaterThan(0)
-      expect(Number.isFinite(entry.amount)).toBe(true)
-      expect(entry.amount).toBeGreaterThanOrEqual(0)
-      expect(/^[A-Z]{3}$/.test(entry.currency)).toBe(true)
-    }
-    expect(new Set(SPONSORS.map((e) => e.name)).size).toBe(SPONSORS.length)
+  it("随包回落刻意留空：不把演示 / 测试名单带进界面", () => {
+    expect(SPONSORS).toEqual([])
   })
 })
 

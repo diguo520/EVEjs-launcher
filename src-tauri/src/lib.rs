@@ -30,6 +30,7 @@ pub mod process;
 pub mod pty;
 pub mod runtime;
 pub mod secrets;
+pub mod storeeditor;
 pub mod seed;
 pub mod shell;
 pub mod sidecar;

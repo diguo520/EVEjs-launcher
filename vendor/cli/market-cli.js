@@ -362,9 +362,14 @@ function book(root, typeId) {
         "FROM market_orders WHERE type_id = ? AND state = 'open' ORDER BY price"
     ).all(id);
 
-    const history = db.prepare(
-      "SELECT day, low_price, high_price, avg_price, volume, order_count FROM price_history WHERE type_id = ? ORDER BY day"
-    ).all(id);
+    // 倒序取最近 HISTORY_DAYS 天再翻回升序：升序 + LIMIT 会取到**最老**的那 30 天。
+    const history = db
+      .prepare(
+        "SELECT day, low_price, high_price, avg_price, volume, order_count FROM price_history " +
+          "WHERE type_id = ? ORDER BY day DESC LIMIT ?"
+      )
+      .all(id, HISTORY_DAYS)
+      .reverse();
 
     const fills = db.prepare(
       "SELECT json_extract(response_json,'$.price') AS price, " +
@@ -549,6 +554,15 @@ function bonusEntries(list, lang) {
 
 /** unitID=116 是「typeID」：属性值指向另一个物品（技能、弹药…），界面要显示名字而不是数字 */
 const TYPE_REF_UNIT = 116;
+
+/**
+ * 价格史窗口（天）。
+ *
+ * 游戏里也是固定窗口；而 `price_history` 会一天天长（种子已经铺了一段，之后每个有成交的
+ * 日子再加一行）—— 不设上限的话，一年后几百个点挤在同一个宽度里会糊成一片，横轴的
+ * 日期刻度也会退化成一堆重复的月份。取最近 30 天，与界面「30 天最低/最高」的口径一致。
+ */
+const HISTORY_DAYS = 30;
 
 /** 舰船的 SDE 类别 id（invCategories：6 = Ship） */
 const SHIP_CATEGORY = 6;

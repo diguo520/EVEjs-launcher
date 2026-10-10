@@ -126,8 +126,13 @@ export function MarketPage() {
   const unavailable = store.reason != null && !store.catalogLoaded
 
   return (
-    <div className="space-y-4">
+    // 整页占满 main 的高度（与 settings-page 同一套写法）：下面的浏览器面板才能拿到
+    // **确定高度**，三列各自内部滚动。「最近成交」那种长列表就不会再把整页往下撑——
+    // 之前面板只给了 min-h-[560px]，是个下限不是高度，flex-1 拿不到可分配空间，
+    // 60 行就全量铺开，页面被撑到三四千像素。
+    <div className="flex h-full min-h-0 flex-col gap-4">
       <SectionHeading
+        className="shrink-0"
         title="物品市场"
         sub="// ITEM & MARKET CATALOG"
         actions={
@@ -147,7 +152,7 @@ export function MarketPage() {
         }
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid shrink-0 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {tiles.map((tile) => (
           <StatTile
             key={tile.label}
@@ -172,7 +177,7 @@ export function MarketPage() {
               })
             : undefined
         }
-        className="min-h-[560px]"
+        className="flex-1 min-h-0"
         bodyClassName="flex min-h-0"
       >
         {unavailable ? (

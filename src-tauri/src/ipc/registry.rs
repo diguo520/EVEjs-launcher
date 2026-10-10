@@ -37,6 +37,11 @@ pub const HANDLED: &[&str] = &[
     // 游戏世界参数（本工程扩展，契约见 contract/extensions.json）
     "gameConfig:read",
     "gameConfig:save",
+    // 伊甸币商城（本工程扩展，契约见 contract/extensions.json）：
+    // read=整棵 newEdenStore 权威数据 + 摘要；save=整棵写回（服务在跑时拒绝）
+    "storeEditor:read",
+    "storeEditor:save",
+    "storeEditor:itemLookup",
     // 静态数据热重载（本工程扩展，契约见 contract/extensions.json）：
     // state=表清单/脏表/快照；apply=把改过的 JSON 送进运行中的服务端内存；restore=快照回滚
     "hotreload:apply",

@@ -23,7 +23,7 @@ import { SPONSOR_LIST } from "../src/sponsors.js"
 const TOKEN = "fixture-admin-token-0123456789"
 
 test("输入校验：名字必填、金额是非负有限数、币种要么三位字母要么别写", () => {
-  assert.equal(checkSponsorInput({ name: " 星海孤舟 ", amount: "666" }).entry.amount, 666)
+  assert.equal(checkSponsorInput({ name: " 测试用户 ", amount: "10" }).entry.amount, 10)
   assert.equal(checkSponsorInput({ name: "甲", amount: 0 }).ok, true, "0 是合法金额")
   assert.equal(checkSponsorInput({ name: "甲", amount: "usd" }).ok, false)
   assert.equal(checkSponsorInput({ name: "甲", amount: -1 }).ok, false)
@@ -152,12 +152,12 @@ test("加一个人：写进 KV、回包是归一化视图，重算后快照里�
   const call = http(env)
 
   // 刻意用一个种子里没有的名字：同名会被判成「改」（那条另有测试）
-  const response = await post(call, "/v1/admin/sponsors", { name: "Cmdr. Nova Prime", amount: "50", currency: "usd" })
+  const response = await post(call, "/v1/admin/sponsors", { name: "测试用户", amount: "50", currency: "usd" })
   assert.equal(response.status, 200)
   const body = await response.json()
   assert.equal(body.action, "added")
   const added = body.sponsors.at(-1)
-  assert.deepEqual([added.name, added.amount, added.currency], ["Cmdr. Nova Prime", 50, "USD"])
+  assert.deepEqual([added.name, added.amount, added.currency], ["测试用户", 50, "USD"])
   assert.ok(added.id, "回包里的条目都带 id（启动器拿它当 key）")
 
   assert.ok(env.store.has(SPONSOR_SOURCE_KEY), "名单本体要落 KV，不能只活在这一次请求里")
@@ -170,7 +170,7 @@ test("加一个人：写进 KV、回包是归一化视图，重算后快照里�
 
   const snapshot = await (await call("/v1/sponsors.json")).json()
   assert.ok(await verifyPayload(me.publicKey, snapshot), "启动器要能验过这份快照")
-  assert.ok(snapshot.sponsors.some((item) => item.name === "Cmdr. Nova Prime" && item.currency === "USD"))
+  assert.ok(snapshot.sponsors.some((item) => item.name === "测试用户" && item.currency === "USD"))
 })
 
 test("同名再存一次是「改」，不是再来一条", async () => {
@@ -178,14 +178,14 @@ test("同名再存一次是「改」，不是再来一条", async () => {
   const env = fakeEnv(me)
   const call = http(env)
 
-  await post(call, "/v1/admin/sponsors", { name: "星海孤舟", amount: 888 })
-  const response = await post(call, "/v1/admin/sponsors", { name: "星海孤舟", amount: 999 })
+  await post(call, "/v1/admin/sponsors", { name: "同名测试", amount: 10 })
+  const response = await post(call, "/v1/admin/sponsors", { name: "同名测试", amount: 20 })
   const body = await response.json()
   assert.equal(body.action, "updated")
-  assert.equal(body.sponsors.length, SPONSOR_LIST.length, "总数不该变")
-  assert.equal(body.sponsors[0].name, "星海孤舟")
-  assert.equal(body.sponsors[0].amount, 999)
-  assert.equal(JSON.parse(env.store.get(SPONSOR_SOURCE_KEY)).length, SPONSOR_LIST.length)
+  assert.equal(body.sponsors.length, 1, "总数不该变")
+  assert.equal(body.sponsors[0].name, "同名测试")
+  assert.equal(body.sponsors[0].amount, 20)
+  assert.equal(JSON.parse(env.store.get(SPONSOR_SOURCE_KEY)).length, 1)
 })
 
 test("打错的输入当场拒，且不污染 KV", async () => {

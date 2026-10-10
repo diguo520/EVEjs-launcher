@@ -73,6 +73,34 @@
       "why": "写回世界参数。走服务端自己的 saveConfig：先按 schema 校验（未知键 / 类型 / 整数 / 范围 / 枚举全在服务端判定），再原子写 config/*.json。启动器侧额外做的事只有一件 —— 写前把整份 config 备份到 _local/config-backups/gameconfig-<时间戳>/，因为服务端自己的原子写不带回滚，而这里改的是全局玩法参数。只写 config/*.json，不碰 server/ 下任何源码。"
     },
     {
+      "api": "storeEditorRead",
+      "channel": "storeEditor:read",
+      "kind": "invoke",
+      "signature": "",
+      "params": [],
+      "why": "伊甸币商城（服务端 newEdenStore 权威数据）此前启动器完全碰不到：服务端自带的 tools/NewEdenStoreEditor 里，桌面版 editor.py 依赖 Python 3，Web 版 editor.js 既没有启动脚本、又用 app.listen(port) 不绑 host，实际监听在全网卡上且没有任何鉴权 —— 局域网里谁都能 POST /api/store 改写商城目录，现役版也没有这条能力。这条通道把同一份权威数据搬进启动器：侧车 store-cli.js 直接 require 服务端 server/src/services/newEdenStore/storeState 的 getEditorSnapshot，返回整棵 authority（meta / config / stores / publicOffers / fastCheckout）加一份计数摘要供界面渲染。规则不在启动器里重写，服务端改目录形状时这里不用跟着动。纯读，不写盘，也不受服务运行状态限制。"
+    },
+    {
+      "api": "storeEditorSave",
+      "channel": "storeEditor:save",
+      "kind": "invoke",
+      "signature": "authority: Record<string, unknown>",
+      "params": [
+        "authority"
+      ],
+      "why": "写回商城的整棵 authority。服务端的 saveEditorAuthority 是 database.write(AUTHORITY_TABLE, 根路径, value) —— 整棵覆盖，所以渲染层提交的必须是「读出来的整棵 + 改过的字段」，只送差异会把商城写空。侧车因此在下笔前自检 authority.meta 与 authority.stores 存在且是对象，挡住这种界面上看不见的损坏。只写 newEdenStore 这一张表，不碰 server/ 下任何源码，也不碰存档里的其它表（军团、资产、市场订单都不受影响）。服务在跑时拒绝执行：服务端进程自己持有商城缓存并对同一张表写入（购买结算会追加流水），两边同时写必然互相覆盖。"
+    },
+    {
+      "api": "storeEditorItemLookup",
+      "channel": "storeEditor:itemLookup",
+      "kind": "invoke",
+      "signature": "typeIDs: number[]",
+      "params": [
+        "typeIDs"
+      ],
+      "why": "上架新商品时查物品：游戏内货架的 offer 必须带一个客户端认得的 imageUrl，而图标规则是 itemIcons.iconsByID[itemTypes[typeID].iconID]（实测现有 15 条游戏内商品里 12 条与该规则逐字一致）。这条通道把 typeID 送进侧车 store-cli.js item-lookup：校验它在不在服务端的 52590 条物品库里（不在就会买了拿不到货），并回它的图标路径；iconID 为 null 的物品在客户端里本来就没有图标（Sunesis 42685、Drake 24698 就是），游戏内会画问号占位，所以侧车如实回空串、界面提前警告，而不是给一个猜的路径。物品库在数据根下分两个文件（itemTypes 22 MB + itemIcons），只在点开上架向导时才读，快照通道不背这个开销。纯读，不写盘。"
+    },
+    {
       "api": "hotreloadApply",
       "channel": "hotreload:apply",
       "kind": "invoke",

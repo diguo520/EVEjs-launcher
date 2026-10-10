@@ -150,7 +150,7 @@ try {
         $profileName = if ($DebugBuild) { "debug" } else { "release" }
         $cliDir = Join-Path $root "src-tauri\target\$profileName\_launcher\cli"
         New-Item -ItemType Directory -Force -Path $cliDir | Out-Null
-        $cliScripts = @("account-cli.js", "database-cli.js", "game-config-cli.js", "market-cli.js")
+        $cliScripts = @("account-cli.js", "database-cli.js", "game-config-cli.js", "market-cli.js", "store-cli.js")
         foreach ($name in $cliScripts) {
             Copy-Item -LiteralPath (Join-Path $root "vendor\cli\$name") -Destination $cliDir -Force
         }

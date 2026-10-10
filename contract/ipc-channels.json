@@ -2,12 +2,12 @@
   "generatedFrom": "E:\\Games\\EveJS-v0.12.8\\launcher\\launcher",
   "generatedAt": "2026-10-05T11:17:38.460Z",
   "counts": {
-    "invoke": 106,
+    "invoke": 109,
     "send": 6,
     "events": 7,
-    "requests": 112,
+    "requests": 115,
     "registered": 82,
-    "apiTotal": 119
+    "apiTotal": 122
   },
   "invoke": [
     {
@@ -871,6 +871,31 @@
       ]
     },
     {
+      "api": "storeEditorItemLookup",
+      "channel": "storeEditor:itemLookup",
+      "kind": "invoke",
+      "signature": "typeIDs: number[]",
+      "params": [
+        "typeIDs"
+      ]
+    },
+    {
+      "api": "storeEditorRead",
+      "channel": "storeEditor:read",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "storeEditorSave",
+      "channel": "storeEditor:save",
+      "kind": "invoke",
+      "signature": "authority: Record<string, unknown>",
+      "params": [
+        "authority"
+      ]
+    },
+    {
       "api": "updateApply",
       "channel": "update:apply",
       "kind": "invoke",
@@ -1022,7 +1047,10 @@
       "mods:reviewSubmit",
       "mods:reviews",
       "mods:updateMeta",
-      "sponsors:snapshot"
+      "sponsors:snapshot",
+      "storeEditor:itemLookup",
+      "storeEditor:read",
+      "storeEditor:save"
     ],
     "send": [],
     "events": []

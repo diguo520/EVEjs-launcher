@@ -7,15 +7,15 @@ import worker, { rebuildSnapshots } from "../src/index.js"
 import { SNAPSHOT_SCHEMA_VERSION, normalizeCurrency, sponsorSnapshot } from "../src/snapshot.js"
 import { SPONSOR_LIST } from "../src/sponsors.js"
 
-const entry = (over = {}) => ({ name: "星海孤舟", amount: 666, currency: "CNY", ...over })
+const entry = (over = {}) => ({ name: "测试用户", amount: 10, currency: "CNY", ...over })
 
 test("快照：按原顺序保留，字段就是启动器要的四个", () => {
-  const snapshot = sponsorSnapshot([entry(), entry({ name: "星轨拾荒者", amount: 500 })], 1234)
+  const snapshot = sponsorSnapshot([entry(), entry({ name: "测试用户二", amount: 20 })], 1234)
   assert.equal(snapshot.schemaVersion, SNAPSHOT_SCHEMA_VERSION)
   assert.equal(snapshot.generatedAt, 1234)
   assert.deepEqual(snapshot.sponsors, [
-    { id: "sponsor-01", name: "星海孤舟", amount: 666, currency: "CNY" },
-    { id: "sponsor-02", name: "星轨拾荒者", amount: 500, currency: "CNY" },
+    { id: "sponsor-01", name: "测试用户", amount: 10, currency: "CNY" },
+    { id: "sponsor-02", name: "测试用户二", amount: 20, currency: "CNY" },
   ])
 })
 
@@ -33,13 +33,13 @@ test("快照：名字空、金额缺失 / 非数 / 负数都丢掉", () => {
 
 test("快照：同名只留第一条，金额保留两位小数", () => {
   const snapshot = sponsorSnapshot([
-    entry({ name: "星海孤舟", amount: 666 }),
-    entry({ name: "星海孤舟", amount: 128 }),
-    entry({ name: "星尘补给", amount: 32.666 }),
+    entry({ name: "测试用户", amount: 10 }),
+    entry({ name: "测试用户", amount: 20 }),
+    entry({ name: "测试用户二", amount: 32.666 }),
   ])
   assert.deepEqual(snapshot.sponsors.map((item) => [item.name, item.amount]), [
-    ["星海孤舟", 666],
-    ["星尘补给", 32.67],
+    ["测试用户", 10],
+    ["测试用户二", 32.67],
   ])
 })
 
@@ -123,16 +123,6 @@ test("重建快照：没配签名密钥就不发布（fail closed）", async () 
   assert.match(result.reason, /RATINGS_SIGNING_KEY/)
 })
 
-test("随包的名单本身是合法的：非空、id 与名字都不重复、金额都是数字", () => {
-  const snapshot = sponsorSnapshot(SPONSOR_LIST, 0)
-  assert.ok(snapshot.sponsors.length >= 2, "名单不该是空的")
-  assert.equal(snapshot.sponsors.length, SPONSOR_LIST.length, "随包名单里不该有被丢掉的条目")
-  assert.equal(new Set(snapshot.sponsors.map((item) => item.id)).size, snapshot.sponsors.length)
-  assert.equal(new Set(snapshot.sponsors.map((item) => item.name)).size, snapshot.sponsors.length)
-  for (const item of snapshot.sponsors) {
-    assert.ok(Number.isFinite(item.amount) && item.amount >= 0, item.name)
-    assert.match(item.currency, /^[A-Z]{3}$/)
-  }
-  // 用户明确说过「赞助人也有国外的，不全是人民币」——这条钉住美元那条路径
-  assert.ok(snapshot.sponsors.some((item) => item.currency !== "CNY"), "名单里应有非人民币币种")
+test("随包种子刻意留空：真实名单只从 KV 管理接口写入", () => {
+  assert.equal(SPONSOR_LIST.length, 0, "代码里不能再带演示 / 测试赞助人")
 })

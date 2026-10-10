@@ -6,8 +6,7 @@
  */
 export const SPONSOR_DANMAKU_TARGET_VISIBLE = 6
 export const SPONSOR_DANMAKU_MIN_CYCLE_SECONDS = 42
-export const SPONSOR_DANMAKU_BASE_TRAVEL_SECONDS = 22
-export const SPONSOR_DANMAKU_TRAVEL_JITTER_SECONDS = 8
+export const SPONSOR_DANMAKU_TRAVEL_SECONDS = 26
 export const SPONSOR_DANMAKU_TOP_MIN = 8
 export const SPONSOR_DANMAKU_TOP_MAX = 92
 
@@ -42,10 +41,7 @@ export function sponsorDanmakuCycleSeconds(count: number): number {
   const safeCount = Math.max(0, count)
   return Math.max(
     SPONSOR_DANMAKU_MIN_CYCLE_SECONDS,
-    (safeCount *
-      (SPONSOR_DANMAKU_BASE_TRAVEL_SECONDS +
-        SPONSOR_DANMAKU_TRAVEL_JITTER_SECONDS / 2)) /
-      SPONSOR_DANMAKU_TARGET_VISIBLE
+    (safeCount * SPONSOR_DANMAKU_TRAVEL_SECONDS) / SPONSOR_DANMAKU_TARGET_VISIBLE
   )
 }
 
@@ -63,11 +59,9 @@ export function sponsorDanmakuSchedule(count: number): SponsorDanmakuBullet[] {
     const topSeed = (index * 0.6180339887498949 + noise(index, 301) * 0.11) % 1
     const topPercent = SPONSOR_DANMAKU_TOP_MIN + topSeed * topSpan
 
-    // 均匀铺满整周期，再加一点抖动；连续但没有整齐节拍。
-    const phase = (index + noise(index, 302) * 0.42) * interval
-    const travelSeconds =
-      SPONSOR_DANMAKU_BASE_TRAVEL_SECONDS +
-      noise(index, 303) * SPONSOR_DANMAKU_TRAVEL_JITTER_SECONDS
+    // 严格均匀铺满整周期：首尾刚好接力，不会出现一段无人进场或重新起跑的停顿。
+    const phase = index * interval
+    const travelSeconds = SPONSOR_DANMAKU_TRAVEL_SECONDS
     const driftY = (noise(index, 304) - 0.5) * 28
     const rotateDeg = (noise(index, 305) - 0.5) * 2.6
 

@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react"
-import { AlertTriangle, Loader2, RefreshCw, RotateCcw, Save, Search } from "lucide-react"
+import { AlertTriangle, Loader2, RefreshCw, RotateCcw, Save, Search, Store } from "lucide-react"
 import { toast } from "sonner"
 
 import { Panel, SectionHeading } from "@/components/common/panel"
 import { useLocale } from "@/components/shell/locale-provider"
 import { ParamRow } from "@/components/gameconfig/param-row"
+import { StoreEditorDialog } from "@/components/store/store-editor-dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
@@ -38,6 +39,7 @@ export function GameConfigPage() {
     multipliersOnly: false,
     changedOnly: false,
   })
+  const [storeOpen, setStoreOpen] = useState(false)
 
   const domainItems = useMemo(
     () => definitionsOfDomain(gc.definitions, domain),
@@ -118,6 +120,25 @@ export function GameConfigPage() {
           )}
         </p>
       </div>
+
+      {/* 商城是"另一份目录"，不在 config/*.json 里：权威数据在服务端 newEdenStore 表，
+          所以这里只放入口，编辑器自己一个弹窗，保存前要求先停服务端。 */}
+      <Panel
+        title="伊甸币商城"
+        flush
+        actions={
+          <Button variant="secondary" size="sm" onClick={() => setStoreOpen(true)}>
+            <Store />
+            打开商城编辑器
+          </Button>
+        }
+      >
+        <p className="px-4 py-3 text-[11px] leading-relaxed text-muted-foreground">
+          {t(
+            "商品目录、PLEX 定价与上下架都在服务端的 newEdenStore 权威数据里，不在 config/ 下。这里改的是同一份目录，保存前请先停止服务端。"
+          )}
+        </p>
+      </Panel>
 
       <Panel
         title="筛选"
@@ -244,6 +265,7 @@ export function GameConfigPage() {
           保存参数
         </Button>
       </div>
+      {storeOpen ? <StoreEditorDialog onClose={() => setStoreOpen(false)} /> : null}
     </div>
   )
 }

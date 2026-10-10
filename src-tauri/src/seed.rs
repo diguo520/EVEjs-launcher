@@ -33,6 +33,10 @@ const CLI_SCRIPTS: &[(&str, &[u8])] = &[
         "market-cli.js",
         include_bytes!("../../vendor/cli/market-cli.js"),
     ),
+    (
+        "store-cli.js",
+        include_bytes!("../../vendor/cli/store-cli.js"),
+    ),
 ];
 
 /// 自更新器：由 `build.rs` 拷进 OUT_DIR（vendor/updater/bin 被 .gitignore 排除，

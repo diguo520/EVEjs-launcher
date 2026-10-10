@@ -75,17 +75,17 @@ const sponsorsPayload = {
   schemaVersion: 1,
   generatedAt: 1790842714426,
   sponsors: [
-    { id: "sponsor-01", name: "星海孤舟", amount: 666, currency: "CNY" },
-    { id: "sponsor-15", name: "Cmdr. Nova", amount: 50, currency: "USD" },
-    { id: "sponsor-07", name: "星尘补给", amount: 32.66, currency: "CNY" },
-    { id: "sponsor-16", name: "Star Drifter", amount: 12.5, currency: "USD" },
+    { id: "sponsor-01", name: "Fixture Alpha", amount: 10, currency: "CNY" },
+    { id: "sponsor-02", name: "Fixture Bravo", amount: 20, currency: "USD" },
+    { id: "sponsor-03", name: "Fixture Charlie", amount: 32.66, currency: "CNY" },
+    { id: "sponsor-04", name: "Fixture Delta", amount: 12.5, currency: "USD" },
   ],
 }
 const sponsorsValid = await signDocument(bytesToBase64(pkcs8), sponsorsPayload, KEY_ID)
 const sponsorsTampered = {
   ...sponsorsValid,
   sponsors: sponsorsValid.sponsors.map((item) =>
-    item.id === "sponsor-15" ? { ...item, amount: item.amount + 1 } : item
+    item.id === "sponsor-02" ? { ...item, amount: item.amount + 1 } : item
   ),
 }
 if (!(await verifyPayload(rawPubkey, sponsorsValid))) throw new Error("自检失败：sponsors-valid 验不过")

@@ -18,7 +18,7 @@ pub struct ChannelSpec {
     pub kind: ChannelKind,
 }
 
-pub const REQUEST_COUNT: usize = 112;
+pub const REQUEST_COUNT: usize = 115;
 pub const EVENT_COUNT: usize = 7;
 
 #[rustfmt::skip]
@@ -125,6 +125,9 @@ pub const CHANNELS: &[ChannelSpec] = &[
     ChannelSpec { channel: "settings:set", api: "settingsSet", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "shell:openExternal", api: "openExternal", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "sponsors:snapshot", api: "sponsorsSnapshot", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "storeEditor:itemLookup", api: "storeEditorItemLookup", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "storeEditor:read", api: "storeEditorRead", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "storeEditor:save", api: "storeEditorSave", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "terminal:input", api: "terminalInput", kind: ChannelKind::Send },
     ChannelSpec { channel: "terminal:resize", api: "terminalResize", kind: ChannelKind::Send },
     ChannelSpec { channel: "update:apply", api: "updateApply", kind: ChannelKind::Invoke },

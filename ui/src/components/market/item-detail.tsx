@@ -10,6 +10,7 @@ import { StockEditDialog } from "@/components/market/stock-edit-dialog"
 import { BestPriceDialog } from "@/components/market/best-price-dialog"
 import { AttributeEditDialog } from "@/components/market/attribute-edit-dialog"
 import { DescriptionDialog } from "@/components/market/description-dialog"
+import { PriceHistoryDialog } from "@/components/market/price-history-dialog"
 import { TypeInfoPanel } from "@/components/market/item-tooltip"
 import { useLocale } from "@/components/shell/locale-provider"
 import type {
@@ -86,6 +87,8 @@ export function ItemDetail({
   const [editingAttrs, setEditingAttrs] = useState(false)
   // 物品简介弹窗：简介从页签里挪到了标题栏那个书页图标上
   const [showDescription, setShowDescription] = useState(false)
+  // 价格史大图弹窗（右栏太窄，放不下游戏那张图的元素）
+  const [showChart, setShowChart] = useState(false)
   // 修改最优价格弹窗（两列：最优买价只读 / 最优卖价可改）
   const [editingBestPrice, setEditingBestPrice] = useState(false)
   const { t } = useLocale()
@@ -245,6 +248,16 @@ export function ItemDetail({
                 <span className="tabular">{formatDay(history[0].day)}</span>
                 <span className="tabular">{formatDay(history[history.length - 1].day)}</span>
               </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 w-full gap-1.5 text-[11px]"
+                onClick={() => setShowChart(true)}
+              >
+                <TrendingUp className="size-3" />
+                {t("查看完整图表")}
+              </Button>
               <HistoryStats history={history} />
             </div>
           )}
@@ -315,6 +328,14 @@ export function ItemDetail({
           typeName={pair.main}
           text={description}
           onClose={() => setShowDescription(false)}
+        />
+      ) : null}
+
+      {showChart && history.length > 0 ? (
+        <PriceHistoryDialog
+          typeName={pair.main}
+          history={history}
+          onClose={() => setShowChart(false)}
         />
       ) : null}
     </div>

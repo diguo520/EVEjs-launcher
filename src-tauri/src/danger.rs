@@ -84,7 +84,9 @@ fn running_services(state: &AppState) -> Vec<String> {
         .collect()
 }
 
-fn blocked_by_services(state: &AppState) -> Option<String> {
+/// 「服务在跑时拒绝写」的统一判断。清档、重置配置、改商城都走这里 ——
+/// 服务端进程会把内存里的状态回写覆盖进程外的改动，各写各的必然互相踩。
+pub(crate) fn blocked_by_services(state: &AppState) -> Option<String> {
     let running = running_services(state);
     if running.is_empty() {
         return None;

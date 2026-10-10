@@ -11,8 +11,8 @@
 //!   "schemaVersion": 1,
 //!   "generatedAt": 1790842714426,
 //!   "sponsors": [
-//!     { "id": "sponsor-01", "name": "星海孤舟", "amount": 666, "currency": "CNY" },
-//!     { "id": "sponsor-15", "name": "Cmdr. Nova", "amount": 50, "currency": "USD" }
+//!     { "id": "sponsor-01", "name": "Fixture Alpha", "amount": 10, "currency": "CNY" },
+//!     { "id": "sponsor-02", "name": "Fixture Bravo", "amount": 20, "currency": "USD" }
 //!   ]
 //! }
 //! ```

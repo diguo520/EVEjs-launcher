@@ -7,17 +7,23 @@ import type {
   RawMarketTypeRow,
 } from "@/lib/ipc"
 import {
+  buildPriceChart,
   EMPTY_CATALOG,
   filterTypeRows,
   formatDay,
+  formatAxisTick,
   formatIsk,
   formatIskShort,
   formatQty,
   formatStamp,
   historyChart,
+  movingAverage,
   namePair,
+  niceTicks,
   nodePath,
   parseAdjustDraft,
+  pickAxisUnit,
+  shortDay,
   sortStockByPrice,
   sortTypeRows,
   toCatalog,
@@ -367,5 +373,130 @@ describe("改价 / 改量输入", () => {
       ok: false,
       reason: "价格要填不小于 0 的数字。",
     })
+  })
+})
+
+/**
+ * 价格史大图的几何：这些数字直接决定线画在哪，算错一处就是画面上一条跑偏的线 ——
+ * 所以和迷你图一样，全部锁在纯函数这一层。
+ */
+describe("价格史大图", () => {
+  const point = (
+    day: string,
+    low: number,
+    high: number,
+    avg: number,
+    volume: number
+  ): RawMarketHistoryPoint => ({ day, low, high, avg, volume, orders: 1 })
+
+  const layout = {
+    width: 900,
+    priceHeight: 300,
+    volumeHeight: 80,
+    gap: 18,
+    padLeft: 60,
+    padRight: 50,
+    padTop: 10,
+    padBottom: 20,
+  }
+
+  it("均线：样本不够的头部不画，够了以后是滑动平均", () => {
+    expect(movingAverage([1, 2, 3, 4, 5, 6], 5)).toEqual([null, null, null, null, 3, 4])
+    // 窗口比数据还长 → 整条都是 null（界面据此不画这条线）
+    expect(movingAverage([1, 2, 3], 20)).toEqual([null, null, null])
+    // 单点也能算（窗口 1）
+    expect(movingAverage([7], 1)).toEqual([7])
+  })
+
+  it("刻度取 1/2/5×10ⁿ 的整齐步长，不是把区间等分", () => {
+    expect(niceTicks(0, 100, 4)).toEqual([0, 25, 50, 75, 100])
+    expect(niceTicks(0, 10, 4)).toEqual([0, 2.5, 5, 7.5, 10])
+    // 全部相等时退化成一个刻度，不除零、不死循环
+    expect(niceTicks(5, 5, 4)).toEqual([5])
+    expect(niceTicks(Number.NaN, 1, 4)).toEqual([])
+  })
+
+  it("Y 轴数值：中文写亿/万，其他语言写 K/M/B", () => {
+    // 中文：千万级就用亿 —— 游戏里 7,000 万 ~ 8,800 万那一段写的就是 0.70亿…0.88亿
+    expect(pickAxisUnit(88_000_000, "zh")).toBe("yi")
+    expect(pickAxisUnit(70_000_000, "zh-CN")).toBe("yi")
+    expect(pickAxisUnit(9_000_000, "zh")).toBe("wan")
+    expect(pickAxisUnit(365, "zh")).toBe("none")
+    // 非中文：K/M/B，与 formatIskShort 同一套口径
+    expect(pickAxisUnit(88_000_000, "en")).toBe("m")
+    expect(pickAxisUnit(2_500_000_000, "de")).toBe("b")
+    expect(pickAxisUnit(37_500, "ru")).toBe("k")
+    expect(pickAxisUnit(375, "en")).toBe("none")
+
+    // 一根轴一个单位：同一根轴上不会一半亿一半万
+    expect(formatAxisTick(88_000_000, "yi")).toBe("0.88亿")
+    expect(formatAxisTick(70_000_000, "yi")).toBe("0.70亿")
+    expect(formatAxisTick(33_795_540, "yi")).toBe("0.34亿")
+    expect(formatAxisTick(25_000, "wan")).toBe("2.50万")
+    expect(formatAxisTick(365, "none")).toBe("365")
+    expect(formatAxisTick(375, "none", 0)).toBe("375")
+    expect(formatAxisTick(88_000_000, "m")).toBe("88.00M")
+    expect(formatAxisTick(2_500_000_000, "b")).toBe("2.50B")
+    expect(formatAxisTick(Number.NaN, "none")).toBe("—")
+  })
+
+  it("横轴日期截成 MM-DD；不是完整日期就原样返回", () => {
+    expect(shortDay("2026-09-27")).toBe("09-27")
+    expect(shortDay("2026-09")).toBe("2026-09")
+  })
+
+  it("几何：价格区与体积区上下相接，横轴按天数等距", () => {
+    const history = [
+      point("2026-09-01", 90, 110, 100, 10),
+      point("2026-09-02", 80, 120, 90, 40),
+      point("2026-09-03", 95, 105, 100, 20),
+    ]
+    const model = buildPriceChart(history, layout)
+    expect(model).not.toBeNull()
+    if (!model) return
+
+    expect(model.points).toHaveLength(3)
+    // 三个点铺满绘图区两侧
+    expect(model.points[0].x).toBeCloseTo(layout.padLeft, 5)
+    expect(model.points[2].x).toBeCloseTo(layout.width - layout.padRight, 5)
+    // 价格区在下、体积区紧接着它下面
+    expect(model.volumeTop).toBe(model.priceBottom + layout.gap)
+    expect(model.volumeBottom).toBe(model.volumeTop + layout.volumeHeight)
+
+    // 影线：最高价往上画（y 更小），最低价往下画
+    expect(model.points[1].yHigh).toBeLessThan(model.points[1].yLow)
+    // 价格域把上下影线也包进来，影线不能戳出画布
+    for (const item of model.points) {
+      expect(item.yHigh).toBeGreaterThanOrEqual(model.priceTop - 0.001)
+      expect(item.yLow).toBeLessThanOrEqual(model.priceBottom + 0.001)
+    }
+    // 体积柱从 0 起算：最大值顶到体积区顶部
+    expect(model.points[1].yVolume).toBeCloseTo(model.volumeTop, 5)
+    expect(model.peakVolume).toBe(40)
+  })
+
+  it("均线交点与散点共用同一套坐标，不足窗口的条数不画", () => {
+    const history = Array.from({ length: 8 }, (_, index) =>
+      point(`2026-09-0${index + 1}`, 100, 100, 100 + index, 5)
+    )
+    const model = buildPriceChart(history, layout)
+    expect(model).not.toBeNull()
+    if (!model) return
+    // 8 天：5 日均线有 4 个点，20 日均线一个都没有
+    expect(model.ma5).toHaveLength(4)
+    expect(model.ma20).toHaveLength(0)
+    // 第一个 5 日均线点落在第 5 天（index 4）的横坐标上
+    expect(model.ma5[0].x).toBeCloseTo(model.points[4].x, 5)
+  })
+
+  it("空数据回 null（界面据此画空态），单点落在绘图区中间", () => {
+    expect(buildPriceChart([], layout)).toBeNull()
+    const single = buildPriceChart([point("2026-09-01", 10, 20, 15, 3)], layout)
+    expect(single).not.toBeNull()
+    if (!single) return
+    expect(single.points[0].x).toBeCloseTo(
+      layout.padLeft + (layout.width - layout.padLeft - layout.padRight) / 2,
+      5
+    )
   })
 })

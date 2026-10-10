@@ -32,9 +32,7 @@ describe("赞助人弹幕调度", () => {
     const sorted = bullets.map((item) => item.delaySeconds).sort((a, b) => a - b)
     const gaps = sorted.slice(1).map((value, index) => value - sorted[index])
     expect(Math.min(...gaps)).toBeGreaterThan(0)
-    expect(Math.max(...gaps)).toBeLessThan(
-      (bullets[0].cycleSeconds / bullets.length) * 2
-    )
+    expect(Math.max(...gaps) - Math.min(...gaps)).toBeLessThan(0.0001)
   })
 
   it("纵向位置不规则但有界，并带轻微漂移和旋转", () => {

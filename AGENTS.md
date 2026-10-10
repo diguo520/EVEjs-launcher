@@ -94,3 +94,28 @@ node scripts/release-channel.mjs pin-legacy --tag v0.1.28  # 回滚：把 Latest
 - 渲染层产物 `ui/dist`、`ui/app-dist` 不进仓；打 exe 前必须先构建界面，否则 `--ui=react` 会白屏。
 - 不要提交 `launcher.config.json`、`.keys/`、`artifacts/`、`.parity-out/`、`docs/*.md`、`assets/`（已在 .gitignore 中）。
 - 维护者私钥只进 CI Secret，不进仓。
+
+## 发版效率（省时间 / 省 token，硬性要求）
+
+一次发版**只跑这些**，多一步都不做：
+
+1. 提版本号（4 个文件）+ `release-notes/vX.Y.Z.json` + `pending.json` 归零。
+2. `pwsh -File scripts/build.ps1` —— **同一个 commit 只跑一次**，跑过就别重跑。
+3. `pwsh -File scripts/package.ps1 -SkipBuild -SignKey .keys/update-key.pem -KeyId evejs-release-2026-09-28`
+4. commit + `git tag -a` + push（提交信息**英文在前**）。
+5. `node --use-system-ca scripts/make-release.mjs --version X.Y.Z --watch-ci`
+   —— 建 release、传资产、转正式、推通道、等 CI 全在这一条命令里，只打一个摘要。
+   该脚本会调 `release-channel.mjs publish`，**publish 结尾已自带**隔离断言 + 清单验签。
+
+明确**不做**的事：
+
+- **不重复跑** `release-channel.mjs verify` / `status`：`publish` 结尾已经跑过同一套断言，
+  再跑一遍只是把同样的字重新烧一次 token。
+- **不重复拉** release 资产列表、**不倾倒**清单正文来「再确认一遍」——`publish` 的末尾摘要就是凭据。
+- **不用固定 `Start-Sleep` 轮询 CI**：用 `make-release.mjs --watch-ci`（20 秒一次、只在有结论时打印一次）。
+- **全仓搜索必须排除大文件**：`ui/src/data/*.json`、`ui/package-lock.json`、`infra/package-lock.json`、
+  `artifacts/**`、`.parity-out/**`、`src-tauri/target/**`。这些一旦进入输出就是几十万 token
+  （`ui/src/data/items.json` 单文件就有 25 万+ token）。用 `git grep` 时加 pathspec 排除，
+   用 `Select-String` 时先限定 `-Path` 到具体目录或文件。
+- 门禁的实测耗时数字，只在当次发版总结里说一次，不反复复述。
+- 发版收尾**不写临时脚本**：上传/建 release/通道一律走 `scripts/make-release.mjs`。

@@ -443,6 +443,278 @@ export function historyChart(
   return { path, area, points, min, max }
 }
 
+/* ---------------- 价格史大图（对齐游戏里的市场图表） ---------------- */
+
+/**
+ * 大图布局：价格区在上、体积区在下，两区**共用同一条横轴**（游戏里也是这么叠的）。
+ * 价格刻度放左边、体积刻度放右边 —— 与游戏那张图一致。
+ */
+export interface PriceChartLayout {
+  width: number
+  /** 价格区高度 */
+  priceHeight: number
+  /** 体积区高度 */
+  volumeHeight: number
+  /** 两区之间的留白 */
+  gap: number
+  padLeft: number
+  padRight: number
+  padTop: number
+  /** 留给横轴日期标签 */
+  padBottom: number
+}
+
+/** 均线窗口：与游戏图例一致（5 天 / 20 天） */
+export const PRICE_MA_WINDOWS = [5, 20] as const
+
+export interface PriceChartPoint {
+  day: string
+  low: number
+  high: number
+  avg: number
+  volume: number
+  x: number
+  yAvg: number
+  yLow: number
+  yHigh: number
+  yVolume: number
+}
+
+export interface PriceChartTick {
+  value: number
+  y: number
+}
+
+export interface PriceChartModel {
+  points: PriceChartPoint[]
+  /** 5 日均线（不足 5 天的头部不画） */
+  ma5: { x: number; y: number }[]
+  /** 20 日均线（不足 20 天就整条不画） */
+  ma20: { x: number; y: number }[]
+  priceTicks: PriceChartTick[]
+  volumeTicks: PriceChartTick[]
+  dayLabels: { x: number; day: string }[]
+  priceTop: number
+  priceBottom: number
+  volumeTop: number
+  volumeBottom: number
+  /** 窗口内的最低 / 最高价（含上下影线） */
+  min: number
+  max: number
+  peakVolume: number
+}
+
+/**
+ * 简单移动平均。前 `window - 1` 天样本不够，回 null —— 界面据此**不画**那一段，
+ * 而不是拿不足的样本硬算一个会误导人的均值。
+ */
+export function movingAverage(values: number[], window: number): (number | null)[] {
+  const out: (number | null)[] = new Array(values.length).fill(null)
+  if (!Number.isFinite(window) || window <= 0) return out
+  let sum = 0
+  for (let index = 0; index < values.length; index += 1) {
+    sum += values[index]
+    if (index >= window) sum -= values[index - window]
+    if (index >= window - 1) out[index] = sum / window
+  }
+  return out
+}
+
+/**
+ * 把理想步长收成「好看」的档位：1 / 2 / 2.5 / 5 / 10 × 10ⁿ，取最接近的那个。
+ *
+ * 带上 2.5 这一档是为了 0…100 这类区间：只有 1/2/5 时理想步长 25 会被抬到 50，
+ * 刻度只剩三根；2.5 能给出 0/25/50/75/100 这种整齐又不稀疏的轴。
+ */
+function niceStep(raw: number): number {
+  if (!(raw > 0)) return 0
+  const magnitude = Math.pow(10, Math.floor(Math.log10(raw)))
+  const normalized = raw / magnitude
+  const candidates = [1, 2, 2.5, 5, 10]
+  let best = candidates[0]
+  for (const candidate of candidates) {
+    if (Math.abs(candidate - normalized) < Math.abs(best - normalized)) best = candidate
+  }
+  return best * magnitude
+}
+
+/**
+ * 刻度值：「好看」的步长（1 / 2 / 5 × 10ⁿ）铺满 [min, max]。
+ *
+ * 直接等分区间会出现 `0.8734亿` 这种刻度，而游戏里是 0.70 / 0.73 / 0.76… 这种整齐值。
+ */
+export function niceTicks(min: number, max: number, count = 4): number[] {
+  if (!Number.isFinite(min) || !Number.isFinite(max) || count <= 0) return []
+  if (max <= min) return [min]
+  const step = niceStep((max - min) / count)
+  if (!(step > 0)) return []
+  const out: number[] = []
+  for (let value = Math.ceil(min / step) * step; value <= max + step * 1e-9; value += step) {
+    out.push(Number(value.toPrecision(12)))
+    if (out.length > 16) break
+  }
+  return out
+}
+
+/** 坐标轴单位。**一根轴只能用一个** —— 否则同一根轴上会并排出现「0.70亿」和「8,800万」。 */
+export type AxisUnit = "none" | "wan" | "yi" | "k" | "m" | "b"
+
+/**
+ * 按**整根轴的最大值**挑单位（不是逐个刻度值挑，那样会在一根轴上混单位）。
+ *
+ * 阈值是对着游戏那张图定的：中文客户端把 7,000 万 ~ 8,800 万这一段写成
+ * `0.70亿`…`0.88亿` —— 全都不到 1 亿却用亿，所以中文的「亿」不是卡在 1e8，
+ * 而是千万级（1e7）就切过去。其他语言仍按 K/M/B，与 `formatIskShort` 同一套口径。
+ */
+export function pickAxisUnit(max: number, locale: string): AxisUnit {
+  const abs = Math.abs(max)
+  if (!Number.isFinite(abs)) return "none"
+  if (locale.startsWith("zh")) {
+    if (abs >= 1e7) return "yi"
+    if (abs >= 1e4) return "wan"
+    return "none"
+  }
+  if (abs >= 1e9) return "b"
+  if (abs >= 1e6) return "m"
+  if (abs >= 1e3) return "k"
+  return "none"
+}
+
+/** 按给定的轴单位写一个刻度值 */
+export function formatAxisTick(value: number, unit: AxisUnit, digits = 2): string {
+  if (!Number.isFinite(value)) return "—"
+  switch (unit) {
+    // i18n-exempt: 亿 是中文单位本身，不是待翻译文案（其他语言走下面的 K/M/B）
+    case "yi":
+      return `${(value / 1e8).toFixed(digits)}亿`
+    // i18n-exempt: 同上，万也是中文单位本身
+    case "wan":
+      return `${(value / 1e4).toFixed(digits)}万`
+    case "b":
+      return `${(value / 1e9).toFixed(digits)}B`
+    case "m":
+      return `${(value / 1e6).toFixed(digits)}M`
+    case "k":
+      return `${(value / 1e3).toFixed(1)}K`
+    default:
+      return value.toFixed(0)
+  }
+}
+
+/** 「2026-09-27」→「09-27」，横轴标签用的短写法 */
+export function shortDay(day: string): string {
+  const parts = day.split("-")
+  return parts.length === 3 ? `${parts[1]}-${parts[2]}` : day
+}
+
+/** 横轴日期标签：均匀挑最多 5 个，首尾一定在内（同一天只出现一次） */
+function pickDayLabels(
+  history: RawMarketHistoryPoint[],
+  xOf: (index: number) => number,
+  max = 5
+): { x: number; day: string }[] {
+  const count = history.length
+  const wanted = Math.min(max, count)
+  if (wanted <= 0) return []
+  if (wanted === 1) return [{ x: xOf(0), day: history[0].day }]
+  const seen = new Set<string>()
+  const out: { x: number; day: string }[] = []
+  for (let slot = 0; slot < wanted; slot += 1) {
+    const index = Math.round((slot * (count - 1)) / (wanted - 1))
+    const day = history[index].day
+    if (seen.has(day)) continue
+    seen.add(day)
+    out.push({ x: xOf(index), day })
+  }
+  return out
+}
+
+/**
+ * 把价格史算成一张图的全套几何：点、两条均线、两组刻度、日期标签。
+ *
+ * 刻意的口径（对着游戏那张图定，不是随手取的）：
+ * - 价格域取**上下影线**的 min/max（不只是均价），否则影线会戳出画布；
+ * - 上下各留 8% 余量，最值不贴边框；
+ * - 体积区从 0 起算（柱状图不能截断基线）；
+ * - 横轴按**天数等距**，缺失的日子不补零 —— 库里没有那天就是没有成交。
+ */
+export function buildPriceChart(
+  history: RawMarketHistoryPoint[],
+  layout: PriceChartLayout
+): PriceChartModel | null {
+  const count = history.length
+  if (count === 0) return null
+
+  const priceTop = layout.padTop
+  const priceBottom = layout.padTop + layout.priceHeight
+  const volumeTop = priceBottom + layout.gap
+  const volumeBottom = volumeTop + layout.volumeHeight
+  const plotLeft = layout.padLeft
+  const plotRight = Math.max(layout.padLeft + 1, layout.width - layout.padRight)
+  const plotWidth = plotRight - plotLeft
+
+  const xOf = (index: number): number =>
+    count === 1 ? plotLeft + plotWidth / 2 : plotLeft + (plotWidth * index) / (count - 1)
+
+  let min = Number.POSITIVE_INFINITY
+  let max = Number.NEGATIVE_INFINITY
+  let peakVolume = 0
+  for (const row of history) {
+    if (Number.isFinite(row.low)) min = Math.min(min, row.low)
+    if (Number.isFinite(row.high)) max = Math.max(max, row.high)
+    if (Number.isFinite(row.volume)) peakVolume = Math.max(peakVolume, row.volume)
+  }
+  if (!Number.isFinite(min) || !Number.isFinite(max)) {
+    min = 0
+    max = 0
+  }
+  if (max <= min) max = min + Math.max(1, Math.abs(min) * 0.02)
+  const padding = (max - min) * 0.08
+  const domainMin = Math.max(0, min - padding)
+  const domainMax = max + padding
+  const domainSpan = domainMax - domainMin || 1
+
+  const yPrice = (value: number): number =>
+    priceBottom - ((value - domainMin) / domainSpan) * layout.priceHeight
+  const yVolume = (value: number): number =>
+    peakVolume <= 0
+      ? volumeBottom
+      : volumeBottom - Math.max(0, Math.min(1, value / peakVolume)) * layout.volumeHeight
+
+  const points: PriceChartPoint[] = history.map((row, index) => ({
+    day: row.day,
+    low: row.low,
+    high: row.high,
+    avg: row.avg,
+    volume: row.volume,
+    x: xOf(index),
+    yAvg: yPrice(row.avg),
+    yLow: yPrice(row.low),
+    yHigh: yPrice(row.high),
+    yVolume: yVolume(row.volume),
+  }))
+
+  const averages = history.map((row) => row.avg)
+  const line = (series: (number | null)[]): { x: number; y: number }[] =>
+    series.flatMap((value, index) => (value == null ? [] : [{ x: xOf(index), y: yPrice(value) }]))
+
+  return {
+    points,
+    ma5: line(movingAverage(averages, PRICE_MA_WINDOWS[0])),
+    ma20: line(movingAverage(averages, PRICE_MA_WINDOWS[1])),
+    priceTicks: niceTicks(domainMin, domainMax, 4).map((value) => ({ value, y: yPrice(value) })),
+    volumeTicks: niceTicks(0, peakVolume, 3).map((value) => ({ value, y: yVolume(value) })),
+    dayLabels: pickDayLabels(history, xOf),
+    priceTop,
+    priceBottom,
+    volumeTop,
+    volumeBottom,
+    min,
+    max,
+    peakVolume,
+  }
+}
+
 /* ---------------- 概览瓦片 ---------------- */
 
 export interface MarketTile {
