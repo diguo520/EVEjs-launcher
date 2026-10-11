@@ -2,12 +2,12 @@
   "generatedFrom": "E:\\Games\\EveJS-v0.12.8\\launcher\\launcher",
   "generatedAt": "2026-10-05T11:17:38.460Z",
   "counts": {
-    "invoke": 109,
+    "invoke": 114,
     "send": 6,
-    "events": 7,
-    "requests": 115,
+    "events": 9,
+    "requests": 120,
     "registered": 82,
-    "apiTotal": 122
+    "apiTotal": 129
   },
   "invoke": [
     {
@@ -283,6 +283,50 @@
       "kind": "invoke",
       "signature": "",
       "params": []
+    },
+    {
+      "api": "factionAction",
+      "channel": "faction:action",
+      "kind": "invoke",
+      "signature": "action: string, params?: Record<string, unknown>",
+      "params": [
+        "action",
+        "params"
+      ]
+    },
+    {
+      "api": "factionApi",
+      "channel": "faction:api",
+      "kind": "invoke",
+      "signature": "path: string, query?: Record<string, unknown>",
+      "params": [
+        "path",
+        "query"
+      ]
+    },
+    {
+      "api": "factionSovereignty",
+      "channel": "faction:sovereignty",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "factionStatus",
+      "channel": "faction:status",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "factionStream",
+      "channel": "faction:stream",
+      "kind": "invoke",
+      "signature": "start: boolean, opts?: { backlog?: number; group?: string }",
+      "params": [
+        "start",
+        "opts"
+      ]
     },
     {
       "api": "gameConfigRead",
@@ -977,6 +1021,14 @@
   ],
   "events": [
     {
+      "api": "onFactionEvent",
+      "channel": "faction:event"
+    },
+    {
+      "api": "onFactionStreamState",
+      "channel": "faction:streamState"
+    },
+    {
       "api": "onInitChanged",
       "channel": "init:changed"
     },
@@ -1024,6 +1076,11 @@
       "danger:clearCache",
       "danger:eraseWorld",
       "danger:resetConfig",
+      "faction:action",
+      "faction:api",
+      "faction:sovereignty",
+      "faction:status",
+      "faction:stream",
       "gameConfig:read",
       "gameConfig:save",
       "hotreload:apply",
@@ -1053,6 +1110,9 @@
       "storeEditor:save"
     ],
     "send": [],
-    "events": []
+    "events": [
+      "faction:event",
+      "faction:streamState"
+    ]
   }
 }

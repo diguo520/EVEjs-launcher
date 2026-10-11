@@ -37,6 +37,16 @@ const CLI_SCRIPTS: &[(&str, &[u8])] = &[
         "store-cli.js",
         include_bytes!("../../vendor/cli/store-cli.js"),
     ),
+    // 势力推演面板的只读令牌读取（见 src-tauri/src/faction.rs 的文件头）
+    (
+        "faction-cli.js",
+        include_bytes!("../../vendor/cli/faction-cli.js"),
+    ),
+    // 玩家主权（游戏侧，读 gameStore.sovereignty）
+    (
+        "sovereignty-cli.js",
+        include_bytes!("../../vendor/cli/sovereignty-cli.js"),
+    ),
 ];
 
 /// 自更新器：由 `build.rs` 拷进 OUT_DIR（vendor/updater/bin 被 .gitignore 排除，

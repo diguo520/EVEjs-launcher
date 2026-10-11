@@ -1,0 +1,23 @@
+{
+  "version": "0.4.6",
+  "changelog": {
+    "zh": [
+      { "type": "new", "text": "新增「势力推演」页：用启动器自己的界面重画 NPC 势力模拟（evejs-faction-sim）模组的面板总览 —— 推演时钟 / 倍速 / 告警、世界近况、实时势力动态、121 家势力的一览卡片（层级筛选、搜索、按战力 / 舰船 / 资金 / 领地排序）。面板数据由启动器在 Rust 侧代理读取（面板令牌不进渲染层），不修改服务端与模组的任何文件。" },
+      { "type": "new", "text": "势力推演 · 军事页：进行中行动（巡逻 / 侦察 / 打击 / 伏击 / 拦截，带相位与位置）、近期交战（双方、损失、结果、胜方）、目击记录、旗舰保护伞状态，以及一路滚动的实时事件流。" },
+      { "type": "new", "text": "势力推演 · 情报与外交页：按势力切换关注对象，看它的已知敌人与兵力、对外关系、以及它当前在外的资产行动；附一份带层级与敌人数的势力名录。" },
+      { "type": "new", "text": "势力推演 · 经济与物流页：工业规模、经济排行（前 20 名带占比条）、矿带存量（剩余比例与主要矿石）、前哨与建筑（含燃料小时数与欠费 / 低能量提示）、货运舰队与运输单。" },
+      { "type": "new", "text": "势力推演 · 星图页：把模组 5000+ 星系的 2D 布局画成可缩放 / 拖动的星图（安全等级配色、图层开关、悬停与点选星系），并叠加 200+ 支推演舰队的实时位置。" },
+      { "type": "new", "text": "新增「KM」页：把推演的逐舰战损摊开看 —— 顶部三项计数（有逐舰记录的战斗 / 击毁舰船 / 战损价值），左侧交战记录列表，右侧单场战报（胜方、效率、击毁与承受、双方损失 ISK、参战舰队数），按舰型汇总损失，以及逐条击杀明细（时间、被击毁、击杀者、舰型、价值）。模组不记录伤害与飞行员，界面照实说明，不编数据。" },
+      { "type": "new", "text": "势力推演 · GM 控制页：暂停 / 继续（全局与逐家）、倍速、快进、剧本部署、逐条改外交关系、导出诊断包，以及面板最近的 GM 操作记录。破坏性动作（改关系 / 快进 / 部署）一律先二次确认，部署还要把剧本 id 再打一遍。" }
+    ],
+    "en": [
+      { "type": "new", "text": "New Faction Simulation page: the NPC faction-sim (evejs-faction-sim) panel overview, redrawn with the launcher's own UI — sim clock / speed / alerts, world situation, live faction feed, and cards for all 121 factions (tier filter, search, sort by power / ships / funds / territory). Panel data is proxied by the launcher on the Rust side (the panel token never reaches the renderer); no server or mod file is modified." },
+      { "type": "new", "text": "Faction Simulation · Military page: active operations (patrol / scout / strike / ambush / snare with phase and location), recent battles (sides, losses, outcome, winner), sightings, capital umbrella status, and a scrolling live event feed." },
+      { "type": "new", "text": "Faction Simulation · Intel & Diplomacy page: pick a faction to see its known enemies and strength, its relations, and its current asset operations, plus a roster with tier and enemy counts." },
+      { "type": "new", "text": "Faction Simulation · Economy & Logistics page: industry scale, economy ranking (top 20 with share bars), belt reserves (remaining ratio and main ore), outposts and structures (fuel hours, unpaid / low-power flags), freight fleets and shipments." },
+      { "type": "new", "text": "Faction Simulation · Star map page: the mod's 5000+ system 2D layout rendered as a zoomable, draggable canvas (security-based colours, layer toggles, hover and click to select), with 200+ simulated fleets overlaid live." },
+      { "type": "new", "text": "New KM page: the simulation's per-ship losses laid out in full — three counters on top (battles with per-ship records / ships destroyed / losses by value), a battle list on the left, a single-battle report on the right (winner, efficiency, kills and losses taken, ISK lost on both sides, fleets involved), losses grouped by hull type, and a per-kill list with time, victim, killer, hull type and value. The mod records neither damage nor pilots, and the page says so instead of inventing numbers." },
+      { "type": "new", "text": "Faction Simulation · GM Control page: pause / resume (global and per faction), speed, fast-forward, scenario deployment, per-pair diplomacy changes, diagnostics export, and the panel's recent GM action log. Destructive actions (relations / fast-forward / deploy) always ask for confirmation first, and deployment requires retyping the scenario id." }
+    ]
+  }
+}

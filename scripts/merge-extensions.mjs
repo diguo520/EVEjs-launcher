@@ -10,6 +10,9 @@
  *
  * 本脚本只做提取器里那一段「合并扩展清单」的搬运，语义与之逐行对齐：
  *   · 只**追加** extensions 里 ipc-channels.json 还没有的通道（按 channel 判重）；
+ *   · 扩展清单里**已有的**通道，签名 / 参数以 extensions.json 为准同步过来
+ *     （只动扩展清单自己列的通道，现役版的通道一个都不碰）——
+ *     否则改一次扩展通道的签名（例如给 faction:stream 加 opts），生成物会一直停在旧签名；
  *   · 追加后按 api 名排序，与提取器一致；
  *   · 重算 counts.invoke / send / events / requests / apiTotal，并刷新 extensions 台账；
  *   · 不动 `registeredNotExposed` / `exposedNotRegistered` / `dynamicRegistrations`
@@ -37,6 +40,7 @@ const KINDS = [
 ];
 
 let added = 0;
+let synced = 0;
 const notices = [];
 
 for (const { key, label } of KINDS) {
@@ -44,6 +48,18 @@ for (const { key, label } of KINDS) {
   const existing = new Set(list.map((entry) => entry.channel));
   for (const item of extensions[key] ?? []) {
     if (existing.has(item.channel)) {
+      // 已在台账里：把签名 / 参数同步成扩展清单里最新的（只对我们自己的扩展通道生效）
+      const entry = list.find((candidate) => candidate.channel === item.channel);
+      const nextSignature = item.signature ?? "";
+      const nextParams = JSON.stringify(item.params ?? []);
+      const nextBody = JSON.stringify([nextSignature, nextParams]);
+      const currentBody = JSON.stringify([entry.signature ?? "", JSON.stringify(entry.params ?? [])]);
+      if (entry && nextBody !== currentBody) {
+        entry.signature = nextSignature;
+        entry.params = item.params ?? [];
+        synced += 1;
+        notices.push(`扩展通道 ~ ${item.channel}`);
+      }
       continue;
     }
     existing.add(item.channel);
@@ -60,13 +76,13 @@ for (const { key, label } of KINDS) {
   contract[key] = list.sort((a, b) => a.api.localeCompare(b.api));
 }
 
-if (added === 0) {
+if (added === 0 && synced === 0) {
   console.log("  契约台账已经是最新，没有需要并回的扩展通道。");
   process.exit(0);
 }
 
 if (CHECK_ONLY) {
-  console.error("  ✗ 契约台账缺少下列扩展通道（跑 `node scripts/merge-extensions.mjs` 补）：");
+  console.error("  ✗ 契约台账与扩展清单不一致（跑 `node scripts/merge-extensions.mjs` 补）：");
   for (const line of notices) {
     console.error("    - " + line);
   }
@@ -90,7 +106,7 @@ contract.extensions = {
 };
 
 fs.writeFileSync(CONTRACT, JSON.stringify(contract, null, 2) + "\n", "utf8");
-console.log(`  已并回 ${added} 条扩展通道：`);
+console.log(`  已并回 ${added} 条扩展通道、同步 ${synced} 条签名：`);
 for (const line of notices) {
   console.log("    - " + line);
 }

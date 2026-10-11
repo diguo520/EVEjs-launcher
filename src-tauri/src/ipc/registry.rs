@@ -150,6 +150,12 @@ pub const HANDLED: &[&str] = &[
     "update:cancel",
     "update:check",
     "update:download",
+    // ---- 势力推演面板（本工程扩展，代理模组自带的 127.0.0.1:26410，见 crate::faction）----
+    "faction:status",
+    "faction:sovereignty",
+    "faction:api",
+    "faction:action",
+    "faction:stream",
 ];
 
 /// 待实现通道（**0 个**）：S2 收口后 82 条请求通道全部真实现。

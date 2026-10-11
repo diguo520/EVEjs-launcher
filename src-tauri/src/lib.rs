@@ -13,6 +13,7 @@ pub mod danger;
 pub mod db;
 pub mod dialog;
 pub mod env;
+pub mod faction;
 pub mod gameconfig;
 pub mod github;
 pub mod health;

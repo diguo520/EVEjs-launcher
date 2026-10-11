@@ -106,6 +106,11 @@ node scripts/release-channel.mjs pin-legacy --tag v0.1.28  # 回滚：把 Latest
    先单独跑这两条再做门禁**，否则会「本地 12 分钟全绿、CI 一上来就红」——
    2026-10-11 发 v0.4.5 时就是这么白跑了一轮。
 3. `pwsh -File scripts/package.ps1 -SkipBuild -SignKey .keys/update-key.pem -KeyId evejs-release-2026-09-28`
+   ⚠️ parity 的通道基线 `tests/parity/fixtures/channels/tauri-baseline.json` 里记着
+   `app:info.version` / `update:state.currentVersion`，而那份 dump 是**跑已构建的 exe** 得出的。
+   所以提完版本号必然要经历「构建一次 → `node tests/parity/diff.mjs --update` → 再构建一次」：
+   第一次构建加 `-SkipParity` 就不会白做一遍重活。若这次还新增了 IPC 通道，
+   同样在这一次里刷新（差异应只有版本号那两条；多出来的要人工确认）。
 4. commit + `git tag -a` + push（提交信息**英文在前**）。
 5. `node --use-system-ca scripts/make-release.mjs --version X.Y.Z --watch-ci`
    —— 建 release、传资产、转正式、推通道、等 CI 全在这一条命令里，只打一个摘要。

@@ -314,8 +314,68 @@
         "force"
       ],
       "why": "赞助人「补给线」名单。名单不随启动器发版：它由 infra/ 那个 Cloudflare 服务定时签出来（源头是 infra/src/sponsors.js），这里走的是与模组评分完全一样的读法 —— 多镜像 + 本地缓存 + Ed25519 验签，实现在 src-tauri/src/snapshot.rs。force=true 绕开 TTL 缓存重拉。取不到不算错误：渲染层回落到随包那份演示名单，这块面板不开天窗。名单是用户数据，名字不翻译；条目带 currency（三位字母码），国外赞助人按符号显示 $ / € 而不是硬套 ¥。"
+    },
+    {
+      "api": "factionStatus",
+      "channel": "faction:status",
+      "kind": "invoke",
+      "signature": "",
+      "params": [],
+      "why": "势力推演面板的可用性探针。`evejs-faction-sim` 模组会在本机起一个 Web 面板（默认 127.0.0.1:26410），它的每一个请求都要 `Authorization: Bearer <panelToken>`，令牌由模组生成后只存在它自己的推演库 `_local/faction-sim/faction.sqlite` 的 `setting.panelToken` 里 —— 通过随包侧车 `faction-cli.js` 只读取出，**只留在 Rust 侧**，渲染层拿不到（`/api/session` 那条专门交令牌的路由也被代理白名单挡掉）。这条通道一次回三件事：能不能读到令牌（模组装没装）、面板连不连得上（服务端起没起）、以及 `/api/status` 的读数（推演时钟 / 倍速 / 告警数）。三种失败分得清，界面才能给出不同的空态而不是笼统一句「失败」。现役版完全没有这条能力。"
+    },
+    {
+      "api": "factionApi",
+      "channel": "faction:api",
+      "kind": "invoke",
+      "signature": "path: string, query?: Record<string, unknown>",
+      "params": [
+        "path",
+        "query"
+      ],
+      "why": "只读代理：把面板的 `/api/<name>` 原样搬到渲染层。为什么不让渲染层直接 fetch —— 渲染层 CSP 是 `connect-src 'self' ipc:`，够不到 127.0.0.1:26410；而且面板的读接口也要令牌，直接让网页拿令牌等于把 GM 权限交给渲染层（`/api/action` 能改世界状态）。所以请求由 Rust 侧代发：路径必须落在 `/api/` 命名空间内、不含 `..`/`?`/`#`/反斜杠/空白，`/api/session` 单独拉黑；主机与端口写死 127.0.0.1 + 面板端口，渲染层**不能指定地址**。`query` 只认标量键值（面板的分页参数 page/size/q/sort/tier/filter 走这里），对象/数组一概忽略。"
+    },
+    {
+      "api": "factionSovereignty",
+      "channel": "faction:sovereignty",
+      "kind": "invoke",
+      "signature": "",
+      "params": [],
+      "why": "玩家主权（**游戏侧**，不是模组）。模组的 `/api/realm` 只描述它自己模拟出来的 NPC 政体版图（本机实测 121 个政体、2960 个星系），**不知道玩家军团 / 联盟的主权** —— 而游戏库 `_local/gameStore/gamestore.sqlite` 的 `sovereignty` 表才是权威（`systems␟<星系>` 一行一个声明，带 allianceID / corporationID / 主权结构）。星图要统计到玩家领地就必须读它。走随包侧车 `sovereignty-cli.js`（`readonly: true` + WAL，只 SELECT、不写盘），与数据库页读游戏库是同一条链路；回包是整理过的形状（systems / alliances / corporations / structureCounts），省得渲染层解析游戏内部的 KV 命名空间。"
+    },
+    {
+      "api": "factionAction",
+      "channel": "faction:action",
+      "kind": "invoke",
+      "signature": "action: string, params?: Record<string, unknown>",
+      "params": [
+        "action",
+        "params"
+      ],
+      "why": "GM 写操作的代理（`POST /api/action {action, params}`）：暂停 / 继续、倍速、节奏、外交姿态与关系、舰队命令、快进、库存与舰船增删、会战剧本等 35 个动作。参数校验**不在启动器里重写** —— 每一个动作的范围、枚举、数量上限都由面板自己判定（不合法就地 400 并回中文原因），启动器只挡「动作名不像动作名」这一类明显错误，避免服务端加了新动作而启动器不认。破坏性动作（改关系、解散舰队、快进、部署、改库存、开会战）在界面上先二次确认。令牌同样只在 Rust 侧。"
+    },
+    {
+      "api": "factionStream",
+      "channel": "faction:stream",
+      "kind": "invoke",
+      "signature": "start: boolean, opts?: { backlog?: number; group?: string }",
+      "params": [
+        "start",
+        "opts"
+      ],
+      "why": "订阅 / 取消面板的事件流（`GET /api/events/stream`，text/event-stream）。SSE 不是请求-响应模型，进不了普通 IPC，所以由 Rust 侧持一条连接、把每一帧 `data: {...}` 转成 `faction:event` 事件推给渲染层（与既有的 `terminal:data` 同一种做法）。start=false 只停线程。**启动器始终只开一条**：面板最多允许 8 条 SSE 连接，重复订阅会先停旧的。断线后每 3 秒重连一次，重连前重读一次令牌（模组换过库也能接上）。opts.backlog（1–500，模组 maxBacklog 上限）决定初始回补多少条；opts.group 是分组白名单（fleet/combat/intel/territory/economy/logistics/system/other），Rust 侧过滤后再拼进 URL —— KM 页订阅 `{ backlog: 500, group: \\\"combat\\\" }` 才能拿到逐舰损失（loss / killReward）：不过滤时这类事件在混合流里稀疏到 200 条回补里一条都没有，KM 就永远开天窗。"
     }
   ],
   "send": [],
-  "events": []
+  "events": [
+    {
+      "api": "onFactionEvent",
+      "channel": "faction:event",
+      "why": "面板事件流的一帧（原样透传模组写好的事件对象：`{id, at, factionKey, type, label, group, text, payload}`）。`text` 已经是模组渲染好的中文文案，启动器不重写文案表。渲染层的「势力动态」按它滚动。"
+    },
+    {
+      "api": "onFactionStreamState",
+      "channel": "faction:streamState",
+      "why": "事件流的连接状态：`{connected, reason}`。掉线时界面把「动态」标成「已断开（原因）」并自动重连，而不是静默停在最后一帧 —— 静默会让用户以为世界不动了。"
+    }
+  ]
 }

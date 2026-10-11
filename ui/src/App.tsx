@@ -18,7 +18,8 @@ import type { NavBadges, ViewId } from "@/components/shell/nav-config"
 import { useLauncher } from "@/hooks/use-launcher"
 import { useLauncherAccounts } from "@/hooks/use-launcher-accounts"
 import { useEnvCheck } from "@/hooks/use-env-check"
-import { callOr, hasIpc, type RawModList } from "@/lib/ipc"
+import { useInstalledMods } from "@/hooks/use-installed-mods"
+import { hasIpc } from "@/lib/ipc"
 import { markLegalNoticeSeen, needsLegalNotice } from "@/lib/legal-notice"
 import { DashboardPage } from "@/pages/dashboard-page"
 import { ConsolePage } from "@/pages/console-page"
@@ -29,6 +30,9 @@ import { CommandsPage } from "@/pages/commands-page"
 import { DatabasePage } from "@/pages/database-page"
 import { MarketPage } from "@/pages/market-page"
 import { ModulesPage } from "@/pages/modules-page"
+import { FactionPage } from "@/pages/faction-page"
+import { StarmapPage } from "@/pages/starmap-page"
+import { KmPage } from "@/pages/km-page"
 import { ConfigPage } from "@/pages/config-page"
 import { SettingsPage } from "@/pages/settings-page"
 
@@ -41,30 +45,6 @@ import { SettingsPage } from "@/pages/settings-page"
 const BOOT_MIN_MS = 900
 const BOOT_MAX_MS = 2400
 const BOOT_FADE_MS = 400
-
-/**
- * 侧栏徽标的计数：账号数来自账号库，模组数来自后端 mods:list。
- * 原型里这两个数字（3 / 6）是写死的演示值 —— 这里一律用真数据，读不到就不画。
- */
-function useNavBadges(accountCount: number): NavBadges {
-  const [modCount, setModCount] = useState(0)
-
-  useEffect(() => {
-    if (!hasIpc()) return
-    let alive = true
-    void callOr<RawModList>("modsList", null).then((reply) => {
-      if (alive && reply && Array.isArray(reply.mods)) setModCount(reply.mods.length)
-    })
-    return () => {
-      alive = false
-    }
-  }, [])
-
-  return useMemo(
-    () => ({ accounts: accountCount, modules: modCount }),
-    [accountCount, modCount]
-  )
-}
 
 /**
  * 启动器外壳：顶栏（服务状态 + 时钟）/ 侧栏（八页导航）/ 内容区 / 状态栏。
@@ -83,7 +63,16 @@ export function App() {
   // 自检与修复都走后端（env:check / init:run），不再吃原型那套演示状态
   const env = useEnvCheck()
   const [view, setView] = useState<ViewId>("dashboard")
-  const navBadges = useNavBadges(accounts.accounts.length)
+  /**
+   * 装了哪些模组：既给侧栏的「模组」计数用，也决定「群星」这一组显不显示 ——
+   * 没装 `evejs-faction-sim` 就整组隐藏（势力 / 星图 / KM 的数据都出自它）。
+   * 刷新键用当前页：模组是用户现场装/卸的，而这条路上没有「模组变了」的事件。
+   */
+  const installedMods = useInstalledMods(view)
+  const navBadges = useMemo<NavBadges>(
+    () => ({ accounts: accounts.accounts.length, modules: installedMods?.size ?? 0 }),
+    [accounts.accounts.length, installedMods]
+  )
 
   /** 开机画面：最短展示时间走完 + 第一次握手有回音，才放它淡出 */
   const [bootMinPassed, setBootMinPassed] = useState(false)
@@ -174,6 +163,12 @@ export function App() {
         return <MarketPage />
       case "modules":
         return <ModulesPage serverRoot={serverRoot} onNavigate={setView} />
+      case "faction":
+        return <FactionPage />
+      case "starmap":
+        return <StarmapPage />
+      case "km":
+        return <KmPage />
       case "config":
         return (
           <ConfigPage
@@ -221,6 +216,7 @@ export function App() {
                 onNavigate={setView}
                 metrics={launcher.metrics}
                 badges={navBadges}
+                installedMods={installedMods}
               />
               <main className="min-w-0 flex-1 overflow-y-auto p-5">
                 {renderView()}

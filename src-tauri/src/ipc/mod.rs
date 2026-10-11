@@ -16,6 +16,7 @@ use crate::config;
 use crate::danger;
 use crate::db;
 use crate::env;
+use crate::faction;
 use crate::gameconfig;
 use crate::health;
 use crate::hotreload;
@@ -670,6 +671,21 @@ async fn dispatch(
             let repo = root.clone();
             let runtime = state.runtime.clone();
             Ok(blocking(move || mods::claim::claim_mod(&repo, &runtime, &folder)).await?)
+        }
+
+        /* --------------------------- 势力推演面板 --------------------------- */
+        // 模组自带的本机面板（127.0.0.1:26410）代理，实现见 crate::faction 的文件头。
+        // 面板的每一个请求都要令牌，令牌只在 Rust 侧使用 —— 渲染层拿到的是没有令牌的响应体。
+        "faction:status" => Ok(faction::status(&root).await),
+        // 玩家主权（游戏侧）：模组的政体版图看不到玩家军团 / 联盟，星图要单独读游戏库
+        "faction:sovereignty" => Ok(faction::sovereignty(&root).await),
+        "faction:api" => Ok(faction::api(&root, &arg_str(args, 0), args.get(1)).await),
+        "faction:action" => Ok(faction::action(&root, &arg_str(args, 0), args.get(1)).await),
+        // 事件流订阅：start=true 先读令牌再起线程，false 只停线程。
+        // 面板最多 8 条 SSE 连接，所以启动器始终只开一条（重复订阅会先停旧的）。
+        "faction:stream" => {
+            let start = args.first().and_then(Value::as_bool).unwrap_or(false);
+            Ok(faction::stream(app, &root, start, args.get(1)).await)
         }
 
         // 兜底：契约里若出现未登记的通道（例如将来新增），统一回 {ok:false, reason}，

@@ -18,8 +18,8 @@ pub struct ChannelSpec {
     pub kind: ChannelKind,
 }
 
-pub const REQUEST_COUNT: usize = 115;
-pub const EVENT_COUNT: usize = 7;
+pub const REQUEST_COUNT: usize = 120;
+pub const EVENT_COUNT: usize = 9;
 
 #[rustfmt::skip]
 pub const CHANNELS: &[ChannelSpec] = &[
@@ -57,6 +57,11 @@ pub const CHANNELS: &[ChannelSpec] = &[
     ChannelSpec { channel: "engage:start", api: "engageStart", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "engage:stop", api: "engageStop", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "env:check", api: "envCheck", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "faction:action", api: "factionAction", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "faction:api", api: "factionApi", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "faction:sovereignty", api: "factionSovereignty", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "faction:status", api: "factionStatus", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "faction:stream", api: "factionStream", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "gameConfig:read", api: "gameConfigRead", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "gameConfig:save", api: "gameConfigSave", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "health:check", api: "healthCheck", kind: ChannelKind::Invoke },
@@ -138,6 +143,8 @@ pub const CHANNELS: &[ChannelSpec] = &[
     ChannelSpec { channel: "window:close", api: "windowClose", kind: ChannelKind::Send },
     ChannelSpec { channel: "window:minimize", api: "windowMinimize", kind: ChannelKind::Send },
     ChannelSpec { channel: "window:toggleMaximize", api: "windowToggleMaximize", kind: ChannelKind::Send },
+    ChannelSpec { channel: "faction:event", api: "onFactionEvent", kind: ChannelKind::Event },
+    ChannelSpec { channel: "faction:streamState", api: "onFactionStreamState", kind: ChannelKind::Event },
     ChannelSpec { channel: "init:changed", api: "onInitChanged", kind: ChannelKind::Event },
     ChannelSpec { channel: "mod:downloadProgress", api: "onModDownloadProgress", kind: ChannelKind::Event },
     ChannelSpec { channel: "mod:publishProgress", api: "onModPublishProgress", kind: ChannelKind::Event },

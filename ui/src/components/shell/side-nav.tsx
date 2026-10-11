@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils"
 import { Sparkline } from "@/components/common/sparkline"
 import {
   NAV_GROUPS,
+  visibleNavGroups,
   type NavBadges,
   type ViewId,
 } from "@/components/shell/nav-config"
@@ -88,14 +89,22 @@ export function SideNav({
   onNavigate,
   metrics,
   badges,
+  installedMods,
 }: {
   active: ViewId
   onNavigate: (id: ViewId) => void
   metrics: Metric[]
   /** 真计数徽标：后端还没接过来的那一项就不画，不拿演示数字凑 */
   badges?: NavBadges
+  /**
+   * 本机装了的模组 id；`null` = 拿不到清单（浏览器预览）。
+   * 用来决定「群星」这类**依赖模组**的分组显不显示，见 `visibleNavGroups`。
+   */
+  installedMods?: ReadonlySet<string> | null
 }) {
   const miniMetrics = metrics.filter((m) => MINI_KEYS.includes(m.key))
+  /** 没装对应模组的分组整组不画（连标题一起），而不是画出来再点进去看空页 */
+  const groups = visibleNavGroups(NAV_GROUPS, installedMods ?? null)
   /** 窗口太窄时侧栏一展开就把内容区挤扁，那里固定成图标条，连开关都不给 */
   const wide = useMediaQuery(WIDE_QUERY)
   const [open, setOpen] = useState(readStoredOpen)
@@ -126,7 +135,7 @@ export function SideNav({
           expanded ? "px-2.5" : "px-2"
         )}
       >
-        {NAV_GROUPS.map((group) => (
+        {groups.map((group) => (
           <div
             key={group.title}
             className={cn("last:mb-0", expanded ? "mb-4" : "mb-3")}
