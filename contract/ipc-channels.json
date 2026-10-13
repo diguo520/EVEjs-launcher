@@ -1,13 +1,13 @@
 {
   "generatedFrom": "E:\\Games\\EveJS-v0.12.8\\launcher\\launcher",
-  "generatedAt": "2026-10-05T11:17:38.460Z",
+  "generatedAt": "2026-10-13T16:52:43.237Z",
   "counts": {
-    "invoke": 114,
+    "invoke": 115,
     "send": 6,
     "events": 9,
-    "requests": 120,
+    "requests": 121,
     "registered": 82,
-    "apiTotal": 129
+    "apiTotal": 130
   },
   "invoke": [
     {
@@ -751,7 +751,7 @@
       "api": "modsReviewSubmit",
       "channel": "mods:reviewSubmit",
       "kind": "invoke",
-      "signature": "input: { modId: string; version: string; pkgSha256: string; stars: number; body: string }",
+      "signature": "input: { modId: string; version: string; pkgSha256: string; body: string; stars?: number }",
       "params": [
         "input"
       ]
@@ -792,6 +792,15 @@
       "signature": "folder: string",
       "params": [
         "folder"
+      ]
+    },
+    {
+      "api": "modsStarSet",
+      "channel": "mods:starSet",
+      "kind": "invoke",
+      "signature": "input: { modId: string; on: boolean }",
+      "params": [
+        "input"
       ]
     },
     {
@@ -1103,6 +1112,7 @@
       "mods:reviewRetract",
       "mods:reviewSubmit",
       "mods:reviews",
+      "mods:starSet",
       "mods:updateMeta",
       "sponsors:snapshot",
       "storeEditor:itemLookup",

@@ -466,6 +466,7 @@ mod tests {
             "mods:replySubmit",
             "mods:replyRetract",
             "mods:reportReview",
+            "mods:starSet",
             // 移除投稿台账记录：会改本机台账文件，只靠单测覆盖
             "mods:forgetSubmission",
             "mods:marketInstall",

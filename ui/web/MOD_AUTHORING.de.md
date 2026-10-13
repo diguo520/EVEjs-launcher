@@ -617,3 +617,41 @@ Vier Regeln (🟥 eine verletzt, und andere Mods fallen ohne erkennbaren Grund a
 
 **Dokumentversion**: wird mit dem Launcher aktualisiert (synchron zu `_launcher/mods/MOD_AUTHORING.de.md` im Launcher).
 Bei einem hier nicht beschriebenen Fall zuerst das **Server-Log** im Launcher und die roten Hinweise auf den Karten ansehen und dann mit dem Log den Maintainer fragen.
+
+# Anhang H: Mod-Screenshots (Marktanzeige)
+
+Die Detailansicht eines Mods kann ein paar Screenshots zeigen; ein Klick öffnet eine Ansicht zum Durchblättern. Die Bilder liegen **in deinem eigenen Mod-Repository** — nichts wird irgendwo hochgeladen.
+
+## So fügst du sie hinzu
+
+1. Lege einen Ordner `shots/` im Mod-Ordner an (das „Mod erstellen" des Launchers liefert bereits einen mit, samt kurzer Readme darin)
+2. Lege die Screenshots hinein: `webp` / `png` / `jpg` / `gif` — **Unterordner werden ignoriert**
+3. Veröffentliche (oder veröffentliche eine neue Version) aus dem Launcher — der Rest ist automatisch
+
+## Regeln
+
+| Punkt | Details |
+| --- | --- |
+| Reihenfolge | Sortierung nach **Dateiname**, die Detailansicht folgt ihr (für Kontrolle `01-`, `02-` voranstellen) |
+| Anzahl | Höchstens **9**; darüber hinaus wird der Reihe nach abgeschnitten |
+| Größe | Ziel **≤ 200 KB pro Bild bei 16:9** — große Bilder lassen beim Öffnen warten |
+| Format | `webp` bevorzugen (kleinste Datei bei gleicher Qualität) |
+
+## Was beim Veröffentlichen passiert
+
+1. Der Launcher liest `mods/<dein Mod>/shots/` und schreibt die Dateiliste in `shots` in `evejs-mod.json`
+2. Die Bilder selbst werden in **dein eigenes Mod-Repository** gepusht (nicht ins Markt-Repository)
+3. Der Marktindex (von der CI zusammengeführt und signiert) übernimmt diese Liste
+4. Die Detailansicht des Launchers lädt `https://cdn.jsdelivr.net/gh/<dein Repo>@main/shots/<Datei>`
+
+Also: **die Bilder bleiben immer in deinem Repository**; der Markt hält nur eine Liste von Dateinamen. Ein Bild zu tauschen betrifft nur dein Repository.
+
+## Drei Stolpersteine
+
+- **Lösche die Readme in `shots/` nicht**: leere Ordner überleben weder git noch ZIP — wer dein Repository klont, hätte diesen Ordner sonst nicht
+- **Ohne lokales `shots/` zu veröffentlichen löscht keine bereits gelisteten Screenshots**: der Launcher bewahrt das vorhandene `shots`-Feld aus dem Repository vor dem Schreiben. Zum **Entfernen** leerst du dein lokales `shots/` (ein leerer Ordner zählt als leer)
+- **Ein fehlendes Bild erzeugt keinen Fehler**: löschst du das Repository oder benennst eine Datei um, zeigt die Detailansicht einfach **still weniger Bilder** (ein fehlgeschlagenes Bild versteckt sich, statt einen kaputten Rahmen zu hinterlassen)
+
+## Wann es sichtbar wird
+
+Nach erfolgreicher Veröffentlichung wird der Marktindex **sofort beim Merge deiner PR neu gebaut** (ein 6-stündlicher Lauf dient als Absicherung). Der Launcher hält zusätzlich 2 Minuten Cache.

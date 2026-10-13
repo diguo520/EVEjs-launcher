@@ -889,9 +889,19 @@ pub fn repo_access(token: &str, owner: &str, repo_name: &str) -> Value {
     })
 }
 
-/// 写入/更新仓库里的 `evejs-mod.json`（索引 CI 就是靠它聚合）
-pub fn put_listing_manifest(token: &str, owner: &str, repo_name: &str, content: &str) -> Value {
-    let file_path = "evejs-mod.json";
+/// 写入/更新作者仓库里的**一个文件**（文本或二进制都走它）。
+///
+/// `evejs-mod.json` 与 `shots/*.png` 共用这条路径：先 GET 拿已有 blob 的 sha，
+/// 有就带上 sha 覆盖、没有就新建 —— 这是 GitHub Contents API 的更新约定，
+/// 少带 sha 会被 409 拒掉。
+pub fn put_repo_file(
+    token: &str,
+    owner: &str,
+    repo_name: &str,
+    file_path: &str,
+    bytes: &[u8],
+    message: &str,
+) -> Value {
     let existing = call_publish(
         token,
         "GET",
@@ -908,8 +918,8 @@ pub fn put_listing_manifest(token: &str, owner: &str, repo_name: &str, content: 
         String::new()
     };
     let mut body = json!({
-        "message": "chore: update evejs-mod.json",
-        "content": secrets::base64_encode(content.as_bytes()),
+        "message": message,
+        "content": secrets::base64_encode(bytes),
     });
     if !existing_sha.is_empty() {
         body["sha"] = json!(existing_sha);
@@ -921,7 +931,10 @@ pub fn put_listing_manifest(token: &str, owner: &str, repo_name: &str, content: 
         Some(&body),
     );
     if !put.ok {
-        return json!({ "ok": false, "reason": non_empty_or(&put.reason, "写入 evejs-mod.json 失败") });
+        return json!({
+            "ok": false,
+            "reason": non_empty_or(&put.reason, &format!("写入 {file_path} 失败")),
+        });
     }
     let sha = put
         .data
@@ -930,6 +943,84 @@ pub fn put_listing_manifest(token: &str, owner: &str, repo_name: &str, content: 
         .map(|value| object_field(value, "sha"))
         .unwrap_or_default();
     json!({ "ok": true, "sha": sha })
+}
+
+/// 写入/更新仓库里的 `evejs-mod.json`（索引 CI 就是靠它聚合）
+pub fn put_listing_manifest(token: &str, owner: &str, repo_name: &str, content: &str) -> Value {
+    put_repo_file(
+        token,
+        owner,
+        repo_name,
+        "evejs-mod.json",
+        content.as_bytes(),
+        "chore: update evejs-mod.json",
+    )
+}
+
+/// 读仓库里一个**文本**文件；不存在 / 读不到都返回 `None`（调用方按"没有旧内容"处理）。
+pub fn get_repo_file_text(
+    token: &str,
+    owner: &str,
+    repo_name: &str,
+    file_path: &str,
+) -> Option<String> {
+    let got = call_publish(
+        token,
+        "GET",
+        &format!("/repos/{owner}/{repo_name}/contents/{file_path}"),
+        None,
+    );
+    if !got.ok {
+        return None;
+    }
+    let encoded = got
+        .data
+        .as_ref()
+        .map(|value| object_field(value, "content"))
+        .unwrap_or_default();
+    // GitHub 的 content 是带换行的 base64，先去掉空白再解
+    let cleaned: String = encoded.chars().filter(|ch| !ch.is_whitespace()).collect();
+    let bytes = secrets::base64_decode(&cleaned)?;
+    String::from_utf8(bytes).ok()
+}
+
+/// 新清单里**没有** `shots` 时，把作者仓库里已有的那份留下来。
+///
+/// 为什么必须做这一步：`evejs-mod.json` 是**整份覆盖**写的，而 `shots` 只在本地
+/// `mods/<id>/shots/` 真有图时才生成（见 `submit::shots_for_listing`）。少了这层合并，
+/// 作者换一台没有 `shots/` 的机器发个新版本，就会把之前上好的截图字段悄悄抹掉 ——
+/// 索引跟着丢、详情里的图凭空消失，而且没有任何报错。
+///
+/// 反向不动：新清单自己带了 `shots` 就以它为准（作者删掉本地图 = 想撤下截图，这时该删）。
+/// 合并失败（网络不通 / 旧文件坏了）也照原样写，不因为读不到旧内容就卡住发布。
+fn preserve_listing_shots(token: &str, owner: &str, repo_name: &str, next_json: &str) -> String {
+    let previous = get_repo_file_text(token, owner, repo_name, "evejs-mod.json");
+    merge_listing_shots(next_json, previous.as_deref()).unwrap_or_else(|| next_json.to_string())
+}
+
+/// `preserve_listing_shots` 的纯逻辑（单独抽出来才能单测）。
+/// 返回 `None` 表示"不用改，照新清单原样写"。
+fn merge_listing_shots(next_json: &str, previous_json: Option<&str>) -> Option<String> {
+    let next = serde_json::from_str::<Value>(next_json).ok()?;
+    // 新清单自己带了 shots → 以它为准（作者删掉本地图 = 想撤下截图，这时就该删）
+    if next.get("shots").is_some() {
+        return None;
+    }
+    let previous = serde_json::from_str::<Value>(previous_json?).ok()?;
+    let shots = previous.get("shots")?.clone();
+    // 旧的那份也是空数组就没什么可保的
+    if !shots
+        .as_array()
+        .map(|list| !list.is_empty())
+        .unwrap_or(false)
+    {
+        return None;
+    }
+    let mut merged = next;
+    merged.as_object_mut()?.insert("shots".into(), shots);
+    serde_json::to_string_pretty(&merged)
+        .ok()
+        .map(|text| text + "\n")
 }
 
 /// 确保 tag 对应的 Release 存在（已存在则复用）
@@ -1059,8 +1150,11 @@ pub fn upload_release_asset(
     json!({ "ok": true, "url": browser_url })
 }
 
-/// 一次发布：确保仓库 → 写 `evejs-mod.json` → 建 Release → 上传 ZIP。
+/// 一次发布：确保仓库 → 写 `evejs-mod.json` → 传截图 → 建 Release → 上传 ZIP。
 /// 全程只动作者自己的仓库，**不碰索引仓库**。
+///
+/// `extra_files` 是 `(仓库内相对路径, 字节)`：目前只有 `shots/*`。
+/// 它们**传失败不拦发布** —— 图是装饰，不能因为一张图挂了就发不出模组。
 #[allow(clippy::too_many_arguments)]
 pub fn publish_to_own_repo(
     token: &str,
@@ -1071,6 +1165,7 @@ pub fn publish_to_own_repo(
     changelog: &str,
     description: &str,
     listing_json: &str,
+    extra_files: &[(String, Vec<u8>)],
     default_repo_name: &str,
     mut say: impl FnMut(&str, u32),
 ) -> Value {
@@ -1110,9 +1205,28 @@ pub fn publish_to_own_repo(
     }
 
     say("写入 evejs-mod.json", 40);
-    let listing = put_listing_manifest(token, owner, repo_name, listing_json);
+    // 新清单没带 shots 就把仓库里已有的那份留着（本地没有 shots/ 的机器上发版不该抹掉截图）
+    let listing_text = preserve_listing_shots(token, owner, repo_name, listing_json);
+    let listing = put_listing_manifest(token, owner, repo_name, &listing_text);
     if !listing["ok"].as_bool().unwrap_or(false) {
         return json!({ "ok": false, "reason": non_empty_or(&object_field(&listing, "reason"), "写入 evejs-mod.json 失败") });
+    }
+
+    if !extra_files.is_empty() {
+        say("上传截图", 50);
+        for (file_path, bytes) in extra_files {
+            let uploaded = put_repo_file(
+                token,
+                owner,
+                repo_name,
+                file_path,
+                bytes,
+                &format!("chore: add {file_path}"),
+            );
+            if !uploaded["ok"].as_bool().unwrap_or(false) {
+                say(&format!("{file_path} 上传失败，已跳过"), 52);
+            }
+        }
     }
 
     let tag = format!("v{version}");
@@ -1309,5 +1423,42 @@ mod tests {
             submit_capability("gho_x", None),
             ("unknown", Vec::new(), false)
         );
+    }
+
+    /* ------------------- 清单合并：保住已有的 shots ------------------- */
+
+    #[test]
+    fn merge_listing_shots_keeps_previous_when_next_has_none() {
+        let next = "{\n  \"id\": \"demo\",\n  \"version\": \"1.0.1\"\n}\n";
+        let previous = "{\"id\":\"demo\",\"version\":\"1.0.0\",\"shots\":[\"shots/01.webp\"]}";
+        let merged = merge_listing_shots(next, Some(previous)).expect("应该合并");
+        let value: Value = serde_json::from_str(&merged).unwrap();
+        assert_eq!(value["shots"][0], json!("shots/01.webp"));
+        // 新清单自己的字段照旧
+        assert_eq!(value["version"], json!("1.0.1"));
+        assert!(merged.ends_with('\n'));
+    }
+
+    #[test]
+    fn merge_listing_shots_defers_to_next_when_it_has_shots() {
+        // 新清单带了 shots（作者删掉本地图就是这种：空数组）→ 以它为准，不合并
+        let next = "{\"id\":\"demo\",\"shots\":[]}";
+        let previous = "{\"id\":\"demo\",\"shots\":[\"shots/01.webp\"]}";
+        assert!(merge_listing_shots(next, Some(previous)).is_none());
+
+        let next2 = "{\"id\":\"demo\",\"shots\":[\"shots/99.webp\"]}";
+        assert!(merge_listing_shots(next2, Some(previous)).is_none());
+    }
+
+    #[test]
+    fn merge_listing_shots_is_noop_without_usable_previous() {
+        let next = "{\"id\":\"demo\"}";
+        // 读不到旧文件 / 旧文件坏了 / 旧的那份没有 shots / 旧的是空数组 → 都不用改
+        assert!(merge_listing_shots(next, None).is_none());
+        assert!(merge_listing_shots(next, Some("not json")).is_none());
+        assert!(merge_listing_shots(next, Some("{\"id\":\"demo\"}")).is_none());
+        assert!(merge_listing_shots(next, Some("{\"id\":\"demo\",\"shots\":[]}")).is_none());
+        // 新清单本身就解析不了 → 也别动
+        assert!(merge_listing_shots("not json", Some("{\"shots\":[\"a.webp\"]}")).is_none());
     }
 }

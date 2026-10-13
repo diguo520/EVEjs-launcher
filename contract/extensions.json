@@ -288,11 +288,21 @@
       "api": "modsReviewSubmit",
       "channel": "mods:reviewSubmit",
       "kind": "invoke",
-      "signature": "input: { modId: string; version: string; pkgSha256: string; stars: number; body: string }",
+      "signature": "input: { modId: string; version: string; pkgSha256: string; body: string; stars?: number }",
       "params": [
         "input"
       ],
-      "why": "评价的写路径。启动器不注册账号：署名与身份都用本机那套 Ed25519 作者身份（没有就现建一套，评价的主体正是没发过模组的普通玩家），服务端按公钥指纹一人一票。真正的闸门在服务端 —— 报上去的 pkgSha256 必须命中 mod_versions 白名单，也就是「你确实装过这个版本」，客户端自称不算数。签名覆盖的就是发出去的原值（正文先在本地规范化），服务端不替客户端改写再验签。"
+      "why": "评论的写路径（v0.5 起评分换成星标，见 mods:starSet）。启动器不注册账号：署名与身份都用本机那套 Ed25519 作者身份（没有就现建一套，评论的主体正是没发过模组的普通玩家），服务端按公钥指纹一人一票。真正的闸门在服务端 —— 报上去的 pkgSha256 必须命中 mod_versions 白名单，也就是「你确实装过这个版本」，客户端自称不算数。`stars` 变成可选：老界面（0.3.x–0.4.x）还会带 1..5 的分数，带上就原样进签名负载、服务端折算成一颗星；新界面只写正文。签名覆盖的就是发出去的原值（正文先在本地规范化），服务端不替客户端改写再验签。"
+    },
+    {
+      "api": "modsStarSet",
+      "channel": "mods:starSet",
+      "kind": "invoke",
+      "signature": "input: { modId: string; on: boolean }",
+      "params": [
+        "input"
+      ],
+      "why": "点星 / 取消星标：GitHub 式点赞，二元、可撤销、一人一颗（服务端 `stars` 表幂等，加星是 ON CONFLICT DO NOTHING、取消是删除）。与评论解耦：可以只点星不写评论。**不需要 version / pkgSha256** —— 点星不是「装过才能评」，服务端只要求这个模组在市场名单里，取消时连名单都不看。回包带最新的 `stars` 计数，界面据此直接更新徽章。"
     },
     {
       "api": "modsUpdateMeta",

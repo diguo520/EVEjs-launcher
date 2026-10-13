@@ -355,6 +355,66 @@ fn contains_ignore_case(haystack: &str, needle: &str) -> bool {
     haystack.to_lowercase().contains(&needle.to_lowercase())
 }
 
+/// 一次最多带几张截图。与渲染层 `ui/src/lib/mod-media.ts` 的 `MAX_SHOTS` 对齐，
+/// 改一边记得改另一边。
+pub(crate) const MAX_LISTING_SHOTS: usize = 9;
+
+/// 认这些后缀是图。别的（`.txt` / `.psd` / 源文件）一律不进截图清单。
+fn looks_like_shot(name: &str) -> bool {
+    let lower = name.to_ascii_lowercase();
+    [".webp", ".png", ".jpg", ".jpeg", ".gif"]
+        .iter()
+        .any(|ext| lower.ends_with(ext))
+}
+
+/// 扫描 `mods/<folder>/shots/`，返回 **(作者仓库里的相对路径, 本地绝对路径)**，
+/// 按文件名排序、最多 `MAX_LISTING_SHOTS` 张。
+///
+/// 这条链路的目标是"作者把图丢进 `shots/` 就完事"：
+///   1. 这里收集 → 写进 `evejs-mod.json` 的 `shots`（索引 CI 抓的就是它）；
+///   2. 发布时这些文件被推到**作者自己的仓库**（见 `github::publish_to_own_repo`）；
+///   3. 渲染层按 `https://cdn.jsdelivr.net/gh/<repo>@main/shots/<file>` 显示。
+///
+/// 目录不存在、或者里面没有图片文件，就返回空 —— 索引里不会出现 `shots` 字段，
+/// 界面也就不画截图区（与"绝大多数模组暂时没图"的现状一致）。
+pub(crate) fn shots_for_listing(repo_root: &Path, folder: &str) -> Vec<(String, PathBuf)> {
+    let safe = sanitize_folder_name(folder);
+    let safe = if safe.is_empty() {
+        folder.to_string()
+    } else {
+        safe
+    };
+    if safe.is_empty() {
+        return Vec::new();
+    }
+    let Some(dir) = crate::mods::join_within(&mods_root(repo_root), &safe) else {
+        return Vec::new();
+    };
+    let Ok(entries) = std::fs::read_dir(dir.join("shots")) else {
+        return Vec::new();
+    };
+
+    let mut files: Vec<(String, PathBuf)> = Vec::new();
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+        let Some(name) = path.file_name().and_then(|value| value.to_str()) else {
+            continue;
+        };
+        if !looks_like_shot(name) {
+            continue;
+        }
+        files.push((format!("shots/{name}"), path));
+    }
+    // 按路径排序而不是 read_dir 的顺序：文件系统的枚举顺序不保证稳定，
+    // 不同机器上同一批图排出来的首图不一样，卡片/灯箱的顺序就会跳。
+    files.sort_by(|a, b| a.0.cmp(&b.0));
+    files.truncate(MAX_LISTING_SHOTS);
+    files
+}
+
 /// 从 `mods/<id>/README.md` 里抽出上架用的正文：
 /// 创建模组时生成的 README 有「## 功能要点」与「## 详细介绍」两段 ——
 /// 前者去重后进 highlights，后者按空行拆成段落进 readme；没有标题的手写 README 则整篇当正文。
@@ -707,6 +767,8 @@ pub fn prepare_submission(repo_root: &Path, runtime: &RuntimePaths, input: &Valu
     }
 
     let (listed_readme, listed_highlights) = readme_for_listing(repo_root, &folder);
+    // 截图：作者把图丢进 mods/<id>/shots/ 就自动带上，不用手编 JSON
+    let shot_files = shots_for_listing(repo_root, &folder);
     let changelog = text_field(input, "changelog");
     let description = {
         let value = text_field(input, "description");
@@ -788,6 +850,16 @@ pub fn prepare_submission(repo_root: &Path, runtime: &RuntimePaths, input: &Valu
             .take(10)
             .collect::<String>()),
     );
+    // 只有真有图才写这个键：空数组会让索引里出现 shots: []，界面还要为它做一次判断
+    if !shot_files.is_empty() {
+        index_draft.insert(
+            "shots".into(),
+            json!(shot_files
+                .iter()
+                .map(|(relative, _)| relative.clone())
+                .collect::<Vec<_>>()),
+        );
+    }
 
     let item = json!({
         "id": record.id,
@@ -799,6 +871,13 @@ pub fn prepare_submission(repo_root: &Path, runtime: &RuntimePaths, input: &Valu
         "sizeBytes": size_bytes,
         "downloadUrls": download_urls,
         "indexDraft": Value::Object(index_draft),
+        // 图本身在发布那一步才上传（这里只带路径，别把几 MB 的字节塞进 IPC 载荷）
+        "shotFiles": shot_files
+            .iter()
+            .map(|(relative, absolute)| {
+                json!({ "path": relative, "localPath": absolute.to_string_lossy() })
+            })
+            .collect::<Vec<_>>(),
         "status": "draft",
         "prUrl": "",
         "branch": format!("submit/{}-{version}", record.id),
@@ -952,6 +1031,23 @@ pub fn publish_own_repo(
     let listing = build_listing_json(&draft_with_repo, &download_urls);
 
     let zip_path = PathBuf::from(text_field(&item, "zipPath"));
+    // 截图：准备阶段只记了路径，这里才真读字节（图挂/文件被删就少传一张，不拦发布）
+    let shot_files: Vec<(String, Vec<u8>)> = item
+        .get("shotFiles")
+        .and_then(Value::as_array)
+        .map(|list| {
+            list.iter()
+                .filter_map(|entry| {
+                    let relative = text_field(entry, "path");
+                    let local = text_field(entry, "localPath");
+                    if relative.is_empty() || local.is_empty() {
+                        return None;
+                    }
+                    std::fs::read(&local).ok().map(|bytes| (relative, bytes))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
     let published = github::publish_to_own_repo(
         &token,
         repo_input,
@@ -961,6 +1057,7 @@ pub fn publish_own_repo(
         &text_field(&item, "changelog"),
         &text_field(&item, "displayName"),
         &listing,
+        &shot_files,
         &github::default_repo_name_for(id),
         &mut say,
     );
@@ -1726,6 +1823,62 @@ mod tests {
         // mirror 缺省补 "custom"
         assert_eq!(urls[1]["mirror"], "custom");
         assert_eq!(urls[1]["priority"], 7);
+    }
+
+    /// 作者只要把图丢进 `mods/<id>/shots/`：这里收上来 → 写进清单 → 发布时推到作者仓库。
+    #[test]
+    fn shots_listing_collects_images_sorted_and_capped() {
+        let runtime = temp_runtime("shots");
+        let repo = runtime.root.join("repo");
+        let dir = repo.join("mods").join("demo").join("shots");
+        std::fs::create_dir_all(dir.join("raw")).unwrap(); // 子目录不算
+        for name in [
+            "02.png",
+            "01.PNG",
+            "03.webp",
+            "notes.txt",
+            "cover.psd",
+            "04.jpg",
+            "05.gif",
+            "06.jpeg",
+            "07.webp",
+            "08.png",
+            "09.png",
+            "10.png",
+        ] {
+            std::fs::write(dir.join(name), b"x").unwrap();
+        }
+
+        let files = shots_for_listing(&repo, "demo");
+        let names: Vec<String> = files.iter().map(|(rel, _)| rel.clone()).collect();
+
+        // 只收图片，非图片一律不进清单
+        assert!(
+            !names
+                .iter()
+                .any(|n| n.ends_with(".txt") || n.ends_with(".psd")),
+            "{names:?}"
+        );
+        assert!(names.iter().all(|n| n.starts_with("shots/")), "{names:?}");
+        // 排序稳定（不靠文件系统的枚举顺序），大写后缀也认
+        let mut sorted = names.clone();
+        sorted.sort();
+        assert_eq!(names, sorted);
+        // 限量：12 个图片文件里只取前 9 个（"10.png" 被截掉）
+        assert_eq!(names.len(), MAX_LISTING_SHOTS);
+        assert!(!names.iter().any(|n| n.ends_with("10.png")));
+        // 本地路径必须真的指得到文件（发布时要读它上传）
+        assert!(files.iter().all(|(_, absolute)| absolute.is_file()));
+    }
+
+    #[test]
+    fn shots_listing_is_empty_without_the_folder() {
+        let runtime = temp_runtime("shots-none");
+        let repo = runtime.root.join("repo");
+        std::fs::create_dir_all(repo.join("mods").join("demo")).unwrap();
+        // 没有 shots/ 目录、也没有这个模组目录 → 都是空（索引里不出现 shots 键）
+        assert!(shots_for_listing(&repo, "demo").is_empty());
+        assert!(shots_for_listing(&repo, "missing").is_empty());
     }
 
     #[test]

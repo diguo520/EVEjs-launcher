@@ -14,6 +14,8 @@ import { isSafeModId } from "./snapshot.js"
 export const MAX_REVIEW_BODY = 2000
 export const MAX_REPLY_BODY = 1000
 export const MAX_REPORT_REASON = 500
+/** 评论最短长度：只点星不写字是 `star.add` 的事，评论这条路不接受空正文 */
+export const MIN_REVIEW_BODY = 1
 
 /** 一个人一天最多写几条（新增 + 改动一起算）；正常玩家一天用不到 2 条 */
 export const MAX_REVIEWS_PER_DAY = 20
@@ -84,10 +86,22 @@ export function validateReview(input) {
   // 客户端会收到「签名不匹配」这种跟真实原因无关的报错。形状不对就直接拒，并说清要什么。
   const pkgSha256 = text(input.pkgSha256)
   if (!SHA256_RE.test(pkgSha256)) return fail("pkgSha256 必须是 64 位小写十六进制")
+  /**
+   * 分值**可选**，且写进来也只当「给了一颗星」用（v0.5 起评分改星标）。
+   *
+   * 留着这个字段是因为已经装出去的 0.3.x–0.4.x 客户端还会发 `stars: 1..5`：
+   * 它们发来的分值我们不再当分数存，但**照旧收下并折算成一颗星**，
+   * 老界面读快照里的遗留均分（点星按 5 分派生）也不会空。
+   */
+  const hasStars = input.stars !== undefined && input.stars !== null
   const stars = input.stars
-  if (!Number.isInteger(stars) || stars < 1 || stars > 5) return fail("stars 只能是 1 到 5")
+  if (hasStars && (!Number.isInteger(stars) || stars < 1 || stars > 5)) {
+    return fail("stars 只能是 1 到 5")
+  }
   const body = checkBody(input.body ?? "", MAX_REVIEW_BODY, "评价正文")
   if (!body.ok) return body
+  // 星标与评论解耦：不带分值时正文必须有内容，否则这次写入什么也没发生
+  if (!hasStars && body.value.length < MIN_REVIEW_BODY) return fail("评论不能是空的")
   const reviewId = text(input.reviewId)
   if (!REVIEW_ID_RE.test(reviewId)) return fail("reviewId 不合法")
   const identityId = text(input.identityId)
@@ -97,21 +111,42 @@ export function validateReview(input) {
   const clock = checkClock(input.createdAt, "createdAt")
   if (!clock.ok) return clock
 
-  return {
-    ok: true,
-    payload: {
-      action: "review.upsert",
-      modId,
-      version,
-      pkgSha256,
-      stars,
-      body: body.value,
-      reviewId,
-      identityId,
-      publicKey,
-      createdAt: clock.value,
-    },
+  const payload = {
+    action: "review.upsert",
+    modId,
+    version,
+    pkgSha256,
+    body: body.value,
+    reviewId,
+    identityId,
+    publicKey,
+    createdAt: clock.value,
   }
+  // 签的就是发的：客户端没带 stars，负载里也不能多出来
+  if (hasStars) payload.stars = stars
+  return { ok: true, payload }
+}
+
+/**
+ * 星标：`star.add` / `star.remove`。二元、可取消、一人一颗，幂等。
+ *
+ * 与评价的区别只有一处：**不要求 version / sha256**（点星不需要「装过」的凭据），
+ * 也不写正文。`action` 取自签名负载本身 —— 路径只决定「这是星标接口」，
+ * 加星还是取消以签名里那份为准，两者不一致时服务端不做任何猜测，直接拒。
+ */
+export function validateStar(input) {
+  if (!input || typeof input !== "object") return fail("请求体不是对象")
+  const action = text(input.action)
+  if (action !== "star.add" && action !== "star.remove") return fail("action 只能是 star.add 或 star.remove")
+  const modId = text(input.modId)
+  if (!MOD_ID_RE.test(modId)) return fail("modId 不合法")
+  const identityId = text(input.identityId)
+  if (!IDENTITY_RE.test(identityId)) return fail("identityId 不合法")
+  const publicKey = checkPublicKey(input.publicKey)
+  if (!publicKey) return fail("publicKey 必须是 32 字节 Ed25519 公钥的 base64")
+  const clock = checkClock(input.at, "at")
+  if (!clock.ok) return clock
+  return { ok: true, payload: { action, modId, identityId, publicKey, at: clock.value } }
 }
 
 /** 撤回自己那条评价（人走了想删掉，不该被拒绝） */

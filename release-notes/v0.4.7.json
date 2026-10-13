@@ -1,0 +1,23 @@
+{
+  "version": "0.4.7",
+  "changelog": {
+    "zh": [
+      { "type": "new", "text": "模组详情可以放截图了：点任意一张打开大图，左右箭头翻页（首尾循环）、底部圆点跳转、叉或 Esc 关闭、点遮罩关闭。图片放在作者自己的 mod 仓库里，卡片上不显示，只在详情里出现。" },
+      { "type": "new", "text": "作者加截图零操作：把图片丢进 mods/<模组 id>/shots/ 即可（支持 webp/png/jpg/gif，按文件名排序，最多 9 张）。发布时启动器自动把清单写进市场索引、把图片推到作者自己的仓库。用启动器新建模组时，模板里已经带好 shots/ 目录和一份说明。" },
+      { "type": "new", "text": "模组制作规范新增「模组截图」附录，八种语言同步。" },
+      { "type": "fix", "text": "在本地没有 shots/ 的机器上发新版不再抹掉已上架的截图：发布前会保留仓库清单里已有的截图字段（想撤下就把本地的 shots/ 清空）。" },
+      { "type": "new", "text": "模组评价改成 GitHub 式星标：一元、点一下即星标、再点取消，一人一颗，与评论彼此独立（只写评论不点星、只点星不写评论都成立）。此前 1–5 分的旧评价按「评过即点过星」折算成一颗星，分值本身丢弃 —— 星标的语义是推荐 / 不推荐，五档均分没有对应物。" },
+      { "type": "opt", "text": "评论列表去掉「好评 / 差评 / 高分 / 低分」这些排序与筛选：评论不再带分值，这些分档已经没有判据，列表统一按时间倒序。星标数超过四位数改用国际单位显示（1K / 1.2K），不再把长数字铺开。" },
+      { "type": "new", "text": "KM 页的交战记录改成双阵营对战视图：左右两张阵营卡，各自显示势力色与势力名（胜方带徽标）、损失总额、四项统计、阵营色占比条，以及本方自己的舰型损失明细；两卡按损失舰数排序（平手比 ISK，再平手比 key，避免同分对手每次刷新换位）。悬赏未结算、认不出舰型的损失如实标成「未知舰型」，不再并进 0 号舰型。" }
+    ],
+    "en": [
+      { "type": "new", "text": "Mod detail views can show screenshots: click one to open a large view with left/right arrows (wrapping), dots at the bottom to jump, and a close button, Esc or a click on the backdrop to dismiss. The images live in the author's own mod repository and appear only in the detail view, never on the card." },
+      { "type": "new", "text": "Adding screenshots takes no work from the author: drop the files into mods/<mod id>/shots/ (webp/png/jpg/gif, sorted by file name, up to 9). On publish the launcher writes the list into the market index and pushes the images to the author's own repository. Newly created mods ship with the shots/ folder and a short readme already in place." },
+      { "type": "new", "text": "The mod authoring guide gained a \"mod screenshots\" appendix, in all eight languages." },
+      { "type": "fix", "text": "Publishing from a machine without a local shots/ folder no longer wipes screenshots that are already listed: the existing shots field from the repository is preserved (empty your local shots/ to take them down)." },
+      { "type": "new", "text": "Mod ratings became GitHub-style stars: a single toggle, click to star and click again to unstar, one per person, independent of reviews (reviewing without starring and starring without reviewing are both valid). Previous 1-5 ratings are converted to one star each (reviewed = starred); the score itself is dropped, because a star means recommend / do not recommend and a five-point average has no equivalent." },
+      { "type": "opt", "text": "The review list dropped its \"positive / negative / highest / lowest\" sorts and filters: reviews no longer carry a score, those buckets have no criterion left, and the list is simply newest-first. Star counts of four digits or more now use short units (1K / 1.2K) instead of spilling long numbers." },
+      { "type": "new", "text": "The KM page's battle records became a two-sided view: two faction cards side by side, each showing its faction colour and name (with a winner badge), total losses, four statistics, a faction-coloured share bar, and that side's own hull losses; the cards are ordered by ships lost (ties by ISK, then by key, so tied sides do not swap places between refreshes). Losses with an unsettled bounty and no identifiable hull are labelled \"unknown hull\" instead of being folded into hull type 0." }
+    ]
+  }
+}

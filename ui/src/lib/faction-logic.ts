@@ -1370,6 +1370,37 @@ export interface BattleShipLoss {
   unknown: number
 }
 
+/**
+ * 一型舰船在**某一侧**的损失。
+ *
+ * `typeID` 为 `null` 就是「悬赏没结算、我们不知道这是什么船」的那一档 ——
+ * 不许当成 0 号舰型，也不许丢掉：这条损失真实发生过，界面要如实显示「未知舰型」。
+ */
+export interface SideShipLoss extends Omit<BattleShipLoss, "typeID"> {
+  /** 舰型；`null` = 悬赏未结算，舰型不明 */
+  typeID: number | null
+}
+
+/** 阵营（一侧）的舰型损失明细 + 供进度条使用的占比 */
+export interface BattleSideLosses {
+  /** 阵营 key，与 `BattleSideReport.key` 对得上（含「只出手没挨打」的那一方） */
+  key: string
+  /** 这一侧被打掉的舰数（= `BattleSideReport.lost`，无舰型的也算） */
+  lost: number
+  /** 这一侧被打掉的 ISK（= `BattleSideReport.lostValue`） */
+  lostValue: number
+  /**
+   * 这一侧的损失占**双方损失合计**的比例，0–1。
+   *
+   * 「双方」= 这一场里有过损失的所有阵营（`sides[].lost > 0`）——
+   * 只出手、没挨打的一方不会把它的 0 摊进分母，否则一边倒的战斗会显示成 50/50。
+   * 整场没有损失时是 0。
+   */
+  lostShare: number
+  /** 分型明细，死得多的在前；未知舰型排在最后 */
+  losses: SideShipLoss[]
+}
+
 export interface BattleReport {
   battleID: number
   firstAt: number
@@ -1377,9 +1408,22 @@ export interface BattleReport {
   systemID: number
   sides: BattleSideReport[]
   shipLosses: BattleShipLoss[]
+  /** 按阵营拆开的舰型损失（双阵营对战界面用），顺序与 `sides` 同源，损失多的在前 */
+  sideShipLosses: BattleSideLosses[]
   kills: KillRow[]
   totalLost: number
   totalValue: number
+}
+
+/**
+ * 分型明细排序：死得多的在前 → ISK 高的在前 → 未知舰型沉底 → typeID 小的在前（保证确定性）。
+ * 导出是为了让界面侧的自定义排序和这里保持一致。
+ */
+export function compareShipLosses(left: SideShipLoss, right: SideShipLoss): number {
+  if (right.dead !== left.dead) return right.dead - left.dead
+  if (right.value !== left.value) return right.value - left.value
+  if ((left.typeID === null) !== (right.typeID === null)) return left.typeID === null ? 1 : -1
+  return (left.typeID ?? 0) - (right.typeID ?? 0)
 }
 
 /**
@@ -1402,6 +1446,11 @@ export function battleReports(events: FactionEvent[]): BattleReport[] {
   for (const [battleID, list] of buckets) {
     const sides = new Map<string, BattleSideReport>()
     const shipTypes = new Map<number, BattleShipLoss>()
+    // 分侧表：victimKey → (typeID → 分型损失)。
+    // 直接按阵营 key 挂一层 Map，不用拼字符串键 —— 拼键会在
+    // `a\u0000none`（有船但没结算）与阵营名恰好叫 `a\u0000none` 的当（舰型 null）之间撞车，
+    // 把一方的损失算进另一方。typeID 为 null 的单独成一档，不丢。
+    const sideLosses = new Map<string, Map<number | null, SideShipLoss>>()
     const ensure = (key: string): BattleSideReport => {
       const found = sides.get(key)
       if (found) return found
@@ -1450,6 +1499,18 @@ export function battleReports(events: FactionEvent[]): BattleReport[] {
         if (kill.value <= 0) row.unknown += 1
         shipTypes.set(kill.shipTypeID, row)
       }
+      // 分侧聚合：按 (victimKey, shipTypeID) 分桶。悬赏没结算的 shipTypeID 是 null，
+      // 照样进桶（键为 null），界面显示成「未知舰型」——静默丢数会让两侧数量对不上账。
+      let bucket = sideLosses.get(kill.victimKey)
+      if (!bucket) {
+        bucket = new Map<number | null, SideShipLoss>()
+        sideLosses.set(kill.victimKey, bucket)
+      }
+      const sideRow = bucket.get(kill.shipTypeID) ?? { typeID: kill.shipTypeID, dead: 0, value: 0, unknown: 0 }
+      sideRow.dead += 1
+      sideRow.value += kill.value
+      if (kill.value <= 0) sideRow.unknown += 1
+      bucket.set(kill.shipTypeID, sideRow)
     }
     const sideRows = [...sides.values()]
     for (const side of sideRows) {
@@ -1458,6 +1519,20 @@ export function battleReports(events: FactionEvent[]): BattleReport[] {
       side.fleets.sort((left, right) => left - right)
     }
     sideRows.sort((left, right) => right.killValue - left.killValue || right.lost - left.lost)
+    // 占比的分母只算**挨过打**的阵营：只出手那方的 0 摊进去会把一边倒显示成 50/50
+    const lostTotal = sideRows.reduce((sum, side) => sum + side.lost, 0)
+    const sideLossRows: BattleSideLosses[] = sideRows.map((side) => {
+      // 这一侧的桶直接按 key 取，不存在前缀误匹配
+      const bucket = sideLosses.get(side.key) ?? new Map<number | null, SideShipLoss>()
+      return {
+        key: side.key,
+        lost: side.lost,
+        lostValue: side.lostValue,
+        lostShare: lostTotal > 0 ? side.lost / lostTotal : 0,
+        losses: [...bucket.values()].sort(compareShipLosses),
+      }
+    })
+    sideLossRows.sort((left, right) => right.lost - left.lost || right.lostValue - left.lostValue)
     reports.push({
       battleID,
       firstAt: Number.isFinite(firstAt) ? firstAt : lastAt,
@@ -1467,6 +1542,7 @@ export function battleReports(events: FactionEvent[]): BattleReport[] {
       shipLosses: [...shipTypes.values()].sort(
         (left, right) => right.dead - left.dead || right.value - left.value
       ),
+      sideShipLosses: sideLossRows,
       kills: [...list].sort((left, right) => right.id - left.id),
       totalLost,
       totalValue,

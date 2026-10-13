@@ -77,6 +77,8 @@ fn action_url(base: &str, action: &str) -> Result<String, String> {
         "reply.upsert" => "/replies",
         "reply.retract" => "/replies/retract",
         "report.create" => "/reports",
+        "star.add" => "/stars",
+        "star.remove" => "/stars/remove",
         other => return Err(format!("不认识的写动作：{other}")),
     };
     if root.is_empty() {
@@ -229,18 +231,32 @@ fn shape_error(args: &Value, kind: &str) -> Option<String> {
 
 /* ------------------------------ 对外动作 ------------------------------ */
 
-/// 打分 / 改分（可只打分不写字）。改分是覆盖，不是追加 —— 服务端 `UNIQUE(mod_id, public_key)`。
+/// 写评论 / 改评论。改是覆盖，不是追加 —— 服务端 `UNIQUE(mod_id, public_key)`。
+///
+/// v0.5 起「评分」换成星标（见 `submit_star`），这条路只写正文；`stars` 仍然**可选**地收下：
+/// 已经装出去的 0.3.x–0.4.x 界面还会带 `stars: 1..5`，带上就原样进签名负载，
+/// 服务端把它折算成一颗星（分值本身不再进聚合），老界面因此不用改也能继续用。
 pub fn submit_review(runtime: &RuntimePaths, args: &Value) -> Value {
     if let Some(reason) = shape_error(args, "评价") {
         return json!({ "ok": false, "reason": reason });
     }
-    let stars = args.get("stars").and_then(Value::as_i64).unwrap_or(-1);
-    if !(1..=5).contains(&stars) {
-        return json!({ "ok": false, "reason": "打分只能是 1 到 5 星" });
-    }
+    let stars = match args.get("stars") {
+        None | Some(Value::Null) => None,
+        Some(value) => match value.as_i64() {
+            Some(stars) if (1..=5).contains(&stars) => Some(stars),
+            _ => return json!({ "ok": false, "reason": "打分只能是 1 到 5 星" }),
+        },
+    };
     let body = normalise_body(args.get("body").and_then(Value::as_str).unwrap_or_default());
     if body.chars().count() > MAX_REVIEW_BODY_CHARS {
         return json!({ "ok": false, "reason": format!("评价最多 {MAX_REVIEW_BODY_CHARS} 个字") });
+    }
+    // 不带分值 = 纯评论：空正文等于什么都没写。本地先拦一次，省一趟往返。
+    if stars.is_none() && body.is_empty() {
+        return json!({
+            "ok": false,
+            "reason": "评论不能是空的 —— 只想点赞就点星标，不用写评论",
+        });
     }
     let version = text_field(args, "version");
     if version.is_empty() {
@@ -256,11 +272,35 @@ pub fn submit_review(runtime: &RuntimePaths, args: &Value) -> Value {
     fields.insert("modId".to_string(), json!(text_field(args, "modId")));
     fields.insert("version".to_string(), json!(version));
     fields.insert("pkgSha256".to_string(), json!(pkg_sha256));
-    fields.insert("stars".to_string(), json!(stars));
+    if let Some(stars) = stars {
+        fields.insert("stars".to_string(), json!(stars));
+    }
     fields.insert("body".to_string(), json!(body));
     fields.insert("reviewId".to_string(), json!(new_review_id()));
     fields.insert("createdAt".to_string(), json!(pkg::epoch_ms() as u64));
     post_signed(runtime, fields, "提交评价")
+}
+
+/// 点星 / 取消星标：GitHub 式点赞，二元、可取消、一人一颗（服务端幂等）。
+///
+/// 与评价的差别只有一处：**要版本号和包指纹的是评价，不是星标** ——
+/// 点星不需要「装过」的凭据，服务端只要求这个模组在市场名单里（取消时连名单都不看）。
+pub fn submit_star(runtime: &RuntimePaths, args: &Value) -> Value {
+    if let Some(reason) = shape_error(args, "星标") {
+        return json!({ "ok": false, "reason": reason });
+    }
+    if args.get("on").and_then(Value::as_bool).is_none() {
+        return json!({ "ok": false, "reason": "星标要带 on: true / false" });
+    }
+    let on = args.get("on").and_then(Value::as_bool).unwrap_or(false);
+    let mut fields = Map::new();
+    fields.insert(
+        "action".to_string(),
+        json!(if on { "star.add" } else { "star.remove" }),
+    );
+    fields.insert("modId".to_string(), json!(text_field(args, "modId")));
+    fields.insert("at".to_string(), json!(pkg::epoch_ms() as u64));
+    post_signed(runtime, fields, if on { "点星" } else { "取消星标" })
 }
 
 /// 撤回自己的评价
@@ -424,6 +464,46 @@ mod tests {
     }
 
     #[test]
+    fn comment_without_a_star_needs_text_and_no_score() {
+        let paths = temp_paths("comment-only");
+        // 不带分值 = 纯评论：空正文本地就该拦下（服务端也会拒，但别白跑一趟）
+        let empty = json!({
+            "modId": "evejs-autolockfire", "version": "1.0.0",
+            "pkgSha256": "a".repeat(64), "body": "   "
+        });
+        let verdict = submit_review(&paths, &empty);
+        assert_eq!(verdict.get("ok").and_then(Value::as_bool), Some(false));
+        assert!(verdict
+            .get("reason")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .contains("评论不能是空的"));
+    }
+
+    #[test]
+    fn submit_star_only_needs_mod_id_and_on_flag() {
+        let paths = temp_paths("star-shape");
+        // 缺 on：本地拦下，不去猜「加星还是取消」
+        let no_flag = json!({ "modId": "evejs-autolockfire" });
+        let verdict = submit_star(&paths, &no_flag);
+        assert_eq!(verdict.get("ok").and_then(Value::as_bool), Some(false));
+        assert!(verdict
+            .get("reason")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .contains("on: true / false"));
+
+        // modId 形状不对同样本地拦下
+        let bad_id = json!({ "modId": "EVEJS-AutoLockFire", "on": true });
+        assert_eq!(
+            submit_star(&paths, &bad_id)
+                .get("ok")
+                .and_then(Value::as_bool),
+            Some(false)
+        );
+    }
+
+    #[test]
     fn action_url_derives_every_endpoint_from_the_review_entry() {
         let base = "https://ping.5318.cm/v1/reviews";
         assert_eq!(action_url(base, "review.upsert").unwrap(), base);
@@ -442,6 +522,14 @@ mod tests {
         assert_eq!(
             action_url(base, "report.create").unwrap(),
             "https://ping.5318.cm/v1/reports"
+        );
+        assert_eq!(
+            action_url(base, "star.add").unwrap(),
+            "https://ping.5318.cm/v1/stars"
+        );
+        assert_eq!(
+            action_url(base, "star.remove").unwrap(),
+            "https://ping.5318.cm/v1/stars/remove"
         );
     }
 

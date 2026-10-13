@@ -19,6 +19,7 @@ import {
   validateReport,
   validateRetract,
   validateReview,
+  validateStar,
 } from "../src/write.js"
 
 /** 32 字节 Ed25519 公钥的 base64（内容无所谓，形状对就行） */
@@ -77,8 +78,13 @@ test("评价：正常输入原样进 payload（服务端不改写，签名覆盖
   })
 })
 
-test("评价：只打分不写字是允许的", () => {
+test("评价：带分值时只打分不写字仍允许（老客户端），不带分值时正文不能空", () => {
   assert.equal(validateReview(reviewInput({ body: "" })).ok, true)
+  // v0.5 起星标与评论解耦：不带分值 = 纯评论，空正文就什么也没写，直接拒
+  const empty = validateReview(reviewInput({ stars: undefined, body: "" }))
+  assert.equal(empty.ok, false)
+  assert.match(empty.reason, /不能是空的/)
+  assert.equal(validateReview(reviewInput({ stars: undefined, body: "只评论不点星" })).ok, true)
 })
 
 test("评价：正文必须先规范再签名，服务端不替客户端改", () => {
@@ -91,13 +97,55 @@ test("评价：正文必须先规范再签名，服务端不替客户端改", ()
   assert.equal(validateReview(reviewInput({ body: "x".repeat(MAX_REVIEW_BODY + 1) })).ok, false)
 })
 
-test("评价：stars 只收 1..5 的整数", () => {
-  for (const stars of [0, 6, 2.5, "5", null]) {
+test("评价：分值可选，给了就必须是 1..5 的整数（只当一颗星用）", () => {
+  for (const stars of [0, 6, 2.5, "5"]) {
     assert.equal(validateReview(reviewInput({ stars })).ok, false, `stars=${stars} 应该被拒`)
   }
   for (const stars of [1, 2, 3, 4, 5]) {
-    assert.equal(validateReview(reviewInput({ stars })).ok, true, `stars=${stars} 应该收`)
+    const result = validateReview(reviewInput({ stars }))
+    assert.equal(result.ok, true, `stars=${stars} 应该收`)
+    // 老客户端的分值原样留在签名负载里（服务端先验签，不能悄悄丢）
+    assert.equal(result.payload.stars, stars)
   }
+  // 不带分值 = 纯评论：负载里**不能**多出 stars，多出来就等于改了签名覆盖的那份
+  const plain = validateReview(reviewInput({ stars: undefined }))
+  assert.equal(plain.ok, true)
+  assert.equal("stars" in plain.payload, false)
+  assert.equal(validateReview(reviewInput({ stars: null })).ok, true)
+})
+
+/** 星标入参：没有 version / sha256 —— 点星不需要「装过」的凭据 */
+const starInput = (over = {}) => ({
+  action: "star.add",
+  modId: "evejs-autolockfire",
+  identityId: "au-1234",
+  publicKey: PUBLIC_KEY,
+  at: NOW,
+  ...over,
+})
+
+test("星标：只认 star.add / star.remove，形状不对带着原因拒", () => {
+  assert.equal(validateStar(starInput()).ok, true)
+  assert.equal(validateStar(starInput({ action: "star.remove" })).ok, true)
+  assert.match(validateStar(starInput({ action: "review.upsert" })).reason, /star\.add/)
+  assert.equal(validateStar(starInput({ action: "" })).ok, false)
+  assert.equal(validateStar(starInput({ modId: "EVEJS-AutoLockFire" })).ok, false)
+  assert.equal(validateStar(starInput({ modId: "" })).ok, false)
+  assert.equal(validateStar(starInput({ publicKey: "AAAA" })).ok, false)
+  assert.equal(validateStar(starInput({ identityId: "!" })).ok, false)
+  assert.equal(validateStar(starInput({ at: "now" })).ok, false)
+  assert.equal(validateStar(starInput({ at: NOW - 25 * 60 * 60 * 1000 })).ok, false)
+  assert.equal(validateStar(null).ok, false)
+})
+
+test("星标：负载只有五项，正文 / 指纹 / 版本一律不进来", () => {
+  assert.deepEqual(Object.keys(validateStar(starInput()).payload).sort(), [
+    "action",
+    "at",
+    "identityId",
+    "modId",
+    "publicKey",
+  ])
 })
 
 test("评价：pkgSha256 必须是 64 位小写十六进制（大写会被静默拒）", () => {

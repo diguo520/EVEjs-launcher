@@ -5,6 +5,18 @@
 --
 -- 表结构一次建齐（写入路径在 M2 接上），M1 只读。
 
+-- 星标（GitHub 式点赞）：二元、可取消、一人一颗。这是「评分」在 v0.5 之后的唯一口径。
+-- `reviews.stars` 那一列退化成历史遗留（新写的评论一律记 5），聚合与快照都不再读它。
+CREATE TABLE IF NOT EXISTS stars (
+  mod_id      TEXT    NOT NULL,
+  public_key  TEXT    NOT NULL,
+  key_id      TEXT    NOT NULL,
+  identity_id TEXT    NOT NULL DEFAULT '',
+  created_at  INTEGER NOT NULL,
+  PRIMARY KEY (mod_id, public_key)
+);
+CREATE INDEX IF NOT EXISTS idx_stars_mod ON stars (mod_id, created_at DESC);
+
 -- 评价：一个人对一个模组只有一条，改分改字都是 UPSERT，不是追加
 CREATE TABLE IF NOT EXISTS reviews (
   id          TEXT    PRIMARY KEY,           -- 客户端生成的 reviewId，重试的幂等键

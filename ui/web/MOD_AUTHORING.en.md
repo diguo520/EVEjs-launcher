@@ -617,3 +617,41 @@ Four rules (🟥 breaking any of them makes other mods fail for no visible reaso
 
 **Document version**: ships with the launcher (kept in sync with `_launcher/mods/MOD_AUTHORING.en.md`).
 If something is not covered here, check the launcher's **Server logs** and the red notes on the card first, then ask the maintainer with the log at hand.
+
+# Appendix H: mod screenshots (market display)
+
+The mod detail view can show a few screenshots, and clicking one opens a pager you can flip through. The images live **in your own mod repository** — nothing is uploaded to any platform.
+
+## How to add them
+
+1. Put a `shots/` folder in your mod directory (the launcher's "Create mod" already ships one with a short readme inside)
+2. Drop the screenshots in: `webp` / `png` / `jpg` / `gif` — **subfolders are ignored**
+3. Publish (or publish an update) from the launcher — everything else is automatic
+
+## Rules
+
+| Item | Detail |
+| --- | --- |
+| Order | Sorted by **file name**, and the detail view follows that order (prefix with `01-`, `02-` if you want to control it) |
+| Count | At most **9**; extras are cut off in order |
+| Size | Aim for **≤ 200 KB each at 16:9** — big images make people wait when they open the detail view |
+| Format | Prefer `webp` (smallest at the same quality) |
+
+## What happens on publish
+
+1. The launcher scans `mods/<your mod>/shots/` and writes the file list into `shots` in `evejs-mod.json`
+2. The images themselves are pushed to **your own mod repository** (not the market repository)
+3. The market index (merged and signed by CI) carries that list
+4. The launcher's detail view loads `https://cdn.jsdelivr.net/gh/<your repo>@main/shots/<file>`
+
+So: **the images always stay in your repository**; the market only holds a list of file names. Swapping an image means touching your own repo — nobody else has to be involved.
+
+## Three gotchas
+
+- **Do not delete the readme inside `shots/`**: empty directories do not survive git or ZIP, so removing it means anyone cloning your repo ends up without the folder
+- **Publishing without a local `shots/` will not wipe the screenshots already listed**: the launcher preserves the existing `shots` field from your repository before writing. To **take screenshots down**, empty your local `shots/` (keeping the folder counts as empty)
+- **A missing image never raises an error**: if you delete the repo or rename a file, the detail view simply shows **fewer images silently** (a failed one hides itself instead of leaving a broken frame) — nothing errors and publishing is never blocked
+
+## When it becomes visible
+
+After a successful publish, the market index is rebuilt **immediately when your submission PR is merged** (with a 6-hourly scheduled run as a backstop). The launcher also has a 2-minute cache.

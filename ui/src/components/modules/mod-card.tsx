@@ -25,6 +25,7 @@ import {
   marketVersionDiff,
   pendingReplies,
   ratingOf,
+  formatCount,
   reasonOf,
   type OverlapFlag,
 } from "@/lib/mod-logic"
@@ -194,17 +195,25 @@ export function ModCard({
           <span className="text-[11px] text-muted-foreground">{mod.author}</span>
           <Badge variant="secondary">{mod.cat}</Badge>
           {rating.count > 0 ? (
-            <span className="flex items-center gap-1">
-              <Star className="size-3 text-telemetry" fill="currentColor" />
-              <span className="tabular text-[11px] text-foreground">
-                {rating.average.toFixed(1)}
+            <span className="flex items-center gap-1 text-foreground">
+              <span className="grid size-3 shrink-0 place-items-center">
+                <Star className="size-3 text-telemetry" fill="currentColor" />
               </span>
-              <span className="tabular text-[10px] text-tertiary">
-                ({rating.count.toLocaleString()})
+              <span className="grid size-3 shrink-0 place-items-center">
+                <span className="tabular translate-y-px text-[11px] leading-none">
+                  {formatCount(rating.count)}
+                </span>
               </span>
             </span>
           ) : (
-            <span className="text-[11px] text-tertiary">暂无评分</span>
+            <span className="flex items-center gap-1 text-[11px] text-tertiary">
+              <span className="grid size-3 shrink-0 place-items-center">
+                <Star className="size-3 text-telemetry" />
+              </span>
+              <span className="grid size-3 shrink-0 place-items-center">
+                <span className="tabular translate-y-px leading-none">0</span>
+              </span>
+            </span>
           )}
           {/* 自己的模组：点出还有几条评价等着回，不然入口藏在详情里没人发现 */}
           {mod.mine && pending > 0 ? (

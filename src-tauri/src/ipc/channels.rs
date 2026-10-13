@@ -1,6 +1,6 @@
 //! 由 scripts/gen-contract.mjs 生成 —— 请勿手改。源: contract/ipc-channels.json
 //! 抽取源: E:\Games\EveJS-v0.12.8\launcher\launcher
-//! 生成时间: 2026-10-05T11:17:38.460Z
+//! 生成时间: 2026-10-13T16:52:43.237Z
 
 #![allow(dead_code)]
 
@@ -18,7 +18,7 @@ pub struct ChannelSpec {
     pub kind: ChannelKind,
 }
 
-pub const REQUEST_COUNT: usize = 120;
+pub const REQUEST_COUNT: usize = 121;
 pub const EVENT_COUNT: usize = 9;
 
 #[rustfmt::skip]
@@ -117,6 +117,7 @@ pub const CHANNELS: &[ChannelSpec] = &[
     ChannelSpec { channel: "mods:setEnabled", api: "modsSetEnabled", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "mods:setOrder", api: "modsSetOrder", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "mods:sign", api: "modsSign", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "mods:starSet", api: "modsStarSet", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "mods:submitGithub", api: "modsSubmitGithub", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "mods:submitPrepare", api: "modsSubmitPrepare", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "mods:templates", api: "modsTemplates", kind: ChannelKind::Invoke },

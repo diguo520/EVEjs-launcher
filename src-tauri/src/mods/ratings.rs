@@ -136,11 +136,15 @@ pub fn fetch_review_shard(runtime: &RuntimePaths, mod_id: &str, force: bool) -> 
     )
 }
 
-/// 把聚合分并进市场条目。
+/// 把聚合并进市场条目。
 ///
-/// 线上形状是 `{"ratings": {modId: {average, count, withText, histogram}}}`，取不到就写 0/0；
-/// `average` 是给卡片和排序用的，`withText` 是「玩家评价 · N 条」那个数（**不是** `count`：
-/// 打分的人远多于写评论的人，两个口径分开是刻意的）。
+/// v0.5 起「评分」只有一个口径：**星标数**（GitHub 式点赞，二元、可取消、一人一颗）。
+/// 线上形状是 `{"mods": {modId: {stars, comments, average, count, withText, histogram}}}`：
+///   - `stars` / `comments` 是新口径（星标数 / 评论条数）；
+///   - `average` / `count` / `withText` / `histogram` 是遗留口径，点星按 5 分派生，
+///     只为了老界面与「服务端还没升级」这两种情况不空。
+///
+/// 所以这里**两边都读**：新字段优先，缺失时退回遗留字段（`lib.rs` 那边同理）。
 pub fn apply_ratings(entries: &mut [Value], ratings: Option<&Value>) {
     let empty = Map::new();
     let table = ratings
@@ -166,9 +170,29 @@ pub fn apply_ratings(entries: &mut [Value], ratings: Option<&Value>) {
             .and_then(|value| value.get("histogram"))
             .cloned()
             .unwrap_or_else(|| json!([0, 0, 0, 0, 0]));
+        // 星标数：新字段优先，老服务端（只有遗留口径）退回 count
+        let stars = row
+            .and_then(|value| value.get("stars"))
+            .and_then(Value::as_u64)
+            .or_else(|| {
+                row.and_then(|value| value.get("count"))
+                    .and_then(Value::as_u64)
+            })
+            .unwrap_or(0);
+        // 评论条数：新字段优先，老服务端退回 withText（两个口径本来就都是「写了字的人」）
+        let comments = row
+            .and_then(|value| value.get("comments"))
+            .and_then(Value::as_u64)
+            .or_else(|| {
+                row.and_then(|value| value.get("withText"))
+                    .and_then(Value::as_u64)
+            })
+            .unwrap_or(0);
         let Some(object) = entry.as_object_mut() else {
             continue;
         };
+        object.insert("starCount".into(), json!(stars));
+        object.insert("commentCount".into(), json!(comments));
         object.insert("ratingAvg".into(), json!(average));
         object.insert("ratingCount".into(), json!(count));
         object.insert("ratingWithText".into(), json!(with_text));
@@ -215,10 +239,28 @@ pub fn reviews_for(runtime: &RuntimePaths, mod_id: &str, force: bool) -> Value {
                 .collect()
         })
         .unwrap_or_default();
+    // 「我点过星没有」只能靠分片里那份公开的 keyId 名单：服务端不存「谁是谁」。
+    // 老分片（v0.5 之前）没有 stars 块，退化成 0 / false，界面显示「还没星标」。
+    let star_block = payload.get("stars");
+    let star_count = star_block
+        .and_then(|value| value.get("count"))
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    let starred = !local_key_id.is_empty()
+        && star_block
+            .and_then(|value| value.get("keys"))
+            .and_then(Value::as_array)
+            .map(|keys| {
+                keys.iter()
+                    .any(|key| key.as_str() == Some(local_key_id.as_str()))
+            })
+            .unwrap_or(false);
     json!({
         "ok": true,
         "modId": id,
         "reviews": reviews,
+        "starCount": star_count,
+        "starred": starred,
         "cached": fetched.get("cached").cloned().unwrap_or(json!(false)),
         "fetchedAt": fetched.get("fetchedAt").cloned().unwrap_or(json!(0)),
         "reason": fetched.get("reason").cloned().unwrap_or(Value::Null),

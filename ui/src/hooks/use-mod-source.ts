@@ -134,15 +134,20 @@ export interface ModSourceState {
    * 出现在新快照里）。判断口径见 `@/lib/review-sync`，同一模组 60 秒内只真联网一次。
    */
   openReviews: (id: string) => void
-  /** 打分 / 改分。`pkgSha256` 是市场索引里那一版的安装包指纹，服务端据此确认「真的装过」 */
+  /** 写评论 / 改评论。`pkgSha256` 是市场索引里那一版的安装包指纹，服务端据此确认「真的装过」 */
   submitReview: (input: {
     modId: string
     version: string
     pkgSha256: string
-    stars: number
     body: string
   }) => Promise<RawWriteAck>
-  /** 撤回自己那条评价（打分与评论一起撤） */
+  /** 点星 / 取消星标（GitHub 式：二元、可取消、一人一颗） */
+  toggleStar: (modId: string, on: boolean) => Promise<RawWriteAck>
+  /** 本机身份在某个模组上点过星没有（没拉过分片时按 false 处理） */
+  starredOf: (id: string) => boolean
+  /** 正在点星的模组 id，空串表示没有在进行的请求 */
+  starBusyId: string
+  /** 撤回自己那条评论（星标是另一件事，要取消得点星标按钮） */
   retractReview: (modId: string) => Promise<RawWriteAck>
   /** 作者回复 / 改回复。鉴权在服务端：签名用的 keyId 必须命中该模组的作者 */
   submitReply: (input: { modId: string; reviewId: string; body: string }) => Promise<RawWriteAck>
@@ -255,6 +260,10 @@ export function useModSource(): ModSourceState {
   const [downloadProgress, setDownloadProgress] = useState<Record<string, RawDownloadProgress>>({})
   /** 已经拉回来的评论正文：只在打开过详情的模组上才有键 */
   const [reviewsById, setReviewsById] = useState<Record<string, ModReview[]>>({})
+  /** 本机身份在哪些模组上点过星（服务端分片里那份公开 keyId 名单比对出来的） */
+  const [starredById, setStarredById] = useState<Record<string, boolean>>({})
+  /** 正在点星的模组：按钮先禁用，避免连点把服务端打成连发 */
+  const [starBusyId, setStarBusyId] = useState("")
 
   /** 每个模组最近一次「真的打了网络」的评论拉取时刻（epoch ms），给 openReviews 的冷却用 */
   const reviewFetchedAt = useRef(new Map<string, number>())
@@ -315,6 +324,8 @@ export function useModSource(): ModSourceState {
       if (!reply || reply.ok !== true) return
       if (reply.cached === false) reviewFetchedAt.current.set(id, Date.now())
       setReviewsById((prev) => ({ ...prev, [id]: reviewsOf(reply.reviews) }))
+      // 「我点过没有」只能从分片里那份 keyId 名单读 —— 服务端不存「谁是谁」
+      setStarredById((prev) => ({ ...prev, [id]: reply.starred === true }))
     },
     [ipc, reviewsById]
   )
@@ -374,8 +385,26 @@ export function useModSource(): ModSourceState {
   )
 
   const submitReview = useCallback(
-    (input: { modId: string; version: string; pkgSha256: string; stars: number; body: string }) =>
+    (input: { modId: string; version: string; pkgSha256: string; body: string }) =>
       writeReviewAction("modsReviewSubmit", input, input.modId),
+    [writeReviewAction]
+  )
+
+  /**
+   * 点星 / 取消星标。成功后**就地**把状态翻过来，不等那一趟快照重拉 ——
+   * 星标是二元的，没有「提交中」的中间态可言，按钮慢半拍只会让人以为没点上。
+   */
+  const toggleStar = useCallback(
+    async (modId: string, on: boolean): Promise<RawWriteAck> => {
+      setStarBusyId(modId)
+      try {
+        const reply = await writeReviewAction("modsStarSet", { modId, on }, modId)
+        if (reply.ok) setStarredById((prev) => ({ ...prev, [modId]: on }))
+        return reply
+      } finally {
+        setStarBusyId("")
+      }
+    },
     [writeReviewAction]
   )
 
@@ -790,6 +819,9 @@ export function useModSource(): ModSourceState {
     loadReviews,
     openReviews,
     submitReview,
+    toggleStar,
+    starredOf: (id: string) => starredById[id] === true,
+    starBusyId,
     retractReview,
     submitReply,
     retractReply,

@@ -27,6 +27,7 @@ import {
   parseIdList,
   parseTags,
   ratingFromReviews,
+  formatCount,
   reviewPrStateLabel,
   submitCooldownRemaining,
   type PublishCredential,
@@ -537,5 +538,18 @@ describe("overlapReport（疑似重叠：改同一份服务端文件 / 撞同一
       category: ALL_CATEGORY,
     })
     expect(pool).toEqual([])
+  })
+})
+
+describe("formatCount（星标数按国际单位缩写）", () => {
+  it("不足一千原样显示，千以上缩一位小数并去掉多余的 .0", () => {
+    expect(formatCount(0)).toBe("0")
+    expect(formatCount(999)).toBe("999")
+    expect(formatCount(1000)).toBe("1K")
+    expect(formatCount(1234)).toBe("1.2K")
+    expect(formatCount(999_949)).toBe("999.9K")
+    expect(formatCount(1_200_000)).toBe("1.2M")
+    expect(formatCount(2_500_000_000)).toBe("2.5B")
+    expect(formatCount(Number.NaN)).toBe("0")
   })
 })

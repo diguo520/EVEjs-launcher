@@ -15,20 +15,15 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import {
   REVIEW_FILTER_LABEL,
-  REVIEW_SORT_LABEL,
-  REVIEW_SORT_ORDER,
   countReviewFilters,
   isStaleReview,
   matchReviewFilter,
   pendingReplies,
-  ratingOf,
   reviewFilterOrder,
   relativeDate,
   reviewCount,
-  sortReviews,
   todayISO,
   type ReviewFilter,
-  type ReviewSort,
 } from "@/lib/mod-logic"
 import type { ModEntry, ModReview } from "@/lib/mock"
 import { useLocale } from "@/components/shell/locale-provider"
@@ -50,76 +45,17 @@ export function Stars({ value, className }: { value: number; className?: string 
   )
 }
 
-/** 评分汇总行：大星 + 综合分 + 评分人数（简介挪到详情标题下了，长简介不再把这一行撑高） */
-function RatingRow({ mod }: { mod: ModEntry }) {
-  const { average, count } = ratingOf(mod)
-
-  if (count === 0) {
-    return (
-      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 rounded-md border border-input bg-background/40 px-3 py-2.5">
-        <Stars value={0} />
-        <span className="text-[12px] text-tertiary">暂无评分</span>
-        <span className="text-[11px] text-tertiary/80">
-          还没有人打分，装过之后回来投一票。
-        </span>
-      </div>
-    )
-  }
-
-  return (
-    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 rounded-md border border-input bg-background/40 px-3 py-2.5">
-      <Stars value={average} />
-      <span className="tabular text-[14px] font-semibold text-foreground">
-        {average.toFixed(1)}
-      </span>
-      <span className="tabular text-[11px] text-tertiary">
-        ({count.toLocaleString()})
-      </span>
-    </div>
-  )
-}
-
-/** 点星：写评分和改评分共用同一套星标 */
-function StarPicker({
-  value,
-  onChange,
-}: {
-  value: number
-  onChange: (stars: number) => void
-}) {
-  return (
-    <span className="flex items-center gap-0.5">
-      {[1, 2, 3, 4, 5].map((n) => (
-        <button
-          key={n}
-          type="button"
-          aria-label={t("{n} 星", { n })}
-          aria-pressed={n === value}
-          onClick={() => onChange(n)}
-          className="rounded-sm p-0.5 transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:shadow-focus"
-        >
-          <Star
-            className={cn("size-4", n <= value ? "text-telemetry" : "text-border")}
-            fill={n <= value ? "currentColor" : "none"}
-          />
-        </button>
-      ))}
-    </span>
-  )
-}
-
 /**
- * 我的评分。打分是主操作，写两句是顺手的事，
- * 所以先只露星标，点了星再展开输入框——不写文字也能只打分。
+ * 我的评论。星标在上面那一行单独点，这里只写文字 —— 两者是独立的两件事，
+ * 所以不再有「先点星才展开输入框」的门槛。
  */
 function MyRating({
   mod,
   onSubmit,
 }: {
   mod: ModEntry
-  onSubmit: (input: { stars: number; body: string }) => void
+  onSubmit: (input: { body: string }) => void
 }) {
-  const [stars, setStars] = useState(0)
   const [body, setBody] = useState("")
 
   const mine = mod.reviews.find((review) => review.mine) ?? null
@@ -128,19 +64,12 @@ function MyRating({
     return (
       <div className="rounded-md border border-input bg-background/40 px-3 py-2.5">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-          <span className="text-[12px] font-semibold text-foreground">我的评分</span>
-          <Stars value={mine.stars} />
-          <span className="tabular text-[11px] text-foreground">
-            {mine.stars.toFixed(1)}
-          </span>
+          <span className="text-[12px] font-semibold text-foreground">我的评论</span>
           <span className="min-w-2 flex-1" />
           <span className="text-[10px] text-tertiary">
-            你的这一票已经计入上面的平均分
+            想改文字，在下面那条「我的评价」上点修改。
           </span>
         </div>
-        <p className="mt-1 text-[11px] text-tertiary/80">
-          想改分数或者改文字，在下面那条「我的评价」上点修改。
-        </p>
       </div>
     )
   }
@@ -148,44 +77,30 @@ function MyRating({
   return (
     <div className="rounded-md border border-input bg-background/40 px-3 py-2.5">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-        <span className="text-[12px] font-semibold text-foreground">我的评分</span>
-        <StarPicker value={stars} onChange={setStars} />
+        <span className="text-[12px] font-semibold text-foreground">写条评论</span>
         <span className="text-[11px] text-tertiary">
-          {stars > 0 ? t("{n} 星", { n: stars }) : "点星星打分"}
-        </span>
-        <span className="min-w-2 flex-1" />
-        <span className="text-[10px] text-tertiary">
-          你的这一票会计入上面的平均分
+          点不点星都行，评论和星标是分开的两件事。
         </span>
       </div>
 
-      <p className="mt-1 text-[11px] text-tertiary/80">
-        打满分可以顺手写两句，让别人知道值不值得装。
-      </p>
-
-      {stars > 0 ? (
-        <>
-          <Textarea
-            value={body}
-            onChange={(event) => setBody(event.target.value)}
-            placeholder="说说实际用起来怎么样，比如和哪些模组冲突、占用多少资源。"
-            className="mt-2 min-h-[64px] text-[12px]"
-          />
-          <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
-            <span className="text-[10px] text-tertiary">不写文字也可以只打分</span>
-            <Button
-              size="sm"
-              onClick={() => {
-                onSubmit({ stars, body: body.trim() })
-                setStars(0)
-                setBody("")
-              }}
-            >
-              发布评价
-            </Button>
-          </div>
-        </>
-      ) : null}
+      <Textarea
+        value={body}
+        onChange={(event) => setBody(event.target.value)}
+        placeholder="说说实际用起来怎么样，比如和哪些模组冲突、占用多少资源。"
+        className="mt-2 min-h-[64px] text-[12px]"
+      />
+      <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
+        <Button
+          size="sm"
+          disabled={body.trim().length === 0}
+          onClick={() => {
+            onSubmit({ body: body.trim() })
+            setBody("")
+          }}
+        >
+          发布评论
+        </Button>
+      </div>
     </div>
   )
 }
@@ -196,16 +111,12 @@ function ReviewControls({
   counts,
   filter,
   onFilterChange,
-  sort,
-  onSortChange,
 }: {
   /** 按身份裁过的分档顺序：作者的模组才摆「待回复」 */
   order: ReviewFilter[]
   counts: Record<ReviewFilter, number>
   filter: ReviewFilter
   onFilterChange: (filter: ReviewFilter) => void
-  sort: ReviewSort
-  onSortChange: (sort: ReviewSort) => void
 }) {
   const chip = (active: boolean) =>
     cn(
@@ -214,36 +125,20 @@ function ReviewControls({
     )
 
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-      <span className="flex items-center gap-0.5">
-        {REVIEW_SORT_ORDER.map((item) => (
-          <button
-            key={item}
-            type="button"
-            aria-pressed={item === sort}
-            onClick={() => onSortChange(item)}
-            className={chip(item === sort)}
-          >
-            {REVIEW_SORT_LABEL[item]}
-          </button>
-        ))}
-      </span>
-
-      <span className="flex items-center gap-0.5">
-        {order.map((item) => (
-          <button
-            key={item}
-            type="button"
-            aria-pressed={item === filter}
-            onClick={() => onFilterChange(item)}
-            className={chip(item === filter)}
-          >
-            {REVIEW_FILTER_LABEL[item]}
-            <span className="tabular ml-0.5">{counts[item]}</span>
-          </button>
-        ))}
-      </span>
-    </div>
+    <span className="flex items-center gap-0.5">
+      {order.map((item) => (
+        <button
+          key={item}
+          type="button"
+          aria-pressed={item === filter}
+          onClick={() => onFilterChange(item)}
+          className={chip(item === filter)}
+        >
+          {REVIEW_FILTER_LABEL[item]}
+          <span className="tabular ml-0.5">{counts[item]}</span>
+        </button>
+      ))}
+    </span>
   )
 }
 
@@ -285,25 +180,22 @@ function ReplyBox({
   )
 }
 
-/** 改自己的评价：复用写评价那套星标与输入框 */
+/** 改自己的评论：星标在汇总行单独管，这里只改文字 */
 function EditReview({
   review,
   onSubmit,
   onCancel,
 }: {
   review: ModReview
-  onSubmit: (input: { stars: number; body: string }) => void
+  onSubmit: (input: { body: string }) => void
   onCancel: () => void
 }) {
-  const [stars, setStars] = useState(review.stars)
   const [body, setBody] = useState(review.body)
 
   return (
     <div className="rounded-md border border-primary/40 bg-background/40 px-2.5 py-2.5">
       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
-        <span className="text-[12px] font-semibold text-foreground">修改我的评价</span>
-        <StarPicker value={stars} onChange={setStars} />
-        <span className="tabular text-[11px] text-tertiary">{stars} 星</span>
+        <span className="text-[12px] font-semibold text-foreground">修改我的评论</span>
       </div>
 
       <Textarea
@@ -317,7 +209,7 @@ function EditReview({
         <Button variant="ghost" size="sm" onClick={onCancel}>
           取消
         </Button>
-        <Button size="sm" onClick={() => onSubmit({ stars, body: body.trim() })}>
+        <Button size="sm" onClick={() => onSubmit({ body: body.trim() })}>
           保存修改
         </Button>
       </div>
@@ -346,7 +238,7 @@ function ReviewItem({
   onReply: (body: string) => void
   onEditReply: (body: string) => void
   onDeleteReply: () => void
-  onEdit: (input: { stars: number; body: string }) => void
+  onEdit: (input: { body: string }) => void
   onDelete: () => void
 }) {
   const { locale } = useLocale()
@@ -378,10 +270,6 @@ function ReviewItem({
         <span className="flex items-center gap-1.5 text-[12px] font-semibold text-foreground">
           <PlayerFlag country={review.country} />
           {fromCountryLabel(review.country, locale)}
-        </span>
-        <Stars value={review.stars} />
-        <span className="tabular text-[11px] text-foreground">
-          {review.stars.toFixed(1)}
         </span>
         {review.mine ? <Badge variant="default">我的评价</Badge> : null}
         {review.edited ? (
@@ -545,11 +433,11 @@ function ReviewItem({
 
 export interface ModReviewsProps {
   mod: ModEntry
-  onAddReview: (input: { stars: number; body: string }) => void
+  onAddReview: (input: { body: string }) => void
   onReply: (reviewId: string, body: string) => void
   onEditReply: (reviewId: string, body: string) => void
   onDeleteReply: (reviewId: string) => void
-  onEditReview: (reviewId: string, input: { stars: number; body: string }) => void
+  onEditReview: (reviewId: string, input: { body: string }) => void
   onDeleteReview: (reviewId: string) => void
 }
 
@@ -568,7 +456,6 @@ export function ModReviews({
 }: ModReviewsProps) {
   const [showAll, setShowAll] = useState(false)
   const [filter, setFilter] = useState<ReviewFilter>("all")
-  const [sort, setSort] = useState<ReviewSort>("recent")
 
   const today = todayISO()
   const counts = countReviewFilters(mod.reviews)
@@ -576,17 +463,13 @@ export function ModReviews({
   const pending = pendingReplies(mod)
 
   const order = reviewFilterOrder(mod)
-  const reviews = sortReviews(
-    mod.reviews.filter((review) => matchReviewFilter(review, filter)),
-    sort
-  )
+  // 分片本身就是最新在前，这里只筛不排
+  const reviews = mod.reviews.filter((review) => matchReviewFilter(review, filter))
   const folded = reviews.length > VISIBLE_REVIEWS
   const shown = showAll || !folded ? reviews : reviews.slice(0, VISIBLE_REVIEWS)
 
   return (
     <div className="space-y-2.5">
-      <RatingRow mod={mod} />
-
       <MyRating mod={mod} onSubmit={onAddReview} />
 
       {total > 0 ? (
@@ -617,8 +500,6 @@ export function ModReviews({
             counts={counts}
             filter={filter}
             onFilterChange={setFilter}
-            sort={sort}
-            onSortChange={setSort}
           />
         </div>
       ) : (

@@ -73,17 +73,20 @@ for (const code of LOCALES) {
     continue;
   }
 
-  // 末尾结构固定为 `  "最后一条": "…"` + CRLF + `}` + CRLF
-  const marker = "\r\n}\r\n";
+  // 末尾结构固定为 `  "最后一条": "…"` + 换行 + `}` + 换行。
+  // 换行符不写死：仓库里这些目录历史上有过 CRLF，被 formatter 整过之后又变成 LF，
+  // 一律按**文件当前**的用 —— 否则一次工具链变更就会让这个脚本整个拒写。
+  const eol = raw.includes("\r\n") ? "\r\n" : "\n";
+  const marker = eol + "}" + eol;
   const index = raw.lastIndexOf(marker);
   if (index < 0) {
-    console.error(`${code}.json 末尾结构不是预期的 CRLF + } —— 拒绝改动，请人工确认`);
+    console.error(`${code}.json 末尾结构不是预期的「换行 + } + 换行」 —— 拒绝改动，请人工确认`);
     process.exit(1);
   }
   // 每条一行；行间用 ",\r\n" 连接（最后一条不带逗号，紧跟末尾的 `}`）。
   // 开头那个 "," 是补在**原来最后一条**后面的 —— 它本身没有尾逗号。
   const lines = todo.map((key) => `  ${JSON.stringify(key)}: ${JSON.stringify(payload[key][code])}`);
-  const next = raw.slice(0, index) + ",\r\n" + lines.join(",\r\n") + raw.slice(index);
+  const next = raw.slice(0, index) + "," + eol + lines.join("," + eol) + raw.slice(index);
 
   // 写回前先自证：能解析、键变多了、原有键一个没少、行尾仍是 CRLF
   const before = JSON.parse(raw);
@@ -100,9 +103,8 @@ for (const code of LOCALES) {
       process.exit(1);
     }
   }
-  // 行尾结构必须与原文一致：既不能多出裸 LF，也不能丢掉结尾的 CRLF
-  const bareLf = (text) => (text.replace(/\r\n/g, "").match(/\n/g) ?? []).length;
-  if (bareLf(next) !== bareLf(raw) || !next.endsWith("\r\n")) {
+  // 行尾风格必须与原文一致：原文是纯 LF 就别混进 CRLF，反之亦然；结尾换行也不能丢
+  if (next.includes("\r\n") !== raw.includes("\r\n") || !next.endsWith(eol)) {
     console.error(`${code}.json 校验失败：行尾结构与原文不一致，未写入`);
     process.exit(1);
   }

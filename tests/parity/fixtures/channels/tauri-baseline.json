@@ -25,7 +25,7 @@
       "phase": "3-4",
       "platform": "win32",
       "repoRoot": "<abs-path>",
-      "version": "0.4.6"
+      "version": "0.4.7"
     },
     "config:get": {
       "client": {
@@ -126,10 +126,10 @@
       "totalCount": 8
     },
     "health:check": {
-      "game": true,
-      "gateway": true,
-      "images": true,
-      "market": true
+      "game": false,
+      "gateway": false,
+      "images": false,
+      "market": false
     },
     "health:ping": {
       "port": 26000
@@ -172,10 +172,10 @@
       "supported": true
     },
     "metrics:get": {
-      "cpuPercent": 46.83843994140625,
+      "cpuPercent": 32.69810485839844,
       "diskRoot": "<abs-path>",
       "diskTotalGB": 976.5624961853028,
-      "diskUsedGB": 872.6123161315918,
+      "diskUsedGB": 875.7732048034668,
       "gpuDedicatedTotalGB": null,
       "gpuDedicatedUsedGB": null,
       "gpuMemoryTotalGB": null,
@@ -183,38 +183,38 @@
       "gpuPercent": null,
       "gpuSharedUsedGB": null,
       "memTotalGB": 31.855934143066406,
-      "memUsedGB": 10.77645492553711,
+      "memUsedGB": 10.048412322998049,
       "netBytesPerSec": 0,
       "virtualMemTotalGB": 33.855934143066406,
-      "virtualMemUsedGB": 23.310028076171875,
+      "virtualMemUsedGB": 10.378578186035156,
       "volumes": [
         {
-          "freeGB": 48.86783599853515,
-          "percent": 78.0299844926839,
+          "freeGB": 58.152095794677734,
+          "percent": 73.85596435188376,
           "root": "<abs-path>",
           "totalGB": 222.4296836853027,
-          "usedGB": 173.56184768676758
+          "usedGB": 164.277587890625
         },
         {
-          "freeGB": 144.40555572509766,
-          "percent": 50.70956967069752,
+          "freeGB": 143.58469772338867,
+          "percent": 50.98975587226244,
           "root": "<abs-path>",
           "totalGB": 292.96874618530273,
-          "usedGB": 148.56319046020508
+          "usedGB": 149.38404846191406
         },
         {
-          "freeGB": 103.95018005371094,
-          "percent": 89.35550152091993,
+          "freeGB": 100.78929138183594,
+          "percent": 89.67917652218428,
           "root": "<abs-path>",
           "totalGB": 976.5624961853028,
-          "usedGB": 872.6123161315918
+          "usedGB": 875.7732048034668
         },
         {
-          "freeGB": 316.78034591674805,
-          "percent": 87.10426945999335,
+          "freeGB": 331.2270088195801,
+          "percent": 86.51616393388159,
           "root": "<abs-path>",
           "totalGB": 2456.4746055603027,
-          "usedGB": 2139.6942596435547
+          "usedGB": 2125.2475967407227
         }
       ]
     },
@@ -263,12 +263,13 @@
         {
           "category": "玩法",
           "desc": "加载模组后会在游戏本地聊天框看到一条「欢迎回来，飞行员」的信息。",
-          "fileCount": 4,
+          "fileCount": 5,
           "files": [
             "evejs-launcher.mod.json",
             "loader.js",
             "README.md",
-            "CHANGELOG.md"
+            "CHANGELOG.md",
+            "shots/README.md"
           ],
           "highlights": [
             "玩家上线后在其本地聊天频道发送欢迎消息",
@@ -279,7 +280,7 @@
           "id": "broadcast",
           "name": "Welcome Broadcast (Example)",
           "requiresRestart": true,
-          "sizeBytes": 9892,
+          "sizeBytes": 10707,
           "tags": [
             "聊天",
             "新手"
@@ -288,12 +289,13 @@
         {
           "category": "玩法",
           "desc": "同样的加载骨架，业务逻辑留空，适合从零写起",
-          "fileCount": 4,
+          "fileCount": 5,
           "files": [
             "evejs-launcher.mod.json",
             "loader.js",
             "README.md",
-            "CHANGELOG.md"
+            "CHANGELOG.md",
+            "shots/README.md"
           ],
           "highlights": [
             "保留全部 loader 加载要点（身份校验 / require.cache 等待 / unref）",
@@ -303,7 +305,7 @@
           "id": "blank",
           "name": "Blank Skeleton",
           "requiresRestart": true,
-          "sizeBytes": 8245,
+          "sizeBytes": 9060,
           "tags": []
         }
       ]
@@ -336,7 +338,7 @@
     "terminal:input": null,
     "terminal:resize": null,
     "update:state": {
-      "currentVersion": "0.4.6",
+      "currentVersion": "0.4.7",
       "state": "idle"
     }
   }

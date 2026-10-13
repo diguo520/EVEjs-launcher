@@ -318,6 +318,28 @@ export function isReviewing(mod: ModEntry): boolean {
 
 /* ---------------- 评分与评论 ---------------- */
 
+/**
+ * 计数展示：国际单位缩一位小数（1000 → 1K、1234 → 1.2K、1234567 → 1.2M）。
+ *
+ * 星标数是会长的数字，卡片和详情都用它显示 —— 四位数以上直接铺开既占地方又难一眼读懂。
+ * 不足 1000 原样显示；`toFixed(1)` 之后再把 `.0` 抹掉（1K 而不是 1.0K）。
+ */
+export function formatCount(value: number): string {
+  const count = Math.max(0, Math.floor(Number.isFinite(value) ? value : 0))
+  const units: Array<[number, string]> = [
+    [1_000_000_000, "B"],
+    [1_000_000, "M"],
+    [1_000, "K"],
+  ]
+  for (const [size, suffix] of units) {
+    if (count >= size) {
+      const scaled = (count / size).toFixed(1)
+      return `${scaled.endsWith(".0") ? scaled.slice(0, -2) : scaled}${suffix}`
+    }
+  }
+  return String(count)
+}
+
 export interface RatingSummary {
   /** 综合评分（未取整）；没人打分为 0 */
   average: number
@@ -778,25 +800,23 @@ export function relativeDate(date: string, today: string): string {
   return t("{years} 年前", { years: Math.max(1, Math.round(days / 365)) })
 }
 
-/* ---------------- 评论列表的分档与排序 ---------------- */
+/* ---------------- 评论列表的分档 ---------------- */
 
-export type ReviewFilter = "all" | "pending" | "good" | "bad" | "replied"
+/**
+ * 只剩三个「跟内容无关」的分档。
+ *
+ * v0.5 起评论不再带分值，所以「好评 / 差评」没有判据了；「最新 / 高分 / 低分」三种排序同理，
+ * 一并删掉 —— 列表本来就按时间倒序（服务端分片就是这个顺序），再摆一排排序按钮只是噪音。
+ */
+export type ReviewFilter = "all" | "pending" | "replied"
 
 export const REVIEW_FILTER_LABEL: Record<ReviewFilter, string> = {
   all: "全部",
   pending: "待回复",
-  good: "好评",
-  bad: "差评",
   replied: "作者已回复",
 }
 
-export const REVIEW_FILTER_ORDER: ReviewFilter[] = [
-  "all",
-  "pending",
-  "good",
-  "bad",
-  "replied",
-]
+export const REVIEW_FILTER_ORDER: ReviewFilter[] = ["all", "pending", "replied"]
 
 /** 「待回复」只有模组作者用得上，别人的模组不摆这个入口 */
 export function reviewFilterOrder(mod: ModEntry): ReviewFilter[] {
@@ -805,7 +825,6 @@ export function reviewFilterOrder(mod: ModEntry): ReviewFilter[] {
     : REVIEW_FILTER_ORDER.filter((item) => item !== "pending")
 }
 
-/** 好评 4★ 及以上、差评 3★ 及以下，与星级分布条的档位口径一致 */
 export function matchReviewFilter(
   review: ModReview,
   filter: ReviewFilter
@@ -813,8 +832,6 @@ export function matchReviewFilter(
   if (filter === "all") return true
   // 别人写的、作者还没回的，才是作者真正要做的事
   if (filter === "pending") return !review.mine && !review.reply
-  if (filter === "good") return review.stars >= 4
-  if (filter === "bad") return review.stars <= 3
   return Boolean(review.reply)
 }
 
@@ -825,37 +842,8 @@ export function countReviewFilters(
   return {
     all: reviews.length,
     pending: reviews.filter((review) => !review.mine && !review.reply).length,
-    good: reviews.filter((review) => review.stars >= 4).length,
-    bad: reviews.filter((review) => review.stars <= 3).length,
     replied: reviews.filter((review) => review.reply).length,
   }
-}
-
-export type ReviewSort = "recent" | "high" | "low"
-
-export const REVIEW_SORT_LABEL: Record<ReviewSort, string> = {
-  recent: "最新",
-  high: "高分优先",
-  low: "低分优先",
-}
-
-export const REVIEW_SORT_ORDER: ReviewSort[] = ["recent", "high", "low"]
-
-/** 每种排序都带日期兜底键：同分时顺序也稳定，不会来回跳 */
-export function sortReviews(
-  reviews: ModReview[],
-  sort: ReviewSort
-): ModReview[] {
-  const sorted = [...reviews]
-  if (sort === "recent") {
-    return sorted.sort((a, b) => b.date.localeCompare(a.date))
-  }
-  if (sort === "high") {
-    return sorted.sort(
-      (a, b) => b.stars - a.stars || b.date.localeCompare(a.date)
-    )
-  }
-  return sorted.sort((a, b) => a.stars - b.stars || b.date.localeCompare(a.date))
 }
 
 /** 这条评论是不是针对当前版本写的；老版本的评论标出来，避免误导 */

@@ -356,28 +356,37 @@ test("撤回评论顺手删掉挂在它上面的回复（不留孤儿）", async
 })
 
 /** 造一个「只有 KV 有分片、D1 没有对应行」的假环境，专测过期分片的清理 */
-function shardEnv({ rows = [], keys = [], me }) {
+function shardEnv({ rows = [], stars = [], keys = [], me }) {
   const stored = []
   const deleted = []
+  /** KV 桩做成真的键值表：跳过重复写入的逻辑必须先读得到上一轮写进去的东西 */
+  const map = new Map()
   return {
     stored,
     deleted,
     env: {
       DB: {
         prepare: (sql) => ({
-          all: async () =>
-            /FROM reviews r/.test(sql)
-              ? { results: rows.map((row) => projectionRow(sql, row)) }
-              : { results: [] },
+          all: async () => {
+            if (/FROM stars/.test(sql)) return { results: stars }
+            if (/FROM reviews r/.test(sql)) return { results: rows.map((row) => projectionRow(sql, row)) }
+            return { results: [] }
+          },
           first: async () => null,
           run: async () => ({ success: true }),
         }),
       },
       SNAPSHOTS: {
-        get: async () => null,
-        put: async (key, value) => stored.push({ key, value }),
+        get: async (key) => map.get(key) ?? null,
+        put: async (key, value) => {
+          map.set(key, value)
+          stored.push({ key, value })
+        },
         list: async ({ prefix }) => ({ keys: keys.map((name) => ({ name })).filter((item) => item.name.startsWith(prefix)) }),
-        delete: async (name) => deleted.push(name),
+        delete: async (name) => {
+          map.delete(name)
+          deleted.push(name)
+        },
       },
       RATINGS_SIGNING_KEY: me.pkcs8,
       RATINGS_KEY_ID: me.keyId,
@@ -437,4 +446,204 @@ test("有评价的模组分片要重建，别人的过期分片照删", async ()
   const shard = stored.find((item) => item.key === "snapshot:reviews:evejs-a")
   assert.ok(shard, "有评价的模组要重新签一份分片")
   assert.equal(JSON.parse(shard.value).reviews[0].country, "CN")
+})
+
+test("星标：真签名的 POST /v1/stars 200 落库，只动 stars 表", async () => {
+  const me = await identity()
+  const payload = {
+    action: "star.add",
+    modId: "evejs-autolockfire",
+    identityId: "au-1234",
+    publicKey: me.publicKey,
+    at: Date.now(),
+  }
+  const signed = await signDocument(me.pkcs8, payload, me.keyId)
+  const request = new Request("https://ping.5318.cm/v1/stars", {
+    method: "POST",
+    body: JSON.stringify(signed),
+    headers: { "content-type": "application/json" },
+  })
+  const env = fakeEnv()
+  const ctx = ctxSpy()
+  const body = await (await worker.fetch(request, env, ctx)).json()
+  assert.equal(body.ok, true, JSON.stringify(body))
+  assert.equal(body.starred, true)
+  const insert = env.calls.find((call) => call.sql.includes("INSERT INTO stars"))
+  assert.ok(insert, "点星应该写 stars 表")
+  assert.equal(insert.args[2], me.keyId, "落库的 keyId 必须是验签得到的那一个")
+  assert.ok(
+    !env.calls.some((call) => call.sql.includes("INSERT INTO reviews")),
+    "点星不该顺手写一条评论"
+  )
+  await Promise.allSettled(ctx.waited)
+  assert.equal(ctx.waited.length, 1, "写成功必须挂一次快照重算")
+})
+
+test("星标：取消走 DELETE，回包里 starred=false", async () => {
+  const me = await identity()
+  const payload = {
+    action: "star.remove",
+    modId: "evejs-autolockfire",
+    identityId: "au-1234",
+    publicKey: me.publicKey,
+    at: Date.now(),
+  }
+  const signed = await signDocument(me.pkcs8, payload, me.keyId)
+  const request = new Request("https://ping.5318.cm/v1/stars/remove", {
+    method: "POST",
+    body: JSON.stringify(signed),
+    headers: { "content-type": "application/json" },
+  })
+  const env = fakeEnv()
+  const body = await (await worker.fetch(request, env, ctxSpy())).json()
+  assert.equal(body.ok, true, JSON.stringify(body))
+  assert.equal(body.starred, false)
+  assert.ok(env.calls.some((call) => call.sql.includes("DELETE FROM stars")))
+  // 取消不看市场名单：模组下架了也要能把星收回去，所以不该有 mod_versions 的查询
+  assert.ok(!env.calls.some((call) => call.sql.includes("FROM mod_versions")))
+})
+
+test("星标：0.3.x 那种把 star.add 发到 /v1/reviews 的写法也认（兼容网关）", async () => {
+  const me = await identity()
+  const payload = {
+    action: "star.add",
+    modId: "evejs-autolockfire",
+    identityId: "au-1234",
+    publicKey: me.publicKey,
+    at: Date.now(),
+  }
+  const signed = await signDocument(me.pkcs8, payload, me.keyId)
+  const request = new Request("https://ping.5318.cm/v1/reviews", {
+    method: "POST",
+    body: JSON.stringify(signed),
+    headers: { "content-type": "application/json" },
+  })
+  const env = fakeEnv()
+  const body = await (await worker.fetch(request, env, ctxSpy())).json()
+  assert.equal(body.ok, true, JSON.stringify(body))
+  assert.ok(env.calls.some((call) => call.sql.includes("INSERT INTO stars")))
+})
+
+test("老客户端打分 = 一颗星：一条 INSERT INTO reviews 之外还要写一颗星", async () => {
+  const me = await identity()
+  const payload = {
+    action: "review.upsert",
+    modId: "evejs-autolockfire",
+    version: "1.0.10",
+    pkgSha256: SHA,
+    stars: 3,
+    body: "",
+    reviewId: "rv-test-0003",
+    identityId: "au-1234",
+    publicKey: me.publicKey,
+    createdAt: Date.now(),
+  }
+  const signed = await signDocument(me.pkcs8, payload, me.keyId)
+  const request = new Request("https://ping.5318.cm/v1/reviews", {
+    method: "POST",
+    body: JSON.stringify(signed),
+    headers: { "content-type": "application/json" },
+  })
+  const env = fakeEnv()
+  const body = await (await worker.fetch(request, env, ctxSpy())).json()
+  assert.equal(body.ok, true, JSON.stringify(body))
+  assert.ok(env.calls.some((call) => call.sql.includes("INSERT INTO stars")), "老客户端的分值要折算成星标")
+})
+
+test("只点星没写评论的模组也要出分片（否则新界面上那颗星点不亮）", async () => {
+  const me = await identity()
+  const now = 1790882060253
+  const { env, stored } = shardEnv({
+    rows: [],
+    stars: [{ mod_id: "evejs-a", key_id: "abcd1234de", created_at: now - 1000 }],
+    me,
+  })
+  const result = await rebuildSnapshots(env, now)
+  assert.equal(result.ok, true, JSON.stringify(result))
+  assert.equal(result.stars, 1, "job_runs 里要能看出这一轮有多少颗星")
+
+  const ratings = JSON.parse(stored.find((item) => item.key === "snapshot:ratings").value)
+  assert.equal(ratings.mods["evejs-a"].stars, 1)
+  assert.equal(ratings.mods["evejs-a"].comments, 0)
+
+  const shard = stored.find((item) => item.key === "snapshot:reviews:evejs-a")
+  assert.ok(shard, "只有星标也要有分片")
+  const payload = JSON.parse(shard.value)
+  assert.deepEqual(payload.stars, { count: 1, keys: ["abcd1234de"] })
+  assert.deepEqual(payload.reviews, [])
+})
+
+test("KV 额度：内容没变就不重复写（每 10 分钟全量重写会撞免费额度）", async () => {
+  const me = await identity()
+  const { env, stored } = shardEnv({ rows: [REVIEW_ROW], me })
+
+  const first = await rebuildSnapshots(env, 1790882060253)
+  assert.equal(first.ok, true, JSON.stringify(first))
+  // 首轮：聚合 + 1 份分片 + 赞助人名单 = 3 次写
+  assert.equal(first.writes, 3)
+  assert.equal(first.skipped, 0)
+  assert.equal(stored.length, 3)
+
+  // 同样的数据、只有时间戳不同：内容没变，一个 put 都不该发
+  const second = await rebuildSnapshots(env, 1790882069999)
+  assert.equal(second.ok, true, JSON.stringify(second))
+  assert.equal(second.writes, 0, "第二轮不该再写 KV")
+  assert.equal(second.skipped, 3)
+  assert.equal(stored.length, 3, "put 次数必须还是 3")
+
+  // 数据真的变了（多一条评价）→ 只有受影响的那两份重新写：聚合 + 那一份分片
+  env.DB.prepare = ((base) => (sql) => {
+    const stmt = base(sql)
+    if (/FROM reviews r/.test(sql)) {
+      return {
+        ...stmt,
+        all: async () => ({
+          results: [
+            projectionRow(sql, REVIEW_ROW),
+            projectionRow(sql, { ...REVIEW_ROW, id: "rv-2", key_id: "ffff0000aa", body: "第二条" }),
+          ],
+        }),
+      }
+    }
+    return stmt
+  })(env.DB.prepare)
+  const third = await rebuildSnapshots(env, 1790882075000)
+  assert.equal(third.writes, 2, "只有聚合与改动过的分片要重写")
+  assert.equal(third.skipped, 1, "赞助人名单没变，跳过")
+})
+
+test("定时任务：KV 写挂了也要留一条失败台账，而不是留着上一次的成功", async () => {
+  const me = await identity()
+  const recorded = []
+  const env = {
+    DB: {
+      prepare: (sql) => ({
+        bind: (...args) => {
+          if (/INSERT INTO job_runs/.test(sql)) recorded.push(args)
+          return { run: async () => ({ success: true }) }
+        },
+        run: async () => ({ success: true }),
+        all: async () => ({ results: [] }),
+        first: async () => null,
+      }),
+    },
+    SNAPSHOTS: {
+      get: async () => null,
+      // 模拟额度用尽：KV put 直接 429
+      put: async () => {
+        throw new Error("KV PUT failed: 429 Too Many Requests")
+      },
+      list: async () => ({ keys: [] }),
+      delete: async () => {},
+    },
+    RATINGS_SIGNING_KEY: me.pkcs8,
+    RATINGS_KEY_ID: me.keyId,
+  }
+
+  await worker.scheduled({ cron: "*/10 * * * *" }, env, ctxSpy())
+
+  const row = recorded.find((args) => args[0] === "rebuild-snapshots")
+  assert.ok(row, "抛异常也必须写一条 job_runs，否则看板显示的是上一次的成功")
+  assert.equal(row[2], 0, "ok 必须是 0")
+  assert.match(String(row[3]), /429/, "原因里要能看出是额度/限流，而不是一句「失败」")
 })

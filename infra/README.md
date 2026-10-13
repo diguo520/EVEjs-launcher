@@ -23,7 +23,7 @@ Cloudflare Pages 是**纯静态**的，没有地方放 POST 进来的评价，�
 ### 启动器读到的三份东西
 
 ```
-GET /v1/ratings.json            所有模组的聚合分（平均分 / 人数 / 直方图）
+GET /v1/ratings.json            所有模组的聚合（星标数 / 评论数，另附遗留的 1..5 分口径）
 GET /v1/reviews/<modId>.json    单个模组的评论正文，打开详情弹窗时才按需拉
 GET /v1/sponsors.json           赞助人「补给线」名单（与评价无关，同一次 cron 一起发）
 GET /v1/health                  给你排查用的，启动器不读
@@ -48,12 +48,22 @@ GET /v1/health                  给你排查用的，启动器不读
 全部是 `POST` + JSON，**每一条都必须带本机身份的 Ed25519 签名**：
 
 ```
-POST /v1/reviews            打分 / 改分（一人一票，服务端按 (mod_id, public_key) 覆盖）
+POST /v1/reviews            写评论 / 改评论（老客户端的 stars: 1..5 收下并折算成一颗星）
 POST /v1/reviews/retract    撤回自己那条评价
 POST /v1/replies            作者回复 / 改回复
 POST /v1/replies/retract    撤回作者回复
 POST /v1/reports            举报一条评价（只入库，人工处置）
+POST /v1/stars              点星（二元、可撤销、一人一颗）
+POST /v1/stars/remove       取消星标
 ```
+
+**v0.5 起「评分」改成星标**：`stars` 表是唯一口径（GitHub 式点赞 —— 二元、可撤销、一人一颗），
+评论与星标解耦：只点星、只写评论、两者都做都成立。`ratings.json` 同时发布新口径
+（`stars` / `comments`）与遗留口径（`average` / `count` / `histogram`，点星按 5 分派生），
+所以 0.3.x–0.4.x 的老启动器不升级也不会白屏；`reviews.stars` 退化成历史列
+（新评论一律写 5，聚合与快照都不再读它，只用于老客户端把星画满）。
+分片里多一份 `stars: { count, keys }`：`count` 是总数，`keys` 是点星人的 keyId 名单，
+客户端拿本机 keyId 在里面比对就知道「我点过没有」—— 服务端不存「谁是谁」，与评论同一套隐私口径。
 
 **`/v1/reviews` 是兼容网关**：路径优先，但发到这个地址的请求会**按 body 里的 `action` 分派**
 （`review.upsert` / `review.retract` / `reply.upsert` / `reply.retract` / `report.create`）。
@@ -72,7 +82,9 @@ POST /v1/reports            举报一条评价（只入库，人工处置）
 | 约束 | 值 | 为什么 |
 | --- | --- | --- |
 | 一人一票 | `UNIQUE(mod_id, public_key)` | 改分是覆盖，不是追加 |
+| 一人一星 | `UNIQUE(mod_id, public_key)` on `stars` | 点星是幂等的 `ON CONFLICT DO NOTHING`，取消是删除 |
 | 「装过才能评」 | `pkg_sha256` 必须命中 `mod_versions`（每小时从索引同步） | 本地目录算不出包指纹，只能来自市场索引 |
+| 星标门槛 | `mod_versions` 里有这个 `mod_id` 即可（不要求版本 / 指纹） | 点星不是「装过才能评」，但也别让人给不存在的 id 刷星 |
 | 每人每天 | 评价 20 条 / 举报 10 条 | 防刷 |
 | 每 IP 每小时 | 写请求 60 次 | IP 在这一刻就变成 `HMAC(密钥, IP)` 的前 8 字节，**不落原始 IP** |
 | 正文长度 | 评价 2000 字 / 回复 1000 字 / 举报理由 500 字 | 进别人的界面，宁可拒长 |

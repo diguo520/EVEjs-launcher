@@ -546,9 +546,9 @@ async fn dispatch(
             Ok(blocking(move || mods::ratings::reviews_for(&runtime, &mod_id, force)).await?)
         }
         "mods:reviewSubmit" | "mods:reviewRetract" | "mods:replySubmit" | "mods:replyRetract"
-        | "mods:reportReview" => {
-            // 五个写动作共用一条入口：同一个签名身份、同一套「签的就是发的」约定，
-            // 拆成五个几乎一样的 arm 只会让以后改约定时漏改其中一个。
+        | "mods:reportReview" | "mods:starSet" => {
+            // 六个写动作共用一条入口：同一个签名身份、同一套「签的就是发的」约定，
+            // 拆成六个几乎一样的 arm 只会让以后改约定时漏改其中一个。
             let input = args.first().cloned().unwrap_or(Value::Null);
             // 闭包要 'static，`channel` 是借来的 &str，先拷成自己的
             let action = channel.to_string();
@@ -558,6 +558,7 @@ async fn dispatch(
                 "mods:reviewRetract" => mods::review::retract_review(&runtime, &input),
                 "mods:replySubmit" => mods::review::submit_reply(&runtime, &input),
                 "mods:replyRetract" => mods::review::retract_reply(&runtime, &input),
+                "mods:starSet" => mods::review::submit_star(&runtime, &input),
                 _ => mods::review::report_review(&runtime, &input),
             })
             .await?)

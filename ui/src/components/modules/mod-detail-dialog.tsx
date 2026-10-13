@@ -8,6 +8,7 @@ import {
   ListChecks,
   Pencil,
   Send,
+  Star,
   Trash2,
   TriangleAlert,
 } from "lucide-react"
@@ -39,8 +40,10 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { DownloadProgress } from "@/components/modules/download-progress"
 import { ConflictStrip, ReviewStrip } from "@/components/modules/mod-alerts"
 import { ModReviews } from "@/components/modules/mod-reviews"
+import { ModShots } from "@/components/modules/mod-shots"
 import type { DownloadTask } from "@/hooks/use-mod-downloads"
 import {
+  formatCount,
   hasUpdate,
   isPublished,
   marketVersionDiff,
@@ -173,11 +176,15 @@ export interface ModDetailDialogProps {
   onSubmit: () => void
   onCancelDownload: () => void
   onResolveConflict: (other: ModEntry) => void
-  onAddReview: (input: { stars: number; body: string }) => void
+  onAddReview: (input: { body: string }) => void
+  /** 本机身份有没有点过星；星标按钮的状态就是它 */
+  starred: boolean
+  starBusy?: boolean
+  onToggleStar: () => void
   onReply: (reviewId: string, body: string) => void
   onEditReply: (reviewId: string, body: string) => void
   onDeleteReply: (reviewId: string) => void
-  onEditReview: (reviewId: string, input: { stars: number; body: string }) => void
+  onEditReview: (reviewId: string, input: { body: string }) => void
   onDeleteReview: (reviewId: string) => void
 }
 
@@ -198,6 +205,9 @@ export function ModDetailDialog({
   onCancelDownload,
   onResolveConflict,
   onAddReview,
+  starred,
+  starBusy,
+  onToggleStar,
   onReply,
   onEditReply,
   onDeleteReply,
@@ -244,6 +254,43 @@ export function ModDetailDialog({
                 → {mod.latest}
               </span>
             ) : null}
+            {/*
+              星标：只有「金色的星 + 数字」，不放任何文字（标题行最右）。
+              星色统一走 `--telemetry`（#FFB800），与卡片上的那一颗同色；
+              文字标签只留给读屏（aria-label），肉眼看到的仍然只有星和数。
+
+              对齐（这里是**布局**问题，不该靠行高去凑）：图标和数字各放进一个
+              与图标同高的 `grid place-items-center` 盒子里 —— 两个盒子的中线严格重合，
+              数字不会再随字体行高上下漂。盒子内部仍有字体上伸部带来的 ~1px 光学偏移
+              （CJK 字体尤甚），所以数字额外 `translate-y-px` 压回星的中间；
+              这个像素值就是唯一的调节旋钮，觉得偏高就 `-0.5px`、偏低就 `+0.5px`。
+            */}
+            <button
+              type="button"
+              disabled={starBusy}
+              aria-pressed={starred}
+              aria-label={starred ? t("已星标") : t("星标")}
+              title={starred ? t("已星标") : t("星标")}
+              onClick={onToggleStar}
+              className={cn(
+                "ml-auto inline-flex shrink-0 items-center gap-1 self-center rounded-full border px-2 py-[3px] transition-colors focus-visible:outline-none focus-visible:shadow-focus disabled:opacity-60",
+                starred
+                  ? "border-telemetry/60 bg-telemetry/10 text-foreground hover:bg-telemetry/15"
+                  : "border-input bg-background/40 text-tertiary hover:border-telemetry/50 hover:bg-telemetry/10 hover:text-foreground"
+              )}
+            >
+              <span className="grid size-3.5 shrink-0 place-items-center">
+                <Star
+                  className="size-3.5 text-telemetry"
+                  fill={starred ? "currentColor" : "none"}
+                />
+              </span>
+              <span className="grid size-3.5 shrink-0 place-items-center">
+                <span className="tabular translate-y-px text-[12px] font-normal leading-none">
+                  {formatCount(mod.ratingCount)}
+                </span>
+              </span>
+            </button>
           </DialogTitle>
           {/* 徽章是 div，塞进 <p> 里是非法嵌套；换成 div 承接这一行 */}
           <DialogDescription asChild>
@@ -284,6 +331,8 @@ export function ModDetailDialog({
                 {mod.desc}
               </p>
             ) : null}
+
+            <ModShots urls={mod.shots} alt={mod.name} />
 
             {task ? <DownloadProgress task={task} onCancel={onCancelDownload} /> : null}
 

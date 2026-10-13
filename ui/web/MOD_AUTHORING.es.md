@@ -617,3 +617,41 @@ Cuatro reglas (🟥 incumplir cualquiera deja a otros mods sin funcionar sin mot
 
 **Versión del documento**: se actualiza con las versiones del lanzador (sincronizada con `_launcher/mods/MOD_AUTHORING.es.md` del lanzador).
 Si te encuentras con un caso que no aparece aquí, mira primero el **registro del servidor** del lanzador y los avisos rojos de las tarjetas, y luego pregunta al mantenedor con el registro.
+
+# Apéndice H: capturas del mod (visualización en el mercado)
+
+La ficha detallada de un mod puede mostrar unas cuantas capturas, y al hacer clic se abre un visor con el que pasar páginas. Las imágenes viven **en tu propio repositorio del mod**: no hay que subirlas a ninguna plataforma.
+
+## Cómo añadirlas
+
+1. Crea una carpeta `shots/` en el directorio del mod (la opción «Crear mod» del lanzador ya incluye una, con un readme breve dentro)
+2. Suelta las capturas: `webp` / `png` / `jpg` / `gif` — **las subcarpetas se ignoran**
+3. Publica (o publica una actualización) desde el lanzador: el resto es automático
+
+## Reglas
+
+| Punto | Detalle |
+| --- | --- |
+| Orden | Se ordena por **nombre de archivo** y la ficha sigue ese orden (usa prefijos `01-`, `02-` para controlarlo) |
+| Cantidad | Como máximo **9**; las sobrantes se cortan por orden |
+| Peso | Apunta a **≤ 200 KB por imagen en 16:9**: las imágenes grandes hacen esperar al abrir la ficha |
+| Formato | Prefiere `webp` (el más ligero con la misma calidad) |
+
+## Qué ocurre al publicar
+
+1. El lanzador recorre `mods/<tu mod>/shots/` y escribe la lista de archivos en `shots` dentro de `evejs-mod.json`
+2. Las imágenes en sí se suben a **tu propio repositorio del mod** (no al del mercado)
+3. El índice del mercado (fusionado y firmado por la CI) incorpora esa lista
+4. La ficha del lanzador carga `https://cdn.jsdelivr.net/gh/<tu repositorio>@main/shots/<archivo>`
+
+Es decir: **las imágenes siempre están en tu repositorio** y el mercado solo guarda una lista de nombres. Cambiar una imagen solo toca tu repositorio.
+
+## Tres trampas
+
+- **No borres el readme dentro de `shots/`**: las carpetas vacías no sobreviven ni a git ni al ZIP; si lo borras, quien clone tu repositorio se queda sin esa carpeta
+- **Publicar sin un `shots/` local no borra las capturas ya listadas**: el lanzador conserva el campo `shots` existente del repositorio antes de escribir. Para **retirar** capturas, vacía tu `shots/` local (una carpeta vacía cuenta como vacía)
+- **Una imagen ausente no provoca ningún error**: si borras el repositorio o renombras un archivo, la ficha simplemente muestra **menos imágenes, en silencio** (la que falla se oculta en vez de dejar un marco roto)
+
+## Cuándo se ve
+
+Tras una publicación correcta, el índice del mercado se reconstruye **en cuanto se fusiona tu PR** (y hay una ejecución programada cada 6 horas como red de seguridad). El lanzador además guarda 2 minutos de caché.

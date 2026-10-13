@@ -140,6 +140,7 @@
     modsSetEnabled: function (folder, enabled) { return request("mods:setEnabled", [folder, enabled]); },
     modsSetOrder: function (folders) { return request("mods:setOrder", [folders]); },
     modsSign: function (folder) { return request("mods:sign", [folder]); },
+    modsStarSet: function (input) { return request("mods:starSet", [input]); },
     modsSubmitGithub: function (id, version) { return request("mods:submitGithub", [id, version]); },
     modsSubmitPrepare: function (input) { return request("mods:submitPrepare", [input]); },
     modsTemplates: function () { return request("mods:templates", []); },

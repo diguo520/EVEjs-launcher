@@ -26,6 +26,7 @@ import {
 } from "./admin.js"
 import { keyIdFromRaw, signDocument, verifyPayload } from "./canonical.js"
 import {
+  emptyAggregate,
   SNAPSHOT_SCHEMA_VERSION,
   aggregateReviews,
   reviewShard,
@@ -43,6 +44,7 @@ import {
   validateReport,
   validateRetract,
   validateReview,
+  validateStar,
 } from "./write.js"
 
 const RATINGS_KEY = "snapshot:ratings"
@@ -107,20 +109,90 @@ async function readReviewRows(env) {
   return result?.results ?? []
 }
 
+/**
+ * 星标行（谁点了哪些星）。
+ *
+ * 只取三个字段：聚合要 `mod_id` 计数，分片要 `key_id` 让客户端认出自己那条，
+ * 排序要 `created_at`。**不取 public_key** —— 星标名单是公开快照的一部分，
+ * 多带一份公钥出去没有任何用处。
+ */
+async function readStarRows(env) {
+  const statement = env.DB.prepare("SELECT mod_id, key_id, created_at FROM stars ORDER BY created_at, key_id")
+  const result = await statement.all()
+  return result?.results ?? []
+}
+
+/** 某个模组当下的星标数（写路径回包用，省得客户端再拉一次） */
+async function starCount(env, modId) {
+  const row = await env.DB.prepare("SELECT COUNT(*) AS stars FROM stars WHERE mod_id = ?").bind(modId).first()
+  return Number(row?.stars ?? 0)
+}
+
+/**
+ * 内容指纹：把 `generatedAt` / `signature` 剔除后做**键序无关**的稳定序列化。
+ *
+ * 这两个字段每轮重建都会变（时间戳、签名跟着时间戳走），但它们不代表「内容变了」。
+ * 拿它比对「KV 里那份」和「这一轮算出来的那份」，一样就跳过写入。
+ */
+function contentKey(value) {
+  if (value === null || typeof value !== "object") return JSON.stringify(value) ?? "null"
+  if (Array.isArray(value)) return `[${value.map(contentKey).join(",")}]`
+  const body = Object.keys(value)
+    .filter((key) => key !== "generatedAt" && key !== "signature")
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${contentKey(value[key])}`)
+    .join(",")
+  return `{${body}}`
+}
+
+/**
+ * 只在内容真的变了才写 KV，返回是否写了。
+ *
+ * 为什么必须这样：KV 免费额度是 **1000 次写/天**，而快照重建是每 10 分钟一轮、
+ * 每轮要写「聚合 + 每个模组一份分片 + 赞助人名单」。模组一多，光定时任务就能把它顶穿
+ * （2026-10-14 实测：6 个分片 → 8 次/轮 × 144 轮 = 1152 次/天，直接 429，
+ * 而且当时一条评价都没人写）。改成「先读、再比对、没变就不写」之后：
+ * 空闲日子写入为 0，只有真的有人写评价/回复/星标时才会落笔，
+ * 代价只是每轮多几次读（读的额度是 10 万/天，比写宽 100 倍）。
+ */
+async function putSnapshot(env, key, payload) {
+  const next = JSON.stringify(payload)
+  const current = await env.SNAPSHOTS.get(key)
+  if (current) {
+    try {
+      if (contentKey(JSON.parse(current)) === contentKey(payload)) return false
+    } catch {
+      // 存的那份不是合法 JSON（或已被手改）：当成内容变了，照写不误
+    }
+  }
+  await env.SNAPSHOTS.put(key, next)
+  return true
+}
+
 /** 重算全部快照：聚合一份 + 每个有评价的模组一份正文分片 */
 export async function rebuildSnapshots(env, now = Date.now()) {
   const signer = await makeSigner(env)
   if (!signer) return { ok: false, reason: "缺少 RATINGS_SIGNING_KEY / RATINGS_KEY_ID，未发布快照" }
 
   const rows = await readReviewRows(env)
+  const starRows = await readStarRows(env)
+  // 写了几次 / 跳过几次：运维从 job_runs 一眼看出「这一轮有没有真的动 KV」
   const ratings = await signer({
     schemaVersion: SNAPSHOT_SCHEMA_VERSION,
     generatedAt: now,
-    mods: aggregateReviews(rows),
+    mods: aggregateReviews(rows, starRows),
   })
-  await env.SNAPSHOTS.put(RATINGS_KEY, JSON.stringify(ratings))
+  let writes = (await putSnapshot(env, RATINGS_KEY, ratings)) ? 1 : 0
+  let skipped = writes === 0 ? 1 : 0
 
-  const modIds = [...new Set(rows.filter((row) => !row.hidden).map((row) => String(row.mod_id)))]
+  // 只点星、没写评论的模组**也要有分片**：「我点过没有」就写在分片里，
+  // 少一份分片等于那颗星在新界面上点不亮。
+  const modIds = [
+    ...new Set([
+      ...rows.filter((row) => !row.hidden).map((row) => String(row.mod_id)),
+      ...starRows.map((row) => String(row.mod_id)),
+    ]),
+  ]
     .filter((modId) => shardPath(modId))
     .sort()
   let shards = 0
@@ -128,9 +200,10 @@ export async function rebuildSnapshots(env, now = Date.now()) {
     const shard = await signer({
       schemaVersion: SNAPSHOT_SCHEMA_VERSION,
       generatedAt: now,
-      ...reviewShard(modId, rows),
+      ...reviewShard(modId, rows, starRows),
     })
-    await env.SNAPSHOTS.put(REVIEWS_PREFIX + modId, JSON.stringify(shard))
+    if (await putSnapshot(env, REVIEWS_PREFIX + modId, shard)) writes += 1
+    else skipped += 1
     shards += 1
   }
 
@@ -150,7 +223,8 @@ export async function rebuildSnapshots(env, now = Date.now()) {
   // 没写过就用代码里那份种子；不依赖 D1，所以即使一条评价都没有也照发。
   const { entries: sponsorEntries, source: sponsorsSource } = await loadSponsorSource(env)
   const sponsors = await signer(sponsorSnapshot(sponsorEntries, now))
-  await env.SNAPSHOTS.put(SPONSORS_KEY, JSON.stringify(sponsors))
+  if (await putSnapshot(env, SPONSORS_KEY, sponsors)) writes += 1
+  else skipped += 1
 
   return {
     ok: true,
@@ -159,6 +233,10 @@ export async function rebuildSnapshots(env, now = Date.now()) {
     // 这一轮删掉的过期分片数：运维从 job_runs 就能看出「删评论之后分片有没有跟着消失」
     removed: stale.length,
     rows: rows.length,
+    stars: starRows.length,
+    // 这一轮真正发出的 KV 写次数 / 因为「内容没变」被跳过的次数 —— 对账用
+    writes,
+    skipped,
     sponsors: sponsors.sponsors.length,
     sponsorsSource,
   }
@@ -284,7 +362,8 @@ async function health(env, request = null) {
     env.DB.prepare(
       `SELECT (SELECT COUNT(*) FROM reviews) AS reviews,
               (SELECT COUNT(*) FROM mod_versions WHERE active = 1) AS versions,
-              (SELECT COUNT(*) FROM replies) AS replies`
+              (SELECT COUNT(*) FROM replies) AS replies,
+              (SELECT COUNT(*) FROM stars) AS stars`
     ).first(),
     env.DB.prepare(`SELECT job, ran_at, ok, detail FROM job_runs`).all(),
     env.SNAPSHOTS.get(SPONSORS_KEY),
@@ -431,12 +510,80 @@ async function ipBucket(request, env, now, prefix = "i:") {
   return prefix + digest + ":" + hourKey(now)
 }
 
-/** 这十条只喂给 aggregateReviews，字段名与它读的一致 */
-const FRESH_REVIEW_SQL = `SELECT mod_id, stars, body, hidden, country FROM reviews WHERE mod_id = ?`
+/** 这几个字段只喂给 aggregateReviews，字段名与它读的一致 */
+const FRESH_REVIEW_SQL = `SELECT mod_id, body, hidden, country FROM reviews WHERE mod_id = ?`
 
+/** 写成功后回给客户端的那份聚合：星标表与评论表各查一次，口径与快照完全一致 */
 async function reviewAggregate(env, modId) {
   const rows = await env.DB.prepare(FRESH_REVIEW_SQL).bind(modId).all()
-  return aggregateReviews(rows?.results ?? [])[modId] ?? { average: 0, count: 0, withText: 0, histogram: [0, 0, 0, 0, 0] }
+  const stars = await env.DB.prepare("SELECT mod_id, key_id, created_at FROM stars WHERE mod_id = ?")
+    .bind(modId)
+    .all()
+  return aggregateReviews(rows?.results ?? [], stars?.results ?? [])[modId] ?? emptyAggregate()
+}
+
+/** 加星：幂等，同一个人对同一个模组只留一条 */
+async function addStar(env, { modId, keyId, identityId, publicKey, at }) {
+  await env.DB.prepare(
+    `INSERT INTO stars (mod_id, public_key, key_id, identity_id, created_at)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT (mod_id, public_key) DO NOTHING`
+  )
+    .bind(modId, publicKey, keyId, identityId, at)
+    .run()
+}
+
+/**
+ * 星标写路径：`star.add` / `star.remove`。
+ *
+ * 门槛比评价低一档 —— 点星不需要「装过」的凭据（GitHub 上点星也不用装什么），
+ * 只要求这个模组确实在市场名单里（`mod_versions` 有行），免得凭空给不存在的 id 刷星。
+ * 取消不看名单：模组下架了，用户也该能把自己的星收回去。
+ */
+async function upsertStar(request, env, input) {
+  const checked = validateStar(input)
+  if (!checked.ok) return json({ ok: false, reason: checked.reason }, 400, NO_STORE)
+  const payload = checked.payload
+  const verified = await verifySignedWrite(input, payload)
+  if (!verified.ok) return json({ ok: false, reason: verified.reason }, 403, NO_STORE)
+
+  if (payload.action === "star.add") {
+    const listed = await env.DB.prepare("SELECT 1 AS hit FROM mod_versions WHERE mod_id = ? LIMIT 1")
+      .bind(payload.modId)
+      .first()
+    if (!listed?.hit) return json({ ok: false, reason: "这个模组不在市场名单里" }, 403, NO_STORE)
+  }
+
+  // 星标是廉价动作，不吃「每天 N 条」那个人头额度；但每 IP 每小时的写额度照算 ——
+  // 每次写成功都会重算一遍快照，连点就是在拿服务端的 CPU 打点。
+  const now = Date.now()
+  if (!(await consumeQuota(env, await ipBucket(request, env, now), MAX_WRITES_PER_IP_PER_HOUR))) {
+    return json({ ok: false, reason: "这个网络写得太频繁了，过一会儿再试" }, 429, NO_STORE)
+  }
+
+  if (payload.action === "star.remove") {
+    await env.DB.prepare("DELETE FROM stars WHERE mod_id = ? AND public_key = ?")
+      .bind(payload.modId, payload.publicKey)
+      .run()
+  } else {
+    await addStar(env, {
+      modId: payload.modId,
+      keyId: verified.keyId,
+      identityId: payload.identityId,
+      publicKey: payload.publicKey,
+      at: payload.at,
+    })
+  }
+  return json(
+    {
+      ok: true,
+      modId: payload.modId,
+      starred: payload.action === "star.add",
+      stars: await starCount(env, payload.modId),
+    },
+    200,
+    NO_STORE
+  )
 }
 
 /** 写评价：一人一票（UNIQUE(mod_id, public_key)），改分改字都是覆盖。 */
@@ -465,6 +612,9 @@ async function upsertReview(request, env, input, country) {
     return json({ ok: false, reason: "这个网络写得太频繁了，过一会儿再试" }, 429, NO_STORE)
   }
 
+  // 评论不再带分值：`reviews.stars` 退化成历史列（CHECK 还在，只能写 1..5）。
+  // 老客户端发来的分值原样留着（老客户端读分片时按它渲染），新写的评论一律记 5。
+  const legacyScore = Number.isInteger(payload.stars) ? payload.stars : 5
   await env.DB.prepare(
     `INSERT INTO reviews (id, mod_id, version, pkg_sha256, stars, body, author_name, corp, country,
                           identity_id, key_id, public_key, sig, created_at, updated_at, edited, hidden, hide_reason)
@@ -488,7 +638,7 @@ async function upsertReview(request, env, input, country) {
       payload.modId,
       payload.version,
       payload.pkgSha256,
-      payload.stars,
+      legacyScore,
       payload.body,
       country,
       payload.identityId,
@@ -499,6 +649,18 @@ async function upsertReview(request, env, input, country) {
       payload.createdAt
     )
     .run()
+
+  // 老客户端的「打分」就是新口径里的一颗星：分值不再进聚合，但这一票必须折算成星标，
+  // 否则 0.3.x–0.4.x 的用户打完分在星标口径里什么也没发生。
+  if (Number.isInteger(payload.stars)) {
+    await addStar(env, {
+      modId: payload.modId,
+      keyId: verified.keyId,
+      identityId: payload.identityId,
+      publicKey: payload.publicKey,
+      at: payload.createdAt,
+    })
+  }
 
   const aggregate = await reviewAggregate(env, payload.modId)
   return json({ ok: true, modId: payload.modId, country, ...aggregate }, 200, NO_STORE)
@@ -695,6 +857,8 @@ const ACTION_ROUTES = {
   "reply.upsert": "reply",
   "reply.retract": "reply-retract",
   "report.create": "report",
+  "star.add": "star-add",
+  "star.remove": "star-remove",
 }
 
 function writeRoute(pathname, input) {
@@ -702,6 +866,8 @@ function writeRoute(pathname, input) {
   if (pathname === "/v1/replies") return "reply"
   if (pathname === "/v1/replies/retract") return "reply-retract"
   if (pathname === "/v1/reports") return "report"
+  if (pathname === "/v1/stars") return "star-add"
+  if (pathname === "/v1/stars/remove") return "star-remove"
   if (pathname === "/v1/reviews") {
     const action = typeof input?.action === "string" ? input.action : ""
     // 认不出的 action（包括老客户端压根没带 action）一律按评价处理：形状不对时
@@ -736,7 +902,9 @@ async function handleWrite(pathname, request, env, ctx) {
             ? await retractReply(env, input)
             : route === "report"
               ? await createReport(request, env, input)
-              : json({ ok: false, reason: "没有这个写接口" }, 404, NO_STORE)
+              : route === "star-add" || route === "star-remove"
+                ? await upsertStar(request, env, input)
+                : json({ ok: false, reason: "没有这个写接口" }, 404, NO_STORE)
   // 写成功就顺手把快照重算一遍：读路径是静态快照，不重算的话作者自己都要等下一个 cron 才看得到
   if (respond?.status === 200) ctx?.waitUntil?.(rebuildSnapshots(env))
   return respond
@@ -800,9 +968,26 @@ export default {
     const cron = String(event?.cron ?? "").trim()
     // 每小时整点同步白名单，其余（每 10 分钟那档）重算快照
     const job = cron === "0 * * * *" ? "sync-versions" : "rebuild-snapshots"
-    const result =
-      job === "sync-versions" ? await syncModVersions(env) : await rebuildSnapshots(env)
-    await recordJob(env, job, result)
+    let result
+    try {
+      result = job === "sync-versions" ? await syncModVersions(env) : await rebuildSnapshots(env)
+    } catch (error) {
+      /**
+       * **抛出来的失败也必须落一条台账**。
+       *
+       * 这一条是踩出来的：KV 免费额度用尽时 `put` 会抛 429，而这里原来没有 try/catch ——
+       * 那一轮直接静默失败，`job_runs` 里留着的还是上一次的成功记录。
+       * 于是看板上「重建快照，10 分钟前，成功」，实际快照早就不更新了，
+       * 直到 Cloudflare 发额度告警才被人发现（2026-10-14）。
+       */
+      result = { ok: false, reason: `抛异常：${String(error?.message ?? error)}` }
+    }
+    try {
+      await recordJob(env, job, result)
+    } catch (error) {
+      // 台账本身写不进去（D1 挂了）也不能让 cron 崩：日志里还留一份
+      console.error(job, "台账写入失败", String(error?.message ?? error))
+    }
     ctx?.waitUntil?.(Promise.resolve())
     if (!result?.ok) console.error(job, result?.reason)
   },

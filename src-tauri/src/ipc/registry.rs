@@ -133,6 +133,7 @@ pub const HANDLED: &[&str] = &[
     "mods:replySubmit",
     "mods:replyRetract",
     "mods:reportReview",
+    "mods:starSet",
     "mods:marketInstall",
     "mods:myMods",
     "mods:submitPrepare",

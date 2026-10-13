@@ -415,6 +415,13 @@ export interface RawMod {
   updatedAt: number
   /** README 正文段落（后端与上架同一套解析，作者改完立刻可见） */
   readme?: string[]
+  /**
+   * 作者仓库里 `shots/` 目录下的截图文件名（见 `lib/mod-media.ts`）。
+   * `raw.githubusercontent.com` 不能列目录，所以文件名只能由索引给出；空/缺省就不画截图条。
+   */
+  shots?: string[]
+  /** 取图用的 git ref（tag / commit）；缺省时从 downloadUrls 里推 release tag */
+  shotsRef?: string
   /** README 里「功能要点」的条目 */
   highlights?: string[]
   readmePath?: string
@@ -593,6 +600,10 @@ export interface RawReviewShard {
   ok: boolean
   modId?: string
   reviews?: RawReview[]
+  /** 星标数（v0.5 起「评分」的唯一口径） */
+  starCount?: number
+  /** 本机身份点过星没有：后端拿分片里的 keyId 名单跟本机作者身份比对得出 */
+  starred?: boolean
   reason?: string
   cached?: boolean
   fetchedAt?: number

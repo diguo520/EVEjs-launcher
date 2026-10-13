@@ -600,6 +600,143 @@ describe("faction-logic", () => {
       expect(types.get(24700)?.value).toBe(54_249_688)
       expect(types.get(590)?.dead).toBe(1)
     })
+
+    it("分侧舰型损失：按 victimKey 拆桶，双方各自只看到自己掉的那些", () => {
+      const report = battleReports(combat)[0]
+      const byKey = new Map(report.sideShipLosses.map((side) => [side.key, side]))
+      const hantan = byKey.get("hantan")
+      expect(hantan?.lost).toBe(2)
+      expect(hantan?.lostValue).toBe(54_249_688)
+      expect(hantan?.losses.map((row) => row.typeID)).toEqual([24700, null])
+      const taoyuan = byKey.get("taoyuan")
+      expect(taoyuan?.lost).toBe(1)
+      expect(taoyuan?.losses.map((row) => row.typeID)).toEqual([590])
+      // 分侧不吞数：双方明细加起来就是全场那一份
+      expect(report.sideShipLosses.reduce((sum, side) => sum + side.lost, 0)).toBe(report.totalLost)
+      expect(report.sideShipLosses.reduce((sum, side) => sum + side.lostValue, 0)).toBe(report.totalValue)
+    })
+
+    it("分侧舰型损失：只出手没挨打的一方也在，明细为空", () => {
+      // 905 号损失没有 battleID，进不了报表；另造一场 b 只出手、一艘没掉
+      const events: FactionEvent[] = [
+        {
+          id: 1,
+          at: 1,
+          factionKey: "a",
+          type: "loss",
+          label: "战损",
+          group: "combat",
+          text: "",
+          payload: { unitID: 1, battleID: 12, systemID: 5, killer: { kind: "engagement", key: "b" } },
+        },
+      ]
+      const report = battleReports(events)[0]
+      const byKey = new Map(report.sideShipLosses.map((side) => [side.key, side]))
+      expect(byKey.get("a")?.lost).toBe(1)
+      expect(byKey.get("b")?.lost).toBe(0)
+      expect(byKey.get("b")?.losses).toEqual([])
+      expect(byKey.get("b")?.lostShare).toBe(0)
+    })
+
+    it("悬赏没结算的那一条进「未知舰型」，不当 0 号舰型也不丢", () => {
+      const hantan = battleReports(combat)[0].sideShipLosses.find((side) => side.key === "hantan")
+      const unknown = hantan?.losses.find((row) => row.typeID === null)
+      expect(unknown).toBeDefined()
+      expect(unknown?.dead).toBe(1)
+      expect(unknown?.value).toBe(0)
+      expect(unknown?.unknown).toBe(1)
+      // 未知舰型沉底，不跟真实舰型抢前排
+      expect(hantan?.losses.at(-1)?.typeID).toBeNull()
+      // 旧的单表口径保持原样：未知的那些仍然不进 shipLosses
+      expect(battleReports(combat)[0].shipLosses.map((row) => row.typeID)).not.toContain(null)
+    })
+
+    it("损失占比：按双方合计算，只出手没挨打的阵营不吃分母", () => {
+      const report = battleReports(combat)[0]
+      const byKey = new Map(report.sideShipLosses.map((side) => [side.key, side]))
+      expect(byKey.get("hantan")?.lostShare).toBeCloseTo(2 / 3, 6)
+      expect(byKey.get("taoyuan")?.lostShare).toBeCloseTo(1 / 3, 6)
+      const shares = report.sideShipLosses.reduce((sum, side) => sum + side.lostShare, 0)
+      expect(shares).toBeCloseTo(1, 6)
+    })
+
+    it("同一型掉两艘合并成一行；只出手的一方占比 0", () => {
+      const events: FactionEvent[] = [
+        {
+          id: 1, at: 10, factionKey: "a", type: "loss", label: "战损", group: "combat", text: "",
+          payload: { unitID: 1, battleID: 7, systemID: 5, killer: { kind: "engagement", key: "b" } },
+        },
+        {
+          id: 2, at: 11, factionKey: "a", type: "loss", label: "战损", group: "combat", text: "",
+          payload: { unitID: 2, battleID: 7, systemID: 5, killer: { kind: "engagement", key: "b" } },
+        },
+        {
+          id: 3, at: 12, factionKey: "a", type: "killReward", label: "击毁奖励", group: "combat", text: "",
+          payload: { unitID: 1, hullTypeID: 24700, value: 1_000_000, amount: 10_000 },
+        },
+        {
+          id: 4, at: 13, factionKey: "a", type: "killReward", label: "击毁奖励", group: "combat", text: "",
+          payload: { unitID: 2, hullTypeID: 24700, value: 2_000_000, amount: 20_000 },
+        },
+      ]
+      const report = battleReports(events)[0]
+      const byKey = new Map(report.sideShipLosses.map((side) => [side.key, side]))
+      expect(byKey.get("a")?.losses).toHaveLength(1)
+      expect(byKey.get("a")?.losses[0]).toMatchObject({ typeID: 24700, dead: 2, value: 3_000_000, unknown: 0 })
+      expect(byKey.get("a")?.lostShare).toBe(1)
+      expect(byKey.get("b")?.losses).toEqual([])
+      expect(byKey.get("b")?.lost).toBe(0)
+      expect(byKey.get("b")?.lostShare).toBe(0)
+    })
+
+    it("阵营 key 拼不出别家的桶：前缀回捞不会把别家的损失串过来", () => {
+      // 旧实现把键拼成 `${victimKey}\u0000${typeID ?? "none"}`，取数时又用 `${key}\u0000` 做前缀匹配。
+      // 于是当一方的阵营名以「别家 key + \u0000 + none」开头时，前缀匹配会把那份未知舰型
+      // 也算进别家头上：下面 "a" 会被多塞一条属于 "a\u0000none" 的未知舰型损失。
+      const events: FactionEvent[] = [
+        // a：掉 2 艘有结算的护卫舰
+        ...Array.from({ length: 2 }, (_, index): FactionEvent => ({
+          id: 1 + index, at: 10 + index, factionKey: "a", type: "loss", label: "战损", group: "combat", text: "",
+          payload: { unitID: 100 + index, battleID: 3, systemID: 5, killer: { kind: "engagement", key: "z" } },
+        })),
+        {
+          id: 3, at: 12, factionKey: "a", type: "killReward", label: "击毁奖励", group: "combat", text: "",
+          payload: { unitID: 100, hullTypeID: 24700, value: 1_000_000, amount: 10_000 },
+        },
+        {
+          id: 4, at: 13, factionKey: "a", type: "killReward", label: "击毁奖励", group: "combat", text: "",
+          payload: { unitID: 101, hullTypeID: 24700, value: 2_000_000, amount: 20_000 },
+        },
+        // 阵营名恰好是 `a\u0000none`：掉 1 艘没结算的
+        {
+          id: 5, at: 14, factionKey: "a\u0000none", type: "loss", label: "战损", group: "combat", text: "",
+          payload: { unitID: 200, battleID: 3, systemID: 5, killer: { kind: "engagement", key: "z" } },
+        },
+      ]
+      const report = battleReports(events)[0]
+      const byKey = new Map(report.sideShipLosses.map((side) => [side.key, side]))
+      // a 只有自己那 2 艘 24700，没有未知舰型；未知那条归 a\u0000none
+      expect(byKey.get("a")?.losses).toEqual([{ typeID: 24700, dead: 2, value: 3_000_000, unknown: 0 }])
+      expect(byKey.get("a")?.lost).toBe(2)
+      expect(byKey.get("a\u0000none")?.losses).toEqual([{ typeID: null, dead: 1, value: 0, unknown: 1 }])
+      expect(byKey.get("a\u0000none")?.lost).toBe(1)
+      // z 只出手：没有分侧明细
+      expect(byKey.get("z")?.losses).toEqual([])
+      // 每一侧的分型明细加起来必须等于它自己的损失数（跨阵营串数会让这里对不上）
+      for (const side of report.sideShipLosses) {
+        expect(side.losses.reduce((sum, row) => sum + row.dead, 0)).toBe(side.lost)
+      }
+    })
+
+    it("整场没人掉船：分侧占比是 0，不会出现 NaN", () => {
+      const report = battleReports([
+        {
+          id: 1, at: 1, factionKey: "a", type: "engagement", label: "交战", group: "combat", text: "",
+          payload: { systemID: 5, battleID: 9 },
+        },
+      ])
+      expect(report).toEqual([])
+    })
   })
 
   describe("领土列（realm）", () => {

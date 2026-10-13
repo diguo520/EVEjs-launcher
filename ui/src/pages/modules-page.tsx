@@ -680,8 +680,11 @@ export function ModulesPage({
     toast.error(title, { description: reason || t("服务端没有说原因，稍后再试。") })
   }
 
-  /** 打分与改分走同一条：服务端按 (模组, 公钥) 覆盖，本来就是一人一票 */
-  async function addReview(input: { stars: number; body: string }) {
+  /**
+   * 写评论 / 改评论走同一条：服务端按 (模组, 公钥) 覆盖，本来就是一人一条。
+   * v0.5 起评论不带分值 —— 点赞是星标按钮那件事（见 toggleStar）。
+   */
+  async function addReview(input: { body: string }) {
     const mod = detailMod
     if (!mod) return
     const { version, pkgSha256 } = reviewTarget(mod)
@@ -695,14 +698,26 @@ export function ModulesPage({
       modId: mod.id,
       version,
       pkgSha256,
-      stars: input.stars,
       body: input.body,
     })
     if (!reply.ok) {
       reviewFailed(t("评价没能提交"), reply.reason)
       return
     }
-    toast.success(t("评价已提交"), { description: t("你的这一票已经计入平均分。") })
+    toast.success(t("评论已发布"))
+  }
+
+  /** 点星 / 取消星标：二元、幂等，成功后按钮就地翻状态（计数等下一次市场刷新） */
+  async function toggleStar() {
+    const mod = detailMod
+    if (!mod) return
+    const on = !source.starredOf(mod.id)
+    const reply = await source.toggleStar(mod.id, on)
+    if (!reply.ok) {
+      reviewFailed(t("星标没能点上"), reply.reason)
+      return
+    }
+    toast.success(on ? t("已星标") : t("已取消星标"))
   }
 
   async function removeReview() {
@@ -1399,6 +1414,9 @@ export function ModulesPage({
         onCancelDownload={() => detailId && downloads.cancel(detailId)}
         onResolveConflict={(other) => void disableMod(other)}
         onAddReview={(input) => void addReview(input)}
+        starred={detailMod ? source.starredOf(detailMod.id) : false}
+        starBusy={source.starBusyId !== "" && source.starBusyId === detailMod?.id}
+        onToggleStar={() => void toggleStar()}
         onReply={(reviewId, body) => void addReply(reviewId, body)}
         onEditReply={(reviewId, body) => void addReply(reviewId, body)}
         onDeleteReply={(reviewId) => void removeReply(reviewId)}

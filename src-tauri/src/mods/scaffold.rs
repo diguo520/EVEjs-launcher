@@ -39,7 +39,30 @@ const TEMPLATE_FILES: &[&str] = &[
     "loader.js",
     "README.md",
     "CHANGELOG.md",
+    "shots/README.md",
 ];
+
+/// 新建模组时附带的 `shots/README.md`：告诉作者截图往哪放、怎么进市场。
+///
+/// 为什么要放一个说明文件而不是建个空目录：**空目录在 git 与 ZIP 里都留不住** ——
+/// 作者 clone / 解压之后 `shots/` 就没了，等于白建。放一份说明既撑住了目录，
+/// 又把约定写在作者眼前（比翻模组制作规范快）。
+const SHOTS_README: &str = "\
+# 市场截图 / Market screenshots
+
+把要在模组市场里展示的截图放进这个目录（子目录会被忽略）。
+Put the screenshots shown on the mod market page in this folder (subfolders are ignored).
+
+- 格式：webp / png / jpg / gif，推荐 webp
+- 按**文件名排序**决定显示顺序，最多 9 张；第一张当封面
+- 建议每张压到 200 KB 以内、16:9 —— 图太大，别人点开详情要等
+- 发布时自动带上：路径随 `evejs-mod.json` 写进市场索引，图片本身推到你的仓库
+
+- Formats: webp / png / jpg / gif; webp preferred
+- Sorted by file name, up to 9; the first one is the cover
+- Keep each under about 200 KB at 16:9 — large images make the detail view slow
+- Shipped automatically on publish: listed in the market index and uploaded to your repo
+";
 
 /// 默认不改服务端源码：`SOURCE_PATCH` 留 null
 const NO_SOURCE_PATCH: &[&str] = &["const SOURCE_PATCH = null;"];
@@ -122,6 +145,7 @@ fn template_size_bytes(template: &ScaffoldTemplate) -> u64 {
     total += loader_from(&draft, template).len() as u64;
     total += readme_from(&draft, template).len() as u64;
     total += changelog_from(&draft).len() as u64;
+    total += SHOTS_README.len() as u64;
     total
 }
 
@@ -554,6 +578,11 @@ pub fn create_mod(
         )?;
         fs::write(stage.join("README.md"), readme_from(draft, template))?;
         fs::write(stage.join("CHANGELOG.md"), changelog_from(draft))?;
+        // 截图目录：写一份说明把它撑住（空目录在 git / ZIP 里留不住），
+        // 作者往里丢图即可，发布时会被 `submit::shots_for_listing` 自动收进清单
+        let shots_dir = stage.join("shots");
+        fs::create_dir_all(&shots_dir)?;
+        fs::write(shots_dir.join("README.md"), SHOTS_README)?;
         Ok(())
     })();
     if let Err(err) = written {
@@ -1055,6 +1084,8 @@ mod tests {
         assert!(dir.join(scan::MANIFEST_NAME).is_file());
         assert!(dir.join("README.md").is_file());
         assert!(dir.join("CHANGELOG.md").is_file());
+        // 截图目录：说明文件撑住目录，作者往里丢图即可（发布时由目录自动收集）
+        assert!(dir.join("shots").join("README.md").is_file());
         // 默认禁用
         assert!(dir.join(scan::LOADER_DISABLED).is_file());
         assert!(!dir.join(scan::LOADER_ENABLED).exists());
@@ -1366,8 +1397,14 @@ mod tests {
         assert_eq!(list[0]["id"], json!("broadcast"));
         assert_eq!(list[1]["id"], json!("blank"));
         assert_eq!(list[0]["requiresRestart"], json!(true));
-        assert_eq!(list[0]["files"].as_array().unwrap().len(), 4);
-        assert_eq!(list[0]["fileCount"], json!(4));
+        // 4 个骨架文件 + `shots/README.md`（截图目录的说明）
+        assert_eq!(list[0]["files"].as_array().unwrap().len(), 5);
+        assert_eq!(list[0]["fileCount"], json!(5));
+        assert!(list[0]["files"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|name| name == "shots/README.md"));
         // 体积是真算出来的：四个文件的骨架落在 1KB~64KB 这个量级里
         for item in list {
             let bytes = item["sizeBytes"].as_u64().unwrap();

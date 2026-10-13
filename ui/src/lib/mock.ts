@@ -490,6 +490,11 @@ export interface ModEntry {
   inMarket?: boolean
   /** 市场登记的最新版本发布时间（ISO 日期） */
   publishedAt?: string
+  /**
+   * 已解析好的截图地址（作者仓库 `shots/` 里的图，见 `lib/mod-media.ts`）。
+   * 空数组 / 缺省表示这个模组没有图，卡片与详情都不画截图区。
+   */
+  shots?: string[]
 }
 
 export const MODS: ModEntry[] = [

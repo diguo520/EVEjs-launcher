@@ -26,52 +26,54 @@ const row = (over = {}) => ({
   ...over,
 })
 
-test("聚合：平均分与直方图按 1-5 星分桶", () => {
-  const mods = aggregateReviews([
-    row({ id: "a", stars: 5 }),
-    row({ id: "b", stars: 4 }),
-    row({ id: "c", stars: 3 }),
-    row({ id: "d", stars: 5 }),
-  ])
+/** 星标行：只要 mod_id / key_id / created_at（服务端不取 public_key） */
+const starRow = (over = {}) => ({
+  mod_id: "evejs-a",
+  key_id: "key-1",
+  created_at: Date.UTC(2026, 9, 1),
+  ...over,
+})
+
+test("聚合：星标数是唯一评分口径，遗留均分只有 0 与 5", () => {
+  const mods = aggregateReviews(
+    [],
+    [starRow({ key_id: "k1" }), starRow({ key_id: "k2" }), starRow({ key_id: "k3" })]
+  )
   assert.deepEqual(mods["evejs-a"], {
-    average: 4.25,
-    count: 4,
+    stars: 3,
+    comments: 0,
+    // 下面三个是给老客户端看的遗留口径：点星按 5 分折算
+    average: 5,
+    count: 3,
     withText: 0,
-    histogram: [0, 0, 1, 1, 2],
+    histogram: [0, 0, 0, 0, 3],
   })
 })
 
-test("聚合：count 是打过分的人，withText 才是写了字的人（两个口径刻意分开）", () => {
-  const mods = aggregateReviews([
-    row({ id: "a", stars: 5, body: "好用" }),
-    row({ id: "b", stars: 4, body: "" }),
-    row({ id: "c", stars: 5, body: "   " }),
-  ])
-  assert.equal(mods["evejs-a"].count, 3)
+test("聚合：星标与评论分开算，只评论不点星也算一条评论", () => {
+  const mods = aggregateReviews(
+    [row({ id: "a", body: "好用" }), row({ id: "b", body: "" }), row({ id: "c", body: "   " })],
+    [starRow({ key_id: "k1" })]
+  )
+  assert.equal(mods["evejs-a"].stars, 1)
+  assert.equal(mods["evejs-a"].comments, 3)
   assert.equal(mods["evejs-a"].withText, 1)
 })
 
-test("聚合：隐藏的与非法星级都不进统计", () => {
-  const mods = aggregateReviews([
-    row({ id: "a", stars: 5 }),
-    row({ id: "b", stars: 5, hidden: 1 }),
-    row({ id: "c", stars: 0 }),
-    row({ id: "d", stars: 6 }),
-    row({ id: "e", stars: 3.5 }),
-    row({ id: "f", stars: 4, mod_id: "" }),
-  ])
+test("聚合：隐藏的评论不进统计，没有 mod_id 的行一律跳过", () => {
+  const mods = aggregateReviews(
+    [row({ id: "a" }), row({ id: "b", hidden: 1 }), row({ id: "c", mod_id: "" })],
+    [starRow({ key_id: "k1" }), starRow({ key_id: "k2", mod_id: "" })]
+  )
   assert.deepEqual(Object.keys(mods), ["evejs-a"])
-  assert.equal(mods["evejs-a"].count, 1)
+  assert.equal(mods["evejs-a"].comments, 1)
+  assert.equal(mods["evejs-a"].stars, 1)
 })
 
 test("聚合：一个模组都没有时返回空表，不是报错", () => {
   assert.deepEqual(aggregateReviews([]), {})
   assert.deepEqual(aggregateReviews(undefined), {})
-})
-
-test("聚合：平均分只保留两位小数，签名负载里不出现长尾浮点", () => {
-  const mods = aggregateReviews([row({ stars: 4 }), row({ id: "b", stars: 4 }), row({ id: "c", stars: 5 })])
-  assert.equal(mods["evejs-a"].average, 4.33)
+  assert.deepEqual(aggregateReviews(undefined, undefined), {})
 })
 
 test("分片：只装本模组的、未隐藏的评价，最新的在前", () => {
@@ -87,6 +89,22 @@ test("分片：只装本模组的、未隐藏的评价，最新的在前", () =>
     shard.reviews.map((item) => item.id),
     ["new", "old"]
   )
+  // 没有星标行时分片里也必须有 stars 块（形状固定），否则客户端读不到「我点过没有」
+  assert.deepEqual(shard.stars, { count: 0, keys: [] })
+})
+
+test("分片：星标名单只装本模组的，按时间升序（同名时间再按 keyId 稳定排序）", () => {
+  const shard = reviewShard("evejs-a", [], [
+    starRow({ key_id: "late", created_at: Date.UTC(2026, 9, 3) }),
+    starRow({ key_id: "early", created_at: Date.UTC(2026, 9, 1) }),
+    starRow({ key_id: "tie-b", created_at: Date.UTC(2026, 9, 2) }),
+    starRow({ key_id: "tie-a", created_at: Date.UTC(2026, 9, 2) }),
+    starRow({ key_id: "other", mod_id: "evejs-b" }),
+  ])
+  assert.deepEqual(shard.stars, {
+    count: 4,
+    keys: ["early", "tie-a", "tie-b", "late"],
+  })
 })
 
 test("分片：有回复才带 reply，没有就不带这个键", () => {

@@ -21,6 +21,7 @@ import type {
   RawSubmissionItem,
 } from "./ipc"
 import { FEATURES_HEADING, compareVersions, ratingFromReviews, readmeParagraphs } from "./mod-logic"
+import { modShotUrls } from "./mod-media"
 import type { ModChangelog, ModEntry, ModReview, ModReviewState } from "./mock"
 
 const BYTES_PER_MB = 1024 * 1024
@@ -188,6 +189,8 @@ export function fromMarket(mod: RawMarketMod): ModEntry {
     gameVersion: mod.evejsVersions?.[0] ?? "",
     readme: readmeOf(mod.readme, mod.highlights),
     changelog: marketChangelog(mod),
+    // 截图：作者仓库 shots/ 里的图，按索引给的文件名拼地址（见 lib/mod-media.ts）
+    shots: modShotUrls(mod),
     mine: false,
     inMarket: true,
   }

@@ -10,15 +10,18 @@
  *
  * 用法：
  *   node infra/scripts/build-snapshot.mjs --rows rows.json --out .parity-out/ratings \
- *        --key .keys/ratings-key.pem --key-id evejs-ratings-2026-10-01 [--sponsors sponsors.json]
+ *        --key .keys/ratings-key.pem --key-id evejs-ratings-2026-10-01 \
+ *        [--stars stars.json] [--sponsors sponsors.json]
  *
  * 补给线名单跟 D1 无关（它的本体在 KV 里，见 `src/admin.js`）：要把线上那份写进镜像，
  * 就加 `--sponsors <名单.json>` —— 文件内容就是 `/admin.html` 上「导出 JSON」给出的那份；
  * 不给就退回代码里的种子名单。
  *
- * 取 rows 的两条路（`--rows` 只吃 JSON 文件，故意不在这儿连网）：
+ * 取 rows 的两条路（`--rows` / `--stars` 只吃 JSON 文件，故意不在这儿连网）：
  *   npx wrangler d1 execute evejs-mod-ratings --remote --json \
  *     --command "SELECT ... FROM reviews ..." > rows.json
+ *   npx wrangler d1 execute evejs-mod-ratings --remote --json \
+ *     --command "SELECT mod_id, key_id, created_at FROM stars" > stars.json
  */
 import crypto from "node:crypto"
 import fs from "node:fs"
@@ -36,6 +39,7 @@ const value = (name, fallback = null) => {
 
 const sponsorsPath = value("--sponsors")
 const rowsPath = value("--rows")
+const starsPath = value("--stars")
 const outDir = value("--out")
 const keyPath = value("--key")
 const keyId = value("--key-id", "")
@@ -69,6 +73,8 @@ function readSponsorFile(file) {
 const privateKey = crypto.createPrivateKey(fs.readFileSync(keyPath))
 const secret = bytesToBase64(privateKey.export({ type: "pkcs8", format: "der" }))
 const rows = readRows(rowsPath)
+// 星标行可选：没有 `--stars` 就按「一颗星都没有」重算（评分模型是星标，聚合读它）
+const starRows = starsPath ? readRows(starsPath) : []
 const generatedAt = Number(value("--at", Date.now()))
 
 const write = (relative, value) => {
@@ -79,7 +85,7 @@ const write = (relative, value) => {
 
 const ratings = await signDocument(
   secret,
-  { schemaVersion: SNAPSHOT_SCHEMA_VERSION, generatedAt, mods: aggregateReviews(rows) },
+  { schemaVersion: SNAPSHOT_SCHEMA_VERSION, generatedAt, mods: aggregateReviews(rows, starRows) },
   keyId
 )
 write("ratings.json", ratings)
@@ -95,18 +101,31 @@ const sponsors = await signDocument(
 write("sponsors.json", sponsors)
 
 let shards = 0
-const modIds = [...new Set(rows.filter((row) => !row?.hidden).map((row) => String(row.mod_id)))].sort()
+// 只点星、没写评论的模组也要出分片：「我点过没有」写在分片里
+const modIds = [
+  ...new Set([
+    ...rows.filter((row) => !row?.hidden).map((row) => String(row.mod_id)),
+    ...starRows.map((row) => String(row.mod_id)),
+  ]),
+].sort()
 for (const modId of modIds) {
   const relative = shardPath(modId)
   if (!relative) {
     console.warn(`跳过形状不合法的模组标识：${modId}`)
     continue
   }
-  write(relative, await signDocument(secret, { schemaVersion: SNAPSHOT_SCHEMA_VERSION, generatedAt, ...reviewShard(modId, rows) }, keyId))
+  write(
+    relative,
+    await signDocument(
+      secret,
+      { schemaVersion: SNAPSHOT_SCHEMA_VERSION, generatedAt, ...reviewShard(modId, rows, starRows) },
+      keyId
+    )
+  )
   shards += 1
 }
 
 console.log(
   `已写入 ${outDir}：${Object.keys(ratings.mods).length} 个模组的聚合分、${shards} 份评论分片、` +
-    `${sponsors.sponsors.length} 位赞助人（keyId=${keyId}）`
+    `${starRows.length} 颗星标、${sponsors.sponsors.length} 位赞助人（keyId=${keyId}）`
 )

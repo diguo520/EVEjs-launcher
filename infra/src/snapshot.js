@@ -26,36 +26,57 @@ function round2(value) {
 }
 
 /**
- * 聚合分。口径与界面文案严格一致（`ui/src/lib/mod-logic.ts` 的 `ratingOf`）：
- *   - `count` 是**打过分的人**，含只打分不写评论的；
- *   - `withText` 才是**写了评论的人**，界面那句「玩家评价 · N 条」用它。
- * 两个口径分开是刻意的：打分的人远多于写字的人。
+ * 空聚合：一个模组既没有星标也没有评论时的形状。
+ * 新客户端读 `stars` / `comments`，老客户端读 `average` / `count` / `histogram`。
  */
-export function aggregateReviews(rows) {
+export function emptyAggregate() {
+  return { stars: 0, comments: 0, average: 0, count: 0, withText: 0, histogram: [0, 0, 0, 0, 0] }
+}
+
+/**
+ * 聚合。v0.5 起「评分」只有一个口径 —— **星标数**（GitHub 式点赞：二元、可取消、一人一颗）：
+ *   - `stars`    星标数，卡片 / 排序 / 筛选都读它；
+ *   - `comments` 写了评论的人数（只评论不点星也算，两个口径是独立的）。
+ *
+ * 另外三个字段是**遗留口径**，只为了让 0.3.x–0.4.x 老客户端不白屏：
+ * 点星按 5 分折算，所以 `average` 只有 0 与 5 两种取值，`histogram` 全压在最后一格，
+ * `count` 等于星标数。新客户端不要读它们，字段留着是因为老客户端的快照校验不认新字段。
+ */
+export function aggregateReviews(rows, starRows = []) {
   const totals = new Map()
+  const bucketOf = (modId) => {
+    let bucket = totals.get(modId)
+    if (!bucket) {
+      bucket = { stars: 0, comments: 0, withText: 0 }
+      totals.set(modId, bucket)
+    }
+    return bucket
+  }
+
+  for (const row of starRows ?? []) {
+    const modId = String(row?.mod_id ?? "")
+    if (!modId) continue
+    bucketOf(modId).stars += 1
+  }
+
   for (const row of rows ?? []) {
     if (!row || row.hidden) continue
     const modId = String(row.mod_id ?? "")
-    const stars = Number(row.stars)
-    if (!modId || !Number.isInteger(stars) || stars < 1 || stars > 5) continue
-    let bucket = totals.get(modId)
-    if (!bucket) {
-      bucket = { sum: 0, count: 0, histogram: [0, 0, 0, 0, 0], withText: 0 }
-      totals.set(modId, bucket)
-    }
-    bucket.sum += stars
-    bucket.count += 1
-    bucket.histogram[stars - 1] += 1
+    if (!modId) continue
+    const bucket = bucketOf(modId)
+    bucket.comments += 1
     if (String(row.body ?? "").trim()) bucket.withText += 1
   }
 
   const mods = {}
   for (const [modId, bucket] of [...totals.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
     mods[modId] = {
-      average: round2(bucket.sum / bucket.count),
-      count: bucket.count,
+      stars: bucket.stars,
+      comments: bucket.comments,
+      average: bucket.stars > 0 ? 5 : 0,
+      count: bucket.stars,
       withText: bucket.withText,
-      histogram: bucket.histogram,
+      histogram: [0, 0, 0, 0, bucket.stars],
     }
   }
   return mods
@@ -74,6 +95,7 @@ function shardItem(row) {
     author: String(row.author_name ?? "").trim(),
     corp: String(row.corp ?? "").trim(),
     country: String(row.country ?? "").trim().toUpperCase(),
+    // 遗留字段：v0.5 起评论不再带分值，这一列只为了让老客户端把「星标 ×」画满。
     stars: Number(row.stars),
     version: String(row.version ?? ""),
     date: toDateString(row.updated_at || row.created_at),
@@ -90,13 +112,34 @@ function shardItem(row) {
   return item
 }
 
-/** 单个模组的评论正文，最新的在前 */
-export function reviewShard(modId, rows) {
+/**
+ * 单个模组的评论正文，最新的在前。
+ *
+ * `stars` 是 v0.5 新加的：**本模组的星标记账**（谁点的星，按时间升序）。
+ * 启动器拿本机 keyId 在这份名单里一比就知道「我点没点过」，计数则直接读 `count`。
+ * 星标名单进分片是刻意的：快照是所有人共读的静态文件，服务端不认「谁是谁」，
+ * 「我点过没有」只能由客户端自己在一份公开名单里比对 —— 与评论的 `keyId` 同一套隐私口径。
+ */
+export function reviewShard(modId, rows, starRows = []) {
   const reviews = (rows ?? [])
     .filter((row) => row && !row.hidden && String(row.mod_id ?? "") === modId)
     .map(shardItem)
     .sort((a, b) => b.date.localeCompare(a.date))
-  return { schemaVersion: SNAPSHOT_SCHEMA_VERSION, modId, reviews }
+  const keys = (starRows ?? [])
+    .filter((row) => row && String(row.mod_id ?? "") === modId)
+    .sort(
+      (a, b) =>
+        Number(a.created_at ?? 0) - Number(b.created_at ?? 0) ||
+        String(a.key_id ?? "").localeCompare(String(b.key_id ?? ""))
+    )
+    .map((row) => String(row.key_id ?? ""))
+    .filter(Boolean)
+  return {
+    schemaVersion: SNAPSHOT_SCHEMA_VERSION,
+    modId,
+    reviews,
+    stars: { count: keys.length, keys },
+  }
 }
 
 /* ------------------------------ 补给线（赞助人） ------------------------------ */

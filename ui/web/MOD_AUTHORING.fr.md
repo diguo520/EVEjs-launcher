@@ -617,3 +617,41 @@ Quatre règles (🟥 en violer une fait échouer d'autres mods sans raison appar
 
 **Version du document** : mise à jour avec les versions du lanceur (synchronisée avec `_launcher/mods/MOD_AUTHORING.fr.md` du lanceur).
 Pour un cas non couvert ici, regardez d'abord le **journal du serveur** du lanceur et les avertissements rouges sur les cartes, puis posez la question au mainteneur avec le journal.
+
+# Annexe H : captures d'écran du mod (affichage sur le marché)
+
+La fiche détaillée d'un mod peut afficher quelques captures, et un clic ouvre une visionneuse que l'on feuillette. Les images restent **dans votre propre dépôt de mod** — rien n'est téléversé ailleurs.
+
+## Comment les ajouter
+
+1. Placez un dossier `shots/` dans le dossier du mod (le « Créer un mod » du lanceur en fournit déjà un, avec un court readme dedans)
+2. Déposez les captures : `webp` / `png` / `jpg` / `gif` — **les sous-dossiers sont ignorés**
+3. Publiez (ou publiez une mise à jour) depuis le lanceur — le reste est automatique
+
+## Règles
+
+| Élément | Détail |
+| --- | --- |
+| Ordre | Tri par **nom de fichier**, et la fiche suit cet ordre (préfixez `01-`, `02-` pour le contrôler) |
+| Nombre | **9 au maximum** ; au-delà, les fichiers sont coupés dans l'ordre |
+| Poids | Visez **≤ 200 Ko par image en 16:9** — des images lourdes font attendre à l'ouverture |
+| Format | Préférez `webp` (le plus léger à qualité égale) |
+
+## Ce qui se passe à la publication
+
+1. Le lanceur parcourt `mods/<votre mod>/shots/` et écrit la liste des fichiers dans `shots` de `evejs-mod.json`
+2. Les images elles-mêmes sont poussées vers **votre dépôt de mod** (pas celui du marché)
+3. L'index du marché (fusionné et signé par la CI) reprend cette liste
+4. La fiche du lanceur charge `https://cdn.jsdelivr.net/gh/<votre dépôt>@main/shots/<fichier>`
+
+Donc : **les images restent toujours dans votre dépôt** ; le marché ne contient qu'une liste de noms. Changer une image ne concerne que votre dépôt.
+
+## Trois pièges
+
+- **Ne supprimez pas le readme dans `shots/`** : un dossier vide ne survit ni à git ni au ZIP ; le supprimer prive de ce dossier quiconque clone votre dépôt
+- **Publier sans `shots/` local n'efface pas les captures déjà listées** : le lanceur conserve le champ `shots` existant du dépôt avant d'écrire. Pour **retirer** des captures, videz votre `shots/` local (un dossier vide compte comme vide)
+- **Une image manquante ne provoque aucune erreur** : si vous supprimez le dépôt ou renommez un fichier, la fiche affiche simplement **moins d'images, en silence** (l'image en échec se cache au lieu de laisser un cadre cassé)
+
+## Quand cela devient visible
+
+Après une publication réussie, l'index du marché est reconstruit **immédiatement à la fusion de votre PR** (avec une exécution planifiée toutes les 6 heures en filet de sécurité). Le lanceur garde en plus un cache de 2 minutes.
