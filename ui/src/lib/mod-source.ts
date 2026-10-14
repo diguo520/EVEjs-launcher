@@ -20,7 +20,7 @@ import type {
   RawMyMods,
   RawSubmissionItem,
 } from "./ipc"
-import { FEATURES_HEADING, compareVersions, ratingFromReviews, readmeParagraphs } from "./mod-logic"
+import { FEATURES_HEADING, compareVersions, ratingFromStarCount, readmeParagraphs } from "./mod-logic"
 import { modShotUrls } from "./mod-media"
 import type { ModChangelog, ModEntry, ModReview, ModReviewState } from "./mock"
 
@@ -324,6 +324,8 @@ export function buildMods(input: {
   submissions?: RawSubmissionItem[] | null
   /** 已经按需拉回来的评论正文：modId → 评论。没拉过的模组不在表里 */
   reviews?: Record<string, ModReview[]>
+  /** 分片里带的星标数：modId → 星标数。它比列表里的聚合新，有值时以它为准 */
+  starCounts?: Record<string, number>
   /** 当前界面语言：审核原因按它取 zh / en（与更新说明同口径） */
   locale?: LocaleCode
 }): ModEntry[] {
@@ -372,8 +374,16 @@ export function buildMods(input: {
   // 列表构建不依赖它，拉回来之后重新构建一次就能把评论挂上去
   const withReviews = [...byId.values()].map((entry) => {
     const loaded = input.reviews?.[entry.id]
-    // 分片就是该模组的全部评价，聚合分直接拿它算：刚投的那一票立刻反映到汇总行（见 ratingFromReviews）
-    return loaded ? { ...entry, reviews: loaded, ...ratingFromReviews(loaded) } : entry
+    if (!loaded) return entry
+    /**
+     * 星标数**以分片为准**（列表里那份聚合可能还没刷新），缺失时才保留原值。
+     * 之前这里是从评论条数重算的，会把星标数覆盖成「评论条数」——
+     * 列表 5 颗、详情 3 个的错位就是这么来的。
+     */
+    const stars = input.starCounts?.[entry.id]
+    return stars === undefined
+      ? { ...entry, reviews: loaded }
+      : { ...entry, reviews: loaded, ...ratingFromStarCount(stars) }
   })
 
   return withReviews.map((entry) => {

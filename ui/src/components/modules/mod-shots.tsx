@@ -34,7 +34,9 @@ export function ModShots({
 
   return (
     <>
-      <div className={cn("flex flex-wrap gap-2", className)}>
+      {/* 单行横向滚动，**不换行**：详情弹窗里还有概览 / 版本历史 / 评论，
+          截图一旦自动换行就会连成九宫格，把后面的内容全顶到屏幕外 */}
+      <div className={cn("flex gap-2 overflow-x-auto pb-1", className)}>
         {alive.map((url, at) => (
           <button
             key={url}
@@ -49,7 +51,7 @@ export function ModShots({
               loading="lazy"
               draggable={false}
               onError={() => setBroken((prev) => (prev.includes(url) ? prev : [...prev, url]))}
-              className="h-24 w-40 rounded-md border border-border bg-card object-cover transition-opacity hover:opacity-85"
+              className="h-16 w-28 rounded-md border border-border bg-card object-cover transition-opacity hover:opacity-85"
             />
           </button>
         ))}

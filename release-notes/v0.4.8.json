@@ -1,0 +1,17 @@
+{
+  "version": "0.4.8",
+  "changelog": {
+    "zh": [
+      { "type": "fix", "text": "模组详情的截图改回紧凑的一排小图（横向滚动）。上一版把图放大成 96×160 并允许自动换行，9 张就连成九宫格，把「概览 / 版本历史 / 评论」整个顶出屏幕之外 —— 现在恢复成 64×112 的单行排列。点开大图的查看器（左右箭头 / 底部圆点 / 叉或 Esc 关闭）不变。" },
+      { "type": "fix", "text": "修好星标数在列表和详情里对不上的问题：列表显示 5 颗星、点开详情却变成 3 个。根因是详情加载分片后，汇总行被「评论条数」覆盖了（evejs-automining 恰好 5 颗星、3 条评论，所以一眼就能看出来）。现在星标数只认服务端给的星标数，详情分片里的优先，不再从评论条数去推。" },
+      { "type": "fix", "text": "点星之后立刻生效：服务端写回包里带着它算好的星标数，界面直接更新，不用再等市场聚合刷新那一轮。" },
+      { "type": "fix", "text": "「只打分、不写正文」的历史空评论不再计入评论条数 —— 那是老客户端（0.3.x–0.4.x）留下的行，星标化之后它的分值已经折算成一颗星，再作为一条空评论挂在列表和计数里就是纯噪音。线上 3 条历史空行已清掉，以后老客户端再写出来的空行也会被挡在快照之外。" }
+    ],
+    "en": [
+      { "type": "fix", "text": "Screenshots in the mod detail view are a compact single row again (scrolling horizontally). The previous release enlarged them to 96x160 and allowed wrapping, so nine images formed a grid and pushed the overview, version history and reviews off the screen; they are back to 64x112 in one row. The larger viewer (arrows, dots, close button or Esc) is unchanged." },
+      { "type": "fix", "text": "Fixed star counts disagreeing between the list and the detail view: the list showed five stars and opening the detail showed three. The detail shard, once loaded, overwrote the summary row with the number of reviews (evejs-automining happens to have five stars and three reviews, which is what made it obvious). Star counts now come only from the server's star count, preferring the value in the detail shard, and are never derived from review counts." },
+      { "type": "fix", "text": "Starring now takes effect immediately: the write reply carries the server-computed star count, so the UI updates straight away instead of waiting for the next market aggregate refresh." },
+      { "type": "fix", "text": "Legacy score-only comments (a rating with no text) no longer count as reviews. Those rows came from older clients (0.3.x-0.4.x); once ratings became stars, their score was already converted into a star, so keeping them as empty comments in the list and the counter was pure noise. The three legacy empty rows have been cleaned up, and future empty rows written by older clients are filtered out of the snapshot." }
+    ]
+  }
+}

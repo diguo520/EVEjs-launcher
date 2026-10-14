@@ -364,23 +364,23 @@ export function ratingOf(mod: ModEntry): RatingSummary {
  * 立刻重算（Worker 里 `ctx.waitUntil(rebuildSnapshots)`），聚合表要等索引下一次刷新 ——
  * 拿分片算，用户刚投的那一票马上就能在汇总行看到，不会「打了分平均分不动」。
  */
-export function ratingFromReviews(
-  reviews: ModReview[]
+/**
+ * 星标口径的汇总：**星标数是唯一来源**，绝不从评论条数去推。
+ *
+ * 这里原来是「拿评论列表算分值平均分」，星标化之后那段逻辑就成了 bug：详情加载分片后
+ * 会把「评论条数」盖到汇总行上 —— 列表显示 5 颗星、点开详情变成 3 个，就是这么来的
+ * （`evejs-automining` 恰好 5 颗星、3 条评论，2026-10-14 实测）。
+ *
+ * 现在由调用方把服务端分片里的 `stars.count` 传进来，这里只负责派生遗留的 5 分制字段。
+ */
+export function ratingFromStarCount(
+  count: number
 ): Pick<ModEntry, "ratingAvg" | "ratingCount" | "ratingHistogram"> {
-  const histogram = [0, 0, 0, 0, 0]
-  let sum = 0
-  let count = 0
-  for (const review of reviews) {
-    const stars = Math.round(review.stars)
-    if (!Number.isInteger(stars) || stars < 1 || stars > 5) continue
-    histogram[stars - 1] += 1
-    sum += stars
-    count += 1
-  }
+  const stars = Math.max(0, Math.floor(Number.isFinite(count) ? count : 0))
   return {
-    ratingAvg: count > 0 ? Math.round((sum / count) * 100) / 100 : 0,
-    ratingCount: count,
-    ratingHistogram: histogram,
+    ratingAvg: stars > 0 ? 5 : 0,
+    ratingCount: stars,
+    ratingHistogram: [0, 0, 0, 0, stars],
   }
 }
 
@@ -1280,7 +1280,8 @@ export function sortMods(mods: ModEntry[], sort: ModSort): ModEntry[] {
   const sorted = [...mods]
   sorted.sort((a, b) => {
     if (sort === "rating") {
-      const gap = ratingOf(b).average - ratingOf(a).average
+      // 星标口径：比「多少人点过星」，平均分在星标模型里恒为 5，比它没有意义
+      const gap = ratingOf(b).count - ratingOf(a).count
       if (gap !== 0) return gap
       return b.downloads - a.downloads
     }

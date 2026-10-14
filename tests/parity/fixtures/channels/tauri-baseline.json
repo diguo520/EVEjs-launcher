@@ -25,7 +25,7 @@
       "phase": "3-4",
       "platform": "win32",
       "repoRoot": "<abs-path>",
-      "version": "0.4.7"
+      "version": "0.4.8"
     },
     "config:get": {
       "client": {
@@ -172,10 +172,10 @@
       "supported": true
     },
     "metrics:get": {
-      "cpuPercent": 32.69810485839844,
+      "cpuPercent": 19.8402099609375,
       "diskRoot": "<abs-path>",
       "diskTotalGB": 976.5624961853028,
-      "diskUsedGB": 875.7732048034668,
+      "diskUsedGB": 876.803150177002,
       "gpuDedicatedTotalGB": null,
       "gpuDedicatedUsedGB": null,
       "gpuMemoryTotalGB": null,
@@ -183,31 +183,31 @@
       "gpuPercent": null,
       "gpuSharedUsedGB": null,
       "memTotalGB": 31.855934143066406,
-      "memUsedGB": 10.048412322998049,
+      "memUsedGB": 11.852184295654297,
       "netBytesPerSec": 0,
       "virtualMemTotalGB": 33.855934143066406,
-      "virtualMemUsedGB": 10.378578186035156,
+      "virtualMemUsedGB": 13.008464813232422,
       "volumes": [
         {
-          "freeGB": 58.152095794677734,
-          "percent": 73.85596435188376,
+          "freeGB": 52.72538757324219,
+          "percent": 76.29570536644788,
           "root": "<abs-path>",
           "totalGB": 222.4296836853027,
-          "usedGB": 164.277587890625
+          "usedGB": 169.70429611206055
         },
         {
-          "freeGB": 143.58469772338867,
-          "percent": 50.98975587226244,
+          "freeGB": 143.52787017822266,
+          "percent": 51.00915300793169,
           "root": "<abs-path>",
           "totalGB": 292.96874618530273,
-          "usedGB": 149.38404846191406
+          "usedGB": 149.44087600708008
         },
         {
-          "freeGB": 100.78929138183594,
-          "percent": 89.67917652218428,
+          "freeGB": 99.75934600830078,
+          "percent": 89.78464292884625,
           "root": "<abs-path>",
           "totalGB": 976.5624961853028,
-          "usedGB": 875.7732048034668
+          "usedGB": 876.803150177002
         },
         {
           "freeGB": 331.2270088195801,
@@ -338,7 +338,7 @@
     "terminal:input": null,
     "terminal:resize": null,
     "update:state": {
-      "currentVersion": "0.4.7",
+      "currentVersion": "0.4.8",
       "state": "idle"
     }
   }

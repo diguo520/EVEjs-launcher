@@ -26,14 +26,14 @@ import {
   moveWithin,
   parseIdList,
   parseTags,
-  ratingFromReviews,
+  ratingFromStarCount,
   formatCount,
   reviewPrStateLabel,
   submitCooldownRemaining,
   type PublishCredential,
 } from "@/lib/mod-logic"
 import type { RawModPreflightMod, RawModPreflightReport } from "@/lib/ipc"
-import type { ModEntry, ModReview } from "@/lib/mock"
+import type { ModEntry } from "@/lib/mock"
 
 const NOW = 1_770_000_000_000
 const liveCredential = { token: "ghp_x", savedAt: NOW - 60_000, expiresAt: NOW + 3_600_000 } as unknown as PublishCredential
@@ -378,42 +378,26 @@ describe("marketVersionDiff（本地与市场不一致时并列显示）", () =>
   })
 })
 
-describe("ratingFromReviews（拿评论分片算聚合分）", () => {
-  const review = (stars: number): ModReview => ({
-    id: "rv",
-    author: "",
-    corp: "",
-    stars,
-    date: "2026-10-01",
-    version: "1.0.0",
-    body: "",
+describe("ratingFromStarCount（星标数就是唯一口径）", () => {
+  it("星标数原样进汇总，遗留均分只有 0 与 5", () => {
+    const result = ratingFromStarCount(5)
+    expect(result.ratingCount).toBe(5)
+    expect(result.ratingAvg).toBe(5)
+    expect(result.ratingHistogram).toEqual([0, 0, 0, 0, 5])
   })
 
-  it("平均分与服务端同口径（两位四舍五入），分档五格", () => {
-    const result = ratingFromReviews([review(5), review(4), review(4)])
-    expect(result.ratingCount).toBe(3)
-    expect(result.ratingAvg).toBe(4.33)
-    // 下标 0 是 1 星：两个 4 星（下标 3）+ 一个 5 星（下标 4）
-    expect(result.ratingHistogram).toEqual([0, 0, 0, 2, 1])
-  })
-
-  it("一条都没有时是 0 / 0（界面据此显示「暂无评分」）", () => {
-    expect(ratingFromReviews([])).toEqual({
+  it("没人点星时是 0 / 0（界面据此显示「0」而不是空白）", () => {
+    expect(ratingFromStarCount(0)).toEqual({
       ratingAvg: 0,
       ratingCount: 0,
       ratingHistogram: [0, 0, 0, 0, 0],
     })
   })
 
-  it("越界的星级跳过，不把脏数据算进平均分", () => {
-    const result = ratingFromReviews([review(5), review(9), review(0)])
-    expect(result.ratingCount).toBe(1)
-    expect(result.ratingAvg).toBe(5)
-  })
-
-  it("分片就是全部评价：只打分不写字的也算一票", () => {
-    const scoreOnly: ModReview = { ...review(3), body: "" }
-    expect(ratingFromReviews([scoreOnly]).ratingCount).toBe(1)
+  it("脏数据（负数 / NaN / 小数）不进界面", () => {
+    expect(ratingFromStarCount(-3).ratingCount).toBe(0)
+    expect(ratingFromStarCount(Number.NaN).ratingCount).toBe(0)
+    expect(ratingFromStarCount(2.7).ratingCount).toBe(2)
   })
 })
 

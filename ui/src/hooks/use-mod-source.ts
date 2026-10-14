@@ -262,6 +262,8 @@ export function useModSource(): ModSourceState {
   const [reviewsById, setReviewsById] = useState<Record<string, ModReview[]>>({})
   /** 本机身份在哪些模组上点过星（服务端分片里那份公开 keyId 名单比对出来的） */
   const [starredById, setStarredById] = useState<Record<string, boolean>>({})
+  /** 分片里带的星标数：点星之后立刻用服务端回包里的数字更新，不用等聚合刷新 */
+  const [starCountById, setStarCountById] = useState<Record<string, number>>({})
   /** 正在点星的模组：按钮先禁用，避免连点把服务端打成连发 */
   const [starBusyId, setStarBusyId] = useState("")
 
@@ -326,6 +328,9 @@ export function useModSource(): ModSourceState {
       setReviewsById((prev) => ({ ...prev, [id]: reviewsOf(reply.reviews) }))
       // 「我点过没有」只能从分片里那份 keyId 名单读 —— 服务端不存「谁是谁」
       setStarredById((prev) => ({ ...prev, [id]: reply.starred === true }))
+      if (typeof reply.starCount === "number") {
+        setStarCountById((prev) => ({ ...prev, [id]: reply.starCount as number }))
+      }
     },
     [ipc, reviewsById]
   )
@@ -399,7 +404,12 @@ export function useModSource(): ModSourceState {
       setStarBusyId(modId)
       try {
         const reply = await writeReviewAction("modsStarSet", { modId, on }, modId)
-        if (reply.ok) setStarredById((prev) => ({ ...prev, [modId]: on }))
+        if (reply.ok) {
+          setStarredById((prev) => ({ ...prev, [modId]: on }))
+          // 写路径的回包就带着服务端算好的星标数：直接落状态，卡片/详情立刻动
+          const stars = (reply as { stars?: number }).stars
+          if (typeof stars === "number") setStarCountById((prev) => ({ ...prev, [modId]: stars }))
+        }
         return reply
       } finally {
         setStarBusyId("")
@@ -527,9 +537,10 @@ export function useModSource(): ModSourceState {
         mine,
         submissions: submissions?.items,
         reviews: reviewsById,
+        starCounts: starCountById,
         locale,
       }),
-    [list, market, mine, submissions, reviewsById, locale]
+    [list, market, mine, submissions, reviewsById, starCountById, locale]
   )
 
   const marketById = useMemo(() => {

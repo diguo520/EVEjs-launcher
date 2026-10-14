@@ -15,7 +15,8 @@ const row = (over = {}) => ({
   mod_id: "evejs-a",
   version: "1.0.0",
   stars: 5,
-  body: "",
+  // 默认给一句正文：v0.5 起「空正文 = 只打分不写字」的老行不再算一条评论
+  body: "装上就能用",
   author_name: "指挥官",
   corp: "",
   key_id: "abc",
@@ -50,13 +51,14 @@ test("聚合：星标数是唯一评分口径，遗留均分只有 0 与 5", () 
   })
 })
 
-test("聚合：星标与评论分开算，只评论不点星也算一条评论", () => {
+test("聚合：星标与评论分开算；空正文的行不算法一条评论", () => {
   const mods = aggregateReviews(
     [row({ id: "a", body: "好用" }), row({ id: "b", body: "" }), row({ id: "c", body: "   " })],
     [starRow({ key_id: "k1" })]
   )
   assert.equal(mods["evejs-a"].stars, 1)
-  assert.equal(mods["evejs-a"].comments, 3)
+  // 只有 a 写了字：b / c 是「只打分不写字」的老行，分值早已折算成星标，不再算一条空评论
+  assert.equal(mods["evejs-a"].comments, 1)
   assert.equal(mods["evejs-a"].withText, 1)
 })
 

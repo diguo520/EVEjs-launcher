@@ -493,15 +493,17 @@ describe("评价写路径要的数据（指纹与聚合分）", () => {
     expect(mods[0].pkgSha256).toBeUndefined()
   })
 
-  it("评论拉回来之后聚合分改由分片算（刚投的那一票立刻进汇总行）", () => {
+  it("评论拉回来之后星标数改由分片算（刚点的那一颗立刻进汇总）", () => {
     const mods = buildMods({
       market: market([
         { id: "demo", displayName: "演示", version: "1.0.0", ratingAvg: 2, ratingCount: 1 },
       ]),
       reviews: { demo: [review({ id: "rv-1", stars: 5 }), review({ id: "rv-2", stars: 4 })] },
+      // 分片带的星标数：与评论条数（这里 2 条）**故意不同**，用来钉死不再拿评论数当星标数
+      starCounts: { demo: 7 },
     })
-    expect(mods[0].ratingCount).toBe(2)
-    expect(mods[0].ratingAvg).toBe(4.5)
+    expect(mods[0].ratingCount).toBe(7)
+    expect(mods[0].ratingAvg).toBe(5)
     expect(mods[0].reviews).toHaveLength(2)
   })
 

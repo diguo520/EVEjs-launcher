@@ -34,6 +34,18 @@ export function emptyAggregate() {
 }
 
 /**
+ * 这条评论算不算「一条评论」：**写了正文才算**。
+ *
+ * 老客户端（0.3.x–0.4.x）允许「只打分不写字」，那种行正文是空的；星标化之后它的分值已经
+ * 折算成 `stars` 里的一颗星，再作为一条空评论挂在列表和 `comments` 计数里就是纯噪音
+ * （2026-10-14：线上 3 条历史空行被清掉，但同时要把「以后再由老客户端写出来的空行」
+ * 挡在快照外，否则清一次还会再长出来）。
+ */
+function hasCommentBody(row) {
+  return String(row?.body ?? "").trim() !== ""
+}
+
+/**
  * 聚合。v0.5 起「评分」只有一个口径 —— **星标数**（GitHub 式点赞：二元、可取消、一人一颗）：
  *   - `stars`    星标数，卡片 / 排序 / 筛选都读它；
  *   - `comments` 写了评论的人数（只评论不点星也算，两个口径是独立的）。
@@ -63,9 +75,10 @@ export function aggregateReviews(rows, starRows = []) {
     if (!row || row.hidden) continue
     const modId = String(row.mod_id ?? "")
     if (!modId) continue
+    if (!hasCommentBody(row)) continue
     const bucket = bucketOf(modId)
     bucket.comments += 1
-    if (String(row.body ?? "").trim()) bucket.withText += 1
+    bucket.withText += 1
   }
 
   const mods = {}
@@ -122,7 +135,7 @@ function shardItem(row) {
  */
 export function reviewShard(modId, rows, starRows = []) {
   const reviews = (rows ?? [])
-    .filter((row) => row && !row.hidden && String(row.mod_id ?? "") === modId)
+    .filter((row) => row && !row.hidden && String(row.mod_id ?? "") === modId && hasCommentBody(row))
     .map(shardItem)
     .sort((a, b) => b.date.localeCompare(a.date))
   const keys = (starRows ?? [])
