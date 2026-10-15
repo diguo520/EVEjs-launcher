@@ -520,6 +520,18 @@ async fn start_main_server(app: &AppHandle) -> Result<Value, String> {
         ),
         ("EVEJS_PROXY_LOCAL_INTERCEPT".to_string(), "1".to_string()),
     ];
+    // R2：Node 的编译缓存（NODE_COMPILE_CACHE）。
+    //
+    // 服务端会 fork 出 10 个 worker，`NODE_OPTIONS` 被逐层继承 —— 没有这个缓存时，
+    // **每个进程**都要把服务端 + 全部模组的模块重新编译一遍（同一份代码编译 11 次）。
+    // 有了它，编译产物落到磁盘，第二次进程（以及下次启动）直接复用。
+    // Node ≥ 22.1 支持；更低版本会静默忽略这个环境变量，无害。
+    let compile_cache = state.runtime.cache.join("node-compile");
+    let _ = std::fs::create_dir_all(&compile_cache);
+    env_vars.push((
+        "NODE_COMPILE_CACHE".to_string(),
+        compile_cache.to_string_lossy().to_string(),
+    ));
     // 模组 loader：通过 NODE_OPTIONS=--require 注入，服务端文件零改动。
     // 注意 NODE_OPTIONS 的解析规则：反斜杠会被当转义符吃掉，且按空格分词，
     // 所以路径必须转成正斜杠并加双引号（已实测验证；plan_loaders 保证斜杠方向）。

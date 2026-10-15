@@ -2,12 +2,12 @@
   "generatedFrom": "E:\\Games\\EveJS-v0.12.8\\launcher\\launcher",
   "generatedAt": "2026-10-13T16:52:43.237Z",
   "counts": {
-    "invoke": 115,
-    "send": 6,
-    "events": 9,
-    "requests": 121,
+    "invoke": 116,
+    "send": 7,
+    "events": 10,
+    "requests": 123,
     "registered": 82,
-    "apiTotal": 130
+    "apiTotal": 133
   },
   "invoke": [
     {
@@ -105,6 +105,13 @@
     {
       "api": "appInfo",
       "channel": "app:info",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "appQuit",
+      "channel": "app:quit",
       "kind": "invoke",
       "signature": "",
       "params": []
@@ -1014,6 +1021,13 @@
       "params": []
     },
     {
+      "api": "windowHideToTray",
+      "channel": "window:hideToTray",
+      "kind": "send",
+      "signature": "",
+      "params": []
+    },
+    {
       "api": "windowMinimize",
       "channel": "window:minimize",
       "kind": "send",
@@ -1029,6 +1043,10 @@
     }
   ],
   "events": [
+    {
+      "api": "onAppCloseRequested",
+      "channel": "app:closeRequested"
+    },
     {
       "api": "onFactionEvent",
       "channel": "faction:event"
@@ -1082,6 +1100,7 @@
       "accounts:deleteCharacter",
       "accounts:logotypes",
       "accounts:online",
+      "app:quit",
       "danger:clearCache",
       "danger:eraseWorld",
       "danger:resetConfig",
@@ -1119,8 +1138,11 @@
       "storeEditor:read",
       "storeEditor:save"
     ],
-    "send": [],
+    "send": [
+      "window:hideToTray"
+    ],
     "events": [
+      "app:closeRequested",
       "faction:event",
       "faction:streamState"
     ]

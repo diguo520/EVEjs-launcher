@@ -15,7 +15,7 @@ type SettingKey =
   | "autoRestart"
   | "autoBackup"
   | "experimental"
-  | "telemetry"
+  | "closeAction"
 
 interface SettingDef {
   key: SettingKey
@@ -63,11 +63,11 @@ const SETTINGS: SettingDef[] = [
     wired: false,
   },
   {
-    key: "telemetry",
-    label: "遥测数据上报",
-    hint: "上报崩溃日志帮助改进",
+    key: "closeAction",
+    label: "关闭时最小化到托盘",
+    hint: "打开后点窗口的叉直接收进托盘（服务继续跑，再启动一次启动器即可唤回）；关掉则每次关窗都问你",
     def: false,
-    wired: false,
+    wired: true,
   },
 ]
 
@@ -90,14 +90,23 @@ export function GeneralSettings() {
     if (!ipc) return
     void callOr<RawSettings>("settingsGet", null).then((settings) => {
       if (!settings) return
-      setValues((prev) => ({ ...prev, startMarket: startMarketOf(settings) }))
+      setValues((prev) => ({
+        ...prev,
+        startMarket: startMarketOf(settings),
+        // closeAction 是字符串（ask / tray / exit）而不是布尔：这里只映射「托盘化」这一态
+        closeAction:
+          String((settings as Record<string, unknown>).closeAction ?? "") === "tray",
+      }))
     })
   }, [ipc])
 
   async function toggle(item: SettingDef, next: boolean) {
     if (!item.wired) return
     setValues((prev) => ({ ...prev, [item.key]: next }))
-    const reply = await callOr<RawAck>("settingsSet", null, { [item.key]: next })
+    // closeAction 写的是字符串；关掉 = 回到「每次问」
+    const payload =
+      item.key === "closeAction" ? { closeAction: next ? "tray" : "ask" } : { [item.key]: next }
+    const reply = await callOr<RawAck>("settingsSet", null, payload)
     if (!reply?.ok) {
       setValues((prev) => ({ ...prev, [item.key]: !next }))
       toast.error("设置没能写入", { description: reply?.reason ?? "后端没说明原因" })

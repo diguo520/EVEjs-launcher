@@ -44,7 +44,9 @@ pub mod win32;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use tauri::{Manager, WebviewUrl, WebviewWindowBuilder, WindowEvent};
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 
 /// 渲染层注入脚本：window.api shim（由 scripts/gen-contract.mjs 生成，随源码进仓）。
 const API_SHIM: &str = include_str!("../../ui/src/api-shim.js");
@@ -218,17 +220,88 @@ pub fn run() {
             // 防白屏：等首帧就绪再显示（对齐现役版 ready-to-show 后再 show）
             let handle = window.clone();
             window.on_window_event(move |event| match event {
-                WindowEvent::CloseRequested { .. } => {
+                WindowEvent::CloseRequested { api, .. } => {
                     ipc::window::save_bounds(&handle);
+                    // 一律先拦下默认退出：主服务器与市场服务可能正在运行，直接退会连带
+                    // 把它们杀掉，而窗口右上角那个叉是最容易误点的位置。
+                    api.prevent_close();
+                    match ipc::window::close_action(&handle) {
+                        // 记住过选择就不再问，直接照做
+                        ipc::window::CloseAction::Tray => {
+                            let _ = handle.hide();
+                        }
+                        ipc::window::CloseAction::Exit => {
+                            handle.app_handle().exit(0);
+                        }
+                        // 没记住 → 交给渲染层画选择框（components/shell/close-prompt.tsx）
+                        ipc::window::CloseAction::Ask => {
+                            let _ = handle.emit("app:closeRequested", serde_json::json!([]));
+                        }
+                    }
                 }
                 WindowEvent::Moved(_) | WindowEvent::Resized(_) => {
                     ipc::window::save_bounds_throttled(&handle);
                 }
                 _ => {}
             });
+            // 托盘图标：关窗提示里的「最小化到托盘」把窗口 hide 掉之后，这里是唯一的唤回入口。
+            // 没有它，hide 等于把启动器扔进一个找不回来的地方（2026-10-15 报障）。
+            // 自检进程（--self-test）不建托盘：那是无人值守的诊断进程。
+            if !self_test {
+                build_tray(&window)?;
+            }
             window.show()?;
             Ok(())
         })
         .run(tauri::generate_context!())
         .expect("Tauri 应用启动失败");
+}
+
+/// 托盘图标：左键单击唤回窗口，右键菜单「显示主窗口 / 退出程序」。
+///
+/// 存在的理由：窗口按用户的「最小化到托盘」被 hide 之后，托盘是**唯一**能把它叫回来的地方。
+/// 图标用随包的那张 PNG（`icon-src.png`）而不是系统的默认窗口图标 —— 后者在某些打包形态下
+/// 是空的，那样会得到一个没有图标的托盘项（等于没建）。
+fn build_tray(window: &tauri::WebviewWindow) -> tauri::Result<()> {
+    let app = window.app_handle();
+
+    let show = MenuItem::with_id(app, "show", "显示主窗口", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", "退出程序", true, None::<&str>)?;
+    let menu = Menu::with_items(app, &[&show, &quit])?;
+
+    TrayIconBuilder::with_id("main-tray")
+        .icon(tauri::image::Image::from_bytes(include_bytes!(
+            "../icons/icon-src.png"
+        ))?)
+        .tooltip("EvEJS 启动器")
+        .menu(&menu)
+        // 左键留给「唤回窗口」，菜单只走右键 —— 左键弹菜单会让唤回变成两跳
+        .show_menu_on_left_click(false)
+        .on_menu_event(|app, event| match event.id.as_ref() {
+            "show" => restore_main_window(app),
+            "quit" => app.exit(0),
+            _ => {}
+        })
+        .on_tray_icon_event(|tray, event| {
+            if let TrayIconEvent::Click {
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+                ..
+            } = event
+            {
+                restore_main_window(tray.app_handle());
+            }
+        })
+        .build(app)?;
+    Ok(())
+}
+
+/// 把主窗口放出来：hide 过的窗口 show 之后还要 unminimize + 聚焦，否则它可能以最小化
+/// 状态回来（用户点了图标却只看到任务栏闪一下）。
+fn restore_main_window(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+    }
 }

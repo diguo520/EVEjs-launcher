@@ -3591,5 +3591,15 @@
   "下一张": "Weiter",
   "第 {n} 张，共 {total} 张": "Bild {n} von {total}",
   "切换截图": "Screenshot wechseln",
-  "查看第 {n} 张截图": "Screenshot {n} ansehen"
+  "查看第 {n} 张截图": "Screenshot {n} ansehen",
+  "全部服务已在运行，无需重复启动": "Alle Dienste laufen bereits; ein erneuter Start ist nicht nötig",
+  "关闭启动器？": "Launcher schließen?",
+  "主服务器或市场服务可能还在运行：收进任务栏可以继续跑，退出程序会一并把它们关掉。": "Hauptserver oder Marktdienst laufen möglicherweise noch: Minimieren lässt sie weiterlaufen, Beenden stoppt sie mit.",
+  "最小化到任务栏": "In die Taskleiste minimieren",
+  "退出程序": "Beenden",
+  "关闭时最小化到托盘": "Beim Schließen in den Infobereich minimieren",
+  "打开后点窗口的叉直接收进托盘（服务继续跑，再启动一次启动器即可唤回）；关掉则每次关窗都问你": "An: Das X des Fensters legt es direkt in den Infobereich (Dienste laufen weiter; Launcher erneut starten holt es zurück). Aus: Jedes Schließen fragt nach.",
+  "最小化到托盘": "In den Infobereich minimieren",
+  "记住我的选择": "Meine Wahl merken",
+  "主服务器或市场服务可能还在运行：收进托盘可以继续跑，退出程序会一并把它们关掉。": "Hauptserver oder Marktdienst laufen möglicherweise noch: Minimieren in den Infobereich lässt sie weiterlaufen, Beenden stoppt sie mit."
 }

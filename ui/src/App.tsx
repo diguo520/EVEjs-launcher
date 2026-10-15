@@ -23,6 +23,7 @@ import { hasIpc } from "@/lib/ipc"
 import { markLegalNoticeSeen, needsLegalNotice } from "@/lib/legal-notice"
 import { DashboardPage } from "@/pages/dashboard-page"
 import { ConsolePage } from "@/pages/console-page"
+import { ClosePrompt } from "@/components/shell/close-prompt"
 import { GameConfigPage } from "@/pages/game-config-page"
 import { StaticDataPage } from "@/pages/static-data-page"
 import { AccountsPage } from "@/pages/accounts-page"
@@ -246,6 +247,7 @@ export function App() {
         </div>
 
         <Toaster />
+        <ClosePrompt />
       </TooltipProvider>
     </LauncherVersionProvider>
   )

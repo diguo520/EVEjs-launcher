@@ -77,16 +77,20 @@ export function LaunchBanner({
         </div>
 
         <div className="flex items-center gap-2">
-          {/* 门禁挡着就把按钮按死：拦不住就不叫门禁。理由就在旁边那行红字里 */}
+          {/* 门禁挡着就按死：拦不住就不叫门禁。理由就在旁边那行红字里。
+              全部服务起来之后同样按死 —— 再点一次只会把已经跑起来的服务重启一遍，
+              用户看到的却是「一键启动没反应」或者服务被无谓地打断。 */}
           <Button
             onClick={onLaunchAll}
-            disabled={busy || blocked}
+            disabled={busy || blocked || allUp}
             size="lg"
             className="px-7"
             title={
               blocked
                 ? t("缺少 {list}，补上后即可启动", { list: blockers.join(listSeparator()) })
-                : undefined
+                : allUp
+                  ? t("全部服务已在运行，无需重复启动")
+                  : undefined
             }
           >
             {busy ? <Loader2 className="animate-spin" /> : <Play />}

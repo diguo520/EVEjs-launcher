@@ -63,6 +63,11 @@ async fn dispatch(
 
     match channel {
         /* ------------------------------ 窗口控制 ------------------------------ */
+        // 托盘化：hide 掉窗口（任务栏不留按钮），服务继续跑。唤回靠重新启动一次启动器
+        "window:hideToTray" => {
+            window.hide().map_err(text)?;
+            Ok(Value::Null)
+        }
         "window:minimize" => {
             window.minimize().map_err(text)?;
             Ok(Value::Null)
@@ -96,6 +101,13 @@ async fn dispatch(
             // 已经在启动阶段搬好，这里把结果报给设置页，用户不需要重新配置任何东西
             "legacy": crate::legacy::last_state(&state.runtime)
         })),
+        // 关窗提示框里的「退出程序」：lib.rs 先拦住关窗、让用户选（收进任务栏还是退出），
+        // 真选了退出才走到这里。用 app.exit 而不是 window.close —— 后者会再触发一次
+        // CloseRequested，又落回同一个拦截里，用户会看到「点了没反应」。
+        "app:quit" => {
+            app.exit(0);
+            Ok(json!({ "ok": true }))
+        }
         "shell:openExternal" => Ok(json!(open_external(app, &arg_str(args, 0)))),
 
         /* ------------------------- 环境自检 / 健康检查 ------------------------- */

@@ -25,6 +25,7 @@ pub const HANDLED: &[&str] = &[
     "accounts:setPassword",
     "accounts:verify",
     "app:info",
+    "app:quit",
     "author:exportKey",
     "author:get",
     "author:importKey",
@@ -123,6 +124,7 @@ pub const HANDLED: &[&str] = &[
     "update:state",
     "window:close",
     "window:minimize",
+    "window:hideToTray",
     "window:toggleMaximize",
     // ---- S2 Batch E：模组市场 / 提交 / GitHub 令牌（13 个，见 docs/S2-发布与市场-实施记录.md）----
     "mods:marketList",

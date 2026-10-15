@@ -3591,5 +3591,15 @@
   "下一张": "Next",
   "第 {n} 张，共 {total} 张": "Image {n} of {total}",
   "切换截图": "Switch screenshot",
-  "查看第 {n} 张截图": "View screenshot {n}"
+  "查看第 {n} 张截图": "View screenshot {n}",
+  "全部服务已在运行，无需重复启动": "All services are already running; no need to start again",
+  "关闭启动器？": "Close the launcher?",
+  "主服务器或市场服务可能还在运行：收进任务栏可以继续跑，退出程序会一并把它们关掉。": "The main server or the market service may still be running: minimising keeps them alive, while quitting shuts them down as well.",
+  "最小化到任务栏": "Minimise to taskbar",
+  "退出程序": "Quit",
+  "关闭时最小化到托盘": "Minimise to tray on close",
+  "打开后点窗口的叉直接收进托盘（服务继续跑，再启动一次启动器即可唤回）；关掉则每次关窗都问你": "When on, the window's X drops it straight into the tray (services keep running; launch the launcher again to bring it back). When off, every close asks you first.",
+  "最小化到托盘": "Minimise to tray",
+  "记住我的选择": "Remember my choice",
+  "主服务器或市场服务可能还在运行：收进托盘可以继续跑，退出程序会一并把它们关掉。": "The main server or the market service may still be running: minimising to the tray keeps them alive, while quitting shuts them down as well."
 }

@@ -2,6 +2,14 @@
   "note": "本启动器在现役版契约之外**新增**的通道。extract-contract.mjs 每次重抽都会把它们并回 contract/ipc-channels.json，所以现役版升级重抽不会把它们冲掉。每条都要在本地 docs/S2-* 实施记录里写清「为什么现役版没有、我们为什么需要」（docs/*.md 不入库）。",
   "invoke": [
     {
+      "api": "appQuit",
+      "channel": "app:quit",
+      "kind": "invoke",
+      "signature": "",
+      "params": [],
+      "why": "关窗提示框里的「退出程序」。Tauri 默认的关窗行为就是直接退出，但我们要先把选择交给用户（收进任务栏继续跑，还是退出），所以 lib.rs 把关窗拦下来（prevent_close）并发一条 app:closeRequested 事件给渲染层；用户真选了退出才走这条通道。这里用 app.exit(0) 而不是 window.close()：后者会再次触发 CloseRequested，又落回同一个拦截里 —— 那时框还开着，用户看到的是「点了没反应」。"
+    },
+    {
       "api": "accountsDeleteCharacter",
       "channel": "accounts:deleteCharacter",
       "kind": "invoke",
@@ -375,8 +383,22 @@
       "why": "订阅 / 取消面板的事件流（`GET /api/events/stream`，text/event-stream）。SSE 不是请求-响应模型，进不了普通 IPC，所以由 Rust 侧持一条连接、把每一帧 `data: {...}` 转成 `faction:event` 事件推给渲染层（与既有的 `terminal:data` 同一种做法）。start=false 只停线程。**启动器始终只开一条**：面板最多允许 8 条 SSE 连接，重复订阅会先停旧的。断线后每 3 秒重连一次，重连前重读一次令牌（模组换过库也能接上）。opts.backlog（1–500，模组 maxBacklog 上限）决定初始回补多少条；opts.group 是分组白名单（fleet/combat/intel/territory/economy/logistics/system/other），Rust 侧过滤后再拼进 URL —— KM 页订阅 `{ backlog: 500, group: \\\"combat\\\" }` 才能拿到逐舰损失（loss / killReward）：不过滤时这类事件在混合流里稀疏到 200 条回补里一条都没有，KM 就永远开天窗。"
     }
   ],
-  "send": [],
+  "send": [
+    {
+      "api": "windowHideToTray",
+      "channel": "window:hideToTray",
+      "kind": "send",
+      "signature": "",
+      "params": [],
+      "why": "关窗提示框里的「最小化到托盘」。与既有的 window:minimize（最小化，任务栏还留按钮）不是一回事：托盘化是把窗口 hide 掉，任务栏上什么都不留，服务继续在后台跑。**这个外壳没有托盘图标**，所以唤回的唯一路径是重新启动一次启动器 —— 单实例插件那侧已经写了 unminimize + show + set_focus（见 lib.rs），隐藏的窗口会被它重新显示出来。设置里的 closeAction=tray 走的是同一条 hide 路径，只是不再弹框问。"
+    }
+  ],
   "events": [
+    {
+      "api": "onAppCloseRequested",
+      "channel": "app:closeRequested",
+      "why": "用户点了窗口右上角的关闭按钮。lib.rs 拦下这次关窗（prevent_close）后发这一帧，渲染层弹「最小化到任务栏 / 退出程序」二选一 —— 主服务器与市场服务可能正在跑，直接退掉会连带把它们杀掉，这个后果不该由一次误点来承担。把选择框关掉（叉 / Esc / 点遮罩）= 留在原地，什么都不做。"
+    },
     {
       "api": "onFactionEvent",
       "channel": "faction:event",

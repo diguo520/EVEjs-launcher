@@ -287,6 +287,12 @@ fn render_readme(
             .to_string(),
     );
     lines.push("> 只调用服务端 API 的模组不碰任何服务端文件；要改服务端源码的补丁走 `__evejsMods.register`，不要自己 hook `Module.prototype._compile`。".to_string());
+    lines.push(
+        "> **性能**：`NODE_OPTIONS` 会被服务端 fork 出的 10 个 worker 继承，所以本 `loader.js` 在**每个进程**里都会被执行一次。\
+         业务代码请放在 `isRealServerProcess(entry)` 判断**之内**（或再套一层 `if (isWorld) require(\"./lib/…\")`），\
+         别在文件顶层 `require` 大模块 —— 那会让同一份代码被编译 11 次，大模组下直接拖慢启动。\
+         唯一必须留在顶层的是 `registerSourcePatch()`：源码补丁要在目标文件被编译前注册，任何进程都可能先编译到它。"
+            .to_string());
     lines.push(String::new());
     lines.join("\n")
 }

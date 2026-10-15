@@ -80,7 +80,9 @@ struct Skip {
 
 /// 计算要注入的 loader 顺序（loadAfter/loadBefore 拓扑排序，成环则退回目录顺序）
 pub fn plan_loaders(repo_root: &Path, runtime: &RuntimePaths) -> Value {
-    let scan_result = scan::scan_mods(repo_root, runtime);
+    // R0-B：注入计划只关心「顺序 + loader 路径」，走轻量扫描 —— 不算体积、不读 README。
+    // 这条路径在**每次启动主服务**时都会跑，大模组下"逐文件 stat 体积"曾占掉启动的一大半。
+    let scan_result = scan::scan_mods_plan(repo_root, runtime);
     // 顺序文件里可能记着已经删掉的目录名：先留一份「本地都有哪些目录」，
     // 待会儿用它把「找不到对应模组」的那些条目如实报出来（以前是静默忽略）
     let all_folders: Vec<String> = scan_result

@@ -7,6 +7,7 @@
 use crate::mods::{plan, sign};
 use crate::runtime::RuntimePaths;
 use crate::shell;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 use std::collections::BTreeMap;
 use std::fs;
@@ -30,6 +31,18 @@ const IGNORED_MODULE_TOKENS: [&str; 5] = [
     "helper.js",
     "package.json",
 ];
+
+/// 扫描详细程度。
+///
+/// `Full` = 界面列表要的全部（体积、更新时间、README、模块引用、来源文件）。
+/// `Plan` = **只给注入计划用**：`plan_loaders` 只需要「顺序 + loader 路径」，
+///   而它是在「启动主服务」这条路径上被调用的 —— 每多模组一个文件就要做一次 stat，
+///   大模组下这一项能占掉启动的一大半。所以这里专门给它一条轻量路径。
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum ScanDetail {
+    Full,
+    Plan,
+}
 
 /* ------------------------------ 基础判定 ------------------------------ */
 
@@ -131,6 +144,89 @@ pub fn dir_stats(dir: &Path) -> (u64, u64) {
         }
     }
     (bytes, newest)
+}
+
+/// 模组体积 / 更新时间缓存（R0-A）。
+///
+/// 键 = 模组目录的绝对路径；失效判据 = **目录自身的 mtime**（增删 / 改名子项都会改它）。
+/// 于是每次扫描只对「模组数」个目录各做一次 stat，而不是对「文件数」个文件各做一次
+/// —— 1 GB / 几万文件的模组，从"每次启动扫几十秒"降到毫秒级。
+///
+/// 已知取舍（写在这里以免后来人以为是 bug）：只改**文件内容**、不改目录结构时
+/// 父目录 mtime 不变，卡片上的「体积 / 更新时间」可能滞后一轮。体积本来就是展示用，
+/// 不值当为它逐文件 stat。
+#[derive(Default, Serialize, Deserialize)]
+pub struct ModStatsCache {
+    #[serde(default)]
+    entries: BTreeMap<String, CachedDirStats>,
+    #[serde(skip)]
+    dirty: bool,
+}
+
+#[derive(Clone, Copy, Serialize, Deserialize)]
+struct CachedDirStats {
+    mtime_ms: u64,
+    bytes: u64,
+    newest: u64,
+}
+
+impl ModStatsCache {
+    pub fn load(path: &Path) -> Self {
+        let Ok(raw) = fs::read_to_string(path) else {
+            return Self::default();
+        };
+        serde_json::from_str(&raw).unwrap_or_default()
+    }
+
+    pub fn save(&self, path: &Path) {
+        if !self.dirty {
+            return;
+        }
+        if let Some(parent) = path.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        if let Ok(text) = serde_json::to_string(self) {
+            let _ = fs::write(path, text);
+        }
+    }
+
+    /// 目录的 (字节数, 最新改动时间)：顶层 mtime 没变就用缓存，变了才真走一遍。
+    fn stats_for(&mut self, dir: &Path) -> (u64, u64) {
+        let mtime_ms = dir_mtime_ms(dir);
+        let key = dir.to_string_lossy().to_string();
+        if mtime_ms != 0 {
+            if let Some(hit) = self.entries.get(&key) {
+                if hit.mtime_ms == mtime_ms {
+                    return (hit.bytes, hit.newest);
+                }
+            }
+        }
+        let (bytes, newest) = dir_stats(dir);
+        self.entries.insert(
+            key,
+            CachedDirStats {
+                mtime_ms,
+                bytes,
+                newest,
+            },
+        );
+        self.dirty = true;
+        (bytes, newest)
+    }
+}
+
+/// 目录自身的 mtime（毫秒）；拿不到就回 0，调用方见到 0 会绕过缓存重算。
+fn dir_mtime_ms(dir: &Path) -> u64 {
+    fs::metadata(dir)
+        .ok()
+        .and_then(|meta| meta.modified().ok())
+        .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|elapsed| elapsed.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+fn mod_stats_cache_path(runtime: &RuntimePaths) -> PathBuf {
+    runtime.cache.join("mod-stats.json")
 }
 
 /// 启发式扫描 loader 源码：取形如 `"xxx.js"` 的字符串字面量。
@@ -371,6 +467,23 @@ fn read_mod_source(dir: &Path) -> (String, String, String) {
 }
 /// 读取单个模组目录（校验 manifest schema 3）
 pub fn read_mod_dir(folder: &str, dir: &Path) -> ModRecord {
+    read_mod_dir_with(folder, dir, ScanDetail::Full, None)
+}
+
+/// R0-B：给「注入计划」用的轻量读取 —— 跳过体积统计、README、模块引用、来源文件。
+///
+/// `plan_loaders` 只要「顺序 + loader 路径」，上面这几样它一样都不看；
+/// 而它们恰恰是"随模组体积线性变贵"的部分（体积统计要对每个文件做一次 stat）。
+pub fn read_mod_dir_light(folder: &str, dir: &Path) -> ModRecord {
+    read_mod_dir_with(folder, dir, ScanDetail::Plan, None)
+}
+
+fn read_mod_dir_with(
+    folder: &str,
+    dir: &Path,
+    detail: ScanDetail,
+    stats: Option<&mut ModStatsCache>,
+) -> ModRecord {
     let manifest_path = dir.join(MANIFEST_NAME);
     let manifest = match read_manifest(&manifest_path) {
         Ok(manifest) => manifest,
@@ -592,18 +705,24 @@ pub fn read_mod_dir(folder: &str, dir: &Path) -> ModRecord {
     if !record.valid {
         record.supported = false;
     }
-    let (bytes, newest) = dir_stats(dir);
+    // 体积 / 更新时间：Full 走缓存（顶层 mtime 命中就不逐文件 stat），Plan 直接不算。
+    let (bytes, newest) = match stats {
+        Some(cache) => cache.stats_for(dir),
+        None => (0, 0),
+    };
     record.size_bytes = bytes;
     record.updated_at = newest;
-    record.modules = if record.kind == "loader" {
+    record.modules = if detail == ScanDetail::Full && record.kind == "loader" {
         scan_loader_modules(dir)
     } else {
         Vec::new()
     };
-    let (source, source_repo, source_version) = read_mod_source(dir);
-    record.source = source;
-    record.source_repo = source_repo;
-    record.source_version = source_version;
+    if detail == ScanDetail::Full {
+        let (source, source_repo, source_version) = read_mod_source(dir);
+        record.source = source;
+        record.source_repo = source_repo;
+        record.source_version = source_version;
+    }
     record
 }
 /* ------------------------------ 冲突鉴定 ------------------------------ */
@@ -776,6 +895,17 @@ fn empty_scan(root: PathBuf) -> ModScanResult {
 
 /// 扫描 `<EveJS 根>/mods`（排序文件在 `_launcher/mods`，所以要 runtime）
 pub fn scan_mods(repo_root: &Path, runtime: &RuntimePaths) -> ModScanResult {
+    scan_mods_with(repo_root, runtime, ScanDetail::Full)
+}
+
+/// R0-B：`plan_loaders` 专用 —— 只拿「顺序 + loader 路径」需要的字段。
+///
+/// 它在**每次启动主服务**时都会被调用，所以这里必须便宜：不算体积、不读 README。
+pub fn scan_mods_plan(repo_root: &Path, runtime: &RuntimePaths) -> ModScanResult {
+    scan_mods_with(repo_root, runtime, ScanDetail::Plan)
+}
+
+fn scan_mods_with(repo_root: &Path, runtime: &RuntimePaths, detail: ScanDetail) -> ModScanResult {
     let root = crate::mods::mods_root(repo_root);
     let mut result = empty_scan(root.clone());
     if !root.is_dir() {
@@ -785,6 +915,13 @@ pub fn scan_mods(repo_root: &Path, runtime: &RuntimePaths) -> ModScanResult {
         return result;
     };
     result.exists = true;
+
+    // R0-A：体积 / 更新时间走缓存（键=目录，失效=目录自身 mtime）。只有 Full 需要。
+    let mut stats = if detail == ScanDetail::Full {
+        Some(ModStatsCache::load(&mod_stats_cache_path(runtime)))
+    } else {
+        None
+    };
 
     let mut by_id: BTreeMap<String, usize> = BTreeMap::new();
     for entry in entries.flatten() {
@@ -796,13 +933,15 @@ pub fn scan_mods(repo_root: &Path, runtime: &RuntimePaths) -> ModScanResult {
         if !entry.path().join(MANIFEST_NAME).is_file() {
             continue;
         }
-        let mut record = read_mod_dir(&name, &entry.path());
+        let mut record = read_mod_dir_with(&name, &entry.path(), detail, stats.as_mut());
         // README 正文与功能要点跟着 `mods:list` 一起回（复用提交时那套解析）：
         // 作者改完信息、或本机草稿还没上架时，详情页也要能立刻看到内容，
         // 不能等索引刷新 —— 索引要审核合并之后才更新。
-        let (readme, highlights) = super::submit::readme_for_listing(repo_root, &name);
-        record.readme = readme;
-        record.highlights = highlights;
+        if detail == ScanDetail::Full {
+            let (readme, highlights) = super::submit::readme_for_listing(repo_root, &name);
+            record.readme = readme;
+            record.highlights = highlights;
+        }
         by_id.insert(record.id.to_lowercase(), result.mods.len());
         result.mods.push(record);
     }
@@ -851,6 +990,9 @@ pub fn scan_mods(repo_root: &Path, runtime: &RuntimePaths) -> ModScanResult {
 
     result.order = result.mods.iter().map(|item| item.folder.clone()).collect();
     result.conflicts = detect_conflicts(&result.mods);
+    if let Some(cache) = stats.as_ref() {
+        cache.save(&mod_stats_cache_path(runtime));
+    }
     result
 }
 #[cfg(test)]
@@ -870,6 +1012,38 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(dir.join("mods")).expect("应能建 mods 目录");
         dir
+    }
+
+    /// R0-A 的核心承诺：顶层 mtime 没变时**不重新遍历**（用 dirty 标记当探针）。
+    #[test]
+    fn mod_stats_cache_hits_until_the_directory_changes() {
+        let repo = repo_for("stats-cache");
+        let mod_dir = repo.join("mods").join("demo");
+        fs::create_dir_all(&mod_dir).unwrap();
+        fs::write(mod_dir.join("a.bin"), vec![0_u8; 1024]).unwrap();
+
+        let mut cache = ModStatsCache::default();
+        let (bytes, _newest) = cache.stats_for(&mod_dir);
+        assert!(bytes >= 1024, "首次应真遍历出体积，得到 {bytes}");
+        assert!(cache.dirty, "首次算完应标脏");
+
+        // 模拟「已经存过盘」：dirty 归零后再查 —— 命中缓存就不该再置脏
+        cache.dirty = false;
+        let cached = cache.stats_for(&mod_dir);
+        assert_eq!(cached.0, bytes, "缓存应给出同一个体积");
+        assert!(!cache.dirty, "顶层 mtime 没变时必须命中缓存，不重新遍历");
+
+        // 改目录结构（加一个文件）→ 目录 mtime 变 → 必须重算
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        fs::write(mod_dir.join("b.bin"), vec![0_u8; 2048]).unwrap();
+        cache.dirty = false;
+        let after = cache.stats_for(&mod_dir);
+        assert!(
+            after.0 > bytes,
+            "加了文件后体积应变大（{bytes} → {}）",
+            after.0
+        );
+        assert!(cache.dirty, "目录变了必须重新遍历");
     }
 
     fn write_mod(repo: &Path, folder: &str, manifest: Value, loader: Option<&str>) {

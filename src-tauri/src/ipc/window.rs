@@ -29,6 +29,35 @@ fn settings_file<R: Runtime>(window: &WebviewWindow<R>) -> Option<PathBuf> {
         .map(|state| state.runtime.settings_file())
 }
 
+/// 关窗行为：设置文件里的 `closeAction`（渲染层在关窗提示框里"记住我的选择"时写它）。
+/// 缺省、空串、认不出来的值一律当 `Ask` —— 宁可按老样子每次问，也不要因为一个坏值
+/// 把用户的窗口静默藏起来。
+const CLOSE_ACTION_KEY: &str = "closeAction";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CloseAction {
+    /// 每次都弹框问（默认）
+    Ask,
+    /// 收进托盘（隐藏窗口，服务继续跑）
+    Tray,
+    /// 直接退出
+    Exit,
+}
+
+pub fn close_action<R: Runtime>(window: &WebviewWindow<R>) -> CloseAction {
+    let Some(file) = settings_file(window) else {
+        return CloseAction::Ask;
+    };
+    match config::read_settings(&file)
+        .get(CLOSE_ACTION_KEY)
+        .and_then(Value::as_str)
+    {
+        Some("tray") => CloseAction::Tray,
+        Some("exit") => CloseAction::Exit,
+        _ => CloseAction::Ask,
+    }
+}
+
 fn read_bounds(file: &Path) -> Option<Value> {
     config::read_settings(file).get(BOUNDS_KEY).cloned()
 }

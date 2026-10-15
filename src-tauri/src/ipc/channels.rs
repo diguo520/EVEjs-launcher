@@ -18,8 +18,8 @@ pub struct ChannelSpec {
     pub kind: ChannelKind,
 }
 
-pub const REQUEST_COUNT: usize = 121;
-pub const EVENT_COUNT: usize = 9;
+pub const REQUEST_COUNT: usize = 123;
+pub const EVENT_COUNT: usize = 10;
 
 #[rustfmt::skip]
 pub const CHANNELS: &[ChannelSpec] = &[
@@ -34,6 +34,7 @@ pub const CHANNELS: &[ChannelSpec] = &[
     ChannelSpec { channel: "accounts:setPassword", api: "accountsSetPassword", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "accounts:verify", api: "accountsVerify", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "app:info", api: "appInfo", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "app:quit", api: "appQuit", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "author:exportKey", api: "authorExportKey", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "author:get", api: "authorGet", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "author:importKey", api: "authorImportKey", kind: ChannelKind::Invoke },
@@ -142,8 +143,10 @@ pub const CHANNELS: &[ChannelSpec] = &[
     ChannelSpec { channel: "update:download", api: "updateDownload", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "update:state", api: "updateState", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "window:close", api: "windowClose", kind: ChannelKind::Send },
+    ChannelSpec { channel: "window:hideToTray", api: "windowHideToTray", kind: ChannelKind::Send },
     ChannelSpec { channel: "window:minimize", api: "windowMinimize", kind: ChannelKind::Send },
     ChannelSpec { channel: "window:toggleMaximize", api: "windowToggleMaximize", kind: ChannelKind::Send },
+    ChannelSpec { channel: "app:closeRequested", api: "onAppCloseRequested", kind: ChannelKind::Event },
     ChannelSpec { channel: "faction:event", api: "onFactionEvent", kind: ChannelKind::Event },
     ChannelSpec { channel: "faction:streamState", api: "onFactionStreamState", kind: ChannelKind::Event },
     ChannelSpec { channel: "init:changed", api: "onInitChanged", kind: ChannelKind::Event },

@@ -1,6 +1,6 @@
 [package]
 name = "evejs-launcher"
-version = "0.4.8"
+version = "0.4.9"
 description = "EvEJS 启动器（Tauri 2 外壳）"
 authors = ["EvEJS"]
 edition = "2021"
@@ -24,7 +24,7 @@ opt-level = "s"
 strip = true
 
 [dependencies]
-tauri = { version = "2.11.6", features = [] }
+tauri = { version = "2.11.6", features = ["tray-icon", "image-png"] }
 tauri-plugin-opener = "2.5.5"
 tauri-plugin-single-instance = "2.4.5"
 serde = { version = "1.0.229", features = ["derive"] }

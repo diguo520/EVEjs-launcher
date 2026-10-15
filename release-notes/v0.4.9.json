@@ -1,0 +1,25 @@
+{
+  "version": "0.4.9",
+  "changelog": {
+    "zh": [
+      { "type": "new", "text": "点窗口右上角的叉不再直接退出：弹框让你选「最小化到托盘（服务继续跑）」还是「退出程序」，两个选项旁边有「记住我的选择」—— 勾上之后下次关窗直接照做、不再问。框关掉（叉 / Esc / 点遮罩）等于取消，窗口留着。" },
+      { "type": "new", "text": "新增托盘图标：左键单击唤回主窗口，右键菜单「显示主窗口 / 退出程序」。之前「最小化到托盘」只是把窗口藏起来却没有托盘入口，藏了就叫不回来 —— 这根入口是补上的。" },
+      { "type": "new", "text": "设置中心的「遥测数据上报」换成「关闭时最小化到托盘」—— 打开后点叉直接收进托盘，关掉则每次关窗都问你（这条设置真接后端，不再是灰着的占位开关）。" },
+      { "type": "opt", "text": "主控台的「一键启动」在全部服务都起来之后变灰，避免重复点击把已经跑好的服务重启一遍。" },
+      { "type": "opt", "text": "启动提速：模组注入计划改走轻量扫描 —— 它只需要「加载顺序 + loader 路径」，此前却会把每个模组目录下的文件逐个 stat 取体积、连 README 一起读，而这条路径每次启动主服务都要跑一遍，大模组下能占掉启动时间的一大半。" },
+      { "type": "opt", "text": "启动提速：模组体积与更新时间的读取结果按模组目录的 mtime 缓存，目录内容没变就不再重复遍历。" },
+      { "type": "opt", "text": "启动提速：给服务端进程设置 Node 编译缓存（NODE_COMPILE_CACHE）。服务端会 fork 出 10 个 worker 且环境变量被逐层继承，此前每个进程都要把服务端与全部模组的模块重新编译一遍（同一份代码编译 11 次）；现在编译产物落盘、后续进程直接复用。Node ≥ 22.1 生效，更低版本静默忽略。" },
+      { "type": "new", "text": "新建模组的模板与制作规范都提醒了上面这条性能约束：业务代码写在 isRealServerProcess 判断之内，别在 loader 顶层 require 大模块（唯一必须留在顶层的是 registerSourcePatch，源码补丁要在目标文件被编译前注册）。" }
+    ],
+    "en": [
+      { "type": "new", "text": "The window's close button no longer quits outright: a dialog asks whether to minimise to the tray (services keep running) or quit, with a \"remember my choice\" box next to the two options. Tick it and later closes follow your choice without asking. Dismissing the dialog (X, Esc or clicking the backdrop) cancels and leaves the window open." },
+      { "type": "new", "text": "A tray icon was added: left click brings the main window back, right click opens a menu with \"Show main window / Quit\". Previously \"minimise to tray\" only hid the window with no tray entry to bring it back." },
+      { "type": "new", "text": "The telemetry-upload row in settings was replaced by \"minimise to tray on close\": when on, the window's X drops straight into the tray; when off, every close asks. This setting is wired to the backend rather than being a grey placeholder." },
+      { "type": "opt", "text": "The dashboard's one-click start button greys out once every service is running, so a second click cannot restart services that are already up." },
+      { "type": "opt", "text": "Faster startup: the mod injection plan now uses a lightweight scan. It only needs the load order and loader paths, yet it used to stat every file under each mod to read sizes and pull in READMEs — and that path runs on every main-server start, accounting for most of the startup time with large mods." },
+      { "type": "opt", "text": "Faster startup: mod size and update time are cached against the mod directory's mtime, so an unchanged directory is no longer walked again." },
+      { "type": "opt", "text": "Faster startup: the server process now gets Node's compile cache (NODE_COMPILE_CACHE). The server forks ten workers and the environment is inherited, so previously every process recompiled the server and all mods (the same code compiled eleven times); compiled output now lands on disk and later processes reuse it. Works on Node 22.1+; older versions silently ignore it." },
+      { "type": "new", "text": "The new-mod template and the authoring guide now warn about that performance constraint: keep business code inside the isRealServerProcess check and avoid requiring large modules at a loader's top level (the only thing that must stay there is registerSourcePatch, because source patches have to be registered before the target file is compiled)." }
+    ]
+  }
+}

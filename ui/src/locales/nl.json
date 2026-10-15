@@ -3591,5 +3591,15 @@
   "下一张": "Volgende",
   "第 {n} 张，共 {total} 张": "Afbeelding {n} van {total}",
   "切换截图": "Schermafbeelding wisselen",
-  "查看第 {n} 张截图": "Schermafbeelding {n} bekijken"
+  "查看第 {n} 张截图": "Schermafbeelding {n} bekijken",
+  "全部服务已在运行，无需重复启动": "Alle services draaien al; opnieuw starten is niet nodig",
+  "关闭启动器？": "Launcher sluiten?",
+  "主服务器或市场服务可能还在运行：收进任务栏可以继续跑，退出程序会一并把它们关掉。": "De hoofdserver of marktservice draait mogelijk nog: minimaliseren laat ze draaien, afsluiten stopt ze ook.",
+  "最小化到任务栏": "Minimaliseren naar taakbalk",
+  "退出程序": "Afsluiten",
+  "关闭时最小化到托盘": "Bij sluiten naar systeemvak minimaliseren",
+  "打开后点窗口的叉直接收进托盘（服务继续跑，再启动一次启动器即可唤回）；关掉则每次关窗都问你": "Aan: de X van het venster legt het direct in het systeemvak (services blijven draaien; start de launcher opnieuw om het terug te halen). Uit: elke keer wordt het gevraagd.",
+  "最小化到托盘": "Minimaliseren naar systeemvak",
+  "记住我的选择": "Mijn keuze onthouden",
+  "主服务器或市场服务可能还在运行：收进托盘可以继续跑，退出程序会一并把它们关掉。": "De hoofdserver of marktservice draait mogelijk nog: minimaliseren naar het systeemvak laat ze draaien, afsluiten stopt ze ook."
 }
