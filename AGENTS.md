@@ -128,3 +128,80 @@ node scripts/release-channel.mjs pin-legacy --tag v0.1.28  # 回滚：把 Latest
    用 `Select-String` 时先限定 `-Path` 到具体目录或文件。
 - 门禁的实测耗时数字，只在当次发版总结里说一次，不反复复述。
 - 发版收尾**不写临时脚本**：上传/建 release/通道一律走 `scripts/make-release.mjs`。
+
+## `github.com` 被墙时的推送兜底（API 推送）
+
+### 症状与判断
+
+`git push` 报 `Failed to connect to github.com:443 after 21000 ms: Could not connect to server`
+（或 `the remote end hung up unexpectedly`），但**别的 GitHub 域名都通**：
+
+```powershell
+foreach ($h in @('github.com','api.github.com','codeload.github.com','objects.githubusercontent.com')) {
+  "$h : " + (Test-NetConnection $h -Port 443 -InformationLevel Quiet -WarningAction SilentlyContinue)
+}
+```
+
+只有 `github.com:443` 是 `False` 就是这种情况（ISP / DNS 层面单独挡了它）。
+它是**间歇性**的：2026-10-14 通、10-15 又不通，别认定「一直连不上」。
+
+### 顺序
+
+1. **本机有代理**：`git -c http.proxy=socks5h://127.0.0.1:10808 push origin main`
+   （端口按实际监听改；`Get-NetTCPConnection -State Listen` 找）。**不要**改全局 git 配置。
+2. **没有代理**：走 Git Data API —— 全程只用 `api.github.com`，不需要 `github.com`。
+
+### API 推送：blob → tree → commit → ref
+
+`POST /git/blobs`（逐个文件，base64）→ `POST /git/trees`（带 `base_tree` = 父提交的 tree，
+只列改动的路径，GitHub 自动复用其余条目）→ `POST /git/commits` →
+`PATCH /git/refs/heads/main`（`force:false`，必须是 fast-forward）。
+
+**每一步都要自证，不对就中止 —— 中止时远端什么都没变：**
+
+| 校验 | 依据 |
+| --- | --- |
+| 每个 blob 上传后回的 `sha` == 本地 `git ls-tree -r HEAD` 里那个 blob sha | 字节一致 |
+| 建出的 tree `sha` == 本地 `git rev-parse HEAD^{tree}` | **整棵内容逐字节一致** |
+| 建出的 commit `sha` == 本地 `git rev-parse HEAD` | 元数据也一致；不等就中止、别动 ref |
+
+tree 相等就已经证明「内容没差」，commit 不等只说明元数据没复现出来 —— 看到 tree 相符可以先放心，
+但**本地/远端会成为「同内容不同 SHA」的兄弟提交**，下次 `git push` 会 non-fast-forward，必须处理
+（见下面「对齐本地」）。
+
+### 两个必踩的坑
+
+- **`git log --format=%B` 会自己多追加一个换行**。commit 对象里真正的消息是它去掉末尾那一个 `\n`。
+  多送这一个换行 → commit SHA 与本地不同（2026-10-14 发 v0.4.7 就是这么错开的，排查了很久）。
+  发消息前先 `message.replace(/\n$/, "")`。
+- **日期送 ISO**（`git log -1 --format=%aI`，形如 `2026-10-15T20:17:31+08:00`）。GitHub 会**保留**原时区。
+  不要送 `unix +offset`（`"1791934367 +0800"`），API 直接 422 `is not a valid date-time`。
+  ⚠️ 但 API **读回来**的日期是 UTC（`...Z`）—— 别拿它当序列化依据，否则会推出 `+0000` 的错对象。
+
+### 对齐本地（万一 SHA 还是不同）
+
+远端对象在本地是不存在的，`git update-ref` 会报 `nonexistent object`。用 API 取回远端对象字段，
+在本地把对象**原样重建**出来 —— `git hash-object -t commit --stdin` 枚举几个变体
+（offset `+0800` / `+0000` × 消息几种结尾），命中后再加 `-w` 落盘，然后 `git update-ref refs/heads/main <sha>`：
+
+```js
+// unix = Math.floor(Date.parse(远端日期) / 1000)；offset 两种都试（+0800 更常见）
+const who = `${name} <${email}> ${unix} +0800`;
+const body =
+  `tree ${tree}\n` +
+  parents.map((p) => `parent ${p}\n`).join("") +
+  `author ${who}\n` +
+  `committer ${who}\n` +
+  `\n${message}`;
+const sha = execFileSync("git", ["hash-object", "-t", "commit", "--stdin"], { input: body }).trim();
+// sha 命中目标才继续：用 -w 落盘 → git update-ref refs/heads/main <sha>
+```
+
+注释 tag 同理：`POST /git/tags` + `POST /git/refs`（`refs/tags/vX.Y.Z`），tagger 日期同一套规则。
+本地 tag 对象与远端不一致时，`git push --tags` 会冲突 —— 用同样办法把远端 tag 对象重建到本地，
+或干脆删掉本地 tag 只留远端。
+
+### 收尾核对
+
+`GET /repos/<repo>/branches/main`、`GET /repos/<repo>/releases/tags/vX.Y.Z` 对一遍
+commit sha 与资产清单，再跑 `make-release.mjs --watch-ci`（它读的是本地 tag，指向对的 commit 就行）。
