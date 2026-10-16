@@ -149,6 +149,41 @@ pub fn clear_cache(runtime: &RuntimePaths) -> Value {
     }
 }
 
+/// 缓存台账：cache 目录现在占多少，其中「清空缓存」真会删掉的又是多少。
+///
+/// 为什么必须把两个数分开报：清空缓存只按白名单删，老 Electron 版把 Chromium 的
+/// `Local State` / `Cache` / `Code Cache` 留在同一个目录下，那些一律保留。只报目录总占用
+/// 会误导 —— 用户看见「500 MB」点下去只释放 5 KB。界面两个数都显示。
+///
+/// 只读：不碰磁盘上的任何东西，服务在跑时也能随时调。
+pub fn cache_report(runtime: &RuntimePaths) -> Value {
+    let dir = &runtime.cache;
+    let exists = dir.is_dir();
+    let mut bytes: u64 = 0;
+    let mut clearable_bytes: u64 = 0;
+    let mut clearable: u64 = 0;
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            let size = dir_size(&entry.path());
+            bytes += size;
+            if CACHE_WHITELIST.contains(&name.as_str()) {
+                clearable += 1;
+                clearable_bytes += size;
+            }
+        }
+    }
+    json!({
+        "ok": true,
+        "path": dir.to_string_lossy(),
+        "exists": exists,
+        "bytes": bytes,
+        "clearableBytes": clearable_bytes,
+        "clearable": clearable,
+        "keptBytes": bytes.saturating_sub(clearable_bytes),
+    })
+}
+
 /// 重置配置：由服务端自己的配置管理器把 config 域写回默认值（侧车 reset）。
 /// 默认值只有服务端有，启动器不抄第二套，所以这里只做搬运。
 pub async fn reset_config(state: &AppState, root: &Path) -> Value {
@@ -252,6 +287,45 @@ mod tests {
         fs::write(root.join("a").join("one.bin"), vec![0u8; 10]).unwrap();
         fs::write(root.join("two.bin"), vec![0u8; 5]).unwrap();
         assert_eq!(dir_size(&root), 15);
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn cache_report_separates_clearable_from_kept() {
+        let root = scratch("report");
+        let cache = root.join("cache");
+        fs::create_dir_all(cache.join("mod-reviews")).unwrap();
+        fs::write(cache.join("mod-reviews").join("abc.json"), vec![0u8; 20]).unwrap();
+        fs::write(cache.join("mod-index.json"), vec![0u8; 10]).unwrap();
+        // 名单外：老 Electron 版的 OSCrypt 密钥与它自己的磁盘缓存，两块都要留在 kept 里
+        fs::write(cache.join("Local State"), vec![0u8; 5]).unwrap();
+        fs::create_dir_all(cache.join("Code Cache")).unwrap();
+        fs::write(cache.join("Code Cache").join("blob"), vec![0u8; 7]).unwrap();
+
+        let runtime = RuntimePaths::from_root(root.clone(), false);
+        let value = cache_report(&runtime);
+
+        assert_eq!(value["ok"], json!(true));
+        assert_eq!(value["exists"], json!(true));
+        assert_eq!(value["bytes"], json!(42), "总占用应含保留部分");
+        assert_eq!(value["clearableBytes"], json!(30), "只算白名单里的两项");
+        assert_eq!(value["clearable"], json!(2));
+        assert_eq!(value["keptBytes"], json!(12));
+        assert_eq!(value["path"], json!(cache.to_string_lossy()));
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn cache_report_tolerates_missing_directory() {
+        let root = scratch("report-missing");
+        // 不建 cache/：全新用户还没联网拉过任何快照
+        let runtime = RuntimePaths::from_root(root.clone(), false);
+        let value = cache_report(&runtime);
+
+        assert_eq!(value["ok"], json!(true), "目录不存在不是错误");
+        assert_eq!(value["exists"], json!(false));
+        assert_eq!(value["bytes"], json!(0));
+        assert_eq!(value["clearable"], json!(0));
         let _ = fs::remove_dir_all(&root);
     }
 }

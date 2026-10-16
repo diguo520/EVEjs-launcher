@@ -12,7 +12,6 @@ import {
   Trash2,
   TriangleAlert,
 } from "lucide-react"
-import { toast } from "sonner"
 
 import {
   AlertDialog,
@@ -46,6 +45,7 @@ import {
   formatCount,
   hasUpdate,
   isPublished,
+  localFolderOf,
   marketVersionDiff,
   readmeSections,
   reasonOf as conflictReasonOf,
@@ -171,6 +171,8 @@ export interface ModDetailDialogProps {
   onInstall: () => void
   onUpdate: () => void
   onUninstall: () => void
+  /** 在资源管理器里定位这个模组的本地目录（没有本地目录的条目不会显示这个按钮） */
+  onOpenFolder: () => void
   onEdit: () => void
   onDeleteDraft: () => void
   onSubmit: () => void
@@ -199,6 +201,7 @@ export function ModDetailDialog({
   onInstall,
   onUpdate,
   onUninstall,
+  onOpenFolder,
   onEdit,
   onDeleteDraft,
   onSubmit,
@@ -225,6 +228,14 @@ export function ModDetailDialog({
   const published = isPublished(mod)
   const canInstall = published && !mod.installed
   const updatable = hasUpdate(mod)
+  /**
+   * 「打开所在目录」只对**本机真有这个目录**的条目有意义。
+   *
+   * 市场里还没装的条目既没有 folder 也没 installed —— 那种情况下点下去只会弹一句
+   * 「目录不存在」，不如不画。目录名怎么取（folder 优先、回落 id）交给页面，
+   * 与启用 / 卸载 / 签名那几条写通道同一口径。
+   */
+  const canRevealFolder = localFolderOf(mod) !== null
   /** 本地与市场不一样时的市场那一版（概览里并列两行，作者一眼看出市场收没收到） */
   const marketDiff = marketVersionDiff(mod)
   const reasonOf = (other: ModEntry) => conflictReasonOf(mod, other)
@@ -504,15 +515,12 @@ export function ModDetailDialog({
           <DialogClose asChild>
             <Button variant="outline">关闭</Button>
           </DialogClose>
-          <Button
-            variant="ghost"
-            onClick={() =>
-              toast("已打开所在目录", { description: `mods\\${mod.id}` })
-            }
-          >
-            <FolderOpen />
-            打开所在目录
-          </Button>
+          {canRevealFolder ? (
+            <Button variant="ghost" onClick={onOpenFolder}>
+              <FolderOpen />
+              打开所在目录
+            </Button>
+          ) : null}
 
           {mod.mine ? (
             <Button variant="outline" onClick={onEdit}>

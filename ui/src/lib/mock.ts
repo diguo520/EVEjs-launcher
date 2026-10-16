@@ -1319,8 +1319,19 @@ export function formatCount(n: number): string {
   return n.toLocaleString("en-US")
 }
 
-/** 安装包体积：小于 1 GB 显示 MB，否则显示 GB */
+/**
+ * 安装包体积读数：1 GB 以上按 GB、0.1 MB 以上按 MB、再小的按 KB。
+ *
+ * 不足 0.1 MB 的包不能照 MB 四舍五入 —— 那会写成「0.0 MB」，几 KB 的小模组在市场里
+ * 全成了 0（2026-10-16 报障：当时 28 个模组里 22 个读数不对）。体积拿不到（0 / 非有限数）
+ * 画破折号，不编一个 0.0 出来：与「下载量」「最近更新」同一个口径。
+ */
 export function formatMB(mb: number): string {
+  if (!Number.isFinite(mb) || mb <= 0) return "—"
   if (mb >= 1024) return `${(mb / 1024).toFixed(2)} GB`
+  if (mb < 0.1) {
+    const kb = mb * 1024
+    return `${kb < 100 ? kb.toFixed(1) : Math.round(kb)} KB`
+  }
   return `${mb.toFixed(1)} MB`
 }

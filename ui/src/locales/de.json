@@ -3601,5 +3601,8 @@
   "打开后点窗口的叉直接收进托盘（服务继续跑，再启动一次启动器即可唤回）；关掉则每次关窗都问你": "An: Das X des Fensters legt es direkt in den Infobereich (Dienste laufen weiter; Launcher erneut starten holt es zurück). Aus: Jedes Schließen fragt nach.",
   "最小化到托盘": "In den Infobereich minimieren",
   "记住我的选择": "Meine Wahl merken",
-  "主服务器或市场服务可能还在运行：收进托盘可以继续跑，退出程序会一并把它们关掉。": "Hauptserver oder Marktdienst laufen möglicherweise noch: Minimieren in den Infobereich lässt sie weiterlaufen, Beenden stoppt sie mit."
+  "主服务器或市场服务可能还在运行：收进托盘可以继续跑，退出程序会一并把它们关掉。": "Hauptserver oder Marktdienst laufen möglicherweise noch: Minimieren in den Infobereich lässt sie weiterlaufen, Beenden stoppt sie mit.",
+  "缓存 {size}": "Cache {size}",
+  "可清理 {clearable} · 保留 {kept}": "Löschbar {clearable} · bleibt {kept}",
+  "缓存目录：{path}": "Cache-Ordner: {path}"
 }

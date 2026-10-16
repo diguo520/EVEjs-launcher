@@ -219,9 +219,12 @@ async fn dispatch(
         }
 
         /* ------------------------------ 危险操作 ------------------------------ */
-        // 三条都有磁盘副作用，实现在 src-tauri/src/danger.rs：
+        // 都有磁盘副作用，实现在 src-tauri/src/danger.rs：
         // 清空缓存只删白名单里的联网快照（保留 Local State），重置配置由服务端写回默认值，
         // 擦除世界数据先整目录改名再复用 init 的 db 任务重建。
+        // danger:cacheSize 是唯一的只读项：给「清空缓存」旁边那个占用读数用，
+        // 总占用与可清理量分开报（见 danger::cache_report 的注释）。
+        "danger:cacheSize" => Ok(danger::cache_report(&state.runtime)),
         "danger:clearCache" => Ok(danger::clear_cache(&state.runtime)),
         "danger:resetConfig" => Ok(danger::reset_config(state.inner(), &root).await),
         "danger:eraseWorld" => Ok(danger::erase_world(app, state.inner(), &root)),

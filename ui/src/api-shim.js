@@ -67,6 +67,7 @@
     configRepairClientDisplay: function () { return request("config:repairClientDisplay", []); },
     configSetClient: function (patch) { return request("config:setClient", [patch]); },
     configSetRepoRoot: function (repoRoot) { return request("config:setRepoRoot", [repoRoot]); },
+    dangerCacheSize: function () { return request("danger:cacheSize", []); },
     dangerClearCache: function () { return request("danger:clearCache", []); },
     dangerEraseWorld: function () { return request("danger:eraseWorld", []); },
     dangerResetConfig: function () { return request("danger:resetConfig", []); },

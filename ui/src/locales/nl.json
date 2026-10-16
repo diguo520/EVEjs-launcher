@@ -3601,5 +3601,8 @@
   "打开后点窗口的叉直接收进托盘（服务继续跑，再启动一次启动器即可唤回）；关掉则每次关窗都问你": "Aan: de X van het venster legt het direct in het systeemvak (services blijven draaien; start de launcher opnieuw om het terug te halen). Uit: elke keer wordt het gevraagd.",
   "最小化到托盘": "Minimaliseren naar systeemvak",
   "记住我的选择": "Mijn keuze onthouden",
-  "主服务器或市场服务可能还在运行：收进托盘可以继续跑，退出程序会一并把它们关掉。": "De hoofdserver of marktservice draait mogelijk nog: minimaliseren naar het systeemvak laat ze draaien, afsluiten stopt ze ook."
+  "主服务器或市场服务可能还在运行：收进托盘可以继续跑，退出程序会一并把它们关掉。": "De hoofdserver of marktservice draait mogelijk nog: minimaliseren naar het systeemvak laat ze draaien, afsluiten stopt ze ook.",
+  "缓存 {size}": "Cache {size}",
+  "可清理 {clearable} · 保留 {kept}": "Opruimbaar {clearable} · blijft {kept}",
+  "缓存目录：{path}": "Cachemap: {path}"
 }

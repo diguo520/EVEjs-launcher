@@ -12,6 +12,7 @@ import {
   hasUpdate,
   isPublished,
   isSemverLike,
+  localFolderOf,
   intervalText,
   marketVersionDiff,
   publishBlockers,
@@ -28,6 +29,7 @@ import {
   parseTags,
   ratingFromStarCount,
   formatCount,
+  formatBytes,
   reviewPrStateLabel,
   submitCooldownRemaining,
   type PublishCredential,
@@ -294,6 +296,26 @@ describe("isPublished（市场页签准入）", () => {
   })
 })
 
+describe("localFolderOf（「打开所在目录」的目标目录）", () => {
+  const entry = (mod: Record<string, unknown>) => mod as unknown as ModEntry
+
+  it("有 folder 就用 folder：手写目录可以和清单 id 不同名", () => {
+    expect(
+      localFolderOf(entry({ id: "my-mod", folder: "My Handmade Mod", installed: true }))
+    ).toBe("My Handmade Mod")
+  })
+
+  it("只有 installed、没有 folder 时回落到 id", () => {
+    expect(localFolderOf(entry({ id: "demo", installed: true }))).toBe("demo")
+  })
+
+  it("市场里还没装的条目没有本地目录，返回 null（详情页据此不画那个按钮）", () => {
+    // 2026-10-17 报障的那条路：市场条目上点「打开所在目录」只会得到「目录不存在」
+    expect(localFolderOf(entry({ id: "demo", inMarket: true, installed: false }))).toBeNull()
+    expect(localFolderOf(entry({ id: "demo" }))).toBeNull()
+  })
+})
+
 describe("compareVersions", () => {
   it("逐段比数字，短的一侧补 0", () => {
     expect(compareVersions("1.0.0", "1.0.0")).toBe(0)
@@ -522,6 +544,21 @@ describe("overlapReport（疑似重叠：改同一份服务端文件 / 撞同一
       category: ALL_CATEGORY,
     })
     expect(pool).toEqual([])
+  })
+})
+
+describe("formatBytes（体积读数）", () => {
+  it("按量级换单位", () => {
+    expect(formatBytes(0)).toBe("0 B")
+    expect(formatBytes(1023)).toBe("1023 B")
+    expect(formatBytes(10240)).toBe("10.0 KB")
+    expect(formatBytes(1024 * 200)).toBe("200 KB")
+    expect(formatBytes(1024 * 1024 * 3)).toBe("3.0 MB")
+  })
+
+  it("真拿不到才画破折号", () => {
+    expect(formatBytes(Number.NaN)).toBe("—")
+    expect(formatBytes(-1)).toBe("—")
   })
 })
 

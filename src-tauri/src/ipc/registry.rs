@@ -109,6 +109,8 @@ pub const HANDLED: &[&str] = &[
     "mods:forgetSubmission",
     // 危险操作（本工程扩展，契约见 contract/extensions.json）：
     // clearCache=只删启动器联网快照；resetConfig=服务端 config 回默认值；eraseWorld=改名存档并重建
+    // cacheSize=只读台账：cache 目录总占用 / 其中可清理多少（不碰磁盘）
+    "danger:cacheSize",
     "danger:clearCache",
     "danger:resetConfig",
     "danger:eraseWorld",

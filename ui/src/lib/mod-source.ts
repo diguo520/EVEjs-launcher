@@ -26,10 +26,19 @@ import type { ModChangelog, ModEntry, ModReview, ModReviewState } from "./mock"
 
 const BYTES_PER_MB = 1024 * 1024
 
-/** 字节 → MB（保留一位小数）；0 / 缺失都给 0 */
+/**
+ * 字节 → MB。
+ *
+ * 保留四位小数（≈ 100 字节的分辨率）。早先只留一位，52 KB 以下的包会被四舍五入成 **0**，
+ * 详情页「安装包」就写成「0.0 MB」—— 市场上 28 个模组里有 22 个因此读数不对
+ * （2026-10-16 报障：evejs-npc-corp-info 的包 5663 B，索引与 GitHub 资产都确认是 5.6 KB）。
+ * 多出来的小数位不影响读数，展示统一走 `formatMB()`。
+ *
+ * 0 / 缺失仍然给 0：这里只做换算，「拿不到体积」该怎么画由展示层决定。
+ */
 export function toMB(bytes: number | undefined | null): number {
   if (!bytes || bytes <= 0) return 0
-  return Math.round((bytes / BYTES_PER_MB) * 10) / 10
+  return Math.round((bytes / BYTES_PER_MB) * 10000) / 10000
 }
 
 /** 毫秒时间戳 → YYYY-MM-DD；拿不到就给空串（页面显示 —） */

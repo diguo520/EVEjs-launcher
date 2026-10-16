@@ -69,9 +69,13 @@ export const FALLBACK_MOD_TEMPLATES: ModTemplateCard[] = [
   },
 ]
 
-/** 字节数写成一眼能读的量级；拿不到就画破折号，不编数字 */
+/**
+ * 字节数写成一眼能读的量级；真拿不到（NaN / 负数）才画破折号，不编数字。
+ *
+ * 0 照实写「0 B」而不是破折号：下载进度这类读数就是从 0 起步的，画成「—」会像是坏了。
+ */
 export function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes <= 0) return "—"
+  if (!Number.isFinite(bytes) || bytes < 0) return "—"
   if (bytes < 1024) return `${Math.round(bytes)} B`
   const kb = bytes / 1024
   if (kb < 1024) return `${kb >= 100 ? Math.round(kb) : kb.toFixed(1)} KB`
@@ -308,6 +312,25 @@ export function modByFolderOrId(
     mods.find((item) => item.id === ref.id) ??
     null
   )
+}
+
+/**
+ * 这条模组在本地 `mods/` 里的目录名；本机没有这个目录（市场里还没装的条目）返回 null。
+ *
+ * 为什么不是直接用 `id`：手写的模组目录可以和清单里的 id 不同名，`folder` 才是
+ * 启用 / 卸载 / 签名那几条写通道认的东西，只有拿不到 folder 时才回落到 id。
+ *
+ * 调用方的两条用途：
+ *   - 详情页据此决定「打开所在目录」按钮画不画 —— 没装的市场条目点下去只会得到
+ *     一句「目录不存在」，不如不画；
+ *   - 点按钮时把这个名字交给 `mods:openModFolder`。
+ *
+ * 两个信号任取其一即可认定「本机有目录」：`folder`（扫描给的名字）或 `installed`
+ * （扫描确实找到了它）。市场条目两者都没有。
+ */
+export function localFolderOf(mod: ModEntry): string | null {
+  if (mod.folder) return mod.folder
+  return mod.installed ? mod.id : null
 }
 
 /* ---------------- 审核状态 ---------------- */

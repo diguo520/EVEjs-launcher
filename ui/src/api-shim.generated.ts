@@ -56,6 +56,7 @@ export const api = {
   configRepairClientDisplay: (): Promise<unknown> => request("config:repairClientDisplay", []),
   configSetClient: (patch: Record<string, string>): Promise<unknown> => request("config:setClient", [patch]),
   configSetRepoRoot: (repoRoot: string): Promise<unknown> => request("config:setRepoRoot", [repoRoot]),
+  dangerCacheSize: (): Promise<unknown> => request("danger:cacheSize", []),
   dangerClearCache: (): Promise<unknown> => request("danger:clearCache", []),
   dangerEraseWorld: (): Promise<unknown> => request("danger:eraseWorld", []),
   dangerResetConfig: (): Promise<unknown> => request("danger:resetConfig", []),

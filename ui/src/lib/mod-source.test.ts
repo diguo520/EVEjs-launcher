@@ -40,6 +40,13 @@ describe("toMB", () => {
     expect(toMB(1024 * 1024)).toBe(1)
     expect(toMB(1536 * 1024)).toBe(1.5)
   })
+
+  it("几 KB 的小包不塌成 0", () => {
+    // 2026-10-16 报障现场：evejs-npc-corp-info 的包 5663 B。
+    // 只留一位小数时这个值会变成 0，详情页就写成「0.0 MB」。
+    expect(toMB(5663)).toBe(0.0054)
+    expect(toMB(5197)).toBeGreaterThan(0)
+  })
 })
 
 describe("isoDate", () => {

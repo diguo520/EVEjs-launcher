@@ -3601,5 +3601,8 @@
   "打开后点窗口的叉直接收进托盘（服务继续跑，再启动一次启动器即可唤回）；关掉则每次关窗都问你": "When on, the window's X drops it straight into the tray (services keep running; launch the launcher again to bring it back). When off, every close asks you first.",
   "最小化到托盘": "Minimise to tray",
   "记住我的选择": "Remember my choice",
-  "主服务器或市场服务可能还在运行：收进托盘可以继续跑，退出程序会一并把它们关掉。": "The main server or the market service may still be running: minimising to the tray keeps them alive, while quitting shuts them down as well."
+  "主服务器或市场服务可能还在运行：收进托盘可以继续跑，退出程序会一并把它们关掉。": "The main server or the market service may still be running: minimising to the tray keeps them alive, while quitting shuts them down as well.",
+  "缓存 {size}": "Cache {size}",
+  "可清理 {clearable} · 保留 {kept}": "Clearable {clearable} · kept {kept}",
+  "缓存目录：{path}": "Cache folder: {path}"
 }

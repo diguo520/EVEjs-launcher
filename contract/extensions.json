@@ -39,6 +39,14 @@
       "why": "账号页每 5 秒刷新在线角色。完整 accounts:list 会启动 Node、全量读账号库并把所有角色用 JSON 回传；账号和模拟角色多时这是持续 CPU / 内存抖动。这条通道只读取注入 host 已经写好的 _launcher/hotreload/online.json，返回在线角色 ID 列表；known=false 表示 host 暂不可用，前端保持已有状态，不误报全体离线。"
     },
     {
+      "api": "dangerCacheSize",
+      "channel": "danger:cacheSize",
+      "kind": "invoke",
+      "signature": "",
+      "params": [],
+      "why": "设置页「危险操作」的「清空缓存」旁边那个占用读数。清空缓存只能按白名单删（模组索引 / 评分 / 赞助人名单 / GitHub 登录名），其余（老 Electron 版留下的 Chromium `Local State`、Cache、Code Cache 等）一律保留 —— 所以「文件夹多大」和「点一下能释放多少」是两个数，只报一个必然误导：用户看见 500 MB 点下去只释放 5 KB。这条只读通道把两个数一起报回来：`bytes` 整个 cache 目录占用、`clearableBytes` / `clearable` 是白名单里真会删掉的量与条目数、`keptBytes` 是保留部分的占用，另有 `path` 给界面显示目录位置、`exists` 区分「还没拉过缓存」与「读不到」。**只读**：不删任何东西，服务在跑时也能随时调。"
+    },
+    {
       "api": "dangerClearCache",
       "channel": "danger:clearCache",
       "kind": "invoke",

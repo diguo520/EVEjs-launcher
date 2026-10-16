@@ -4,8 +4,10 @@ import { t } from "@/lib/i18n"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { PHASE_LABEL, type DownloadTask } from "@/hooks/use-mod-downloads"
-import { formatMB } from "@/lib/mock"
+import { formatBytes } from "@/lib/mod-logic"
 import { cn } from "@/lib/utils"
+
+const BYTES_PER_MB = 1024 * 1024
 
 const PHASE_ICON = {
   downloading: Download,
@@ -28,7 +30,10 @@ export function DownloadProgress({
 }) {
   const Icon = PHASE_ICON[task.phase]
   const percent = Math.floor(task.progress)
-  const moved = (task.sizeMB * task.progress) / 100
+  /* 体积读数按字节算：几 KB 的小包在 MB 口径下会读成 0.0 / 0.0 MB（2026-10-16 报障），
+     formatBytes 会自己挑 B / KB / MB */
+  const totalBytes = task.sizeMB * BYTES_PER_MB
+  const movedBytes = (totalBytes * task.progress) / 100
 
   return (
     <div
@@ -75,11 +80,11 @@ export function DownloadProgress({
 
       <div className="tabular mt-1.5 flex items-center justify-between text-[10px] text-tertiary">
         <span>
-          {moved.toFixed(1)} / {task.sizeMB.toFixed(1)} MB
+          {formatBytes(movedBytes)} / {formatBytes(totalBytes)}
         </span>
         <span>
           {task.phase === "downloading"
-            ? t("剩余 {size}", { size: formatMB(Math.max(0, task.sizeMB - moved)) })
+            ? t("剩余 {size}", { size: formatBytes(Math.max(0, totalBytes - movedBytes)) })
             : "本地处理中"}
         </span>
       </div>

@@ -2,12 +2,12 @@
   "generatedFrom": "E:\\Games\\EveJS-v0.12.8\\launcher\\launcher",
   "generatedAt": "2026-10-13T16:52:43.237Z",
   "counts": {
-    "invoke": 116,
+    "invoke": 117,
     "send": 7,
     "events": 10,
-    "requests": 123,
+    "requests": 124,
     "registered": 82,
-    "apiTotal": 133
+    "apiTotal": 134
   },
   "invoke": [
     {
@@ -177,6 +177,13 @@
       "params": [
         "repoRoot"
       ]
+    },
+    {
+      "api": "dangerCacheSize",
+      "channel": "danger:cacheSize",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
     },
     {
       "api": "dangerClearCache",
@@ -1101,6 +1108,7 @@
       "accounts:logotypes",
       "accounts:online",
       "app:quit",
+      "danger:cacheSize",
       "danger:clearCache",
       "danger:eraseWorld",
       "danger:resetConfig",

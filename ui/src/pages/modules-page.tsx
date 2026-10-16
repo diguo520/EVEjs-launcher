@@ -54,6 +54,7 @@ import {
   groupByEnabled,
   hasOwnSignature,
   hasUpdate,
+  localFolderOf,
   isPublished,
   mergeEnabledOrder,
   moveWithin,
@@ -765,6 +766,28 @@ export function ModulesPage({
   }
 
   /**
+   * 在资源管理器里定位**某一个**模组的本地目录。
+   *
+   * 目录名要的是 `mods/` 里那一层的名字（`folder`），不是清单里的 `id`：手写的模组目录
+   * 可以和 id 不同名，只有拿不到 folder 时才回落到 id —— 与启用 / 卸载 / 签名同一口径。
+   *
+   * 以前这个按钮只弹一句「已打开所在目录」，根本没走通道（2026-10-17 报障），
+   * 所以成功与否都要以回包为准，不能再凭空报成功。
+   */
+  async function revealModFolder(mod: ModEntry) {
+    const folder = localFolderOf(mod)
+    if (folder === null) return
+    const reply = await source.openModFolder(folder)
+    if (!reply.ok) {
+      toast.error(t("没能打开目录"), { description: reply.reason ?? "系统没有返回原因" })
+      return
+    }
+    toast(t("已打开所在目录"), {
+      description: typeof reply.dir === "string" && reply.dir ? reply.dir : `mods\\${folder}`,
+    })
+  }
+
+  /**
    * 导入 ZIP：弹系统「打开文件」选包，取消就静默（后端回 canceled:true）。
    * 成功必须重扫列表 —— 导入是真往 mods/ 里落目录，不重扫界面上什么都看不见。
    */
@@ -1399,6 +1422,7 @@ export function ModulesPage({
           if (detailMod) void uninstallMod(detailMod)
           setDetailId(null)
         }}
+        onOpenFolder={() => detailMod && void revealModFolder(detailMod)}
         onEdit={() => {
           const id = detailId
           setDetailId(null)

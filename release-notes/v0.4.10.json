@@ -1,0 +1,15 @@
+{
+  "version": "0.4.10",
+  "changelog": {
+    "zh": [
+      { "type": "fix", "text": "模组体积读数不再把几 KB 的小包写成「0.0 MB」：详情页的「安装包」、下载进度条和上架预览此前都把 MB 四舍五入到一位小数，52 KB 以下的包直接被压成 0 —— 市场上 28 个模组里有 22 个读数不对（例：evejs-npc-corp-info 的 5.5 KB 装包显示成 0.0 MB）。现在按 B / KB / MB 自适应，体积拿不到时画破折号，不编一个 0.0 出来。" },
+      { "type": "new", "text": "设置 →「危险操作 → 清空缓存」增加缓存占用读数：标题旁徽标显示缓存目录总大小（悬停可看目录路径），并把总占用拆成「可清理」与「保留」两部分 —— 清空缓存只按白名单删模组索引 / 评分 / 赞助人名单 / GitHub 登录名，老版残留的 Chromium 缓存与本地凭据一律保留，只报一个总数会让人以为点一下能把空间全腾出来。清空之后读数自动刷新。" },
+      { "type": "fix", "text": "模组详情页的「打开所在目录」现在真的会打开资源管理器：此前它只弹一句「已打开所在目录」，根本没调后端通道，点下去什么都不发生（2026-10-17 报障）。同时市场里还没安装的条目不再显示这个按钮 —— 那些条目本机没有目录，点了只可能失败。目录名取本地 mods/ 里那一层的名字（folder），拿不到时才回落到 id，与启用 / 卸载 / 签名同一口径。" }
+    ],
+    "en": [
+      { "type": "fix", "text": "Mod package sizes no longer read \"0.0 MB\" for small mods: the size readout in the mod detail dialog, the download progress bar and the publish preview all rounded MB to one decimal, flattening any package under 52 KB to zero — 22 of the 28 mods in the market showed wrong numbers (for example the 5.5 KB evejs-npc-corp-info package displayed as 0.0 MB). Sizes now adapt across B / KB / MB, and an unknown size shows a dash instead of inventing a 0.0." },
+      { "type": "new", "text": "Settings → Danger zone → Clear cache now reports how much the cache folder takes: a badge next to the title shows the total size (hover for the folder path) and splits it into \"clearable\" and \"kept\". Clearing only removes whitelisted snapshots — the mod index, ratings, sponsors and the cached GitHub login — while Chromium leftovers from the old Electron build and local credentials always stay. A single total would imply that one click frees all of it. The readout refreshes after clearing." },
+      { "type": "fix", "text": "The mod detail dialog's \"Show in folder\" now actually opens Explorer: previously it only showed a \"folder opened\" toast and never called the backend channel, so nothing happened at all (reported 2026-10-17). Mods that are not installed locally no longer show that button — there is no folder to open. The folder name is the one in the local mods/ directory (folder), falling back to the id only when it is missing, matching the enable / uninstall / sign channels." }
+    ]
+  }
+}

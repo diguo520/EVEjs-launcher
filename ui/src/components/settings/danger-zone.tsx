@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import type { ReactNode } from "react"
 import { TriangleAlert } from "lucide-react"
 import { toast } from "sonner"
@@ -15,9 +15,10 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { t } from "@/lib/i18n"
-import { call } from "@/lib/ipc"
+import { call, callOr, hasIpc } from "@/lib/ipc"
 
 /** 三条危险通道的统一回包形状；成功分支各自带自己的字段 */
 interface DangerReply {
@@ -30,17 +31,36 @@ interface DangerReply {
 
 type DangerKey = "cache" | "config" | "world"
 
-/** 释放空间给一个量级读数就好，不追求精确到字节 */
+/**
+ * `danger:cacheSize` 的回包：整个 cache 目录的占用，以及其中「清空缓存」真会删掉的那部分。
+ *
+ * 两个数必须都留着：清空缓存按白名单删，老 Electron 版留在同一目录下的 Chromium
+ * `Local State` / `Cache` / `Code Cache` 一律保留，只报总占用就成了「看着 500 MB、点完释放 5 KB」。
+ */
+interface CacheReport {
+  ok?: boolean
+  path?: string
+  exists?: boolean
+  bytes?: number
+  clearableBytes?: number
+  clearable?: number
+  keptBytes?: number
+}
+
+/** 空间读数给一个量级就好，不追求精确到字节；到 GB 是因为老版残留的 Chromium 缓存可能上 G */
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return bytes + " B"
   const kb = bytes / 1024
   if (kb < 1024) return kb.toFixed(1) + " KB"
-  return (kb / 1024).toFixed(1) + " MB"
+  const mb = kb / 1024
+  if (mb < 1024) return mb.toFixed(1) + " MB"
+  return (mb / 1024).toFixed(2) + " GB"
 }
 
 /** 危险操作行：左说明 + 右按钮，点击后必须二次确认 */
 function DangerRow({
   title,
+  titleMeta,
   desc,
   actionLabel,
   tone,
@@ -50,6 +70,8 @@ function DangerRow({
   onConfirm,
 }: {
   title: string
+  /** 标题右侧的读数（目前只有「清空缓存」用：缓存目录占用） */
+  titleMeta?: ReactNode
   desc: ReactNode
   actionLabel: string
   tone: "outline" | "warning" | "destructive"
@@ -68,6 +90,7 @@ function DangerRow({
       <div className="min-w-[220px] flex-1">
         <div className="flex items-center gap-2 text-[13px] font-medium text-foreground">
           {title}
+          {titleMeta}
         </div>
         <p className="mt-0.5 text-[11px] leading-relaxed text-tertiary">{desc}</p>
       </div>
@@ -105,6 +128,32 @@ function DangerRow({
 
 export function DangerZone() {
   const [busy, setBusy] = useState<DangerKey | null>(null)
+  const [cache, setCache] = useState<CacheReport | null>(null)
+  const ipc = hasIpc()
+
+  /**
+   * 缓存台账：进面板拉一次，清空之后再拉一次。
+   *
+   * 读不到就画「—」，不弹 toast：这只是个读数，「清空缓存」按钮本身不依赖它，
+   * 为了一条只读信息打断用户不值当。没搬 state 进来是为了让 effect 走 `.then`
+   * —— 直接在 effect 体里 setState 会被 react-hooks/set-state-in-effect 拦下，
+   * 同一写法见 general-settings / launcher-version。
+   */
+  const loadCacheSize = useCallback(
+    () => callOr<CacheReport | null>("dangerCacheSize", null),
+    []
+  )
+
+  useEffect(() => {
+    if (!ipc) return
+    let alive = true
+    void loadCacheSize().then((reply) => {
+      if (alive && reply?.ok) setCache(reply)
+    })
+    return () => {
+      alive = false
+    }
+  }, [ipc, loadCacheSize])
 
   /**
    * 三条通道的共同收尾：跑的时候锁住整块，失败一定把后端给的原因说出来 ——
@@ -152,21 +201,46 @@ export function DangerZone() {
     >
       <DangerRow
         title="清空缓存"
-        desc="清理模组索引、评分与赞助人名单等联网缓存，下次用到会自动重拉"
+        titleMeta={
+          <Badge
+            variant="outline"
+            className="tabular font-normal tracking-normal normal-case"
+            title={cache?.path ? t("缓存目录：{path}", { path: cache.path }) : undefined}
+          >
+            {cache?.ok ? t("缓存 {size}", { size: formatBytes(cache.bytes ?? 0) }) : "—"}
+          </Badge>
+        }
+        desc={
+          <>
+            清理模组索引、评分与赞助人名单等联网缓存，下次用到会自动重拉
+            {cache?.ok && (cache.keptBytes ?? 0) > 0 ? (
+              <span className="mt-1 block">
+                {t("可清理 {clearable} · 保留 {kept}", {
+                  clearable: formatBytes(cache.clearableBytes ?? 0),
+                  kept: formatBytes(cache.keptBytes ?? 0),
+                })}
+              </span>
+            ) : null}
+          </>
+        }
         actionLabel="清空缓存"
         tone="outline"
         confirmTitle="清空缓存"
         confirmDesc="只会删掉启动器联网拉来的缓存，身份 key 与令牌不受影响。"
         busy={busy !== null}
         onConfirm={() =>
-          void run("cache", "dangerClearCache", "清空缓存失败", (reply) =>
+          void run("cache", "dangerClearCache", "清空缓存失败", (reply) => {
             toast.success(
               t("已清空 {count} 项缓存 · 释放 {size}", {
                 count: String(reply.removed?.length ?? 0),
                 size: formatBytes(reply.freedBytes ?? 0),
               })
             )
-          )
+            // 清完把读数刷新，否则还挂着删之前那个数字
+            void loadCacheSize().then((next) => {
+              if (next?.ok) setCache(next)
+            })
+          })
         }
       />
 

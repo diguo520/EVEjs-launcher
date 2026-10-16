@@ -3601,5 +3601,8 @@
   "打开后点窗口的叉直接收进托盘（服务继续跑，再启动一次启动器即可唤回）；关掉则每次关窗都问你": "Activé : la croix de la fenêtre la range directement dans la zone de notification (les services continuent ; relancez le lanceur pour la retrouver). Désactivé : chaque fermeture vous demande.",
   "最小化到托盘": "Réduire dans la zone de notification",
   "记住我的选择": "Mémoriser mon choix",
-  "主服务器或市场服务可能还在运行：收进托盘可以继续跑，退出程序会一并把它们关掉。": "Le serveur principal ou le service de marché tourne peut-être encore : réduire dans la zone de notification les laisse tourner, quitter les arrête aussi."
+  "主服务器或市场服务可能还在运行：收进托盘可以继续跑，退出程序会一并把它们关掉。": "Le serveur principal ou le service de marché tourne peut-être encore : réduire dans la zone de notification les laisse tourner, quitter les arrête aussi.",
+  "缓存 {size}": "Cache {size}",
+  "可清理 {clearable} · 保留 {kept}": "Effaçable {clearable} · conservé {kept}",
+  "缓存目录：{path}": "Dossier de cache : {path}"
 }

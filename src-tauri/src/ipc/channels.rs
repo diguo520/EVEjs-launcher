@@ -18,7 +18,7 @@ pub struct ChannelSpec {
     pub kind: ChannelKind,
 }
 
-pub const REQUEST_COUNT: usize = 123;
+pub const REQUEST_COUNT: usize = 124;
 pub const EVENT_COUNT: usize = 10;
 
 #[rustfmt::skip]
@@ -44,6 +44,7 @@ pub const CHANNELS: &[ChannelSpec] = &[
     ChannelSpec { channel: "config:repairClientDisplay", api: "configRepairClientDisplay", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "config:setClient", api: "configSetClient", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "config:setRepoRoot", api: "configSetRepoRoot", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "danger:cacheSize", api: "dangerCacheSize", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "danger:clearCache", api: "dangerClearCache", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "danger:eraseWorld", api: "dangerEraseWorld", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "danger:resetConfig", api: "dangerResetConfig", kind: ChannelKind::Invoke },
