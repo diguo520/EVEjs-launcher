@@ -493,6 +493,7 @@ async fn start_main_server(app: &AppHandle) -> Result<Value, String> {
     // 端口取 config 里的单一声明（现役版这几处都是字面量 26000）
     let port = crate::config::DEFAULT_GAME_PORT;
     if health::tcp_alive(port).await {
+        crate::logarchive::mark_external(&state.runtime, crate::logarchive::SERVER, port);
         set_state(
             app,
             MAIN_SERVER,
@@ -581,7 +582,8 @@ async fn start_main_server(app: &AppHandle) -> Result<Value, String> {
         session_id(MAIN_SERVER),
         PtySpec::new("cmd.exe", &server_dir)
             .args(vec!["/c".to_string(), "npm start".to_string()])
-            .env(env_vars),
+            .env(env_vars)
+            .log(archive_log_path(state.inner(), crate::logarchive::SERVER)),
     )?;
 
     let budget_ms = main_start_budget_ms(loader.count);
@@ -770,12 +772,15 @@ fn mods_loader_injection(root: &Path, runtime: &crate::runtime::RuntimePaths) ->
         hotreload,
     }
 }
+
 async fn start_market_server(app: &AppHandle) -> Result<Value, String> {
     let state = app.state::<AppState>();
     let root = state.repo_root();
 
     let port = crate::config::DEFAULT_MARKET_PORT;
     if health::tcp_alive(port).await {
+        // 外部已经起着了：抓不到它的输出，但这一轮也要在存档列表里留个说明
+        crate::logarchive::mark_external(&state.runtime, crate::logarchive::MARKET, port);
         set_state(
             app,
             MARKET_SERVER,
@@ -804,7 +809,8 @@ async fn start_market_server(app: &AppHandle) -> Result<Value, String> {
     let pid = state.pty.spawn(
         app,
         session_id(MARKET_SERVER),
-        PtySpec::new(&exe.to_string_lossy(), &market_dir),
+        PtySpec::new(&exe.to_string_lossy(), &market_dir)
+            .log(archive_log_path(state.inner(), crate::logarchive::MARKET)),
     )?;
     set_state(
         app,
@@ -1231,8 +1237,21 @@ pub(crate) fn iso_timestamp() -> String {
 }
 
 /// 文件名安全版 ISO 时间戳（把 `:` 和 `.` 换成 `-`）
-fn iso_log_stamp() -> String {
+pub(crate) fn iso_log_stamp() -> String {
     iso_timestamp().replace([':', '.'], "-")
+}
+
+/// 这一轮服务输出的存档路径：`logs/archive/<group>/<时间戳>-<pid>.log`。
+///
+/// 启动前先按组裁到最新 N 份（`logarchive::KEEP_PER_GROUP`）：存档是为了排查问题，
+/// 不是为了把磁盘写满 —— 一个每天早上跑一次的人，一年也就攒二三十份。
+fn archive_log_path(state: &AppState, group: &str) -> PathBuf {
+    crate::logarchive::prune(&state.runtime, group);
+    crate::logarchive::group_dir(&state.runtime, group).join(format!(
+        "{}-{}.log",
+        iso_log_stamp(),
+        std::process::id()
+    ))
 }
 
 /// 天数 → (年, 月, 日)（Howard Hinnant 的 civil_from_days，避免为一行时间戳引入 chrono）
@@ -1263,6 +1282,8 @@ pub async fn start_client(app: &AppHandle, login: Option<ClientLogin>) -> Result
     };
 
     let client = crate::config::read_client_config(&root);
+    // 客户端每启动一次就多两份 .out/.err：先按组裁到最新 N 份再开新的
+    crate::logarchive::prune_in(&logs_dir.join(CLIENT));
     if client.client_path.trim().is_empty() || !Path::new(&client.client_path).exists() {
         let message = "客户端路径无效，请先在配置面板设置".to_string();
         set_state(app, CLIENT, "error", None, Some(message));

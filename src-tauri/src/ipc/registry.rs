@@ -64,6 +64,12 @@ pub const HANDLED: &[&str] = &[
     "init:run",
     "init:state",
     "log:read",
+    // 存档日志（本工程扩展，契约见 contract/extensions.json）：
+    // archives=三组存档清单（主服务器 / 市场服务 / 客户端）；clearArchives=清空这三组；
+    // openArchive=用系统默认程序打开其中一份（只收组 id + 文件名，路径由后端现算）
+    "log:archives",
+    "log:clearArchives",
+    "log:openArchive",
     "login:start",
     // 物品市场（本工程扩展，契约见 contract/extensions.json）：直读服务端市场库，
     // 现役版没有物品/市场浏览功能

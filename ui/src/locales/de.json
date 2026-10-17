@@ -3604,5 +3604,14 @@
   "主服务器或市场服务可能还在运行：收进托盘可以继续跑，退出程序会一并把它们关掉。": "Hauptserver oder Marktdienst laufen möglicherweise noch: Minimieren in den Infobereich lässt sie weiterlaufen, Beenden stoppt sie mit.",
   "缓存 {size}": "Cache {size}",
   "可清理 {clearable} · 保留 {kept}": "Löschbar {clearable} · bleibt {kept}",
-  "缓存目录：{path}": "Cache-Ordner: {path}"
+  "缓存目录：{path}": "Cache-Ordner: {path}",
+  "存档日志": "Archivierte Protokolle",
+  "清空日志": "Protokolle löschen",
+  "暂无存档": "Noch keine Archive",
+  "清空存档日志失败": "Archivierte Protokolle konnten nicht gelöscht werden",
+  "已清空 {count} 份存档 · 释放 {size}": "{count} Archiv(e) gelöscht · {size} freigegeben",
+  "共 {count} 份 · {size}": "{count} Datei(en) · {size}",
+  "另有 {count} 份更早的": "{count} ältere Datei(en) nicht angezeigt",
+  "打开日志": "Protokoll öffnen",
+  "打开日志失败": "Protokoll konnte nicht geöffnet werden"
 }

@@ -2,12 +2,12 @@
   "generatedFrom": "E:\\Games\\EveJS-v0.12.8\\launcher\\launcher",
   "generatedAt": "2026-10-13T16:52:43.237Z",
   "counts": {
-    "invoke": 117,
+    "invoke": 120,
     "send": 7,
     "events": 10,
-    "requests": 124,
+    "requests": 127,
     "registered": 82,
-    "apiTotal": 134
+    "apiTotal": 137
   },
   "invoke": [
     {
@@ -421,6 +421,20 @@
       "params": []
     },
     {
+      "api": "logArchives",
+      "channel": "log:archives",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "logClearArchives",
+      "channel": "log:clearArchives",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
       "api": "loginStart",
       "channel": "login:start",
       "kind": "invoke",
@@ -430,6 +444,16 @@
         "password",
         "remember",
         "characterId"
+      ]
+    },
+    {
+      "api": "logOpenArchive",
+      "channel": "log:openArchive",
+      "kind": "invoke",
+      "signature": "group: string, name: string",
+      "params": [
+        "group",
+        "name"
       ]
     },
     {
@@ -1122,6 +1146,9 @@
       "hotreload:apply",
       "hotreload:restore",
       "hotreload:state",
+      "log:archives",
+      "log:clearArchives",
+      "log:openArchive",
       "market:adjustStock",
       "market:book",
       "market:catalog",

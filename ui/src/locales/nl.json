@@ -3604,5 +3604,14 @@
   "主服务器或市场服务可能还在运行：收进托盘可以继续跑，退出程序会一并把它们关掉。": "De hoofdserver of marktservice draait mogelijk nog: minimaliseren naar het systeemvak laat ze draaien, afsluiten stopt ze ook.",
   "缓存 {size}": "Cache {size}",
   "可清理 {clearable} · 保留 {kept}": "Opruimbaar {clearable} · blijft {kept}",
-  "缓存目录：{path}": "Cachemap: {path}"
+  "缓存目录：{path}": "Cachemap: {path}",
+  "存档日志": "Gearchiveerde logs",
+  "清空日志": "Logs wissen",
+  "暂无存档": "Nog geen archieven",
+  "清空存档日志失败": "Gearchiveerde logs wissen mislukt",
+  "已清空 {count} 份存档 · 释放 {size}": "{count} archief/archieven gewist · {size} vrijgemaakt",
+  "共 {count} 份 · {size}": "{count} bestand(en) · {size}",
+  "另有 {count} 份更早的": "{count} ouder(e) bestand(en) niet getoond",
+  "打开日志": "Log openen",
+  "打开日志失败": "Log openen mislukt"
 }

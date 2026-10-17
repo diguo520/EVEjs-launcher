@@ -18,7 +18,7 @@ pub struct ChannelSpec {
     pub kind: ChannelKind,
 }
 
-pub const REQUEST_COUNT: usize = 124;
+pub const REQUEST_COUNT: usize = 127;
 pub const EVENT_COUNT: usize = 10;
 
 #[rustfmt::skip]
@@ -73,6 +73,9 @@ pub const CHANNELS: &[ChannelSpec] = &[
     ChannelSpec { channel: "hotreload:state", api: "hotreloadState", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "init:run", api: "initRun", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "init:state", api: "initState", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "log:archives", api: "logArchives", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "log:clearArchives", api: "logClearArchives", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "log:openArchive", api: "logOpenArchive", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "log:read", api: "readServerLog", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "login:start", api: "loginStart", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "market:adjustStock", api: "marketAdjustStock", kind: ChannelKind::Invoke },

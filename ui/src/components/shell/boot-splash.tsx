@@ -2,6 +2,7 @@ import { useRef } from "react"
 import { LogoMark } from "@/components/shell/logo-mark"
 import { cn } from "@/lib/utils"
 import { BootThreeFx } from "./boot/boot-three-fx"
+import { StarMapFx } from "./star-map-fx"
 
 /**
  * 开机画面：窗口一显示就盖满整屏，等后端第一次握手回来再淡出。
@@ -10,11 +11,14 @@ import { BootThreeFx } from "./boot/boot-three-fx"
  * G1 运行时自检只看那个根节点「有子树」，这层在不在都不影响它判定渲染层已挂载。
  * 读不到真实进度就不摆百分比，只走一条不定量信号带。
  *
- * 背景动效是 WebGL（three.js）那一版，见 boot/boot-three-fx.tsx：星场 + 围着标识的三段弧。
- * three 走 import() 懒加载：开机画面先用 CSS 那一层立刻显示，WebGL 就绪后再叠上去，
- * 不让 736 KB 的解析挡在首帧前面（入口 chunk 因此保持在 1.25 MB 量级）。
+ * 背景分两层：
+ *   - 底层是 EVE 星图（star-map-fx.tsx）—— 与主界面用的是同一个组件、同一颗随机种子，
+ *     所以淡出时星域位置不会跳一下；
+ *   - 上层是围着标识的三段弧（boot/boot-three-fx.tsx）。
+ * 两块都是 WebGL，且都走 import() 懒加载：开机画面先用纯 CSS 那层立刻显示，
+ * three 就绪后再叠上去，不让 736 KB 的解析挡在首帧前面（入口 chunk 因此保持在 1.25 MB 量级）。
  * 拿不到 WebGL 上下文（驱动黑名单 / 远程桌面 / 虚拟机）就静默不渲染，
- * 底下的环境光、参考网格、外环、信号带照常工作，开机画面不会因为动效挂掉。
+ * 外环与信号带照常工作，开机画面不会因为动效挂掉。
  *
  * 标识（LogoMark）、文字、信号带、外环在这一层之上，不参与动效绘制。
  */
@@ -39,12 +43,9 @@ export function BootSplash({
       )}
       aria-hidden={visible ? undefined : true}
     >
-      {/* 动效层贴在底：它是背景，标识与文字盖在它上面 */}
+      {/* 动效层贴在底：先星图（背景），再三段弧（围着标识），标识与文字盖在最上面 */}
+      <StarMapFx />
       <BootThreeFx hostRef={hostRef} logoRef={logoRef} />
-
-      {/* 跟主界面同一套环境光与参考网格，好让淡出时看不出接缝 */}
-      <div className="mission-glow pointer-events-none absolute inset-0" aria-hidden="true" />
-      <div className="mission-grid pointer-events-none absolute inset-0" aria-hidden="true" />
 
       <div className="relative flex flex-col items-center gap-6">
         {/* 外环呼吸 + 标识本身脉动：一眼看出是「正在接入」而不是卡死 */}

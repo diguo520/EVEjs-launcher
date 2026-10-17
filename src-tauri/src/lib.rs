@@ -22,6 +22,7 @@ pub mod init;
 pub mod ipc;
 pub mod legacy;
 pub mod log;
+pub mod logarchive;
 pub mod market;
 pub mod metrics;
 pub mod mods;

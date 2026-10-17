@@ -43,7 +43,14 @@ import { SettingsPage } from "@/pages/settings-page"
  * 最少亮 BOOT_MIN_MS，让动画走完一遍（数据到早了也不闪一下就没）；
  * 最多等 BOOT_MAX_MS，后端忙也不能一直盖着；淡出时长跟 index.css 的 .boot-splash 对齐。
  */
-const BOOT_MIN_MS = 900
+/**
+ * 开机画面至少亮这么久。
+ *
+ * 0.5.0 起定成 20 秒（维护者的选择）：星图走完一轮再进主界面，开机这一段本身就是展示。
+ * 它只控制「最短停留」—— 后端握手早就完成了，20 秒到点直接淡出进主界面，不额外等。
+ * 想改回「数据一到就走」就把它调回 900。
+ */
+const BOOT_MIN_MS = 20_000
 const BOOT_MAX_MS = 2400
 const BOOT_FADE_MS = 400
 
@@ -195,7 +202,9 @@ export function App() {
           data-evejs-renderer="react"
           className="relative flex h-screen flex-col overflow-hidden bg-background text-foreground"
         >
-          {/* 环境光与参考网格：低光指挥室里唯一的装饰层 */}
+          {/* 环境光与参考网格：低光指挥室里唯一的装饰层。
+              星图只留在开机画面（boot-splash.tsx），进主界面之后不再跑 WebGL ——
+              常驻动效会跟面板里的读数抢注意力，也白耗一个 30fps 的绘制循环。 */}
           <div
             className="mission-glow pointer-events-none fixed inset-0 z-0"
             aria-hidden="true"

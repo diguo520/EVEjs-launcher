@@ -1,17 +1,16 @@
 /**
- * 开机动画：three.js（WebGL）—— 星场 + 围着标识的三段弧。
+ * 开机动画的**前景**层：three.js（WebGL）画的、围着标识的三段弧。
  *
- * 为什么用 WebGL：星点要有厚度、弧线要有辉光，2D 画布与预渲染视频都做不出这个层次。
- * 代价是一个常驻 GPU 上下文 + 首帧初始化（懒加载块 736 KB / gzip 187 KB，见下面的加载方式）。
- * 正交相机按**像素坐标**摆放（left/right/top/bottom = 视口边缘），粒子密度与弧线半径
- * 跟窗口尺寸就是同一套单位，不用换算。
+ * 星场已经从这里搬走了 —— 开机画面的背景现在就是主界面那块 EVE 星图
+ * （components/shell/star-map-fx.tsx，同一个组件、同一颗种子），再叠一层上浮的星点
+ * 只是把同一件事画两遍、多占一个绘制循环。
  *
- * 性能上刻意做的两件事：
- *   1) 环几何只在「测量/缩放」时重建，逐帧动画只改 transform 与 opacity，不碰几何；
- *   2) 星点位置存相对值（-0.5~0.5）靠 scale 铺满视口，resize 不重建顶点缓冲。
+ * 为什么弧线仍用 WebGL：要有辉光与呼吸，2D 画布做不出这个层次。正交相机按**像素坐标**
+ * 摆放（left/right/top/bottom = 视口边缘），弧线半径跟窗口尺寸是同一套单位，不用换算。
+ * 环几何只在「测量 / 缩放」时重建，逐帧动画只改 transform 与 opacity，不碰几何。
  *
  * 降级：拿不到 WebGL 上下文（驱动黑名单 / 远程桌面 / 虚拟机）就静默不渲染，
- * 底下的 CSS 开机画面照常工作 —— 开机动画坏掉不该挡住启动器。
+ * 底下的星图与 CSS 开机画面照常工作 —— 开机动画坏掉不该挡住启动器。
  */
 import { useEffect, useRef } from "react"
 import { disposeStage, hasWebGL, loadThree } from "@/lib/three-stage"
@@ -21,8 +20,6 @@ import { BOOT_COLORS, prefersReducedMotion, useLogoCenter, type BootLayerProps }
 function hex(value: string): number {
   return Number.parseInt(value.slice(1), 16)
 }
-
-const STAR_COUNT = 220
 
 export function BootThreeFx({ hostRef, logoRef }: BootLayerProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -67,38 +64,6 @@ export function BootThreeFx({ hostRef, logoRef }: BootLayerProps) {
       camera.position.z = 1
 
       const disposables: Array<{ dispose: () => void }> = []
-
-      /* ------------- 星点：一片缓慢上浮的粒子，顶点色区分主色与冷白 ------------- */
-      const positions = new Float32Array(STAR_COUNT * 3)
-      const colors = new Float32Array(STAR_COUNT * 3)
-      const speeds = new Float32Array(STAR_COUNT)
-      const primary = new THREE.Color(hex(BOOT_COLORS.primary))
-      const cold = new THREE.Color("#DCEFFF")
-      for (let i = 0; i < STAR_COUNT; i += 1) {
-        const rand = (seed: number) => Math.abs(Math.sin(i * seed) * 43758.5453) % 1
-        positions[i * 3] = rand(12.9898) - 0.5
-        positions[i * 3 + 1] = rand(78.233) - 0.5
-        positions[i * 3 + 2] = 0
-        const color = rand(39.425) > 0.74 ? primary : cold
-        colors[i * 3] = color.r
-        colors[i * 3 + 1] = color.g
-        colors[i * 3 + 2] = color.b
-        speeds[i] = 0.004 + rand(51.77) * 0.014
-      }
-      const starGeometry = new THREE.BufferGeometry()
-      starGeometry.setAttribute("position", new THREE.BufferAttribute(positions, 3))
-      starGeometry.setAttribute("color", new THREE.BufferAttribute(colors, 3))
-      const starMaterial = new THREE.PointsMaterial({
-        size: 2,
-        sizeAttenuation: false,
-        vertexColors: true,
-        transparent: true,
-        opacity: 0.85,
-        depthWrite: false,
-      })
-      const stars = new THREE.Points(starGeometry, starMaterial)
-      scene.add(stars)
-      disposables.push(starGeometry, starMaterial)
 
       /* ------------- 弧线：围着 Logo 的三段环 ------------- */
       interface Arc {
@@ -172,7 +137,6 @@ export function BootThreeFx({ hostRef, logoRef }: BootLayerProps) {
         telemetryArc.resize(logoRadius + 9)
         scanArc.resize(logoRadius + 26)
 
-        stars.scale.set(width, height, 1)
       }
 
       function render() {
@@ -187,15 +151,6 @@ export function BootThreeFx({ hostRef, logoRef }: BootLayerProps) {
       function frame() {
         if (disposed) return
         const t = performance.now() / 1000
-
-        // 星点上浮：越过上边界折回底部
-        const attr = starGeometry.attributes.position
-        for (let i = 0; i < STAR_COUNT; i += 1) {
-          let y = attr.array[i * 3 + 1] + speeds[i] / 60
-          if (y > 0.5) y -= 1
-          attr.array[i * 3 + 1] = y
-        }
-        attr.needsUpdate = true
 
         const breathe = 1 + Math.sin(t * 1.6) * 0.03
         mainArc.mesh.scale.set(breathe, breathe, 1)

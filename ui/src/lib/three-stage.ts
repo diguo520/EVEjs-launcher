@@ -1,7 +1,8 @@
 /**
  * three.js 的公共入口与收尾。
  *
- * 启动器里要画 WebGL 的地方是开机动画（components/shell/boot/boot-three-fx.tsx）。
+ * 启动器里要画 WebGL 的地方有两处：整屏背景的星图（components/shell/star-map-fx.tsx）
+ * 与开机画面围着标识的弧线（components/shell/boot/boot-three-fx.tsx）。两边共用这份入口。
  * 三条纪律都收在这里，尤其是最后那条归还上下文。
  *
  *   1) **懒加载**。three 单独一块（719 KB，随 exe 嵌入，不联网），只有真要画的时候才

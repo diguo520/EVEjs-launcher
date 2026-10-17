@@ -163,7 +163,7 @@ body {
   }
 }
 
-/* 环境光：低光指挥室里唯一允许的装饰，让画布不至于死平 */
+/* 环境光：低光指挥室里唯一允许的装饰，让画布不至于死平（星图只在开机画面跑） */
 .mission-glow {
   background-image:
     radial-gradient(

@@ -3604,5 +3604,14 @@
   "主服务器或市场服务可能还在运行：收进托盘可以继续跑，退出程序会一并把它们关掉。": "The main server or the market service may still be running: minimising to the tray keeps them alive, while quitting shuts them down as well.",
   "缓存 {size}": "Cache {size}",
   "可清理 {clearable} · 保留 {kept}": "Clearable {clearable} · kept {kept}",
-  "缓存目录：{path}": "Cache folder: {path}"
+  "缓存目录：{path}": "Cache folder: {path}",
+  "存档日志": "Archived logs",
+  "清空日志": "Clear logs",
+  "暂无存档": "No archives yet",
+  "清空存档日志失败": "Failed to clear archived logs",
+  "已清空 {count} 份存档 · 释放 {size}": "Cleared {count} archived file(s) · freed {size}",
+  "共 {count} 份 · {size}": "{count} file(s) · {size}",
+  "另有 {count} 份更早的": "{count} older file(s) not shown",
+  "打开日志": "Open log",
+  "打开日志失败": "Failed to open the log"
 }

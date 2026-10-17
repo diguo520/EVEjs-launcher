@@ -71,6 +71,30 @@
       "why": "设置页「危险操作」的「重置配置」。服务端 `config/*.json` 的默认值、取值范围与校验都在服务端 `manager.js` 里，启动器只负责搬运：这条通道转调侧车 `game-config-cli.js reset`，由服务端自己把每个域写回默认值，Rust 侧不抄第二套默认值。写前照现有约定把整份 `config/` 备份到 `_local/config-backups/reset-<时间戳>/`，并且不碰 `config/version.json` 的版本号。服务在跑时拒绝执行，否则正在写的配置会被进程回写覆盖。现役版只能一项项改，没有一键恢复默认的通道。"
     },
     {
+      "api": "logArchives",
+      "channel": "log:archives",
+      "kind": "invoke",
+      "signature": "",
+      "params": [],
+      "why": "「服务器日志」页右栏那份存档清单。主服务器与市场服务每一轮启动都会把 PTY 原始输出落一份到 `_launcher/logs/archive/<组>/`，客户端沿用 `_launcher/logs/client/` 下由客户端自己按 /stdout= /stderr= 写的 .out.log / .err.log。以前这些输出只活在内存里的终端缓冲区，关掉启动器就没了 —— 而服务起不来、端口被占、依赖没装好时，恰恰是这段最有用。返回每组最新的 6 条 + 文件数 + 总字节，够一眼看出「有没有、多新、多大」。只读，不碰磁盘内容。"
+    },
+    {
+      "api": "logClearArchives",
+      "channel": "log:clearArchives",
+      "kind": "invoke",
+      "signature": "",
+      "params": [],
+      "why": "清空上面那三组存档。**无入参**：删哪些目录由后端固定（logs/archive/server、logs/archive/market、logs/client），渲染层给不了路径，也就不存在越界删除。只删文件、不删目录，`logs/` 下其它文件（mod-load-report.json 之类的运行态）一律不动。每组的旧存档在下次启动时也会按 20 份自动裁剪，这条通道是给「我想立刻清干净」用的。"
+    },
+    {
+      "api": "logOpenArchive",
+      "channel": "log:openArchive",
+      "kind": "invoke",
+      "signature": "group: string, name: string",
+      "params": ["group", "name"],
+      "why": "存档列表里每行那个「打开」：用系统默认程序（记事本 / VSCode / 你关联的编辑器）打开这一份日志。只接受「组 id + 文件名」，真正的路径由后端按 logarchive::collect 现算再按文件名匹配 —— 渲染层给不了路径，所以不存在拿它去打开任意文件。组 id 就是列表里那三个：server / market / client。"
+    },
+    {
       "api": "gameConfigRead",
       "channel": "gameConfig:read",
       "kind": "invoke",

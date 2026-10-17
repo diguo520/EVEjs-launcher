@@ -7,7 +7,7 @@ use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize}
 use serde_json::json;
 use std::collections::HashMap;
 use std::io::{Read, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter};
 
@@ -81,6 +81,11 @@ pub struct PtySpec<'a> {
     pub args: Vec<String>,
     pub cwd: &'a Path,
     pub env: Vec<(String, String)>,
+    /// 把这一路的原始输出同时落一份盘（存档日志）。None = 不落盘。
+    ///
+    /// 只写 PTY 读到的字节，不做 ANSI 过滤：存档要能原样复现终端里看到的东西，
+    /// 真机上排查问题时少一层加工就少一处可疑。
+    pub log_path: Option<PathBuf>,
 }
 
 impl<'a> PtySpec<'a> {
@@ -90,6 +95,7 @@ impl<'a> PtySpec<'a> {
             args: Vec::new(),
             cwd,
             env: Vec::new(),
+            log_path: None,
         }
     }
 
@@ -100,6 +106,12 @@ impl<'a> PtySpec<'a> {
 
     pub fn env(mut self, env: Vec<(String, String)>) -> Self {
         self.env = env;
+        self
+    }
+
+    /// 这一路输出额外存一份到 `path`（目录不存在会自动建）
+    pub fn log(mut self, path: PathBuf) -> Self {
+        self.log_path = Some(path);
         self
     }
 }
@@ -191,12 +203,27 @@ impl PtyManager {
         // 输出泵：读到即发，避免在渲染层做逐行解析；顺带应答终端查询（否则 ConPTY 会一直等）
         let id_out = id.to_string();
         let writer_out = Arc::clone(&writer);
+        // 存档日志的句柄在泵线程里独占：开一次、写到底，停止服务时线程退出即关闭
+        let mut archive = spec.log_path.as_ref().and_then(|path| {
+            if let Some(dir) = path.parent() {
+                let _ = std::fs::create_dir_all(dir);
+            }
+            std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(path)
+                .ok()
+        });
         std::thread::spawn(move || {
             let mut buffer = [0u8; 8192];
             loop {
                 match reader.read(&mut buffer) {
                     Ok(0) => break,
                     Ok(count) => {
+                        if let Some(file) = archive.as_mut() {
+                            // 写失败不打断终端：存档是附加价值，不能因为磁盘满把服务日志也停了
+                            let _ = file.write_all(&buffer[..count]).and_then(|_| file.flush());
+                        }
                         let text = String::from_utf8_lossy(&buffer[..count]).to_string();
                         if let Some(reply) = answer_terminal_queries(&text) {
                             if let Ok(mut guard) = writer_out.lock() {
@@ -453,6 +480,40 @@ mod tests {
 
     /// 退出码要在退出那一刻记下来：Windows 的进程对象随后会被回收，事后拿 PID 是取不到的。
     /// 「启动失败要报 exit code」（process.rs 的 exited_head）靠的就是这一份。
+    /// 存档：PTY 的原始输出必须同时落到 `PtySpec::log` 指定的文件里。
+    ///
+    /// 这块是「服务器日志 → 存档列表」的数据来源：它坏了，界面上主服务器 / 市场服务
+    /// 两组就永远是空的，而终端里照样能看到输出，很容易被当成「列表没读出来」。
+    #[test]
+    fn pty_output_is_piped_into_the_archive_file() {
+        let dir = std::env::temp_dir().join(format!("evejs-pty-archive-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        // 故意放在还不存在的子目录里：sink 要自己把目录建出来
+        let log_path = dir.join("archive").join("market").join("session.log");
+
+        let manager = PtyManager::new();
+        let spec = PtySpec::new("cmd.exe", &dir)
+            .args(vec!["/c".to_string(), "echo evejs-pty-archive".to_string()])
+            .log(log_path.clone());
+        manager
+            .spawn_streaming("archive-test", spec, |_, _| {}, |_, _| {})
+            .unwrap();
+
+        let mut found = false;
+        for _ in 0..60 {
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            if let Ok(text) = std::fs::read_to_string(&log_path) {
+                if text.contains("evejs-pty-archive") {
+                    found = true;
+                    break;
+                }
+            }
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(found, "PTY 输出没有落进存档文件：{log_path:?}");
+    }
+
     #[test]
     fn exit_code_is_recorded_when_the_session_ends() {
         let cwd = std::env::current_dir().expect("拿不到工作目录");

@@ -1,0 +1,15 @@
+{
+  "version": "0.5.0",
+  "changelog": {
+    "zh": [
+      { "type": "new", "text": "开机画面换成 EVE 星图（three.js，俯视 45° 等距视角）：1800 颗星尘 + 140 个星系 + 最近邻航路 + 5 个信标（含一条琥珀色主航线），外加散布全图的絮状尘埃雾（噪声生成、尺寸与星系同一量级、叠加混合并画在星点之下，是背景的一部分而不是盖在上面的一层）；鼠标左右横向平移、上下纵向平移并带盘面仰俯；舰船沿航路跃迁，尾迹拉成一条发白的光速尾迹。星图只留在开机画面，进主界面后不跑 WebGL，主界面回到原来的环境光 + 参考网格。" },
+      { "type": "new", "text": "服务器日志页右栏的「会话概览 + 链路读数」换成存档日志列表：主服务器 / 市场服务读服务端自己写在 `<服务端根>/_local/logs` 的轮转存档（`server.<日期>_<时>.log`、`market.…`），再并上启动器每轮另存的终端原始输出（`_launcher/logs/archive/…`）；客户端沿用 `logs/client`。每行显示文件名、体积、时间，并带一个「打开」按钮用系统默认程序打开；右上角「清空日志」开关一次清掉这些存档（活着的 `server.log` / `market.log` 既不列出也不删除）。服务由外部启动（端口已监听）时也会留一条 `…-external.log`，写明这一轮为什么没有输出可抓。" },
+      { "type": "new", "text": "开机画面固定停留 20 秒再进主界面 —— 星图走完一轮，后端握手其实早就完成了，到点直接淡出，不额外等待。" }
+    ],
+    "en": [
+      { "type": "new", "text": "The boot screen now uses a three.js EVE star map at a 45-degree top-down isometric view: 1,800 dust motes, 140 systems, nearest-neighbour routes and five beacons (with one amber main lane), plus fractal-noise dust fog scattered across the whole map - same scale as the systems, additive-blended and drawn beneath the stars, so it reads as part of the background rather than a layer on top. Moving the pointer pans the map horizontally and vertically with a slight disc tilt; ships jump between systems leaving a white-hot light-speed streak. The star map lives only on the boot screen: the main UI runs no WebGL and keeps the original ambient glow and grid." },
+      { "type": "new", "text": "The right column of the server-log page no longer shows the session overview and link readouts; it now lists archived logs. For the main server and the market service it reads the server's own rotated logs under `<server root>/_local/logs` (`server.<date>_<hour>.log`, `market.…`) and merges the terminal output the launcher saves each run under `_launcher/logs/archive/…`; the client keeps using `logs/client`. Each row shows the file name, size and time plus an Open button that launches the system default app, and a Clear logs switch wipes all of them at once (the live `server.log` / `market.log` is neither listed nor deleted). When a service was started externally (port already listening) a `…-external.log` note explains why that run has no captured output." },
+      { "type": "new", "text": "The boot screen now stays 20 seconds before revealing the main UI: the star map gets a full pass, while the backend handshake has long finished, so the splash fades straight into the app without extra waiting." }
+    ]
+  }
+}

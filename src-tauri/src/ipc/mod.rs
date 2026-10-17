@@ -22,6 +22,7 @@ use crate::health;
 use crate::hotreload;
 use crate::init;
 use crate::log;
+use crate::logarchive;
 use crate::market;
 use crate::mods;
 use crate::process;
@@ -129,6 +130,17 @@ async fn dispatch(
             .map(|mut collector| collector.collect(&root))
             .unwrap_or_else(|_| json!({}))),
         "log:read" => Ok(log::read_server_log(&root)),
+        // 存档日志：每轮服务输出各存一份（见 logarchive.rs）。list 只读，
+        // clear 无入参 —— 删哪儿由后端的分组决定，渲染层给不了路径。
+        "log:archives" => Ok(logarchive::list(&state.runtime, &root)),
+        "log:clearArchives" => Ok(logarchive::clear(&state.runtime, &root)),
+        "log:openArchive" => Ok(logarchive::open(
+            app,
+            &state.runtime,
+            &root,
+            &arg_str(args, 0),
+            &arg_str(args, 1),
+        )),
 
         /* ------------------------------- 配置 ------------------------------- */
         "config:get" => Ok(config::config_bundle(&root)),

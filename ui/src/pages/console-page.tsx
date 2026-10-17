@@ -1,6 +1,6 @@
 import { SectionHeading } from "@/components/common/panel"
 import { LogPanel } from "@/components/console/log-panel"
-import { SessionSummary } from "@/components/console/session-summary"
+import { LogArchives } from "@/components/console/log-archives"
 import type { LauncherState } from "@/hooks/use-launcher"
 
 export function ConsolePage({ launcher }: { launcher: LauncherState }) {
@@ -25,16 +25,10 @@ export function ConsolePage({ launcher }: { launcher: LauncherState }) {
           className="h-[560px]"
         />
 
-        {/* 右栏跟日志面板同高：会话概览排两列省下的位置由「链路读数」撑开，
-            两块面板的底边与左边日志的底边落在同一条线上 */}
-        <div className="h-[560px]">
-          <SessionSummary
-            logCount={launcher.logs.length}
-            runningCount={launcher.runningCount}
-            totalServices={launcher.services.length}
-            session={launcher.session}
-          />
-        </div>
+        {/* 右栏跟日志面板同高：原来这里是「会话概览 + 链路读数」两块读数板，
+            现在换成三组存档日志（主服务器 / 市场服务 / 客户端）—— 读数在顶栏与状态栏
+            已经各有一份，这一列留给「上一轮到底打印了什么」更有用 */}
+        <LogArchives className="h-[560px]" />
       </div>
     </div>
   )
