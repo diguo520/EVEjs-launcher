@@ -377,7 +377,7 @@ struct ScaffoldManifest<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     author: Option<ScaffoldAuthor<'a>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    compatibility: Option<ScaffoldCompatibility<'a>>,
+    compatibility: Option<ScaffoldCompatibility>,
 }
 
 #[derive(serde::Serialize)]
@@ -396,9 +396,32 @@ struct ScaffoldAuthor<'a> {
 }
 
 #[derive(serde::Serialize)]
-struct ScaffoldCompatibility<'a> {
+struct ScaffoldCompatibility {
     #[serde(rename = "evejsVersions")]
-    evejs_versions: [&'a str; 1],
+    evejs_versions: [String; 1],
+}
+
+/// 清单里的兼容声明：`261018.1` → `261018.x`（同一天的构建都算兼容）。
+///
+/// 为什么不再照抄当前版本号：服务端从 0.5.0 起按「日期.构建号」发版，一天里可能连着出
+/// `261018.1`、`261018.2`。写死 `261018.1` 会让同一天的下一个构建立刻把新建的模组判成
+/// 「不支持当前服务端」。规则：日期式（首段 ≥ 6 位数字）只保留日期段；三段及以上的老版本号
+/// 去掉最后一段再补 `.x`；两段的（`0.12`）直接补；带预发布 / 构建后缀（`-rc.1`、`+build`）
+/// 的不做通配，原样写 —— 那种版本本来就该精确匹配。
+fn declaration_from(version: &str) -> String {
+    let trimmed = version.trim();
+    if trimmed.contains('-') || trimmed.contains('+') {
+        return trimmed.to_string();
+    }
+    let parts: Vec<&str> = trimmed.split('.').collect();
+    let first = parts.first().copied().unwrap_or_default();
+    if first.len() >= 6 && first.chars().all(|ch| ch.is_ascii_digit()) {
+        format!("{first}.x")
+    } else if parts.len() >= 3 {
+        format!("{}.x", parts[..parts.len() - 1].join("."))
+    } else {
+        format!("{trimmed}.x")
+    }
 }
 
 /// 生成清单正文（不含末尾换行，落盘时由调用方补一个 `\n`）
@@ -449,10 +472,11 @@ fn manifest_from(
         key_id: &identity.key_id,
         public_key: &identity.public_key,
     });
-    // 现役版 `/^\d+\.\d+/`：版本号不像样就整块不写
+    // 现役版 `/^\d+\.\d+/`：版本号不像样就整块不写。
+    // 写的是「日期.x」而不是当前的那一个构建号，见 declaration_from 的说明。
     let compatibility = if is_version_like(evejs_version) {
         Some(ScaffoldCompatibility {
-            evejs_versions: [evejs_version],
+            evejs_versions: [declaration_from(evejs_version)],
         })
     } else {
         None
@@ -1029,6 +1053,20 @@ mod tests {
     }
 
     #[test]
+    fn declaration_from_uses_the_date_wildcard() {
+        // 服务端 0.5.0 起是「日期.构建号」：同一天的构建都算兼容
+        assert_eq!(declaration_from("261018.1"), "261018.x");
+        assert_eq!(declaration_from("261018.12"), "261018.x");
+        // 老的三段版本号：只通配补丁位，与 satisfies_evejs 的 0.12.x 语义一致
+        assert_eq!(declaration_from("0.12.8"), "0.12.x");
+        // 两段的直接补 .x
+        assert_eq!(declaration_from("0.12"), "0.12.x");
+        // 预发布 / 构建后缀不做通配（那种版本本来就该精确匹配）
+        assert_eq!(declaration_from("0.12.8-rc.1"), "0.12.8-rc.1");
+        assert_eq!(declaration_from("261018.1+build7"), "261018.1+build7");
+    }
+
+    #[test]
     fn loader_skeleton_substitutes_placeholders() {
         let broadcast = loader_from(&draft("demo-mod", "示例模组"), find_template("broadcast"));
         assert!(broadcast.contains("const TAG = \"[demo-mod]\";"));
@@ -1126,7 +1164,10 @@ mod tests {
         // 清单里带兼容性声明（evejsVersion 像版本号时）
         let manifest = fs::read_to_string(dir.join(scan::MANIFEST_NAME)).unwrap();
         assert!(manifest.contains("\"compatibility\""));
-        assert!(manifest.contains("0.12.8"));
+        assert!(
+            manifest.contains("0.12.x"),
+            "兼容声明要写成 0.12.x：{manifest}"
+        );
     }
 
     #[test]

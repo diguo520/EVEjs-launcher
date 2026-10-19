@@ -308,6 +308,15 @@ pub fn satisfies_evejs(entry: &Value, evejs_version: &str) -> bool {
         if let Some(prefix) = want.strip_suffix(".x") {
             return current_lower.starts_with(&prefix.to_ascii_lowercase());
         }
+        // 日期版本号（`261018.1` = 2026-10-18 的第 1 次构建）：同一天的构建算同一代。
+        // 声明 `261018.1` 的模组装到 `261018.2` 上不该被判定为不兼容 —— 它们面对的是同一份服务端。
+        if let (Some((want_major, _, _)), Some((major, _, _))) =
+            (version_triple(want), version_triple(current))
+        {
+            if want_major == major && major >= 10_000 {
+                return true;
+            }
+        }
         // 同 major.minor 的补丁向上兼容：声明 0.12.8、本机 0.12.9 → 放行。
         // 索引里的模组普遍只声明发布时的那个补丁号，卡死会让 0.12.9 的服务端看到空市场。
         matches!(
@@ -672,17 +681,27 @@ pub fn market_list(repo_root: &Path, runtime: &RuntimePaths, force: bool) -> Val
         listed.push(entry);
     }
 
-    let mut compatible: Vec<Value> = Vec::new();
+    let mut listed_all: Vec<Value> = Vec::new();
     let mut blocked: Vec<Value> = Vec::new();
-    for entry in listed {
-        if satisfies_evejs(&entry, &evejs_version) {
-            compatible.push(entry);
-        } else {
+    for mut entry in listed {
+        let ok = satisfies_evejs(&entry, &evejs_version);
+        /*
+         * 不兼容的条目**照样进列表**，只带一个 `evejsCompatible: false`。
+         *
+         * 以前这里直接把它扔进 `blocked` 就不返回了：服务端从 0.12.x 换成日期版本号
+         * （261018.1）之后，整张市场会突然变空，用户完全不知道是版本不匹配。
+         * 现在卡片自己打「不支持当前服务端」，比静默消失有用得多。
+         */
+        if let Some(map) = entry.as_object_mut() {
+            map.insert("evejsCompatible".to_string(), json!(ok));
+        }
+        if !ok {
             blocked.push(json!({
                 "id": entry.get("id").and_then(Value::as_str).unwrap_or_default(),
                 "evejsVersions": entry.get("evejsVersions").cloned().unwrap_or_else(|| json!([])),
             }));
         }
+        listed_all.push(entry);
     }
 
     let updates = match index.as_ref() {
@@ -715,8 +734,8 @@ pub fn market_list(repo_root: &Path, runtime: &RuntimePaths, force: bool) -> Val
     } else {
         None
     };
-    ratings::apply_ratings(&mut compatible, ratings_payload.as_ref());
-    payload.insert("mods".into(), json!(compatible));
+    ratings::apply_ratings(&mut listed_all, ratings_payload.as_ref());
+    payload.insert("mods".into(), json!(listed_all));
     payload.insert(
         "ratings".into(),
         json!({
@@ -856,6 +875,9 @@ fn moderation_reason(value: Option<&Value>) -> Value {
 /// 也没有、审核记录也没有）才由这条投稿自己的审核 PR 状态收口：
 ///   - `merged`：PR 合并过，可现在市场上又没这条 —— 收录被撤了，算「已下架」；
 ///   - `closed`：PR 关闭且没合并 —— 这次投稿没通过，算「已驳回」。
+///   - 另外：台账里这一版的**版本号比索引在架的那一版新**时，说明索引还没把这次投稿
+///     收进去 —— 这时就算索引说「已上架 / 可更新」，界面也该显示「审核中」
+///     （2026-10-19 报障：升级投稿开了 PR，启动器里看不到审核提示）。
 ///
 /// 少了这一步，被审核台删掉的模组会永远挂在「审核中」（2026-10-01 报障：modceshi
 /// 审核台删了、本地也删了，「我创建的」里还是审核中）。
@@ -864,8 +886,9 @@ fn ledger_status(
     submitted: bool,
     resubmitted: bool,
     review_state: &str,
+    pending: bool,
 ) -> String {
-    if resubmitted {
+    if resubmitted || (submitted && pending) {
         return "submitted".to_string();
     }
     if !prev_status.is_empty() && prev_status != "local" {
@@ -1234,11 +1257,21 @@ pub fn list_my_mods(repo_root: &Path, runtime: &RuntimePaths) -> Value {
         // 重新发布（重开一条审核 PR）之后，索引侧那条「已驳回 / 已下架」说的是上一版投稿，
         // 得翻回「审核中」；少了这一步，作者重新提交完列表永远停在驳回状态（2026-10-01 报障）。
         let resubmitted = ledger_supersedes_moderation(prev.as_ref(), submission);
+        // 这一版比索引里在架的那一版新 → 索引还没收进去（PR 还在审），该显示「审核中」。
+        // 只看「有没有 PR」不够：升级投稿的 PR 一直是开着的，但索引里那条旧版本会给
+        // 「已上架 / 可更新」的结论，`prev_status` 一非空就把审核状态压掉了。
+        let submitted_version = item_str(Some(submission), "version");
+        let listed_version = item_str(prev.as_ref(), "listedVersion");
+        let pending = submitted
+            && !submitted_version.is_empty()
+            && !listed_version.is_empty()
+            && compare_version(&submitted_version, &listed_version) > 0;
         let status = ledger_status(
             &prev_status,
             submitted,
             resubmitted,
             &item_str(Some(submission), "reviewPrState"),
+            pending,
         );
         let display_name = {
             let value = item_str(Some(submission), "displayName");
@@ -1569,16 +1602,19 @@ mod tests {
     #[test]
     fn ledger_status_settles_on_the_review_pr_state() {
         // 审核台删掉（收录被撤）：PR 合并过、市场上又没这条 → 已下架
-        assert_eq!(ledger_status("", true, false, "merged"), "delisted");
+        assert_eq!(ledger_status("", true, false, "merged", false), "delisted");
         // PR 关闭且没合并 → 已驳回
-        assert_eq!(ledger_status("", true, false, "closed"), "rejected");
+        assert_eq!(ledger_status("", true, false, "closed", false), "rejected");
         // 还在审 / 状态没确认 → 维持审核中
-        assert_eq!(ledger_status("", true, false, "open"), "submitted");
-        assert_eq!(ledger_status("", true, false, ""), "submitted");
+        assert_eq!(ledger_status("", true, false, "open", false), "submitted");
+        assert_eq!(ledger_status("", true, false, "", false), "submitted");
         // 没交过就是草稿
-        assert_eq!(ledger_status("", false, false, "merged"), "draft");
+        assert_eq!(ledger_status("", false, false, "merged", false), "draft");
         // 本地目录还在（local）同样按 PR 状态收口：本地留着文件夹不等于还在市场上
-        assert_eq!(ledger_status("local", true, false, "merged"), "delisted");
+        assert_eq!(
+            ledger_status("local", true, false, "merged", false),
+            "delisted"
+        );
         // 索引 / 审核记录已有结论时一律以它为准
         for status in [
             "listed",
@@ -1587,10 +1623,25 @@ mod tests {
             "update-pending",
             "submitted",
         ] {
-            assert_eq!(ledger_status(status, true, false, "merged"), status);
+            assert_eq!(ledger_status(status, true, false, "merged", false), status);
         }
         // 重投优先：索引侧那条旧结论已经作废
-        assert_eq!(ledger_status("delisted", true, true, "merged"), "submitted");
+        assert_eq!(
+            ledger_status("delisted", true, true, "merged", false),
+            "submitted"
+        );
+        /*
+         * 升级投稿：索引里还挂着上一版（已上架 / 可更新），台账这一版比它新 → 审核中。
+         * 2026-10-19 报障：升级 PR 都开了，启动器里却只显示「已上架」。
+         */
+        for status in ["listed", "update-pending"] {
+            assert_eq!(
+                ledger_status(status, true, false, "open", true),
+                "submitted"
+            );
+            // 版本没超过索引（同一版重投 / 索引已收录）→ 仍以索引结论为准
+            assert_eq!(ledger_status(status, true, false, "open", false), status);
+        }
     }
 
     #[test]
@@ -1602,6 +1653,24 @@ mod tests {
         // 没声明 / 本机版本为空 → 一律放行
         assert!(satisfies_evejs(&json!({}), "0.12.8"));
         assert!(satisfies_evejs(&entry, ""));
+    }
+
+    #[test]
+    fn satisfies_evejs_handles_date_style_versions() {
+        // 服务端 0.5.0 起改用「日期.构建号」：261018.1 = 2026-10-18 的第 1 次构建
+        let wildcard = json!({ "evejsVersions": ["261018.x"] });
+        assert!(satisfies_evejs(&wildcard, "261018.1"));
+        assert!(satisfies_evejs(&wildcard, "261018.9"));
+        assert!(!satisfies_evejs(&wildcard, "261019.1"));
+
+        // 写死某一天的某个构建：同一天的其它构建照样放行（面对的是同一份服务端）
+        let exact = json!({ "evejsVersions": ["261018.1"] });
+        assert!(satisfies_evejs(&exact, "261018.2"));
+        assert!(!satisfies_evejs(&exact, "261019.1"));
+
+        // 老格式声明的模组装到日期版本的服务端上：确实不兼容（卡片会打「不支持」）
+        let legacy = json!({ "evejsVersions": ["0.12.9"] });
+        assert!(!satisfies_evejs(&legacy, "261018.1"));
     }
 
     #[test]
@@ -1800,7 +1869,11 @@ mod tests {
             .iter()
             .map(|item| item["id"].as_str().unwrap().to_string())
             .collect();
-        assert_eq!(ids, vec!["ok".to_string()]);
+        // 不兼容的条目也留在列表里：界面要在卡片上打「不支持当前服务端」，
+        // 而不是让它静默消失（服务端换版本号那阵子，市场会看着像空的）
+        assert_eq!(ids, vec!["ok".to_string(), "new".to_string()]);
+        assert_eq!(market["mods"][0]["evejsCompatible"], json!(true));
+        assert_eq!(market["mods"][1]["evejsCompatible"], json!(false));
         assert_eq!(market["blocked"][0]["id"], "new");
         assert_eq!(market["blocked"][0]["evejsVersions"][0], "0.13.x");
         assert_eq!(market["delisted"][0]["id"], "hidden");

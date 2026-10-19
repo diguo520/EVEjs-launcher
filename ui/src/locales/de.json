@@ -3613,5 +3613,14 @@
   "共 {count} 份 · {size}": "{count} Datei(en) · {size}",
   "另有 {count} 份更早的": "{count} ältere Datei(en) nicht angezeigt",
   "打开日志": "Protokoll öffnen",
-  "打开日志失败": "Protokoll konnte nicht geöffnet werden"
+  "打开日志失败": "Protokoll konnte nicht geöffnet werden",
+  "需 {version}": "Benötigt {version}",
+  "兼容 {version}": "Kompatibel mit {version}",
+  "未声明": "Nicht angegeben",
+  "声明 {declared} · 当前 {current}": "Angegeben {declared} · aktuell {current}",
+  "当前服务端 {version}": "Aktueller Server {version}",
+  "模组清单没有声明兼容的服务端版本": "Das Mod-Manifest gibt keine kompatible Serverversion an",
+  "兼容服务端": "Server-Kompatibilität",
+  "不支持当前服务端版本": "Nicht mit dieser Serverversion kompatibel",
+  "提交时会把模组清单里的版本号改成这个值并重新签名，ZIP 与 Release tag 一并使用它。": "Beim Einreichen wird die Version im Mod-Manifest auf diesen Wert gesetzt und neu signiert; ZIP und Release-Tag verwenden sie ebenfalls."
 }

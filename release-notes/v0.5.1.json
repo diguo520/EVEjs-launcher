@@ -1,0 +1,19 @@
+{
+  "version": "0.5.1",
+  "changelog": {
+    "zh": [
+      { "type": "fix", "text": "升级投稿现在会显示「审核中」：以前索引里还挂着上一版（已上架），台账里这一版比它新、PR 也开着，但「已上架」的结论把审核状态压掉了 —— 作者提交完看不到任何提示。现在只要台账版本高于索引在架版本，就以「审核中」为准；索引收进去之后自动回到「已上架」。" },
+      { "type": "new", "text": "模组卡片（已安装 / 市场两个列表）在**不支持当前服务端**时打一条红标「不支持当前服务端版本」（悬停看声明的版本与当前版本）；能跑的模组不额外加标。服务端从 0.5.0 起把版本号换成「日期.构建号」（261018.1），旧模组声明的是 0.12.x —— 以前这类条目会被市场静默过滤掉，现在照样列出来并标红；详情页「概览」也多了「兼容服务端」一行。" },
+      { "type": "fix", "text": "发布弹窗的「提交版本号」改为按当前模组版本自动 +1 个补丁号（1.0.14 → 1.0.15，不再直接跳 1.1.0）：以前只有「已上架」状态才推，审核中 / 驳回后重投的模组会原样带出旧版本号。纯草稿仍沿用作者填的号。弹窗里也写清了：提交时会把清单里的版本号改成这个值并重新签名，ZIP 与 Release tag 一并使用它。" },
+      { "type": "new", "text": "新建模组写的兼容声明改用新格式：清单里不再照抄当前版本号，而是写成 `<日期>.x`（`261018.1` → `261018.x`），同一天的构建都算兼容；老格式仍是 `0.12.8` → `0.12.x`，带预发布 / 构建后缀的保持精确匹配。" },
+      { "type": "opt", "text": "模组卡片不再放「详情」按钮，点标题即可打开详情；卡片上的「安装」也改成先打开详情，真正的安装动作在详情页里确认，避免误点一下就下载 / 覆盖。" }
+    ],
+    "en": [
+      { "type": "fix", "text": "Upgrade submissions now show as under review. While the index still listed the previous version, the ledger item had a newer version and an open PR, but the listed verdict suppressed the review state, so authors saw no pending hint at all. Now a ledger version above the listed version wins and shows as under review; once the index catches up it returns to listed." },
+      { "type": "new", "text": "Mod cards (both the installed and the market list) now show a red Not compatible with this server version badge when a mod does not support the current server (hover reveals the declared and current versions); working mods get no extra badge. Since the server moved to date-based versions (261018.1) while older mods declare 0.12.x, those entries used to be silently filtered out of the market; they are now listed and flagged, and the detail overview gained a Server compatibility row." },
+      { "type": "fix", "text": "The submit dialog now pre-fills the next patch version (1.0.14 to 1.0.15 instead of jumping to 1.1.0). Previously only approved mods got a bumped version, so mods under review or resubmitted after rejection carried their old number. Plain drafts still keep the author's number. The dialog also spells out that the manifest version is rewritten and re-signed on submit, and that the ZIP and Release tag use it too." },
+      { "type": "new", "text": "Newly created mods declare compatibility in the new format: the manifest writes a date wildcard such as 261018.x instead of the exact build, so every build of that day counts as compatible. Older versions still map 0.12.8 to 0.12.x, and pre-release or build suffixes stay exact." },
+      { "type": "opt", "text": "Mod cards no longer carry a Details button: clicking the title opens the detail dialog, and the card's Install button now opens the dialog as well; the actual install is confirmed there, so a stray click can no longer start a download or overwrite." }
+    ]
+  }
+}

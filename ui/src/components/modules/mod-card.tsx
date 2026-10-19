@@ -25,12 +25,14 @@ import {
   marketVersionDiff,
   pendingReplies,
   ratingOf,
+  serverSupportOf,
   formatCount,
   reasonOf,
   type OverlapFlag,
 } from "@/lib/mod-logic"
 import { MOD_REVIEW_LABEL, type ModEntry } from "@/lib/mock"
 import { cn } from "@/lib/utils"
+import { useLauncherVersion } from "@/components/shell/launcher-version"
 
 export type ModStatus = "enabled" | "disabled" | "available"
 
@@ -74,7 +76,6 @@ export interface ModCardProps {
   /** 尚未安装时，会与已启用模组冲突的项 */
   pendingConflicts: ModEntry[]
   onToggle: (next: boolean) => void
-  onInstall: () => void
   onUpdate: () => void
   onDetail: () => void
   onSubmit: () => void
@@ -97,7 +98,6 @@ export function ModCard({
   conflicts,
   pendingConflicts,
   onToggle,
-  onInstall,
   onUpdate,
   onDetail,
   onSubmit,
@@ -109,6 +109,14 @@ export function ModCard({
   activeTag = null,
   overlap = null,
 }: ModCardProps) {
+  /**
+   * 当前服务端版本：用 **evejsVersionRaw**（不带 `v`）。
+   * `evejsVersion` 是状态栏的显示值（`v261018.1`），拿它做 `261018.x` 的前缀通配会永远
+   * 对不上 —— 2026-10-19 新建的模组被误判成「不支持」就是这条（`"v261018.1".startsWith("261018")` 为 false）。
+   * 没拿到（空串）时 serverSupportOf 返回 unknown，卡片也就不提示。
+   */
+  const { evejsVersionRaw } = useLauncherVersion()
+  const unsupported = serverSupportOf(mod.evejsVersions, evejsVersionRaw) === "unsupported"
   const status = modStatus(mod)
   const badge = statusBadge[status]
   const reviewBadge = mod.review ? REVIEW_BADGE[mod.review] : null
@@ -146,9 +154,18 @@ export function ModCard({
       <div className="flex flex-1 flex-col p-3.5">
         <div className="flex items-start justify-between gap-2">
           <div className="flex min-w-0 items-baseline gap-2">
-            <span className="truncate text-[14px] font-semibold text-foreground">
+            {/*
+              卡片不再放「详情」按钮：标题本身就是入口（安装按钮也走详情，见下面的 footer）。
+              已安装的卡片没有安装按钮，标题是它们唯一的详情入口。
+            */}
+            <button
+              type="button"
+              onClick={onDetail}
+              title={t("详情")}
+              className="truncate text-left text-[14px] font-semibold text-foreground hover:text-primary"
+            >
               {mod.name}
-            </span>
+            </button>
             {marketDiff ? (
               /* 两个都写出来：只靠「可更新」那一条，本地更高时界面上一个数字都不变，
                  作者看不出市场收没收到自己刚发的那一版（2026-09-30 报障） */
@@ -194,6 +211,18 @@ export function ModCard({
         <div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
           <span className="text-[11px] text-muted-foreground">{mod.author}</span>
           <Badge variant="secondary">{mod.cat}</Badge>
+          {/* 只在**明确不支持**时提示：能跑的模组不该多挂一个绿标（2026-10-19 报障） */}
+          {unsupported ? (
+            <Badge
+              variant="destructive"
+              title={t("声明 {declared} · 当前 {current}", {
+                declared: (mod.evejsVersions ?? []).join(" / ") || "—",
+                current: evejsVersionRaw || "—",
+              })}
+            >
+              {t("不支持当前服务端版本")}
+            </Badge>
+          ) : null}
           {rating.count > 0 ? (
             <span className="flex items-center gap-1 text-foreground">
               <span className="grid size-3 shrink-0 place-items-center">
@@ -325,10 +354,6 @@ export function ModCard({
 
           <div className="flex-1" />
 
-          <Button variant="ghost" size="sm" onClick={onDetail}>
-            详情
-          </Button>
-
           {mod.installed ? (
             <>
               {updatable ? (
@@ -402,7 +427,9 @@ export function ModCard({
                 </Button>
               ) : null}
               {canInstall ? (
-                <Button size="sm" onClick={onInstall}>
+                /* 卡片上的「安装」只负责打开详情：真正的安装动作在详情页里确认，
+                   免得误点一下就开始下载 / 覆盖 */
+                <Button size="sm" onClick={onDetail}>
                   安装
                 </Button>
               ) : null}

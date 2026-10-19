@@ -3613,5 +3613,14 @@
   "共 {count} 份 · {size}": "{count} file(s) · {size}",
   "另有 {count} 份更早的": "{count} older file(s) not shown",
   "打开日志": "Open log",
-  "打开日志失败": "Failed to open the log"
+  "打开日志失败": "Failed to open the log",
+  "需 {version}": "Needs {version}",
+  "兼容 {version}": "Works with {version}",
+  "未声明": "Not declared",
+  "声明 {declared} · 当前 {current}": "Declared {declared} · current {current}",
+  "当前服务端 {version}": "Current server {version}",
+  "模组清单没有声明兼容的服务端版本": "The mod manifest declares no compatible server version",
+  "兼容服务端": "Server compatibility",
+  "不支持当前服务端版本": "Not compatible with this server version",
+  "提交时会把模组清单里的版本号改成这个值并重新签名，ZIP 与 Release tag 一并使用它。": "On submit, the mod manifest's version is rewritten to this value and re-signed; the ZIP and Release tag use it too."
 }

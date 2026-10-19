@@ -3613,5 +3613,14 @@
   "共 {count} 份 · {size}": "{count} bestand(en) · {size}",
   "另有 {count} 份更早的": "{count} ouder(e) bestand(en) niet getoond",
   "打开日志": "Log openen",
-  "打开日志失败": "Log openen mislukt"
+  "打开日志失败": "Log openen mislukt",
+  "需 {version}": "Vereist {version}",
+  "兼容 {version}": "Werkt met {version}",
+  "未声明": "Niet opgegeven",
+  "声明 {declared} · 当前 {current}": "Opgegeven {declared} · huidig {current}",
+  "当前服务端 {version}": "Huidige server {version}",
+  "模组清单没有声明兼容的服务端版本": "Het mod-manifest vermeldt geen compatibele serverversie",
+  "兼容服务端": "Servercompatibiliteit",
+  "不支持当前服务端版本": "Niet compatibel met deze serverversie",
+  "提交时会把模组清单里的版本号改成这个值并重新签名，ZIP 与 Release tag 一并使用它。": "Bij indienen wordt de versie in het mod-manifest op deze waarde gezet en opnieuw ondertekend; de ZIP en Release-tag gebruiken die ook."
 }

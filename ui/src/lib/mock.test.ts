@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { formatMB } from "@/lib/mock"
+import { compatibleDeclaration, formatMB } from "@/lib/mock"
 import { toMB } from "@/lib/mod-source"
 
 describe("formatMB（安装包体积读数）", () => {
@@ -27,5 +27,23 @@ describe("formatMB（安装包体积读数）", () => {
 
   it("与 toMB 串起来读：5663 B 的包读成 5.5 KB（2026-10-16 报障现场）", () => {
     expect(formatMB(toMB(5663))).toBe("5.5 KB")
+  })
+})
+
+describe("compatibleDeclaration（新模组的兼容声明预设）", () => {
+  it("日期版本号只保留日期段", () => {
+    // 服务端 0.5.0 起是「日期.构建号」，同一天的构建都算兼容
+    expect(compatibleDeclaration("261018.1")).toBe("261018.x")
+    expect(compatibleDeclaration("261018.12")).toBe("261018.x")
+  })
+
+  it("老版本号去掉补丁位，两段的直接补 .x", () => {
+    expect(compatibleDeclaration("0.12.8")).toBe("0.12.x")
+    expect(compatibleDeclaration("0.12")).toBe("0.12.x")
+  })
+
+  it("预发布 / 构建后缀不做通配", () => {
+    expect(compatibleDeclaration("0.12.8-rc.1")).toBe("0.12.8-rc.1")
+    expect(compatibleDeclaration("")).toBe("")
   })
 })

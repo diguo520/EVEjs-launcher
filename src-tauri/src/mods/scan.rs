@@ -324,6 +324,9 @@ pub struct ModRecord {
     pub readme: Vec<String>,
     /// `README.md` 里「## 功能要点」的条目
     pub highlights: Vec<String>,
+    /// 清单里 `compatibility.evejsVersions`：作者声明支持的服务端版本。
+    /// 兼容性判定放在渲染层（要跟卡片同屏显示当前版本），这里只负责原样带出去。
+    pub evejs_versions: Vec<String>,
 }
 
 impl ModRecord {
@@ -367,6 +370,7 @@ impl ModRecord {
             "sourceVersion": self.source_version,
             "readme": self.readme,
             "highlights": self.highlights,
+            "evejsVersions": self.evejs_versions,
         })
     }
 }
@@ -412,6 +416,7 @@ fn empty_record(folder: &str, dir: &Path, manifest_path: &Path, error: &str) -> 
         source_version: String::new(),
         readme: Vec::new(),
         highlights: Vec::new(),
+        evejs_versions: Vec::new(),
     }
 }
 
@@ -547,6 +552,19 @@ fn read_mod_dir_with(
     if strategy.is_empty() {
         problems.push("缺少 activation.strategy".to_string());
     }
+    record.evejs_versions = manifest
+        .get("compatibility")
+        .and_then(|value| value.get("evejsVersions"))
+        .and_then(Value::as_array)
+        .map(|list| {
+            list.iter()
+                .filter_map(Value::as_str)
+                .map(str::trim)
+                .filter(|text| !text.is_empty())
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default();
 
     let mut deps: BTreeMap<&str, Vec<String>> = BTreeMap::new();
     for field in DEPENDENCY_FIELDS {

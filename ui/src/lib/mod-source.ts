@@ -196,6 +196,7 @@ export function fromMarket(mod: RawMarketMod): ModEntry {
     updatedAt: mod.publishedAt || "",
     publishedAt: mod.publishedAt || "",
     gameVersion: mod.evejsVersions?.[0] ?? "",
+    evejsVersions: Array.isArray(mod.evejsVersions) ? mod.evejsVersions : [],
     readme: readmeOf(mod.readme, mod.highlights),
     changelog: marketChangelog(mod),
     // 截图：作者仓库 shots/ 里的图，按索引给的文件名拼地址（见 lib/mod-media.ts）
@@ -225,6 +226,11 @@ export function applyLocal(entry: ModEntry, mod: RawMod): ModEntry {
     installed: true,
     enabled: mod.enabled === true,
     sizeMB: mod.sizeBytes ? toMB(mod.sizeBytes) : entry.sizeMB,
+    // 本机清单是作者刚改过的那一份，比索引新：有声明就用它
+    evejsVersions:
+      mod.evejsVersions && mod.evejsVersions.length > 0
+        ? mod.evejsVersions
+        : entry.evejsVersions,
     // 清单里声明的关联 / 互斥 id 要原样带上：`activeConflicts` 只是「当前两边都启用」的
     // 子集，把它当声明列表会让「关联了但对方没装 / 没启用」的关系凭空消失 —— 表单里
     // 明明存过、详情却看不到，还提示保存成功（2026-10-09 报障）。

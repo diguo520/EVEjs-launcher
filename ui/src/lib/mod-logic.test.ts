@@ -30,6 +30,8 @@ import {
   ratingFromStarCount,
   formatCount,
   formatBytes,
+  serverSupportOf,
+  bumpVersion,
   reviewPrStateLabel,
   submitCooldownRemaining,
   type PublishCredential,
@@ -293,6 +295,50 @@ describe("isPublished（市场页签准入）", () => {
     expect(isPublished(entry({ id: "demo", review: "approved" }))).toBe(true)
     expect(isPublished(entry({ id: "demo", review: "draft" }))).toBe(false)
     expect(isPublished(entry({ id: "demo" }))).toBe(true)
+  })
+})
+
+describe("bumpVersion（提交弹窗预填的下一版）", () => {
+  it("补丁号 +1：每交一版只往前走一个号", () => {
+    expect(bumpVersion("1.0.14")).toBe("1.0.15")
+    expect(bumpVersion("0.9.9")).toBe("0.9.10")
+    expect(bumpVersion("2.3.0")).toBe("2.3.1")
+  })
+
+  it("不是三段数字就原样返回，交给弹窗的格式校验去拦", () => {
+    expect(bumpVersion("1.0")).toBe("1.0")
+    expect(bumpVersion("1.0.0-rc.1")).toBe("1.0.0-rc.1")
+  })
+})
+
+describe("serverSupportOf（模组声明的服务端版本）", () => {
+  it("日期版本号：同一天的所有构建算同一代", () => {
+    // 服务端 0.5.0 起是「日期.构建号」：261018.1 = 2026-10-18 的第 1 次构建
+    expect(serverSupportOf(["261018.x"], "261018.1")).toBe("supported")
+    expect(serverSupportOf(["261018.x"], "261018.9")).toBe("supported")
+    expect(serverSupportOf(["261018.1"], "261018.2")).toBe("supported")
+    expect(serverSupportOf(["261018.1"], "261019.1")).toBe("unsupported")
+  })
+
+  it("老版本号：补丁向上兼容，minor / major 仍然拦住", () => {
+    expect(serverSupportOf(["0.12.8"], "0.12.9")).toBe("supported")
+    expect(serverSupportOf(["0.12.x"], "0.12.9")).toBe("supported")
+    expect(serverSupportOf(["0.12.8"], "0.12.7")).toBe("unsupported")
+    expect(serverSupportOf(["0.12.9"], "261018.1")).toBe("unsupported")
+  })
+
+  it("没声明 / 当前版本未知 → unknown（画「未声明」，不画「不兼容」）", () => {
+    expect(serverSupportOf([], "261018.1")).toBe("unknown")
+    expect(serverSupportOf(undefined, "261018.1")).toBe("unknown")
+    expect(serverSupportOf(["261018.x"], "")).toBe("unknown")
+  })
+
+  it("当前版本带 v 前缀也能对上（状态栏显示值曾把通配判错）", () => {
+    // 2026-10-19 报障：卡片拿到的是 `v261018.1`，`261018.x` 的前缀通配直接对不上，
+    // 新建的模组被误判成「不支持当前服务端版本」
+    expect(serverSupportOf(["261018.x"], "v261018.1")).toBe("supported")
+    expect(serverSupportOf(["0.12.x"], "v0.12.9")).toBe("supported")
+    expect(serverSupportOf(["261018.1"], "V261018.2")).toBe("supported")
   })
 })
 

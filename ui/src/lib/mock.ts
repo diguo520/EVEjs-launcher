@@ -352,13 +352,21 @@ export function permLabel(id: string): string {
   return MOD_PERMS.find((perm) => perm.id === id)?.label ?? id
 }
 
-/** 模组可声明的兼容服务端版本，新的在前 */
-export const GAME_VERSIONS: string[] = [
-  "0.12.8+",
-  "0.12.6+",
-  "0.12.4+",
-  "0.12.2+",
-]
+/**
+ * 兼容声明的预设：由**当前服务端版本**裁出来（`261018.1` → `261018.x`）。
+ *
+ * 服务端从 0.5.0 起改用「日期.构建号」，写死几个老版本号（0.12.8+ 之类）很快就会过期，
+ * 而且 `+` 后缀本就不在 compat 的匹配规则里。规则与外壳 `mods::scaffold::declaration_from` 一致。
+ */
+export function compatibleDeclaration(version: string): string {
+  const trimmed = version.trim()
+  if (!trimmed || trimmed.includes('-') || trimmed.includes('+')) return trimmed
+  const parts = trimmed.split('.')
+  const first = parts[0] ?? ''
+  if (first.length >= 6 && /^\d+$/.test(first)) return `${first}.x`
+  if (parts.length >= 3) return `${parts.slice(0, -1).join('.')}.x`
+  return `${trimmed}.x`
+}
 
 /** 本地作者身份 */
 export const MOD_AUTHOR = {
@@ -426,6 +434,11 @@ export interface ModEntry {
   updatedAt: string
   /** 声明的兼容服务端版本 */
   gameVersion: string
+  /**
+   * 清单里 `compatibility.evejsVersions` 的原文（可能有多条，如 `["261018.x"]`）。
+   * 卡片上的「是否支持当前服务端」就按它跟 `app:info.evejsVersion` 比。
+   */
+  evejsVersions?: string[]
   /** 申请的运行时权限 */
   perms: string[]
   /**

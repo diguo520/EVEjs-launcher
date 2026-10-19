@@ -498,7 +498,6 @@ export function ModulesPage({
                 pendingConflicts={pendingConflicts(mods, mod)}
                 overlap={overlapFlag(overlaps, mod)}
                 onToggle={(next) => void toggleMod(mod, next)}
-                onInstall={() => installMod(mod)}
                 onUpdate={() => updateMod(mod)}
                 onDetail={() => setDetailId(mod.id)}
                 onSubmit={() => openSubmit(mod.id)}

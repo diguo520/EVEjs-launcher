@@ -3613,5 +3613,14 @@
   "共 {count} 份 · {size}": "{count} fichier(s) · {size}",
   "另有 {count} 份更早的": "{count} fichier(s) plus ancien(s) non affiché(s)",
   "打开日志": "Ouvrir le journal",
-  "打开日志失败": "Impossible d'ouvrir le journal"
+  "打开日志失败": "Impossible d'ouvrir le journal",
+  "需 {version}": "Requiert {version}",
+  "兼容 {version}": "Compatible {version}",
+  "未声明": "Non déclaré",
+  "声明 {declared} · 当前 {current}": "Déclaré {declared} · actuel {current}",
+  "当前服务端 {version}": "Serveur actuel {version}",
+  "模组清单没有声明兼容的服务端版本": "Le manifeste du mod ne déclare aucune version de serveur compatible",
+  "兼容服务端": "Compatibilité serveur",
+  "不支持当前服务端版本": "Incompatible avec cette version du serveur",
+  "提交时会把模组清单里的版本号改成这个值并重新签名，ZIP 与 Release tag 一并使用它。": "À l'envoi, la version du manifeste du mod est réécrite avec cette valeur puis re-signée ; le ZIP et le tag Release l'utilisent aussi."
 }

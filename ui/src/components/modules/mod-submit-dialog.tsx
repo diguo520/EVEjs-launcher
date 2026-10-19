@@ -277,9 +277,15 @@ export function ModSubmitDialog({
   const stageIndex = stageIndexOf(stages, phase, percent)
   const finished = phase === "done"
 
-  /** 预填的版本号：已上架的才往上推一位；草稿和驳回后重提报作者自己填的那个号 */
+  /**
+   * 预填的版本号：**按当前模组的版本号自动往前推一个补丁号**（1.0.14 → 1.0.15）。
+   *
+   * 以前只有在 `review === "approved"` 时才推 —— 已投稿但还没在索引里翻成「已上架」的模组
+   * （审核中 / 被驳回后重投）会原样带出旧版本号，作者得自己改（2026-10-19 报障）。
+   * 纯草稿（还没交过）仍用作者填的那个号：首次提交不该凭空多一个版本。
+   */
   function suggestVersion(mod: ModEntry): string {
-    return mod.review === "approved" ? bumpVersion(mod.version) : mod.version
+    return mod.review === "draft" ? mod.version : bumpVersion(mod.version)
   }
 
   function pick(mod: ModEntry) {
@@ -550,6 +556,11 @@ export function ModSubmitDialog({
                 placeholder="1.5.0"
                 className="tabular"
               />
+              {/* 版本号不是"只发给索引"：清单、签名、ZIP、Release tag 都得跟着这一版走，
+                  写清楚免得作者以为清单里的旧版本还会留着 */}
+              <p className="text-[11px] leading-relaxed text-tertiary">
+                {t("提交时会把模组清单里的版本号改成这个值并重新签名，ZIP 与 Release tag 一并使用它。")}
+              </p>
             </div>
 
             <div className="space-y-1.5">

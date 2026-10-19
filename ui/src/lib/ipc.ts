@@ -415,6 +415,8 @@ export interface RawMod {
   updatedAt: number
   /** README 正文段落（后端与上架同一套解析，作者改完立刻可见） */
   readme?: string[]
+  /** 清单里 `compatibility.evejsVersions`：作者声明支持的服务端版本 */
+  evejsVersions?: string[]
   /**
    * 作者仓库里 `shots/` 目录下的截图文件名（见 `lib/mod-media.ts`）。
    * `raw.githubusercontent.com` 不能列目录，所以文件名只能由索引给出；空/缺省就不画截图条。
@@ -554,6 +556,8 @@ export interface RawMarketMod {
   /** 更早版本的历史（上一版提交过才会有；现役版恒为 []） */
   history?: { version?: string; changelog?: string; at?: number }[]
   evejsVersions?: string[]
+  /** 市场服务端按当前 EveJS 版本算出的兼容性（false = 不支持当前服务端） */
+  evejsCompatible?: boolean
   readme?: string[]
   highlights?: string[]
   downloads?: number

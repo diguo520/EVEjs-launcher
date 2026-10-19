@@ -7,7 +7,7 @@ import { pinyin } from "pinyin-pro"
 import { t } from "@/lib/i18n"
 import type { RawModPreflightReport } from "@/lib/ipc"
 import {
-  GAME_VERSIONS,
+  compatibleDeclaration,
   type ModEntry,
   type ModReview,
   type ModReviewState,
@@ -1129,7 +1129,9 @@ const DRAFT_SIZE_MB = 0.1
 export function draftMod(
   input: NewModInput,
   today: string,
-  author: string = ""
+  author: string = "",
+  /** 当前服务端版本（app:info.evejsVersion）：兼容声明由它裁出来 */
+  serverVersion: string = ""
 ): ModEntry {
   const desc = input.desc.trim()
   return {
@@ -1152,7 +1154,7 @@ export function draftMod(
     sizeMB: DRAFT_SIZE_MB,
     updatedAt: today,
     // 表单不再收集这两项：新骨架按最新的服务端版本声明，权限留空
-    gameVersion: GAME_VERSIONS[0],
+    gameVersion: compatibleDeclaration(serverVersion) || "",
     perms: [],
     readme: readmeOrFallback(input.readme, input.features, desc),
     changelog: [{ version: input.version, date: today, items: ["初始版本"] }],
@@ -1480,12 +1482,69 @@ export function isSemverLike(version: string): boolean {
   return tail.length > 0 && /^[0-9A-Za-z.-]+$/.test(tail)
 }
 
-/** 1.4.2 → 1.5.0；0.9.0 → 0.10.0 */
+/**
+ * 下一个版本号：**补丁位 +1**（1.0.14 → 1.0.15、0.9.9 → 0.9.10）。
+ *
+ * 提交弹窗拿它预填「提交版本号」—— 作者每交一版只该往前走一个号，
+ * 次版本 / 主版本留给作者按语义自己定（早期这里推的是次版本，1.0.14 直接跳 1.1.0）。
+ * 不是三段数字（`1.0`、`1.0.0-rc.1`）就原样返回，交给弹窗的格式校验去拦。
+ */
 export function bumpVersion(version: string): string {
   const parts = version.split(".").map((n) => Number.parseInt(n, 10))
   if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return version
-  const [major, minor] = parts
-  return `${major}.${minor + 1}.0`
+  const [major, minor, patch] = parts
+  return `${major}.${minor}.${patch + 1}`
+}
+
+/* ---------------- 服务端版本兼容性 ---------------- */
+
+/** 模组和当前服务端的关系：能对上 / 对不上 / 清单里没声明 */
+export type ServerSupport = "supported" | "unsupported" | "unknown"
+
+/** `[v]major[.minor[.patch]]` → 三元组；带预发布标记或解析不了返回 null */
+function versionTriple(value: string): [number, number, number] | null {
+  const trimmed = value.trim().replace(/^[vV]/, "")
+  if (!trimmed || trimmed.includes("-")) return null
+  const parts = trimmed.split(".")
+  if (parts.length > 3 || parts.some((part) => !/^\d+$/.test(part))) return null
+  return [Number(parts[0]), Number(parts[1] ?? 0), Number(parts[2] ?? 0)]
+}
+
+/**
+ * 声明的 `evejsVersions` 能不能对上当前服务端版本。
+ *
+ * 与外壳 `mods::registry::satisfies_evejs` **同一套规则**（改一边记得改另一边，
+ * 两边的测试用同一组向量）：
+ *   1. 精确相同（忽略大小写）；
+ *   2. `261018.x` 这种前缀通配；
+ *   3. 日期版本号（首段 ≥ 6 位数字）：同一天的任何构建都算同一代
+ *      —— 写死 `261018.1` 的模组装到 `261018.2` 上不该报不兼容；
+ *   4. 老版本号：同 major.minor 且补丁 ≥ 声明值（0.12.8 装到 0.12.9 上放行）。
+ *
+ * 列表为空 = 没声明（老模组常见），返回 unknown —— 与外壳一致按「放行」处理，
+ * 界面**不提示**：只有明确对不上（unsupported）才画那条红标。
+ */
+export function serverSupportOf(declared: string[] | undefined, current: string): ServerSupport {
+  const list = (declared ?? []).map((value) => value.trim()).filter(Boolean)
+  // 容错：调用方万一把状态栏那个带 v 前缀的显示值传进来，这里先剥掉
+  const want = current.trim().replace(/^[vV]/, "")
+  if (list.length === 0 || !want) return "unknown"
+  const wantLower = want.toLowerCase()
+  for (const item of list) {
+    const lower = item.toLowerCase()
+    if (lower === wantLower) return "supported"
+    if (lower.endsWith(".x") && wantLower.startsWith(lower.slice(0, -2))) return "supported"
+    const declaredTriple = versionTriple(item)
+    const currentTriple = versionTriple(want)
+    if (!declaredTriple || !currentTriple) continue
+    const [maj, min, patch] = declaredTriple
+    const [curMaj, curMin, curPatch] = currentTriple
+    // 日期版本号：同一天的所有构建算同一代
+    if (maj === curMaj && maj >= 10_000) return "supported"
+    // 老版本号：补丁向上兼容
+    if (maj === curMaj && min === curMin && curPatch >= patch) return "supported"
+  }
+  return "unsupported"
 }
 
 /* ---------------- 下载阶段 ---------------- */

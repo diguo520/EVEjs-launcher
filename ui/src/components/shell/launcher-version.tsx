@@ -28,6 +28,13 @@ export interface LauncherVersionValue {
   progress: number
   /** EveJS 服务端版本（app:info.evejsVersion），状态栏显示用 */
   evejsVersion: string
+  /**
+   * 同一份服务端版本的**原始值**（不带 `v` 前缀；app:info 还没回来时是空串）。
+   *
+   * `evejsVersion` 是给人看的（`v261018.1`），拿来比版本号会把 `261018.x` 这类前缀通配
+   * 判错 —— 模组卡片的兼容性判定要用这一份（2026-10-19 报障）。
+   */
+  evejsVersionRaw: string
   /** 服务端根目录（app:info.repoRoot）：配置中心与模组页的默认值 */
   repoRoot: string
   /** 最近一次 `update:check` 的真结果（没查过 / 浏览器里跑原型时为 null） */
@@ -69,6 +76,7 @@ const FALLBACK: LauncherVersionValue = {
   updating: false,
   progress: 0,
   evejsVersion: LAUNCHER_META.version,
+  evejsVersionRaw: "",
   repoRoot: "",
   check: null,
   checking: false,
@@ -211,6 +219,7 @@ export function useLauncherVersionState(): LauncherVersionValue {
       updating,
       progress,
       evejsVersion: info ? `v${info.evejsVersion}` : LAUNCHER_META.version,
+      evejsVersionRaw: info?.evejsVersion ?? "",
       repoRoot: info?.repoRoot ?? "",
       check,
       checking,

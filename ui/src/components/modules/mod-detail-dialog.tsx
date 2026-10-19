@@ -380,6 +380,14 @@ export function ModDetailDialog({
                 <Readout label="作者" value={mod.author} />
                 <Readout label="分类" value={mod.cat} />
                 <Readout
+                  label="兼容服务端"
+                  value={
+                    mod.evejsVersions && mod.evejsVersions.length > 0
+                      ? mod.evejsVersions.join(" / ")
+                      : "—"
+                  }
+                />
+                <Readout
                   label="下载量"
                   value={mod.downloads > 0 ? mod.downloads.toLocaleString() : "—"}
                 />
