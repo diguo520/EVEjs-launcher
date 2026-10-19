@@ -3622,5 +3622,21 @@
   "模组清单没有声明兼容的服务端版本": "Das Mod-Manifest gibt keine kompatible Serverversion an",
   "兼容服务端": "Server-Kompatibilität",
   "不支持当前服务端版本": "Nicht mit dieser Serverversion kompatibel",
-  "提交时会把模组清单里的版本号改成这个值并重新签名，ZIP 与 Release tag 一并使用它。": "Beim Einreichen wird die Version im Mod-Manifest auf diesen Wert gesetzt und neu signiert; ZIP und Release-Tag verwenden sie ebenfalls."
+  "提交时会把模组清单里的版本号改成这个值并重新签名，ZIP 与 Release tag 一并使用它。": "Beim Einreichen wird die Version im Mod-Manifest auf diesen Wert gesetzt und neu signiert; ZIP und Release-Tag verwenden sie ebenfalls.",
+  "评分": "Bewertungen",
+  "人评分": "Bewertungen",
+  "查看详情": "Details ansehen",
+  "已收藏": "Gespeichert",
+  "收藏": "Speichern",
+  "我收藏的": "Gespeicherte Mods",
+  "已取消收藏": "Aus Speicherung entfernt",
+  "市场里还没有可推荐的模组。": "Im Markt gibt es noch keine empfehlenswerten Mods.",
+  "暂无更多精选模组": "Keine weiteren Empfehlungen",
+  "个模组": "Mods",
+  "精选榜单 · 目录浏览": "Empfohlen · Katalog",
+  "星星最多": "Meiste Sterne",
+  "装备": "Ausrüstung",
+  "皮肤": "Skins",
+  "动画": "Animationen",
+  "声音": "Sound"
 }

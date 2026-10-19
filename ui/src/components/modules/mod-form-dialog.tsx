@@ -38,6 +38,7 @@ import {
   editableReadme,
   hasEvejsPrefix,
   modIdFromName,
+  normalizeModCategory,
   parseIdList,
   parseLines,
   parseTags,
@@ -174,7 +175,7 @@ export function ModFormDialog({
     setId(mod ? stripEvejsPrefix(mod.id) : "")
     setIdIssue(null)
     setVersion(mod?.version ?? "1.0.0")
-    setCat(mod?.cat ?? MOD_CATEGORIES[0])
+    setCat(normalizeModCategory(mod?.cat ?? MOD_CATEGORIES[0]))
     setTags(parseTags((mod?.tags ?? []).join(" ")))
     setTagDraft("")
     setDesc(mod?.desc ?? "")

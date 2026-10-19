@@ -1,5 +1,6 @@
 import type { ReactNode } from "react"
 import {
+  Bookmark,
   Check,
   FileText,
   FolderOpen,
@@ -183,6 +184,9 @@ export interface ModDetailDialogProps {
   starred: boolean
   starBusy?: boolean
   onToggleStar: () => void
+  /** 本机收藏（书签），与服务端星标是两件事 */
+  favorite: boolean
+  onToggleFavorite: () => void
   onReply: (reviewId: string, body: string) => void
   onEditReply: (reviewId: string, body: string) => void
   onDeleteReply: (reviewId: string) => void
@@ -211,6 +215,8 @@ export function ModDetailDialog({
   starred,
   starBusy,
   onToggleStar,
+  favorite,
+  onToggleFavorite,
   onReply,
   onEditReply,
   onDeleteReply,
@@ -276,32 +282,50 @@ export function ModDetailDialog({
               （CJK 字体尤甚），所以数字额外 `translate-y-px` 压回星的中间；
               这个像素值就是唯一的调节旋钮，觉得偏高就 `-0.5px`、偏低就 `+0.5px`。
             */}
-            <button
-              type="button"
-              disabled={starBusy}
-              aria-pressed={starred}
-              aria-label={starred ? t("已星标") : t("星标")}
-              title={starred ? t("已星标") : t("星标")}
-              onClick={onToggleStar}
-              className={cn(
-                "ml-auto inline-flex shrink-0 items-center gap-1 self-center rounded-full border px-2 py-[3px] transition-colors focus-visible:outline-none focus-visible:shadow-focus disabled:opacity-60",
-                starred
-                  ? "border-telemetry/60 bg-telemetry/10 text-foreground hover:bg-telemetry/15"
-                  : "border-input bg-background/40 text-tertiary hover:border-telemetry/50 hover:bg-telemetry/10 hover:text-foreground"
-              )}
-            >
-              <span className="grid size-3.5 shrink-0 place-items-center">
-                <Star
-                  className="size-3.5 text-telemetry"
-                  fill={starred ? "currentColor" : "none"}
-                />
-              </span>
-              <span className="grid size-3.5 shrink-0 place-items-center">
-                <span className="tabular translate-y-px text-[12px] font-normal leading-none">
-                  {formatCount(mod.ratingCount)}
+            <div className="ml-auto flex items-center gap-1.5 self-center">
+              <button
+                type="button"
+                disabled={starBusy}
+                aria-pressed={starred}
+                aria-label={starred ? t("已星标") : t("星标")}
+                title={starred ? t("已星标") : t("星标")}
+                onClick={onToggleStar}
+                className={cn(
+                  "inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-[3px] transition-colors focus-visible:outline-none focus-visible:shadow-focus disabled:opacity-60",
+                  starred
+                    ? "border-telemetry/60 bg-telemetry/10 text-foreground hover:bg-telemetry/15"
+                    : "border-input bg-background/40 text-tertiary hover:border-telemetry/50 hover:bg-telemetry/10 hover:text-foreground"
+                )}
+              >
+                <span className="grid size-3.5 shrink-0 place-items-center">
+                  <Star
+                    className="size-3.5 text-telemetry"
+                    fill={starred ? "currentColor" : "none"}
+                  />
                 </span>
-              </span>
-            </button>
+                <span className="grid size-3.5 shrink-0 place-items-center">
+                  <span className="tabular translate-y-px text-[12px] font-normal leading-none">
+                    {formatCount(mod.ratingCount)}
+                  </span>
+                </span>
+              </button>
+              <button
+                type="button"
+                aria-pressed={favorite}
+                aria-label={favorite ? t("已收藏") : t("收藏")}
+                title={favorite ? t("已收藏") : t("收藏")}
+                onClick={onToggleFavorite}
+                className={cn(
+                  "inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-[3px] text-[11px] transition-colors focus-visible:outline-none focus-visible:shadow-focus",
+                  favorite
+                    ? "border-primary/60 bg-primary/10 text-primary hover:bg-primary/15"
+                    : "border-input bg-background/40 text-tertiary hover:border-primary/50 hover:bg-primary/10 hover:text-foreground"
+                )}
+              >
+                <Bookmark className="size-3.5" fill={favorite ? "currentColor" : "none"} />
+                <span>{favorite ? t("已收藏") : t("收藏")}</span>
+              </button>
+            </div>
           </DialogTitle>
           {/* 徽章是 div，塞进 <p> 里是非法嵌套；换成 div 承接这一行 */}
           <DialogDescription asChild>

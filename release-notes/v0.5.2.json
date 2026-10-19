@@ -1,0 +1,23 @@
+{
+  "version": "0.5.2",
+  "changelog": {
+    "zh": [
+      { "type": "opt", "text": "模组市场重排：左侧筛选栏 + 顶部精选区 + 四列卡片网格，精选区固定为设计高度并限制简介字数；补充「已安装 / 可更新 / 未安装 / 我收藏的」快捷筛选；市场统计改用星星数，排序改成一行标签式按钮。" },
+      { "type": "opt", "text": "主内容区加入轻量页面切入动画、稳定滚动条与滚动边界，页签切换不再那么生硬。" },
+      { "type": "new", "text": "模组分类新增舰船、装备、皮肤、界面、动画、声音六类，旧的「画面」自动归入「界面」；创建模组表单同步可选这些新分类。" },
+      { "type": "opt", "text": "模组市场精选区换成深空采矿横幅，并加入缓慢漂移与掠光动效；底部操作按钮重新与卡片底边对齐，不再贴边裁切。" },
+      { "type": "fix", "text": "模组详情弹窗改为短时淡入，去掉遮罩模糊与缩放跳变，不再出现「先出阴影再弹详情」的观感。" },
+      { "type": "new", "text": "模组市场排序新增「当前版本」：按市场版本号从高到低排，同版本再按下载量排。" },
+      { "type": "new", "text": "模组市场新增本机收藏：左侧筛选里的「我创建的」换成「我收藏的」，详情页增加收藏图标，精选区的收藏按钮与获星彻底分开。" }
+    ],
+    "en": [
+      { "type": "opt", "text": "The mod market was re-laid out: a left filter rail, a featured hero on top and a four-column card grid. The hero keeps a fixed design height and caps the description length, quick filters cover installed / updatable / not installed / my favorites, market stats now count stars, and sorting became a row of tag buttons." },
+      { "type": "opt", "text": "The main content area gained a light page-enter animation, stable scrollbars and scroll boundaries, so switching tabs no longer feels abrupt." },
+      { "type": "new", "text": "Six new mod categories: ships, fittings, skins, UI, animation and sound. The old Visual category folds into UI automatically, and the create-mod form offers the new categories as well." },
+      { "type": "opt", "text": "The market hero now uses a deep-space mining banner with a slow drift and a light sweep, and the action buttons at the bottom line up with the card edge again instead of being clipped." },
+      { "type": "fix", "text": "The mod detail dialog now fades in briefly: the backdrop blur and the zoom jump are gone, so it no longer shows a shadow first and then pops into place." },
+      { "type": "new", "text": "The market sort menu gained Current version, which orders by market version descending and breaks ties by download count." },
+      { "type": "new", "text": "The mod market now has local favorites: the left filter's My mods entry became My favorites, the detail dialog gained a favorite icon, and the hero's favorite button is fully separated from starring." }
+    ]
+  }
+}

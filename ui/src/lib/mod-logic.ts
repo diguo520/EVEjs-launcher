@@ -16,7 +16,25 @@ import {
 /* ---------------- 分类与筛选 ---------------- */
 
 /** 模组分类白名单（数据源里的 cat 取值） */
-export const MOD_CATEGORIES = ["玩法", "经济", "AI", "画面", "工具"] as const
+export const MOD_CATEGORIES = [
+  "玩法",
+  "经济",
+  "AI",
+  "舰船",
+  "装备",
+  "皮肤",
+  "界面",
+  "动画",
+  "声音",
+  "工具",
+] as const
+
+/** 旧分类名 → 当前分类名：历史索引和本地清单里的「画面」统一归到「界面」 */
+export function normalizeModCategory(value: string | undefined | null): string {
+  const category = String(value ?? "").trim()
+  if (!category) return "玩法"
+  return category === "画面" ? "界面" : category
+}
 
 /** 分类筛选的「全部」哨兵值 */
 export const ALL_CATEGORY = "all"
@@ -147,19 +165,23 @@ export function modIdIssue(userPart: string): string | null {
   return null
 }
 
-/** 市场列表的安装状态筛选 */
-export type MarketFilter = "all" | "available" | "installed"
+/** 市场列表的状态筛选 */
+export type MarketFilter = "all" | "installed" | "updatable" | "available" | "favorite"
 
 export const MARKET_FILTER_LABEL: Record<MarketFilter, string> = {
   all: "全部",
-  available: "未安装",
   installed: "已安装",
+  updatable: "可更新",
+  available: "未安装",
+  favorite: "我收藏的",
 }
 
 export const MARKET_FILTER_ORDER: MarketFilter[] = [
   "all",
-  "available",
   "installed",
+  "updatable",
+  "available",
+  "favorite",
 ]
 
 export type ModTab = "installed" | "preflight" | "mine" | "market"
@@ -1283,44 +1305,60 @@ export function matchRating(mod: ModEntry, filter: RatingFilter): boolean {
 /* ---------------- 市场排序 ---------------- */
 
 /** 市场列表的排序方式 */
-export type ModSort = "default" | "rating" | "updated" | "downloads"
+export type ModSort = "default" | "stars" | "updated" | "downloads" | "version"
 
 export const MOD_SORT_LABEL: Record<ModSort, string> = {
   default: "默认排序",
-  rating: "评分最高",
+  stars: "星星最多",
   updated: "最近更新",
   downloads: "下载最多",
+  version: "当前版本",
 }
 
 export const MOD_SORT_ORDER: ModSort[] = [
   "default",
-  "rating",
+  "stars",
   "updated",
   "downloads",
+  "version",
 ]
 
-/** 按选定口径排序；评分并列时用下载量兜底，保证顺序稳定 */
+/** 市场当前版本：已安装条目优先取市场索引里的那一版，没装时 version 就是市场版 */
+export function marketVersionOf(mod: ModEntry): string {
+  return mod.marketVersion || mod.version
+}
+
+/** 按选定口径排序；并列时用下载量兜底，保证顺序稳定 */
 export function sortMods(mods: ModEntry[], sort: ModSort): ModEntry[] {
   if (sort === "default") return mods
   const sorted = [...mods]
   sorted.sort((a, b) => {
-    if (sort === "rating") {
-      // 星标口径：比「多少人点过星」，平均分在星标模型里恒为 5，比它没有意义
-      const gap = ratingOf(b).count - ratingOf(a).count
+    if (sort === "stars") {
+      const gap = b.ratingCount - a.ratingCount
       if (gap !== 0) return gap
       return b.downloads - a.downloads
     }
     if (sort === "downloads") return b.downloads - a.downloads
+    if (sort === "version") {
+      const gap = compareVersions(marketVersionOf(b), marketVersionOf(a))
+      if (gap !== 0) return gap
+      return b.downloads - a.downloads
+    }
     return b.updatedAt.localeCompare(a.updatedAt)
   })
   return sorted
 }
 
-export function marketCounts(pool: ModEntry[]): Record<MarketFilter, number> {
+export function marketCounts(
+  pool: ModEntry[],
+  favoriteOf: (id: string) => boolean = () => false
+): Record<MarketFilter, number> {
   return {
     all: pool.length,
-    available: pool.filter((mod) => !mod.installed).length,
     installed: pool.filter((mod) => mod.installed).length,
+    updatable: pool.filter(hasUpdate).length,
+    available: pool.filter((mod) => !mod.installed).length,
+    favorite: pool.filter((mod) => favoriteOf(mod.id)).length,
   }
 }
 
@@ -1354,6 +1392,7 @@ export function filterMods({
   category,
   rating = "all",
   tag = null,
+  favoriteOf = () => false,
 }: {
   mods: ModEntry[]
   tab: ModTab
@@ -1366,6 +1405,8 @@ export function filterMods({
   rating?: RatingFilter
   /** 标签筛选：点卡片上的标签就按这个筛，空表示不限 */
   tag?: string | null
+  /** 本机收藏判定：收藏是本地书签，不来自服务端星标 */
+  favoriteOf?: (id: string) => boolean
 }): ModEntry[] {
   let pool: ModEntry[]
   // 「启动预检」页签没有模组清单，内容全在面板里
@@ -1375,9 +1416,12 @@ export function filterMods({
   else pool = mods.filter(isPublished)
 
   if (tab === "market" && marketFilter !== "all") {
-    pool = pool.filter((mod) =>
-      marketFilter === "installed" ? mod.installed : !mod.installed
-    )
+    pool = pool.filter((mod) => {
+      if (marketFilter === "installed") return mod.installed
+      if (marketFilter === "updatable") return hasUpdate(mod)
+      if (marketFilter === "favorite") return favoriteOf(mod.id)
+      return !mod.installed
+    })
   }
 
   if (tab === "mine" && mine !== "all") {

@@ -16,8 +16,10 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      "fixed inset-0 z-50 bg-background/80 backdrop-blur-sm",
-      "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+      // 只做淡入：backdrop-blur 在 WebView2 上会先铺一层模糊/阴影，再等内容合成，
+      // 看起来就是「先出阴影、详情后到」。遮罩保持轻量，不参与模糊合成。
+      "fixed inset-0 z-50 bg-background/70",
+      "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 duration-150",
       className
     )}
     {...props}
@@ -38,8 +40,11 @@ const DialogContent = React.forwardRef<
         // 会把整条轨道撑宽，于是所有子元素一起冲出 max-w-* 的边框（2026-10-01 报障：
         // 切到 ru/de/nl/fr 后模组详情的字段与底部按钮全跑到框外）。把子元素的 min-width
         // 压到 0，轨道就老实待在面板宽度里，装不下的文字由各自的 truncate 收尾。
-        "fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-lg border border-border bg-card p-5 shadow-lg [&>*]:min-w-0",
-        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+        "fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-lg border border-border bg-card p-5 shadow-[0_18px_50px_-18px_rgba(0,0,0,0.9)] [&>*]:min-w-0",
+        // 不能用 animate-in / zoom-in-95 / slide-in-*：tailwindcss-animate 的 enter 关键帧
+        // 会覆盖 -translate-x/y-1/2，弹窗先出现在偏右下再跳回中心。这里只做透明度动画，
+        // transform 始终留给居中定位（见 index.css 的 dialog-content-motion）。
+        "dialog-content-motion",
         className
       )}
       {...props}

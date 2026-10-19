@@ -38,13 +38,20 @@ import {
 import { ConflictBanner, ReviewBanner } from "@/components/modules/mod-banners"
 import { ModOverlapPanel } from "@/components/modules/mod-overlap-panel"
 import { ModPreflightPanel } from "@/components/modules/mod-preflight-panel"
+import {
+  MarketGridHeader,
+  MarketSidebar,
+  MarketSpotlight,
+} from "@/components/modules/market-overview"
 import { useModDownloads, type DownloadTask } from "@/hooks/use-mod-downloads"
+import { useModFavorites } from "@/hooks/use-mod-favorites"
 import { shouldOfferClaim } from "@/lib/mod-claim"
 import { markAuthoringDocSeen, needsAuthoringDocPulse } from "@/lib/mod-doc-seen"
 import { useModSource, type PublishOutcome } from "@/hooks/use-mod-source"
 import {
   ALL_CATEGORY,
   DEFAULT_SIGNATURE_PUBLISH_HINT,
+  MOD_CATEGORIES,
   activeConflicts,
   publishIntervalRemaining,
   reviewPrStateLabel,
@@ -72,7 +79,6 @@ import {
   type ModSort,
   type NewModInput,
   type ModTab,
-  type RatingFilter,
 } from "@/lib/mod-logic"
 import { formatMB, type ModEntry } from "@/lib/mock"
 import type { ViewId } from "@/components/shell/nav-config"
@@ -112,6 +118,7 @@ export function ModulesPage({
 
   const { t } = useLocale()
   const source = useModSource()
+  const { favoriteOf, toggleFavorite } = useModFavorites()
   /** 本地副本：真值来自 source.mods，写动作成功后由后端重扫回填 */
   const [mods, setMods] = useState<ModEntry[]>(source.mods)
   useEffect(() => {
@@ -140,7 +147,6 @@ export function ModulesPage({
   const [marketFilter, setMarketFilter] = useState<MarketFilter>("all")
   const [mineFilter, setMineFilter] = useState<MineFilter>("all")
   const [sort, setSort] = useState<ModSort>("default")
-  const [ratingFilter, setRatingFilter] = useState<RatingFilter>("all")
   const [detailId, setDetailId] = useState<string | null>(null)
   /** 表单同时管新建与编辑：formTargetId 为空就是新建 */
   const [formOpen, setFormOpen] = useState(false)
@@ -267,7 +273,35 @@ export function ModulesPage({
 
   const marketPool = useMemo(() => mods.filter(isPublished), [mods])
 
-  const marketCounts = useMemo(() => countMarket(marketPool), [marketPool])
+  const marketCounts = useMemo(
+    () => countMarket(marketPool, favoriteOf),
+    [marketPool, favoriteOf]
+  )
+
+  const marketCategoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {
+      [ALL_CATEGORY]: marketPool.length,
+    }
+    for (const item of MOD_CATEGORIES) counts[item] = 0
+    for (const mod of marketPool) {
+      counts[mod.cat] = (counts[mod.cat] ?? 0) + 1
+    }
+    return counts
+  }, [marketPool])
+
+  const marketTagCounts = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const mod of marketPool) {
+      for (const tag of mod.tags) counts.set(tag, (counts.get(tag) ?? 0) + 1)
+    }
+    return Array.from(counts, ([tag, count]) => ({ tag, count }))
+      .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag))
+      .slice(0, 10)
+  }, [marketPool])
+
+  const featuredMods = useMemo(() => sortMods(marketPool, "stars"), [marketPool])
+  const featuredMod = featuredMods[0] ?? null
+  const secondaryFeatured = featuredMods.slice(1, 3)
 
   const mineCounts = useMemo(
     () => countMine(mods.filter((mod) => mod.mine)),
@@ -283,8 +317,8 @@ export function ModulesPage({
       mine: mineFilter,
       query,
       category,
-      rating: ratingFilter,
       tag: activeTag,
+      favoriteOf,
     })
     if (tab === "market") return sortMods(pool, sort)
     // 已安装页：先按**本地扫描位次**排（那就是用户拖出来的加载顺序），再按「启用在前、
@@ -300,8 +334,8 @@ export function ModulesPage({
     query,
     category,
     sort,
-    ratingFilter,
     activeTag,
+    favoriteOf,
   ])
 
   const installedCount = mods.filter((mod) => mod.installed).length
@@ -422,10 +456,13 @@ export function ModulesPage({
    * 为什么启用 / 停用要分成两块、而不是只按顺序排一遍：三列网格里「最后一张已启用 +
    * 两张已停用」会落在同一行，光看顺序根本看不出分界，像是顺序没生效（2026-10-10 反馈）。
    */
-  function renderCards(list: ModEntry[]) {
+  function renderCards(
+    list: ModEntry[],
+    gridClass = "grid items-stretch gap-3 md:grid-cols-2 xl:grid-cols-3"
+  ) {
     return (
       // items-stretch 是 grid 默认值，显式写出来：同一行卡片等高靠它
-      <div className="grid items-stretch gap-3 md:grid-cols-2 xl:grid-cols-3">
+      <div className={gridClass}>
         {list.map((mod) => {
           const key = orderKeyOf(mod)
           // 只有「已安装页 + 无筛选 + 已启用」的卡片参与排序：停用的不加载，拖它没有意义
@@ -718,6 +755,13 @@ export function ModulesPage({
       return
     }
     toast.success(on ? t("已星标") : t("已取消星标"))
+  }
+
+  /** 收藏是本机书签，和「获星」是两件事：这里只改本地存储，不碰服务端星标 */
+  function toggleFavoriteWithToast(mod: ModEntry) {
+    const on = !favoriteOf(mod.id)
+    toggleFavorite(mod.id)
+    toast.success(on ? t("已收藏") : t("已取消收藏"))
   }
 
   async function removeReview() {
@@ -1275,134 +1319,171 @@ export function ModulesPage({
 
       {tab === "mine" ? <ReviewBanner mods={reviewing} /> : null}
 
-      {tab === "preflight" ? null : (
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-        <StatTile
-          label="已安装数"
-          value={installedCount}
-          unit="个"
-          tone="telemetry"
-          delta={t("共 {count} 个模组在库", { count: mods.length })}
-        />
-        <StatTile
-          label="已启用数"
-          value={enabledCount}
-          unit="个"
-          tone="success"
-          delta={t("已停用 {count} 个", { count: installedCount - enabledCount })}
-        />
-        <StatTile
-          label="可更新数"
-          value={updatableCount}
-          unit="个"
-          tone="primary"
-          delta="市场已发布新版本"
-        />
-        <StatTile
-          label="冲突数"
-          value={conflictPairs.length}
-          unit="组"
-          tone={conflictPairs.length ? "destructive" : "foreground"}
-          delta={
-            conflictPairs.length ? "需停用其中一个" : "未检测到加载冲突"
-          }
-        />
-        <StatTile
-          label="收录待审"
-          value={reviewing.length}
-          unit="个"
-          tone={reviewing.length ? "warning" : "foreground"}
-          delta={
-            reviewing.length
-              ? "等索引仓库合并版本审核 PR"
-              : "暂无待审的版本审核 PR"
-          }
-        />
-      </div>
-      )}
-
-      {tab === "preflight" ? null : (
-      <ModToolbar
-        query={query}
-        category={category}
-        onQueryChange={setQuery}
-        onCategoryChange={setCategory}
-        marketFilter={tab === "market" ? marketFilter : undefined}
-        onMarketFilterChange={tab === "market" ? setMarketFilter : undefined}
-        marketCounts={marketCounts}
-        mineFilter={tab === "mine" ? mineFilter : undefined}
-        onMineFilterChange={tab === "mine" ? setMineFilter : undefined}
-        mineCounts={mineCounts}
-        sort={tab === "market" ? sort : undefined}
-        onSortChange={tab === "market" ? setSort : undefined}
-        rating={tab === "market" ? ratingFilter : undefined}
-        onRatingChange={tab === "market" ? setRatingFilter : undefined}
-        tag={activeTag}
-        onTagChange={setActiveTag}
-        onOpenModsDir={() => void openModsDir()}
-        onImportZip={() => void importZip()}
-        importing={importing}
-        onRefresh={() => {
-          void refreshModsAndMarket()
-        }}
-      />
-      )}
-
-      {tab === "preflight" ? (
-        /* 两列并排：左边是「会按什么顺序加载」，右边是「这些模组有没有问题」。
-           窄屏自动叠成一列（lg 断点以下）。 */
-        <div className="grid items-start gap-3 lg:grid-cols-2">
-          <ModLoadOrderPanel
-            plan={source.plan}
-            enabledOrder={orderState.enabled}
-            onReorder={(next) => void applyOrder(next)}
+      {tab === "market" ? (
+        <div className="grid items-start gap-4 xl:grid-cols-[224px_minmax(0,1fr)]">
+          <MarketSidebar
+            query={query}
+            onQueryChange={setQuery}
+            marketFilter={marketFilter}
+            onMarketFilterChange={setMarketFilter}
+            marketCounts={marketCounts}
+            category={category}
+            onCategoryChange={setCategory}
+            categoryCounts={marketCategoryCounts}
+            sort={sort}
+            onSortChange={setSort}
+            tag={activeTag}
+            onTagChange={setActiveTag}
+            tagCounts={marketTagCounts}
           />
-          <div className="space-y-3">
-            <ModOverlapPanel report={overlaps} mods={mods} onDisable={disableMod} />
-            <ModPreflightPanel
-              report={source.preflight}
-              dryRun={source.preflightDryRun}
-              running={source.preflightRunning}
-              onRun={(dryRun) => void source.runPreflight(dryRun)}
+
+          <div className="min-w-0 space-y-3">
+            <MarketSpotlight
+              featured={featuredMod}
+              secondary={secondaryFeatured}
+              favoriteOf={favoriteOf}
+              onDetail={setDetailId}
+              onToggleFavorite={toggleFavoriteWithToast}
             />
+            <MarketGridHeader
+              count={visible.length}
+              onOpenModsDir={() => void openModsDir()}
+              onImportZip={() => void importZip()}
+              importing={importing}
+              onRefresh={() => void refreshModsAndMarket()}
+            />
+            {visible.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-border py-12 text-center">
+                <p className="text-[13px] text-tertiary">没有匹配的模组</p>
+                <p className="mt-1 text-[11px] text-tertiary/80">{emptyHint}</p>
+              </div>
+            ) : (
+              renderCards(
+                visible,
+                "grid items-stretch gap-3 md:grid-cols-2 xl:grid-cols-4"
+              )
+            )}
           </div>
-        </div>
-      ) : visible.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-border py-12 text-center">
-          <p className="text-[13px] text-tertiary">没有匹配的模组</p>
-          <p className="mt-1 text-[11px] text-tertiary/80">
-            {tab === "market" && marketFilter === "installed"
-              ? "当前筛选只看已安装，切换到「全部」查看市场里的其他模组。"
-              : tab === "mine" && mineFilter === "pending"
-                ? "你的模组下面没有待回复的评价，都回完了。"
-                : tab === "market" && ratingFilter !== "all"
-                  ? "这个评分分档下没有模组，换个分档或选「全部评分」。"
-                  : emptyHint}
-          </p>
         </div>
       ) : (
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="panel-label text-success">已启用</span>
-              <span className="text-[11px] text-tertiary/80">
-                按加载顺序排列，可拖拽调整
-              </span>
+        <>
+          {tab === "preflight" ? null : (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+              <StatTile
+                label="已安装数"
+                value={installedCount}
+                unit="个"
+                tone="telemetry"
+                delta={t("共 {count} 个模组在库", { count: mods.length })}
+              />
+              <StatTile
+                label="已启用数"
+                value={enabledCount}
+                unit="个"
+                tone="success"
+                delta={t("已停用 {count} 个", { count: installedCount - enabledCount })}
+              />
+              <StatTile
+                label="可更新数"
+                value={updatableCount}
+                unit="个"
+                tone="primary"
+                delta="市场已发布新版本"
+              />
+              <StatTile
+                label="冲突数"
+                value={conflictPairs.length}
+                unit="组"
+                tone={conflictPairs.length ? "destructive" : "foreground"}
+                delta={
+                  conflictPairs.length ? "需停用其中一个" : "未检测到加载冲突"
+                }
+              />
+              <StatTile
+                label="收录待审"
+                value={reviewing.length}
+                unit="个"
+                tone={reviewing.length ? "warning" : "foreground"}
+                delta={
+                  reviewing.length
+                    ? "等索引仓库合并版本审核 PR"
+                    : "暂无待审的版本审核 PR"
+                }
+              />
             </div>
-            {renderCards(visible.filter((mod) => mod.enabled))}
-          </div>
-          {visible.some((mod) => !mod.enabled) ? (
-            <div className="space-y-2 border-t border-input pt-3">
-              <div className="flex items-center gap-2">
-                <span className="panel-label text-tertiary">已停用</span>
-                <span className="text-[11px] text-tertiary/80">
-                  不参与加载，打开开关后才会排进上面的顺序
-                </span>
+          )}
+
+          {tab === "preflight" ? null : (
+            <ModToolbar
+              query={query}
+              category={category}
+              onQueryChange={setQuery}
+              onCategoryChange={setCategory}
+              mineFilter={tab === "mine" ? mineFilter : undefined}
+              onMineFilterChange={tab === "mine" ? setMineFilter : undefined}
+              mineCounts={mineCounts}
+              tag={activeTag}
+              onTagChange={setActiveTag}
+              onOpenModsDir={() => void openModsDir()}
+              onImportZip={() => void importZip()}
+              importing={importing}
+              onRefresh={() => void refreshModsAndMarket()}
+            />
+          )}
+
+          {tab === "preflight" ? (
+            /* 两列并排：左边是「会按什么顺序加载」，右边是「这些模组有没有问题」。
+               窄屏自动叠成一列（lg 断点以下）。 */
+            <div className="grid items-start gap-3 lg:grid-cols-2">
+              <ModLoadOrderPanel
+                plan={source.plan}
+                enabledOrder={orderState.enabled}
+                onReorder={(next) => void applyOrder(next)}
+              />
+              <div className="space-y-3">
+                <ModOverlapPanel report={overlaps} mods={mods} onDisable={disableMod} />
+                <ModPreflightPanel
+                  report={source.preflight}
+                  dryRun={source.preflightDryRun}
+                  running={source.preflightRunning}
+                  onRun={(dryRun) => void source.runPreflight(dryRun)}
+                />
               </div>
-              {renderCards(visible.filter((mod) => !mod.enabled))}
             </div>
-          ) : null}
-        </div>
+          ) : visible.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-border py-12 text-center">
+              <p className="text-[13px] text-tertiary">没有匹配的模组</p>
+              <p className="mt-1 text-[11px] text-tertiary/80">
+                {tab === "mine" && mineFilter === "pending"
+                  ? "你的模组下面没有待回复的评价，都回完了。"
+                  : emptyHint}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="panel-label text-success">已启用</span>
+                  <span className="text-[11px] text-tertiary/80">
+                    按加载顺序排列，可拖拽调整
+                  </span>
+                </div>
+                {renderCards(visible.filter((mod) => mod.enabled))}
+              </div>
+              {visible.some((mod) => !mod.enabled) ? (
+                <div className="space-y-2 border-t border-input pt-3">
+                  <div className="flex items-center gap-2">
+                    <span className="panel-label text-tertiary">已停用</span>
+                    <span className="text-[11px] text-tertiary/80">
+                      不参与加载，打开开关后才会排进上面的顺序
+                    </span>
+                  </div>
+                  {renderCards(visible.filter((mod) => !mod.enabled))}
+                </div>
+              ) : null}
+            </div>
+          )}
+        </>
       )}
 
       <ModDetailDialog
@@ -1440,6 +1521,8 @@ export function ModulesPage({
         starred={detailMod ? source.starredOf(detailMod.id) : false}
         starBusy={source.starBusyId !== "" && source.starBusyId === detailMod?.id}
         onToggleStar={() => void toggleStar()}
+        favorite={detailMod ? favoriteOf(detailMod.id) : false}
+        onToggleFavorite={() => detailMod && toggleFavoriteWithToast(detailMod)}
         onReply={(reviewId, body) => void addReply(reviewId, body)}
         onEditReply={(reviewId, body) => void addReply(reviewId, body)}
         onDeleteReply={(reviewId) => void removeReply(reviewId)}

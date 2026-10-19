@@ -228,7 +228,10 @@ export function App() {
                 badges={navBadges}
                 installedMods={installedMods}
               />
-              <main className="min-w-0 flex-1 overflow-y-auto p-5">
+              <main
+                key={view}
+                className="page-surface min-w-0 flex-1 scroll-smooth overflow-y-auto overscroll-contain p-5"
+              >
                 {renderView()}
               </main>
             </div>

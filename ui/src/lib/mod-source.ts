@@ -20,7 +20,13 @@ import type {
   RawMyMods,
   RawSubmissionItem,
 } from "./ipc"
-import { FEATURES_HEADING, compareVersions, ratingFromStarCount, readmeParagraphs } from "./mod-logic"
+import {
+  FEATURES_HEADING,
+  compareVersions,
+  normalizeModCategory,
+  ratingFromStarCount,
+  readmeParagraphs,
+} from "./mod-logic"
 import { modShotUrls } from "./mod-media"
 import type { ModChangelog, ModEntry, ModReview, ModReviewState } from "./mock"
 
@@ -181,7 +187,7 @@ export function fromMarket(mod: RawMarketMod): ModEntry {
     version: mod.version || "",
     marketVersion: mod.version || "",
     author: mod.author?.name || "",
-    cat: mod.category || "玩法",
+    cat: normalizeModCategory(mod.category),
     desc: mod.description || "",
     tags: Array.isArray(mod.tags) ? mod.tags : [],
     needsRestart: mod.requiresRestart !== false,
@@ -214,7 +220,7 @@ export function applyLocal(entry: ModEntry, mod: RawMod): ModEntry {
     name: mod.displayName || entry.name,
     version: mod.version || entry.version,
     author: mod.authorName || entry.author,
-    cat: mod.category || entry.cat,
+    cat: normalizeModCategory(mod.category || entry.cat),
     desc: mod.description || entry.desc,
     // 本机 README 是作者改完立刻能看到的唯一来源（索引要等审核合并才更新）；
     // 没读到 README 时保留原来那份，别把市场里的正文抹掉
@@ -273,7 +279,7 @@ export function applyMine(
   const next: ModEntry = {
     ...entry,
     name: item.displayName || entry.name,
-    cat: item.category || entry.cat,
+    cat: normalizeModCategory(item.category || entry.cat),
     sizeMB: item.sizeBytes ? toMB(item.sizeBytes) : entry.sizeMB,
     updatedAt: entry.updatedAt || isoDate(item.updatedAt),
     mine: true,

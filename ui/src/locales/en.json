@@ -3622,5 +3622,21 @@
   "模组清单没有声明兼容的服务端版本": "The mod manifest declares no compatible server version",
   "兼容服务端": "Server compatibility",
   "不支持当前服务端版本": "Not compatible with this server version",
-  "提交时会把模组清单里的版本号改成这个值并重新签名，ZIP 与 Release tag 一并使用它。": "On submit, the mod manifest's version is rewritten to this value and re-signed; the ZIP and Release tag use it too."
+  "提交时会把模组清单里的版本号改成这个值并重新签名，ZIP 与 Release tag 一并使用它。": "On submit, the mod manifest's version is rewritten to this value and re-signed; the ZIP and Release tag use it too.",
+  "评分": "Ratings",
+  "人评分": "ratings",
+  "查看详情": "View details",
+  "已收藏": "Saved",
+  "收藏": "Save",
+  "我收藏的": "Saved mods",
+  "已取消收藏": "Removed from saved",
+  "市场里还没有可推荐的模组。": "The market has no mods to feature yet.",
+  "暂无更多精选模组": "No more featured mods",
+  "个模组": "mods",
+  "精选榜单 · 目录浏览": "Featured · Catalog",
+  "星星最多": "Most stars",
+  "装备": "Equipment",
+  "皮肤": "Skins",
+  "动画": "Animations",
+  "声音": "Sound"
 }

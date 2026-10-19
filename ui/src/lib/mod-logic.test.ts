@@ -14,6 +14,9 @@ import {
   isSemverLike,
   localFolderOf,
   intervalText,
+  marketCounts,
+  MOD_CATEGORIES,
+  normalizeModCategory,
   marketVersionDiff,
   publishBlockers,
   publishIntervalRemaining,
@@ -28,6 +31,8 @@ import {
   parseIdList,
   parseTags,
   ratingFromStarCount,
+  sortMods,
+  MOD_SORT_ORDER,
   formatCount,
   formatBytes,
   serverSupportOf,
@@ -590,6 +595,89 @@ describe("overlapReport（疑似重叠：改同一份服务端文件 / 撞同一
       category: ALL_CATEGORY,
     })
     expect(pool).toEqual([])
+  })
+
+  it("市场统计与筛选支持已安装 / 可更新 / 未安装 / 我收藏的", () => {
+    const mod = (over: Partial<ModEntry>): ModEntry => ({ ...({} as ModEntry), ...over })
+    const pool = [
+      mod({ id: "installed", installed: true, version: "1.0.0" }),
+      mod({ id: "updated", installed: true, version: "1.0.0", latest: "1.1.0" }),
+      mod({ id: "available", installed: false }),
+      mod({ id: "favorite", installed: false }),
+    ]
+    const favoriteOf = (id: string) => id === "favorite"
+    expect(marketCounts(pool, favoriteOf)).toEqual({
+      all: 4,
+      installed: 2,
+      updatable: 1,
+      available: 2,
+      favorite: 1,
+    })
+
+    const ids = (filter: "installed" | "updatable" | "available" | "favorite") =>
+      filterMods({
+        mods: pool,
+        tab: "market",
+        marketFilter: filter,
+        query: "",
+        category: ALL_CATEGORY,
+        favoriteOf,
+      }).map((item) => item.id)
+    expect(ids("installed")).toEqual(["installed", "updated"])
+    expect(ids("updatable")).toEqual(["updated"])
+    expect(ids("available")).toEqual(["available", "favorite"])
+    expect(ids("favorite")).toEqual(["favorite"])
+  })
+
+  it("星星排序只看获得的星标数，不再看平均分", () => {
+    const mod = (over: Partial<ModEntry>): ModEntry => ({ ...({} as ModEntry), ...over })
+    const pool = [
+      mod({ id: "few", ratingCount: 3, ratingAvg: 5, downloads: 100 }),
+      mod({ id: "many", ratingCount: 30, ratingAvg: 0, downloads: 1 }),
+    ]
+    expect(sortMods(pool, "stars").map((item) => item.id)).toEqual(["many", "few"])
+  })
+
+  it("当前版本排序按市场版本号从高到低，同版本看下载量", () => {
+    const mod = (over: Partial<ModEntry>): ModEntry => ({ ...({} as ModEntry), ...over })
+    const pool = [
+      mod({ id: "old", version: "1.2.9", marketVersion: "1.2.9", downloads: 999 }),
+      mod({ id: "new", version: "1.10.0", marketVersion: "1.10.0", downloads: 10 }),
+      mod({ id: "mid-a", version: "1.9.1", marketVersion: "1.9.1", downloads: 20 }),
+      mod({ id: "mid-b", version: "1.9.1", marketVersion: "1.9.1", downloads: 80 }),
+      // 已安装条目：本地比市场新时，排序仍看市场那一版（version 已被本地扫描覆盖）
+      mod({
+        id: "local-newer",
+        installed: true,
+        version: "2.0.0",
+        marketVersion: "1.9.2",
+        downloads: 1,
+      }),
+    ]
+    expect(sortMods(pool, "version").map((item) => item.id)).toEqual([
+      "new",
+      "local-newer",
+      "mid-b",
+      "mid-a",
+      "old",
+    ])
+    expect(MOD_SORT_ORDER).toContain("version")
+  })
+})
+
+describe("模组分类", () => {
+  it("旧「画面」统一归到「界面」，空分类落到玩法", () => {
+    expect(normalizeModCategory("画面")).toBe("界面")
+    expect(normalizeModCategory(" 界面 ")).toBe("界面")
+    expect(normalizeModCategory("")).toBe("玩法")
+    expect(normalizeModCategory("舰船")).toBe("舰船")
+  })
+
+  it("新增的舰船 / 装备 / 皮肤 / 界面 / 动画 / 声音都在白名单里", () => {
+    for (const category of ["舰船", "装备", "皮肤", "界面", "动画", "声音"]) {
+      expect(MOD_CATEGORIES).toContain(category)
+    }
+    expect(MOD_CATEGORIES).not.toContain("画面")
   })
 })
 
