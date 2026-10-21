@@ -25,7 +25,7 @@
       "phase": "3-4",
       "platform": "win32",
       "repoRoot": "<abs-path>",
-      "version": "0.5.3"
+      "version": "0.5.4"
     },
     "config:get": {
       "client": {
@@ -172,10 +172,10 @@
       "supported": true
     },
     "metrics:get": {
-      "cpuPercent": 44.04152297973633,
+      "cpuPercent": 45.320518493652344,
       "diskRoot": "<abs-path>",
       "diskTotalGB": 976.5624961853028,
-      "diskUsedGB": 773.4260025024414,
+      "diskUsedGB": 776.0926628112793,
       "gpuDedicatedTotalGB": null,
       "gpuDedicatedUsedGB": null,
       "gpuMemoryTotalGB": null,
@@ -183,31 +183,31 @@
       "gpuPercent": null,
       "gpuSharedUsedGB": null,
       "memTotalGB": 31.855934143066406,
-      "memUsedGB": 14.324417114257812,
+      "memUsedGB": 14.384918212890623,
       "netBytesPerSec": 0,
       "virtualMemTotalGB": 34.7852897644043,
-      "virtualMemUsedGB": 26.60382843017578,
+      "virtualMemUsedGB": 28.506916046142575,
       "volumes": [
         {
-          "freeGB": 57.789608001708984,
-          "percent": 74.01893171620443,
+          "freeGB": 57.68716049194336,
+          "percent": 74.06499009657357,
           "root": "<abs-path>",
           "totalGB": 222.4296836853027,
-          "usedGB": 164.64007568359375
+          "usedGB": 164.74252319335938
         },
         {
-          "freeGB": 156.87961196899414,
-          "percent": 46.451758417340606,
+          "freeGB": 156.86689376831055,
+          "percent": 46.45609956323046,
           "root": "<abs-path>",
           "totalGB": 292.96874618530273,
-          "usedGB": 136.0891342163086
+          "usedGB": 136.1018524169922
         },
         {
-          "freeGB": 203.13649368286133,
-          "percent": 79.1988229656204,
+          "freeGB": 200.46983337402344,
+          "percent": 79.47188898231207,
           "root": "<abs-path>",
           "totalGB": 976.5624961853028,
-          "usedGB": 773.4260025024414
+          "usedGB": 776.0926628112793
         },
         {
           "freeGB": 390.2404022216797,
@@ -338,7 +338,7 @@
     "terminal:input": null,
     "terminal:resize": null,
     "update:state": {
-      "currentVersion": "0.5.3",
+      "currentVersion": "0.5.4",
       "state": "idle"
     }
   }

@@ -55,12 +55,15 @@ const HTTP_TIMEOUT: Duration = Duration::from_secs(8);
 /// EVEJS_LAUNCHER_LICENSE_URL 临时覆盖（联调用）。
 const DEFAULT_LICENSE_URL: &str = "";
 
-/// 内置签发公钥表 (keyId, raw 32 字节 base64)。
+/// 内置签发公钥表 (keyId, raw 32 字节 base64)：**这是真实签发公钥**。
 ///
-/// **空表是刻意的**（见模块头注释 3）。填入时 keyId 必须等于
-/// sha256(该公钥 32 字节).hex()[..12]，可用 mods::sign::key_id_from_raw 算。
-///
-const BUILTIN_LICENSE_KEYS: &[(&str, &str)] = &[];
+/// keyId = sha256(raw 32 字节公钥).hex()[..12]（可用 mods::sign::key_id_from_raw 核）。
+/// **私钥不在仓里、也不在本进程**：它属于签发服务（本机放在 `.keys/launcher-license-key.pem`，
+/// `.keys/` 已被 gitignore）。轮换时按 §2.2 走双签，不要直接替换这一条。
+const BUILTIN_LICENSE_KEYS: &[(&str, &str)] = &[(
+    "867242e85fc5",
+    "UJXSqYWG/VrWTa03/Ppq3tAgYpOE9VRyQvTyszk5ihg=",
+)];
 
 /// 运行时登记的签发公钥（联调 / 测试用，形状对齐 sign::trust_public_key）。
 static RUNTIME_LICENSE_KEYS: LazyLock<Mutex<BTreeMap<String, String>>> =
