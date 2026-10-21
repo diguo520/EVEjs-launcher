@@ -1,6 +1,5 @@
-import { useId, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import type { ReactNode } from "react"
-import { createPortal } from "react-dom"
 import { Crosshair, Skull } from "lucide-react"
 
 import { Panel, StatTile } from "@/components/common/panel"
@@ -18,6 +17,7 @@ import {
   labelOf,
   nameOf,
   type BattleReport,
+  type BattleRow,
   type BattleSideLosses,
   type BattleSideReport,
   type BattleView,
@@ -25,8 +25,12 @@ import {
   type RosterEntry,
 } from "@/lib/faction-logic"
 import { formatIskShort, formatQty } from "@/lib/market-logic"
+import { fleetComposition, type FleetTypeLine, type SideComposition } from "@/lib/km-ships"
 import { cn } from "@/lib/utils"
 import { FactionTag, MiniBar, PanelState } from "@/components/faction/faction-shared"
+
+/** 一次最多回查几支舰队的舰型构成：面板一趟几十个请求会把它压住 */
+const MAX_FLEET_LOOKUPS = 24
 
 interface MilitaryPayload {
   now: number
@@ -140,15 +144,86 @@ export function KmPage() {
   }, [military.data?.battles])
   const settled = useMemo(() => battleRows(military.data?.battles), [military.data?.battles])
 
+  /**
+   * 交战列表以**面板结算为准**（`/api/military`）—— 事件流只回补最近一段，
+   * 拿它当列表会让这里显示"共 2 场"、而军事页显示"共 26 场"，两处对不上（2026-10-21 报障）。
+   * 事件流那一份降级为**逐舰明细**，按 battleID 挂到对应的场上；挂不上的场次只是没有明细，不是不存在。
+   */
+  const rows = useMemo(
+    () =>
+      settled.map((row) => ({
+        row,
+        detail: reports.find((report) => report.battleID === row.battleID) ?? null,
+      })),
+    [settled, reports]
+  )
+  /** 有逐舰明细的场次数（事件流窗口内的） */
+  const detailedCount = rows.filter((entry) => entry.detail !== null).length
+
   const now = military.data?.now ?? Date.now()
-  const active = reports.find((report) => report.battleID === selectedBattle) ?? reports[0] ?? null
+  const activeEntry = rows.find((entry) => entry.row.battleID === selectedBattle) ?? rows[0] ?? null
+  const active = activeEntry?.detail ?? null
   const kill = active?.kills.find((row) => row.id === selectedKill) ?? null
 
   const kills = reports.reduce((sum, report) => sum + report.totalLost, 0)
   const value = reports.reduce((sum, report) => sum + report.totalValue, 0)
-  const lastAt = reports[0]?.lastAt ?? 0
-  /** 有交战结算、但没有逐舰记录的场次（多半落在事件流窗口之外） */
-  const noDetail = settled.filter((row) => !reports.some((report) => report.battleID === row.battleID))
+  const lastAt = rows[0] ? rows[0].row.endedAt ?? rows[0].row.startedAt : 0
+
+  /**
+   * **参战舰船**：面板的 `/api/military` 只给了 `sides[].committed` 的 `fleetID → 战力`，
+   * 舰型构成要拿每个 fleetID 去问 `/api/fleet?id=`。只查**当前选中那一场**的舰队并缓存住，
+   * 否则列表页每换一场就要打几十个请求。
+   *
+   * 这里展示的是"这一方投了什么船"，与"损失了什么船"是两回事 —— 用户 2026-10-21 明确要求前者。
+   */
+  const activeFleetIDs = useMemo(() => {
+    const ids = new Set<number>()
+    for (const side of activeEntry?.row.sides ?? []) {
+      for (const fleet of side.fleets) if (Number.isFinite(fleet.id)) ids.add(fleet.id)
+    }
+    return [...ids].sort((left, right) => left - right)
+  }, [activeEntry])
+
+  const fleetTypesRef = useRef(new Map<number, FleetTypeLine[]>())
+  const [fleetTypes, setFleetTypes] = useState<Map<number, FleetTypeLine[]>>(new Map())
+  const fleetKey = activeFleetIDs.join(",")
+
+  useEffect(() => {
+    if (!faction.available || fleetKey === "") return
+    const cache = fleetTypesRef.current
+    const missing = activeFleetIDs.filter((id) => !cache.has(id)).slice(0, MAX_FLEET_LOOKUPS)
+    if (missing.length === 0) return
+    let alive = true
+    void (async () => {
+      for (const id of missing) {
+        const reply = await faction.api<{ types?: FleetTypeLine[] }>("/api/fleet", { id })
+        if (!alive) return
+        const types = Array.isArray(reply?.types) ? reply.types : []
+        cache.set(id, types)
+      }
+      if (!alive) return
+      // 复制一份新的 Map 触发重渲染（cache 本身是 ref，改它不会重画）
+      setFleetTypes(new Map(cache))
+    })()
+    return () => {
+      alive = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fleetKey, faction.available])
+
+  const composition = useMemo(
+    () =>
+      fleetComposition(
+        (activeEntry?.row.sides ?? []).map((side) => ({ key: side.key, fleets: side.fleets })),
+        fleetTypes
+      ),
+    [activeEntry, fleetTypes]
+  )
+  const compositionByKey = useMemo(
+    () => new Map(composition.map((entry) => [entry.key, entry] as const)),
+    [composition]
+  )
+
 
   const systemNameOf = (systemID: number): string => {
     for (const battle of meta.values()) {
@@ -172,10 +247,10 @@ export function KmPage() {
       </div>
 
       <PanelState loading={military.loading && !military.data} error={military.error} onRetry={military.reload}>
-        {reports.length === 0 ? (
+        {rows.length === 0 ? (
           <Panel tag="// BATTLES" title={t("交战记录")}>
             <div className="py-10 text-center text-[12px] text-muted-foreground">
-              {t("事件流窗口里还没有逐舰战损记录（面板只回补最近一段）")}
+              {t("面板还没有交战结算记录")}
             </div>
           </Panel>
         ) : (
@@ -183,22 +258,23 @@ export function KmPage() {
             <Panel
               tag="// BATTLES"
               title={t("交战记录")}
-              meta={t("共 {n} 场", { n: reports.length })}
+              meta={t("共 {n} 场", { n: rows.length })}
               className="min-h-0"
             >
               <div className="max-h-[680px] space-y-1.5 overflow-y-auto pr-1">
-                {reports.map((report) => (
+                {rows.map((entry) => (
                   <ReportListItem
-                    key={report.battleID}
-                    report={report}
-                    battle={meta.get(report.battleID)}
-                    systemName={systemNameOf(report.systemID)}
-                    active={active?.battleID === report.battleID}
+                    key={entry.row.battleID}
+                    row={entry.row}
+                    detail={entry.detail}
+                    battle={meta.get(entry.row.battleID)}
+                    systemName={systemNameOf(entry.row.systemID)}
+                    active={activeEntry?.row.battleID === entry.row.battleID}
                     now={now}
                     roster={roster}
                     colorByKey={colorByKey}
                     onSelect={() => {
-                      setSelectedBattle(report.battleID)
+                      setSelectedBattle(entry.row.battleID)
                       setSelectedKill(null)
                     }}
                   />
@@ -206,15 +282,54 @@ export function KmPage() {
               </div>
             </Panel>
 
-            {active ? (
+            {activeEntry ? (
               <div className="space-y-4">
+                {/* 有结算、但事件流窗口里没有这一场的逐舰明细：不能留空白，
+                    把结算的两侧损失如实画出来，并说明明细为什么缺。 */}
+                {active ? null : (
+                  <Panel
+                    tag="// BATTLE"
+                    title={activeEntry.row.systemName || systemNameOf(activeEntry.row.systemID)}
+                    meta={[activeEntry.row.siteLabel, t("战斗 #{id}", { id: activeEntry.row.battleID })]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  >
+                    {activeEntry.row.sides.length === 0 ? (
+                      <div className="py-6 text-center text-[11.5px] text-tertiary">
+                        {t("这一场没有记录到参战方")}
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                        {activeEntry.row.sides.map((side) => (
+                          <span key={side.key} className="inline-flex items-center gap-1">
+                            <FactionTag name={nameOf(roster, side.key)} color={colorByKey.get(side.key)} />
+                            <span
+                              className={cn(
+                                "tabular",
+                                side.lost > 0 ? "text-destructive" : "text-tertiary"
+                              )}
+                            >
+                              −{side.lost}
+                            </span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <div className="mt-2 flex items-start gap-1.5 text-[10.5px] text-tertiary">
+                      <Crosshair className="mt-0.5 size-3 shrink-0" />
+                      {t("这一场只有结算，没有逐舰明细 —— 事件流只回补最近一段，明细落在窗口之外。")}
+                    </div>
+                  </Panel>
+                )}
+                {active ? (
+                  <>
                 <BattleSummary
                   report={active}
                   battle={meta.get(active.battleID)}
                   systemName={systemNameOf(active.systemID)}
                   roster={roster}
                   colorByKey={colorByKey}
-                  shipNames={shipNames}
+                  compositionByKey={compositionByKey}
                 />
                 <KillList
                   report={active}
@@ -234,15 +349,20 @@ export function KmPage() {
                     colorByKey={colorByKey}
                   />
                 ) : null}
+                  </>
+                ) : null}
               </div>
             ) : null}
           </div>
         )}
       </PanelState>
 
-      {noDetail.length > 0 ? (
+      {rows.length > 0 ? (
         <div className="text-[11px] text-tertiary">
-          {t("另有 {n} 场交战有结算但没有逐舰记录（落在事件流窗口之外）", { n: noDetail.length })}
+          {t("共 {n} 场交战，其中 {m} 场有逐舰明细（事件流只回补最近一段，其余只有结算）。", {
+            n: rows.length,
+            m: detailedCount,
+          })}
         </div>
       ) : null}
     </FactionScreen>
@@ -250,7 +370,8 @@ export function KmPage() {
 }
 
 function ReportListItem({
-  report,
+  row,
+  detail,
   battle,
   systemName,
   active,
@@ -259,7 +380,9 @@ function ReportListItem({
   colorByKey,
   onSelect,
 }: {
-  report: BattleReport
+  row: BattleRow
+  /** 事件流里的逐舰明细；没有就是 null（这一场只有结算） */
+  detail: BattleReport | null
   battle: BattleView | undefined
   systemName: string
   active: boolean
@@ -269,7 +392,14 @@ function ReportListItem({
   onSelect: () => void
 }) {
   const { t } = useLocale()
-  const outcome = battle?.result?.outcome ?? ""
+  const outcome = battle?.result?.outcome ?? row.outcome ?? ""
+  // 时刻：有明细用明细的最后一笔，否则用结算的结束/开始时刻
+  const at = detail?.lastAt ?? row.endedAt ?? row.startedAt
+  // 两侧：有明细用明细的（含击杀读数），没有就用结算的损失数
+  const sides = detail
+    ? detail.sides.map((side) => ({ key: side.key, lost: side.lost }))
+    : row.sides.map((side) => ({ key: side.key, lost: side.lost }))
+  const lostTotal = detail ? detail.totalLost : row.totalLost
   return (
     <button
       type="button"
@@ -281,13 +411,11 @@ function ReportListItem({
     >
       <div className="flex items-center gap-2">
         <span className="truncate text-[12px] text-foreground">{systemName}</span>
-        <span className="shrink-0 tabular text-[10px] text-tertiary">#{report.battleID}</span>
-        <span className="ml-auto shrink-0 text-[10px] text-tertiary">
-          {agoText(report.lastAt, now, t)}
-        </span>
+        <span className="shrink-0 tabular text-[10px] text-tertiary">#{row.battleID}</span>
+        <span className="ml-auto shrink-0 text-[10px] text-tertiary">{agoText(at, now, t)}</span>
       </div>
       <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px]">
-        {report.sides.map((side) => (
+        {sides.map((side) => (
           <span key={side.key} className="inline-flex items-center gap-1">
             <FactionTag name={nameOf(roster, side.key)} color={colorByKey.get(side.key)} />
             <span className={cn("tabular", side.lost > 0 ? "text-destructive" : "text-tertiary")}>
@@ -307,7 +435,10 @@ function ReportListItem({
         ) : null}
       </div>
       <div className="mt-0.5 tabular text-[10px] text-tertiary">
-        {t("{n} 艘 · {isk}", { n: report.totalLost, isk: isk(report.totalValue) })}
+        {detail && detail.totalValue > 0
+          ? t("{n} 艘 · {isk}", { n: lostTotal, isk: isk(detail.totalValue) })
+          : t("{n} 艘", { n: lostTotal })}
+        {detail ? null : ` · ${t("只有结算")}`}
       </div>
     </button>
   )
@@ -317,7 +448,7 @@ function ReportListItem({
  * 图 1 的主体：**双阵营对战**。
  *
  * 上方左右两张阵营卡，各自代表一个参战联盟，卡内自上而下是：
- *   势力色点 + 势力名（+ 胜方徽标）→ 大号损失总额 → 四格统计 → 阵营色进度条 → **本阵营自己**的舰型损失。
+ *   势力色点 + 势力名（+ 胜方徽标）→ 大号损失总额 → 四格统计 → 阵营色进度条 → **本阵营参战的舰船**。
  *
  * 两侧顺序按**损失舰船数量**从多到少（平手比 ISK，再平手比 key）：
  * 谁在挨打一眼就看出来，而且平手时有确定的顺序，不会每个 tick 换一次位。
@@ -328,17 +459,19 @@ function BattleSummary({
   systemName,
   roster,
   colorByKey,
-  shipNames,
+  compositionByKey,
 }: {
   report: BattleReport
   battle: BattleView | undefined
   systemName: string
   roster: Map<string, RosterEntry>
   colorByKey: Map<string, string>
-  shipNames: Map<number, string>
+  /** 各阵营**参战**的舰船构成（来自 /api/fleet 回查，见页面里的取数） */
+  compositionByKey: Map<string, SideComposition>
 }) {
   const { t } = useLocale()
   // 按 key 建索引，**不靠数组顺序对齐**：数据层保证两侧同源，但依赖位置太脆；取不到就退化成空卡。
+  // losses 只留给进度条（占比按**损失船数**算）；舰船表画的是 composition（参战）。
   const lossesByKey = new Map(report.sideShipLosses.map((row) => [row.key, row] as const))
   const ordered = orderSidesForDisplay(report.sides)
   // 两侧舰型数量之和 == 全场损失船数。数据层保证相等；不等就是有损失没归到任何一方，
@@ -368,14 +501,12 @@ function BattleSummary({
         {ordered.map((side) => (
           <SideBattleCard
             key={side.key}
-            report={report}
             side={side}
             losses={lossesByKey.get(side.key)}
+            composition={compositionByKey.get(side.key)}
             winner={battle?.result?.winner === side.key}
             color={colorByKey.get(side.key)}
             roster={roster}
-            colorByKey={colorByKey}
-            shipNames={shipNames}
           />
         ))}
       </div>
@@ -418,55 +549,29 @@ function BattleSummary({
  * Radix 的 tooltip 在聚焦时同样打开、Esc 关闭 —— 只用鼠标能看的信息等于没做。
  */
 function SideBattleCard({
-  report,
   side,
   losses,
+  composition,
   winner,
   color,
   roster,
-  colorByKey,
-  shipNames,
 }: {
-  report: BattleReport
   side: BattleSideReport
+  /** 只用于进度条：占比按**损失船数**算 */
   losses: BattleSideLosses | undefined
+  /** 这一方**参战**的舰船构成（/api/fleet 回查） */
+  composition: SideComposition | undefined
   winner: boolean
   color: string | undefined
   roster: Map<string, RosterEntry>
-  colorByKey: Map<string, string>
-  shipNames: Map<number, string>
 }) {
   const { t } = useLocale()
-  // 用 useMemo 钉住引用：这个数组既进渲染，又是下方明细 useMemo 的依赖，
-  // 每次渲染新建一份会让依赖永远变化，React Compiler 会直接放弃优化这个组件。
-  const rows = useMemo(() => (losses?.losses ?? []).filter((row) => row.dead > 0), [losses])
+  // 进度条：占比按**损失船数**算（用户 2026-10-21 的定稿口径）
   const share = losses?.lostShare ?? 0
   const sharePercent = Math.round(share * 1000) / 10
-  const modelCount = rows.reduce((sum, row) => sum + row.dead, 0)
-  const unknownRows = rows.filter((row) => row.typeID === null).length
-  // 悬停 / 聚焦到某一型时，浮层给的是「这一型在本场里逐条损失」——按 (本阵营, 舰型) 过滤。
-  // typeID 为 null 的那一档单独比，不靠 falsy 判断（0 号舰型是合法值）。
-  // openKey 记「哪一型开着」（行高亮与 +/- 指示也用它）；
-  // anchor 是浮层的锚点 —— 指针在动就用指针坐标，键盘聚焦时没有指针，退回用行的右上角。
-  const [openKey, setOpenKey] = useState<string | null>(null)
-  const [anchor, setAnchor] = useState<{ x: number; y: number } | null>(null)
-  const panelId = useId()
-  const details = useMemo(() => {
-    const map = new Map<number | null, { kills: KillRow[]; fleetLost: number }>()
-    for (const row of rows) {
-      const kills = report.kills.filter(
-        (kill) => kill.victimKey === side.key && kill.shipTypeID === row.typeID
-      )
-      // 整队覆没按**这一型**数：同一场里别的舰型被打光，不该算到这一行头上
-      map.set(row.typeID, { kills, fleetLost: kills.filter((kill) => kill.fleetLost).length })
-    }
-    return map
-  }, [report, side.key, rows])
-  // 浮层只渲染一份：找到当前开着的那一行，内容从这里取
-  const openRow = rows.find(
-    (row) => (row.typeID === null ? "unknown" : String(row.typeID)) === openKey
-  )
-  const openDetail = openRow ? details.get(openRow.typeID) : undefined
+  // 舰船表：画的是**参战**的舰船，不是损失的舰船
+  const ships = composition?.lines ?? []
+  const modelCount = ships.reduce((sum, line) => sum + line.count, 0)
 
   return (
     <div className="flex min-w-0 flex-col rounded border border-border bg-card/60 p-3">
@@ -528,13 +633,15 @@ function SideBattleCard({
 
       <div className="mt-2.5 border-t border-border/60 pt-2">
         <div className="flex items-center gap-2 text-[10px] text-tertiary">
-          <span className="uppercase tracking-[0.08em]">{t("本阵营舰型损失")}</span>
+          <span className="uppercase tracking-[0.08em]">{t("本阵营参战舰船")}</span>
           <span className="ml-auto tabular">
-            {t("{n} 型 · 共 {m} 艘", { n: rows.length, m: modelCount })}
+            {ships.length > 0 ? t("{n} 型 · 共 {m} 艘", { n: ships.length, m: modelCount }) : ""}
           </span>
         </div>
-        {rows.length === 0 ? (
-          <div className="py-3 text-center text-[11px] text-tertiary">{t("这一方没有舰船损失")}</div>
+        {ships.length === 0 ? (
+          <div className="py-3 text-center text-[11px] text-tertiary">
+            {t("这一方的参战舰船还没有记录")}
+          </div>
         ) : (
           <div className="mt-1 max-h-[240px] overflow-y-auto pr-1">
             <table className="w-full text-left text-[11.5px]">
@@ -542,296 +649,39 @@ function SideBattleCard({
                 <tr>
                   <th className="pb-1 pr-2 font-normal">{t("舰型")}</th>
                   <th className="pb-1 pr-2 text-right font-normal">{t("数量")}</th>
-                  <th className="pb-1 pr-2 text-right font-normal">{t("损失数")}</th>
-                  <th className="pb-1 text-right font-normal">{t("损失价值")}</th>
-                  <th className="w-6 pb-1" />
+                  <th className="pb-1 text-right font-normal">{t("损失数")}</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => {
-                  const key = row.typeID === null ? "unknown" : String(row.typeID)
-                  const open = openKey === key
-                  return (
-                    <tr
-                      key={key}
-                      tabIndex={0}
-                      aria-describedby={open ? panelId : undefined}
-                      onPointerEnter={(event) => {
-                        setOpenKey(key)
-                        setAnchor({ x: event.clientX, y: event.clientY })
-                      }}
-                      // 指针移一格就更新一次锚点：浮层跟着鼠标走，不钉在行的一侧
-                      onPointerMove={(event) => setAnchor({ x: event.clientX, y: event.clientY })}
-                      onPointerLeave={() => {
-                        setOpenKey(null)
-                        setAnchor(null)
-                      }}
-                      onFocus={(event) => {
-                        // 键盘进来时没有指针坐标，用行的右上角当锚点
-                        const rect = event.currentTarget.getBoundingClientRect()
-                        setOpenKey(key)
-                        setAnchor({ x: rect.right, y: rect.top })
-                      }}
-                      onBlur={() => {
-                        setOpenKey(null)
-                        setAnchor(null)
-                      }}
-                      onKeyDown={(event) => {
-                        if (event.key === "Escape") {
-                          setOpenKey(null)
-                          setAnchor(null)
-                        }
-                      }}
-                      className={cn(
-                        "border-t border-border/60 outline-none transition-colors",
-                        "hover:bg-card/60 focus-visible:bg-primary/10",
-                        open && "bg-primary/5"
-                      )}
-                    >
-                        <td className="py-1 pr-2 text-foreground">
-                          {row.typeID === null ? (
-                            <span className="text-tertiary">{t("未知舰型")}</span>
-                          ) : (
-                            shipNames.get(row.typeID) ?? t("类型 #{id}", { id: row.typeID })
-                          )}
-                        </td>
-                        <td className="py-1 pr-2 text-right tabular text-muted-foreground">
-                          {battleNum(row.dead)}
-                        </td>
-                        <td className="py-1 pr-2 text-right tabular text-destructive">
-                          {row.dead > 0 ? "−" + formatQty(row.dead) : "—"}
-                        </td>
-                        <td className="py-1 text-right tabular text-destructive">
-                          {row.value > 0 ? "−" + formatIskShort(row.value) : "—"}
-                          {row.unknown > 0 ? (
-                            <span className="ml-1 text-[10px] text-tertiary">
-                              {t("（{n} 艘无记录）", { n: row.unknown })}
-                            </span>
-                          ) : null}
-                        </td>
-                      <td
-                        className="py-1 pl-1 text-right text-[10px] text-tertiary"
-                        aria-hidden="true"
-                      >
-                        {open ? "−" : "+"}
-                      </td>
-                    </tr>
-                  )
-                })}
+                {ships.map((line) => (
+                  <tr key={line.id} className="border-t border-border/60">
+                    <td className="py-1 pr-2 text-foreground">{line.name}</td>
+                    <td className="py-1 pr-2 text-right tabular text-foreground">
+                      {battleNum(line.count)}
+                    </td>
+                    <td className="py-1 text-right tabular text-destructive">
+                      {line.lost > 0 ? "−" + formatQty(line.lost) : "—"}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
         )}
-        {unknownRows > 0 ? (
+        {composition && composition.unknownFleets ? (
           <div className="mt-1 text-[10.5px] text-tertiary">
-            {t("末行「未知舰型」是悬赏没结算的损失：舰型与价值都取不到，但损失确实发生过。")}
+            {t("有 {n} 支舰队查不到舰型构成（舰队已解散或面板没有它的记录），上面的数量少算了它们。", {
+              n: composition.unknownFleets,
+            })}
+          </div>
+        ) : null}
+        {composition ? (
+          <div className="mt-1 text-[10.5px] text-tertiary">
+            {t("参战舰船来自舰队当前构成：战斗结束后舰队可能已补员或改编，属近似记录。")}
           </div>
         ) : null}
       </div>
-      {/* 浮层只渲染一份，位置来自指针坐标 —— 不是每行各挂一个固定位置的弹层 */}
-      {openDetail && openRow ? (
-        <CursorPanel anchor={anchor} sizeKey={openKey} panelId={panelId}>
-          <ShipLossDetail
-            sideKey={side.key}
-            typeID={openRow.typeID}
-            kills={openDetail.kills}
-            fleetLost={openDetail.fleetLost}
-            roster={roster}
-            colorByKey={colorByKey}
-            shipTypeName={(id) => shipNames.get(id) ?? t("类型 #{id}", { id })}
-          />
-        </CursorPanel>
-      ) : null}
-    </div>
-  )
-}
 
-/**
- * 跟随指针的浮层容器。
- *
- * Portal 到 body + `position: fixed`，锚点是**指针坐标**而不是触发元素，
- * 所以浮层贴着鼠标走；指针一离开触发行就消失。
- *
- * 三个刻意的选择：
- * - `pointer-events-none`：浮层就贴在指针旁边，若能命中，指针一进浮层就会让触发行
- *   收到 pointerleave，形成「关→开→关」的闪烁；禁用命中测试后指针事件直接穿透。
- * - 贴边翻转：右下放不下就翻到锚点左上，避免被窗口裁掉。
- * - 键盘路径没有指针坐标：调用方用行的右上角当锚点，行为保持一致。
- *   代价是浮层里的表格**不参与滚动命中**（指针和键盘都不行），内容超长应改回行下展开区。
- */
-function CursorPanel({
-  anchor,
-  sizeKey,
-  panelId,
-  children,
-}: {
-  anchor: { x: number; y: number } | null
-  sizeKey: string | null
-  panelId: string
-  children: ReactNode
-}) {
-  const ref = useRef<HTMLDivElement | null>(null)
-  const [size, setSize] = useState<{ width: number; height: number } | null>(null)
-
-  // 量一次尺寸：换一型才重量，指针在行内移动不重量。
-  // 放在 layout effect 里 —— 量完引发的那次重渲染发生在浏览器绘制之前，看不到跳动。
-  useLayoutEffect(() => {
-    const node = ref.current
-    if (!node) return
-    const rect = node.getBoundingClientRect()
-    setSize({ width: rect.width, height: rect.height })
-  }, [sizeKey])
-
-  if (!anchor) return null
-
-  const pad = 12
-  const gapX = 16
-  const gapY = 18
-  let left = anchor.x + gapX
-  let top = anchor.y + gapY
-  if (size) {
-    if (left + size.width > window.innerWidth - pad) {
-      left = Math.max(pad, anchor.x - size.width - gapX)
-    }
-    if (top + size.height > window.innerHeight - pad) {
-      top = Math.max(pad, anchor.y - size.height - gapY)
-    }
-  }
-
-  return createPortal(
-    <div
-      ref={ref}
-      id={panelId}
-      role="tooltip"
-      style={{ position: "fixed", left, top }}
-      className="pointer-events-none z-50 w-[380px] max-w-[80vw] rounded-md border border-border bg-popover p-2.5 text-xs text-popover-foreground shadow-md"
-    >
-      {children}
-    </div>,
-    document.body
-  )
-}
-
-/**
- * 某一型舰船在**本阵营**的逐条损失（阵营卡里悬停/聚焦一行时，跟着指针弹出的浮层）。
- *
- * 2026-10-13 两次改动记录在此：
- * ① 由「行下展开区」改为浮层 tooltip（用户要求）；
- * ② 浮层由「钉在行的一侧」改为「跟随指针坐标」（用户要求），锚点与翻转见 `CursorPanel`。
- *
- * 取舍：
- * - 保留的：行仍有 `tabIndex`，键盘聚焦同样弹、Esc 可关，内容通过 `aria-describedby` 与行关联。
- * - 付出的：浮层是 `pointer-events-none`，里面的表格不能滚动、也不能用键盘进入
- *   （这是「跟着指针走」的必然代价：可命中的浮层会把指针从触发行上抢走并造成闪烁）。
- *   内容继续变大（超过一屏）时应改回行下展开区。
- * 仍然刻意不把整套 `KillDetail`（Panel 级）搬进来：一个悬停塞一张大面板太重。
- */
-function ShipLossDetail({
-  sideKey,
-  typeID,
-  kills,
-  fleetLost,
-  roster,
-  colorByKey,
-  shipTypeName,
-}: {
-  sideKey: string
-  typeID: number | null
-  kills: KillRow[]
-  fleetLost: number
-  roster: Map<string, RosterEntry>
-  colorByKey: Map<string, string>
-  shipTypeName: (id: number) => string
-}) {
-  const { t } = useLocale()
-  const value = kills.reduce((sum, row) => sum + row.value, 0)
-  const reward = kills.reduce((sum, row) => sum + row.reward, 0)
-
-  return (
-    <div className="min-w-[340px]">
-      <div className="tabular text-[10px] text-tertiary">
-        {t("损失方")} {nameOf(roster, sideKey)} · {t("本场同型损失 {n} 条", { n: kills.length })}
-        {kills.length > 0 ? ` · ${t("合计 {isk}", { isk: isk(value) })}` : ""}
-        {reward > 0 ? ` · ${t("悬赏实付 {isk}", { isk: isk(reward) })}` : ""}
-        {fleetLost > 0 ? ` · ${t("{n} 条整队覆没", { n: fleetLost })}` : ""}
-      </div>
-      {typeID === null ? (
-        <div className="mt-1 text-[10px] text-tertiary">
-          {t("这 {n} 条损失的悬赏没有结算，舰型与价值都取不到；它们仍然计入战损。", {
-            n: kills.length,
-          })}
-        </div>
-      ) : null}
-      <div className="mt-1.5 max-h-[180px] overflow-y-auto pr-1">
-        <table className="w-full text-left text-[11px]">
-          <thead className="text-[10px] uppercase text-tertiary">
-            <tr>
-              <th className="pb-1 pr-2 font-normal">{t("时间")}</th>
-              <th className="pb-1 pr-2 font-normal">{t("被击毁")}</th>
-              <th className="pb-1 pr-2 font-normal">{t("击杀者")}</th>
-              <th className="pb-1 pr-2 font-normal">{t("舰型")}</th>
-              <th className="pb-1 text-right font-normal">{t("价值")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {kills.map((kill) => (
-              <tr key={kill.id} className="border-t border-border/40">
-                <td className="py-0.5 pr-2 tabular text-tertiary">{formatSimClock(kill.at)}</td>
-                <td className="py-0.5 pr-2">
-                  <FactionTag
-                    name={nameOf(roster, kill.victimKey)}
-                    color={colorByKey.get(kill.victimKey)}
-                  />
-                  {kill.victimFleetID !== null ? (
-                    <span className="ml-1 tabular text-[10px] text-tertiary">#{kill.victimFleetID}</span>
-                  ) : null}
-                  {kill.fleetLost ? (
-                    <span className="ml-1 rounded-sm border border-destructive/50 px-1 text-[10px] text-destructive">
-                      {t("整队覆没")}
-                    </span>
-                  ) : null}
-                </td>
-                <td className="py-0.5 pr-2">
-                  {kill.killerKey ? (
-                    <>
-                      <FactionTag
-                        name={nameOf(roster, kill.killerKey)}
-                        color={colorByKey.get(kill.killerKey)}
-                      />
-                      {kill.killerFleetID !== null ? (
-                        <span className="ml-1 tabular text-[10px] text-tertiary">
-                          #{kill.killerFleetID}
-                        </span>
-                      ) : null}
-                    </>
-                  ) : (
-                    <span className="text-tertiary">—</span>
-                  )}
-                </td>
-                <td className="py-0.5 pr-2 text-muted-foreground">
-                  {kill.shipTypeID === null ? (
-                    <span className="text-tertiary">{t("未知舰型")}</span>
-                  ) : (
-                    shipTypeName(kill.shipTypeID)
-                  )}
-                </td>
-                {/* 0 是「没有价值记录」，不是「不值钱」：写「无记录」，不写 0 */}
-                <td className="py-0.5 text-right tabular text-muted-foreground">
-                  {kill.value > 0 ? (
-                    isk(kill.value)
-                  ) : (
-                    <span className="text-tertiary">{t("无价值记录")}</span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <div className="mt-1 flex items-start gap-1.5 text-[10px] text-tertiary">
-        <Crosshair className="mt-0.5 size-3 shrink-0" />
-        {t("模组只记「谁打掉了谁」：没有伤害分摊、没有最后一击武器、也没有逐舰装配。")}
-      </div>
     </div>
   )
 }

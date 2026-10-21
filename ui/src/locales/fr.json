@@ -3638,5 +3638,14 @@
   "装备": "Équipement",
   "皮肤": "Skins",
   "动画": "Animations",
-  "声音": "Son"
+  "声音": "Son",
+  "面板还没有交战结算记录": "Le panneau n'a encore aucun règlement de bataille",
+  "这一场没有记录到参战方": "Aucune faction participante n'a été enregistrée pour cette bataille",
+  "这一场只有结算，没有逐舰明细 —— 事件流只回补最近一段，明细落在窗口之外。": "Cette bataille n'a qu'un règlement, sans détail par vaisseau — le flux d'événements ne rejoue que la période récente, le détail est hors fenêtre.",
+  "共 {n} 场交战，其中 {m} 场有逐舰明细（事件流只回补最近一段，其余只有结算）。": "{n} batailles au total, dont {m} avec détail par vaisseau (le flux d'événements ne rejoue que la période récente ; les autres n'ont qu'un règlement).",
+  "只有结算": "règlement seul",
+  "本阵营参战舰船": "Vaisseaux engagés de ce camp",
+  "这一方的参战舰船还没有记录": "Aucun vaisseau engagé enregistré pour ce camp",
+  "有 {n} 支舰队查不到舰型构成（舰队已解散或面板没有它的记录），上面的数量少算了它们。": "{n} flottes n'ont pas de composition par type (dissoutes, ou absentes du panneau) ; les comptes ci-dessus les omettent.",
+  "参战舰船来自舰队当前构成：战斗结束后舰队可能已补员或改编，属近似记录。": "Les vaisseaux engagés proviennent de la composition actuelle des flottes — après un combat, une flotte peut avoir été réapprovisionnée ou réorganisée : il s'agit d'une approximation."
 }

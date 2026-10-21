@@ -73,6 +73,8 @@ import {
   marketCounts as countMarket,
   mineCounts as countMine,
   sortMods,
+  featuredMods,
+  FEATURED_SLOTS,
   targetVersionOf,
   type MarketFilter,
   type MineFilter,
@@ -299,9 +301,11 @@ export function ModulesPage({
       .slice(0, 10)
   }, [marketPool])
 
-  const featuredMods = useMemo(() => sortMods(marketPool, "stars"), [marketPool])
-  const featuredMod = featuredMods[0] ?? null
-  const secondaryFeatured = featuredMods.slice(1, 3)
+  // 精选位：按「下载量 + 星星数」的综合分取前 3，确定性排序（不随机）。
+  // 综合分与排序规则都在 mod-logic.featuredMods 里，这里只管取用。
+  const featuredPicked = useMemo(() => featuredMods(marketPool, FEATURED_SLOTS), [marketPool])
+  const featuredMod = featuredPicked[0] ?? null
+  const secondaryFeatured = featuredPicked.slice(1)
 
   const mineCounts = useMemo(
     () => countMine(mods.filter((mod) => mod.mine)),

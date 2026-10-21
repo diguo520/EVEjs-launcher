@@ -1,0 +1,57 @@
+{
+  "version": "0.5.3",
+  "changelog": {
+    "zh": [
+      {
+        "type": "new",
+        "text": "「交战详情」新增「双方各有什么船」：每一侧都会列出该方参战的舰船（按舰型）。会战与普通交战两套数据来源已统一；参战舰船取自舰队当前构成，属近似记录，界面里已注明。"
+      },
+      {
+        "type": "new",
+        "text": "模组市场的精选位改用作者仓库里提供的横幅图（shots/Banner/ 下的横版图）；没有这张图或加载失败时自动退回本地横幅，不会留一块破图。次精选卡片同样吃作者横幅。"
+      },
+      {
+        "type": "opt",
+        "text": "精选位的取法写明确了：按「下载量 + 星标人数」的综合分取前三个；并列时下载量多的优先，完全并列则按 id 字典序（顺序稳定）；候选不足三个就少给几个，不拿占位符凑数。"
+      },
+      {
+        "type": "opt",
+        "text": "发布或提交模组时，作者仓库 shots/ 下的截图与 Banner/ 横幅会一并写进市场索引；之后再更新这个模组时，会保留上一次的截图与横幅，只补不丢。"
+      },
+      {
+        "type": "opt",
+        "text": "交战详情补充了数据来源说明：只有结算、没有逐舰明细，或者有舰队查不到舰型构成时，界面会明说少算了哪部分，避免把不全当成全量。"
+      },
+      {
+        "type": "fix",
+        "text": "模组卡片与精选位的背景图加载失败时不再显示破图。"
+      }
+    ],
+    "en": [
+      {
+        "type": "new",
+        "text": "The killmail page gained \"ships on each side\": every side now lists the ships it committed, by hull type. The two data sources (theatre battles and ordinary encounters) are unified; the list is derived from each fleet's current composition, so it is an approximation and the UI says so."
+      },
+      {
+        "type": "new",
+        "text": "The mod market hero now uses the banner the author published in their repository (a wide image under shots/Banner/); when it is missing or fails to load it falls back to the local banner instead of showing a broken image. Secondary featured cards use it too."
+      },
+      {
+        "type": "opt",
+        "text": "The featured slot is now explicit: the top three by a combined score of downloads plus star count, with downloads breaking ties, exact ties falling back to id order for stability, and fewer than three candidates meaning fewer slots rather than placeholders."
+      },
+      {
+        "type": "opt",
+        "text": "Publishing or submitting a mod now writes the author's shots/ screenshots and Banner/ image into the market index; updating that mod later keeps the previous entries instead of dropping them."
+      },
+      {
+        "type": "opt",
+        "text": "The killmail page now states its data limits: when only the settlement is available without per-ship detail, or a fleet's composition cannot be found, the UI says which part is missing."
+      },
+      {
+        "type": "fix",
+        "text": "Broken background images no longer appear on mod cards or the market hero."
+      }
+    ]
+  }
+}

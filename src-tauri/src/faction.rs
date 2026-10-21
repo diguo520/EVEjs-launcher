@@ -33,6 +33,12 @@ use crate::sidecar;
 /// 面板默认端口，与模组侧 `EVEJS_FACTIONSIM_PANEL_PORT` 的默认值同源。
 pub const DEFAULT_PANEL_PORT: u16 = 26410;
 
+/// 势力推演模组的清单 id（与渲染层 `nav-config.ts` 的 `FACTION_MOD_ID` 同值）。
+///
+/// 探针要把「没装」与「装了但面板没给用」分开，只能回到盘上看清单里的 `id` ——
+/// 目录名是作者可以随便改的。
+pub const FACTION_MOD_ID: &str = "evejs-faction-sim";
+
 const CLI: &str = "faction-cli.js";
 /// 玩家主权（游戏侧）的只读侧车：见 `sovereignty` 通道的说明
 const SOVEREIGNTY_CLI: &str = "sovereignty-cli.js";
@@ -179,21 +185,32 @@ fn encode(raw: &str) -> String {
 ///
 /// 面板对 4xx/5xx 回的是 `{error: "..."}`（写操作是 `{ok:false, error}`），
 /// 这里把它翻成 `Err`，让上层统一按「失败 + 原因」回给界面。
+///
+/// 失败里带上状态码（见 [`PanelFailure`]）：探针要分得清「端口没人监听」与
+/// 「端口在监听但请求被 401/403 拒掉」，而原来状态码在这一层就被丢掉了。
 fn http_json_blocking(
     method: &str,
     url: &str,
     token: &str,
     body: Option<&Value>,
-) -> Result<Value, String> {
-    let authorization = format!("Bearer {token}");
-    let headers = vec![
-        ("Authorization", authorization.as_str()),
-        ("Accept", "application/json"),
-    ];
+) -> Result<Value, PanelFailure> {
+    // 没有令牌就**不发** `Authorization` 头：空令牌发成 `Bearer ` 会让面板把
+    // 「探针没带凭据」记成「带了坏凭据」，两种情形在它那边的日志不一样。
+    let authorization = if token.is_empty() {
+        None
+    } else {
+        Some(format!("Bearer {token}"))
+    };
+    let mut headers: Vec<(&str, &str)> = Vec::new();
+    if let Some(value) = authorization.as_deref() {
+        headers.push(("Authorization", value));
+    }
+    headers.push(("Accept", "application/json"));
     let payload = match body {
-        Some(value) => {
-            Some(serde_json::to_vec(value).map_err(|err| format!("请求体序列化失败：{err}"))?)
-        }
+        Some(value) => Some(
+            serde_json::to_vec(value)
+                .map_err(|err| PanelFailure::unreachable(format!("请求体序列化失败：{err}")))?,
+        ),
         None => None,
     };
     let body_ref = payload
@@ -204,7 +221,8 @@ fn http_json_blocking(
     } else {
         POST_TIMEOUT
     };
-    let response = net::send(method, url, &headers, body_ref, timeout)?;
+    let response =
+        net::send(method, url, &headers, body_ref, timeout).map_err(PanelFailure::unreachable)?;
     let status = response.status;
     let parsed = response.json().unwrap_or(Value::Null);
     if status >= 400 {
@@ -213,7 +231,7 @@ fn http_json_blocking(
             .and_then(Value::as_str)
             .map(str::to_string)
             .unwrap_or_else(|| format!("面板返回 HTTP {status}"));
-        return Err(reason);
+        return Err(PanelFailure::http(status, reason));
     }
     Ok(parsed)
 }
@@ -223,43 +241,162 @@ async fn http_json(
     url: String,
     token: String,
     body: Option<Value>,
-) -> Result<Value, String> {
+) -> Result<Value, PanelFailure> {
     tauri::async_runtime::spawn_blocking(move || {
         http_json_blocking(method, &url, &token, body.as_ref())
     })
     .await
-    .map_err(|err| format!("代理请求失败：{err}"))?
+    .map_err(|err| PanelFailure::unreachable(format!("代理请求失败：{err}")))?
 }
 
 /// `faction:status`：面板在不在、连不连得上，以及顶栏要的那几个读数。
 ///
-/// 三种情况分得清清楚楚（界面据此给出不同的空态，而不是笼统一句「失败」）：
-///   - `ok=false`：连令牌都读不到 —— 模组没装 / 没跑过；
-///   - `ok=true, available=false`：拿到令牌但面板连不上 —— 服务端没起或面板挂了；
-///   - `ok=true, available=true`：一切正常，`status` 是 `/api/status` 的原样回包。
+/// 四种情况分得清清楚楚（界面据此给出不同的空态，而不是笼统一句「失败」）：
+///   - `state="missing"`：连令牌都读不到、盘上也没有这个模组 —— 没装 / 没跑过；
+///   - `state="unauthorized"`：**装了但面板没给用** —— 端口在监听却把请求全拒掉
+///     （401/403），或者模组装在 `mods/` 里却连端口都没开（模组侧对「未授权」的推荐
+///     做法就是不 listen）。两种形态都指向「没拿到官方启动器的许可」；
+///   - `state="down"`：读得到令牌（模组装过、跑过）但面板连不上 —— 服务端没起；
+///   - `state="ready"`：一切正常，`status` 是 `/api/status` 的原样回包。
+///
+/// 为什么要「没有令牌也照探一次」：`unauthorized` 那种情形下 sqlite 里往往根本还没有
+/// `panelToken`（模组没走到生成令牌那一步），只按「读不到令牌」判就会把它错报成
+/// 「没装模组」—— 这一条差别就是用户能不能自己看懂发生了什么。
+///
+/// 兼容口径：`ok` / `available` 的含义**不变**（`ok` = 读得到令牌），老界面照旧工作；
+/// 新增的 `state` / `panelReachable` / `httpStatus` 只是把判断依据透给渲染层。
 pub async fn status(repo_root: &Path) -> Value {
     let port = panel_port();
     let url = panel_base(port);
-    let (token, database) = match token_of(repo_root).await {
-        Ok(found) => found,
-        Err(reason) => {
-            return json!({
-                "ok": false, "available": false, "url": url, "port": port, "reason": reason
-            })
-        }
+    let (token, database, token_reason) = match token_of(repo_root).await {
+        Ok((token, database)) => (token, database, String::new()),
+        Err(reason) => (String::new(), String::new(), reason),
     };
+    let has_token = !token.is_empty();
+    // 装没装看盘上的清单，不看目录名（作者可以改目录名）
+    let installed = mod_installed(repo_root);
     match http_json("GET", format!("{url}/api/status"), token, None).await {
         Ok(value) => json!({
             "ok": true,
             "available": true,
+            "state": "ready",
+            "panelReachable": true,
             "url": url,
             "port": port,
             "database": database,
             "status": value
         }),
-        Err(reason) => json!({
-            "ok": true, "available": false, "url": url, "port": port, "reason": reason
-        }),
+        Err(failure) => {
+            let state = probe_state(&failure, has_token, installed);
+            json!({
+                "ok": has_token,
+                "available": false,
+                "state": state,
+                "panelReachable": failure.reachable(),
+                "httpStatus": failure.status,
+                "url": url,
+                "port": port,
+                "database": database,
+                "reason": probe_reason(&failure, state, &token_reason)
+            })
+        }
+    }
+}
+
+/// 一次面板请求的失败：带上「有没有拿到 HTTP 响应」与状态码。
+///
+/// 探针靠它把「端口没人监听」与「端口在监听但请求被拒」分开（见 [`status`] 的 `state`）；
+/// 其余通道（`faction:api` / `faction:action`）只取 `reason`，行为与以前一致。
+struct PanelFailure {
+    /// 拿到了 HTTP 响应时的状态码；`None` = 传输层就没成（端口没监听 / 超时）
+    status: Option<u16>,
+    reason: String,
+}
+
+impl PanelFailure {
+    /// 传输层失败：端口没监听、连不上、超时
+    fn unreachable(reason: impl Into<String>) -> Self {
+        Self {
+            status: None,
+            reason: reason.into(),
+        }
+    }
+
+    /// 拿到了 HTTP 响应，但状态码 ≥ 400：把状态码一起记下来
+    fn http(status: u16, reason: impl Into<String>) -> Self {
+        Self {
+            status: Some(status),
+            reason: reason.into(),
+        }
+    }
+
+    /// 面板给过任何 HTTP 响应（哪怕是 4xx / 5xx）—— 端口有人在监听
+    fn reachable(&self) -> bool {
+        self.status.is_some()
+    }
+
+    /// 401 / 403：请求本身没被授权（不是「没有这个接口」，也不是「服务挂了」）
+    fn unauthorized(&self) -> bool {
+        matches!(self.status, Some(401 | 403))
+    }
+}
+
+/// 盘上有没有装 [`FACTION_MOD_ID`] 这个模组（按清单里的 `id` 认，不看目录名）。
+fn mod_installed(repo_root: &Path) -> bool {
+    let Ok(entries) = std::fs::read_dir(crate::mods::mods_root(repo_root)) else {
+        return false;
+    };
+    for entry in entries.flatten() {
+        let dir = entry.path();
+        if !dir.is_dir() {
+            continue;
+        }
+        let manifest = dir.join(crate::mods::scan::MANIFEST_NAME);
+        let Ok(fields) = crate::mods::scan::read_manifest(&manifest) else {
+            continue;
+        };
+        if fields.get("id").and_then(Value::as_str) == Some(FACTION_MOD_ID) {
+            return true;
+        }
+    }
+    false
+}
+
+/// 探针的状态判定（纯函数，取值与含义见 [`status`] 的说明）。
+fn probe_state(failure: &PanelFailure, has_token: bool, installed: bool) -> &'static str {
+    if failure.unauthorized() {
+        return "unauthorized";
+    }
+    if failure.reachable() {
+        // 面板答了，但答的是别的错（500 / 404…）：不是授权问题，就是它不正常
+        return "down";
+    }
+    if has_token {
+        // 模组装过、跑过（令牌在），面板却连不上 —— 服务端没起
+        return "down";
+    }
+    if installed {
+        // 盘上装着模组，面板却没监听：模组侧「未授权就不 listen」就是这个形态
+        return "unauthorized";
+    }
+    "missing"
+}
+
+/// 探针失败时的原因文案：让用户知道下一步该做什么。
+fn probe_reason(failure: &PanelFailure, state: &str, token_reason: &str) -> String {
+    match state {
+        "unauthorized" if failure.reachable() => format!(
+            "面板在监听，但拒绝了这次请求（{}）：该模组当前未获官方启动器许可。",
+            failure.reason
+        ),
+        "unauthorized" => {
+            "这个模组装在 mods 目录里，但面板没有启动：模组未获官方启动器许可时不会监听端口。"
+                .to_string()
+        }
+        "down" => failure.reason.clone(),
+        // missing：沿用原来那句「读不到令牌」的原因
+        _ if !token_reason.is_empty() => token_reason.to_string(),
+        _ => failure.reason.clone(),
     }
 }
 
@@ -281,7 +418,7 @@ pub async fn api(repo_root: &Path, path: &str, query: Option<&Value>) -> Value {
     );
     match http_json("GET", url, token, None).await {
         Ok(value) => value,
-        Err(reason) => json!({ "ok": false, "reason": reason }),
+        Err(failure) => json!({ "ok": false, "reason": failure.reason }),
     }
 }
 
@@ -309,7 +446,7 @@ pub async fn action(repo_root: &Path, action: &str, params: Option<&Value>) -> V
     let url = format!("{}/api/action", panel_base(panel_port()));
     match http_json("POST", url, token, Some(body)).await {
         Ok(value) => value,
-        Err(reason) => json!({ "ok": false, "reason": reason, "action": action }),
+        Err(failure) => json!({ "ok": false, "reason": failure.reason, "action": action }),
     }
 }
 
@@ -605,5 +742,89 @@ mod tests {
         std::env::set_var("EVEJS_FACTIONSIM_PANEL_PORT", "26500");
         assert_eq!(panel_port(), 26500);
         std::env::remove_var("EVEJS_FACTIONSIM_PANEL_PORT");
+    }
+
+    /// 探针三态：没装 / 装了但面板没给用 / 面板没起，三者必须分得开
+    #[test]
+    fn probe_state_separates_missing_unauthorized_and_down() {
+        // 端口没人监听：没有 HTTP 响应
+        let refused = PanelFailure::unreachable("connection refused");
+        assert!(!refused.reachable() && !refused.unauthorized());
+        // 没令牌 + 盘上没装 = 没装模组
+        assert_eq!(probe_state(&refused, false, false), "missing");
+        // 盘上装着、面板却没监听 = 未授权（模组侧「未授权就不 listen」）
+        assert_eq!(probe_state(&refused, false, true), "unauthorized");
+        // 读得到令牌（装过、跑过）却连不上 = 服务端没起
+        assert_eq!(probe_state(&refused, true, true), "down");
+        // 用户手删了模组目录但令牌还在：仍按「装过」处理，不谎报没装
+        assert_eq!(probe_state(&refused, true, false), "down");
+    }
+
+    /// 端口在监听但请求被拒：与「读不读得到令牌」无关，一律是未授权
+    #[test]
+    fn probe_state_treats_401_403_as_unauthorized() {
+        let denied = PanelFailure::http(401, "面板返回 HTTP 401");
+        assert!(denied.reachable() && denied.unauthorized());
+        assert_eq!(probe_state(&denied, false, true), "unauthorized");
+        assert_eq!(probe_state(&denied, true, true), "unauthorized");
+        assert!(PanelFailure::http(403, "面板返回 HTTP 403").unauthorized());
+        // 401 / 403 以外的状态码不算「未授权」：404 是接口没了，500 是服务挂了
+        let broken = PanelFailure::http(500, "面板返回 HTTP 500");
+        assert!(broken.reachable() && !broken.unauthorized());
+        assert_eq!(probe_state(&broken, true, true), "down");
+    }
+
+    /// 原因文案：未授权那条必须指向「许可」，不能只说「连不上」
+    #[test]
+    fn probe_reason_points_at_authorization() {
+        let denied = PanelFailure::http(401, "面板返回 HTTP 401");
+        assert!(probe_reason(&denied, "unauthorized", "").contains("许可"));
+        let refused = PanelFailure::unreachable("connection refused");
+        assert!(probe_reason(&refused, "unauthorized", "").contains("许可"));
+        // down / missing 沿用原来的原因（老界面靠它显示失败详情）
+        assert_eq!(probe_reason(&refused, "down", ""), "connection refused");
+        assert_eq!(
+            probe_reason(&refused, "missing", "读不到令牌"),
+            "读不到令牌"
+        );
+    }
+
+    /// 装没装看清单里的 `id`，不看目录名
+    #[test]
+    fn mod_installed_matches_manifest_id_not_folder_name() {
+        let root = std::env::temp_dir().join(format!("evejs-faction-probe-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let dir = root.join("mods").join("renamed-folder");
+        std::fs::create_dir_all(&dir).unwrap();
+        // 没有 mods/ 目录、目录里没有清单，都算没装
+        assert!(!mod_installed(&root.join("nowhere")));
+        assert!(!mod_installed(&root));
+        // 别的模组不算
+        std::fs::write(
+            dir.join(crate::mods::scan::MANIFEST_NAME),
+            json!({
+                "schemaVersion": 3,
+                "id": "other-mod",
+                "displayName": "x",
+                "version": "1.0.0"
+            })
+            .to_string(),
+        )
+        .unwrap();
+        assert!(!mod_installed(&root));
+        // 目录名随便改，只要清单 id 是它就算装上了
+        std::fs::write(
+            dir.join(crate::mods::scan::MANIFEST_NAME),
+            json!({
+                "schemaVersion": 3,
+                "id": FACTION_MOD_ID,
+                "displayName": "x",
+                "version": "1.0.0"
+            })
+            .to_string(),
+        )
+        .unwrap();
+        assert!(mod_installed(&root));
+        let _ = std::fs::remove_dir_all(&root);
     }
 }

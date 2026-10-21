@@ -1,3 +1,5 @@
+import { useState } from "react"
+
 import {
   ArrowRight,
   Bookmark,
@@ -222,14 +224,26 @@ export function MarketSpotlight({
   onDetail: (id: string) => void
   onToggleFavorite: (mod: ModEntry) => void
 }) {
+  // 作者仓库里有 shots/Banner/ 就用它当背景，没有/加载失败退回本地横幅。
+  // 用 state 而不是直接用 mod.banner：作者换图或删图时 URL 会 404，不能留一块破图。
+  const [failed, setFailed] = useState<Record<string, true>>({})
+  const setFeaturedBannerFailed = (bad: boolean) => {
+    if (bad && featured?.banner) setFailed((prev) => ({ ...prev, [featured.banner as string]: true }))
+  }
+  const featuredBanner =
+    featured?.banner && !failed[featured.banner] ? featured.banner : marketBanner
+  const bannerOf = (mod: ModEntry) => (mod.banner && !failed[mod.banner] ? mod.banner : null)
+
   return (
     <div className="grid items-stretch gap-3 xl:grid-cols-[minmax(0,1.7fr)_minmax(260px,0.85fr)]">
       <section className="relative h-[204px] overflow-hidden rounded-lg border border-primary/30 bg-card">
-        {/* 横幅是本地资源：左侧压暗留给文案，右侧保留行星弧线、矿船与牵引光束 */}
+        {/* 横幅优先用作者仓库 shots/Banner/ 的横版图；没有或加载失败才退回本地资源。
+            本地图右侧有行星弧线、矿船与牵引光束，作者图则靠 scrim 压暗保证文案可读。 */}
         <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
           <img
-            src={marketBanner}
+            src={featuredBanner}
             alt=""
+            onError={() => setFeaturedBannerFailed(true)}
             className="market-banner-art absolute inset-0 h-full w-full object-cover"
           />
           <div className="market-banner-scrim absolute inset-0" />
@@ -289,12 +303,35 @@ export function MarketSpotlight({
               key={mod.id}
               type="button"
               onClick={() => onDetail(mod.id)}
-              className="group flex h-[96px] min-h-0 items-start gap-3 overflow-hidden rounded-lg border border-border bg-card p-2.5 text-left transition-colors hover:border-primary/45 hover:bg-secondary/40 xl:h-full"
+              className="group relative flex h-[96px] min-h-0 items-start gap-3 overflow-hidden rounded-lg border border-border bg-card p-2.5 text-left transition-colors hover:border-primary/45 xl:h-full"
             >
-              <span className="grid size-8 shrink-0 place-items-center rounded-md border border-primary/25 bg-primary/10 text-primary">
+              {/* 次精选位同样吃作者 Banner；没有就保持纯卡片，不留空图。
+                  图与压暗层都锁在 z-0 的独立层里，正文一律 z-10 —— 文字和图标必须保持实色，
+                  不能跟着背景一起变淡（用户 2026-10-21 明确要求）。 */}
+              {bannerOf(mod) ? (
+                <span
+                  className="pointer-events-none absolute inset-0 z-0 overflow-hidden"
+                  aria-hidden="true"
+                >
+                  <img
+                    src={bannerOf(mod) as string}
+                    alt=""
+                    onError={() => {
+                      const url = mod.banner
+                      if (url) setFailed((prev) => ({ ...prev, [url]: true }))
+                    }}
+                    className="absolute inset-0 h-full w-full object-cover"
+                  />
+                  {/* 压暗只作用于背景图：足够的对比度让白字可读，但不把正文一起调暗 */}
+                  <span className="absolute inset-0 bg-gradient-to-r from-card via-card/80 to-card/35" />
+                </span>
+              ) : null}
+              {/* z-10：Banner 与它的压暗层都在 z-0，文字与图标必须抬到上面，
+                  否则整块内容会跟着遮罩一起变淡（2026-10-21 实测） */}
+              <span className="relative z-10 grid size-8 shrink-0 place-items-center rounded-md border border-primary/40 bg-card text-primary">
                 {mod.installed ? <Layers3 className="size-4" /> : <Package className="size-4" />}
               </span>
-              <span className="min-w-0 flex-1">
+              <span className="relative z-10 min-w-0 flex-1">
                 <span className="flex items-center gap-2">
                   <span className="truncate text-[13px] font-semibold text-foreground">
                     {mod.name}

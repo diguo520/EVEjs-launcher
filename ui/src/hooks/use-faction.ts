@@ -117,7 +117,9 @@ export function useFaction(options: FactionStreamOptions = {}): FactionControlle
       if (!alive) return
       const payload = args[0]
       if (!payload || typeof payload !== "object") return
-      setEvents((previous) => mergeEvents(previous, [payload as FactionEvent]))
+      // 保留窗口跟订阅的 backlog 对齐：默认的 200 会把 KM 页要的 500 条悄悄砍掉一半多，
+      // 表现是"近期交战"里大部分场次只有结算、没有逐舰明细（2026-10-21 报障）。
+      setEvents((previous) => mergeEvents(previous, [payload as FactionEvent], options.backlog))
     })
     const offState = subscribe("onFactionStreamState", (...args) => {
       if (!alive) return

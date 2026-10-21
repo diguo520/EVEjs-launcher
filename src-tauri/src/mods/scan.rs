@@ -327,6 +327,13 @@ pub struct ModRecord {
     /// 清单里 `compatibility.evejsVersions`：作者声明支持的服务端版本。
     /// 兼容性判定放在渲染层（要跟卡片同屏显示当前版本），这里只负责原样带出去。
     pub evejs_versions: Vec<String>,
+    /// 清单里 `binding.launcher`：这份模组声明「只归哪个启动器用」。
+    ///
+    /// 缺失 = 没声明（老模组一律原样放行）。它是**可选新增键**，清单校验是逐字段的，
+    /// 多了这个键**绝不能报 error**。见 docs/faction-sim启动器侧改动单-2026-10-21.md §4.3。
+    pub binding_launcher: String,
+    /// 清单里 `binding.launcherKeyId`：只是提示当前签发公钥，**不参与任何判定**。
+    pub binding_key_id: String,
 }
 
 impl ModRecord {
@@ -361,6 +368,8 @@ impl ModRecord {
             "signatureError": self.signature_error,
             "signatureKeyId": self.signature_key_id,
             "signatureTrusted": self.signature_trusted,
+            "bindingLauncher": self.binding_launcher,
+            "bindingKeyId": self.binding_key_id,
             "authorId": self.author_id,
             "authorName": self.author_name,
             "category": self.category,
@@ -397,6 +406,8 @@ fn empty_record(folder: &str, dir: &Path, manifest_path: &Path, error: &str) -> 
         conflicts: Vec::new(),
         missing_requires: Vec::new(),
         active_conflicts: Vec::new(),
+        binding_launcher: String::new(),
+        binding_key_id: String::new(),
         valid: false,
         error: error.to_string(),
         size_bytes: 0,
@@ -607,6 +618,22 @@ fn read_mod_dir_with(
     record.load_after = deps.get("loadAfter").cloned().unwrap_or_default();
     record.load_before = deps.get("loadBefore").cloned().unwrap_or_default();
     record.conflicts = deps.get("conflicts").cloned().unwrap_or_default();
+    // 可选新增键 `binding`：缺失一律当「没声明」。**不得因为它存在就报错** ——
+    // 清单校验是逐字段的，不拒绝未知键（这是老启动器能安全忽略它的前提）。
+    if let Some(binding) = manifest.get("binding").and_then(Value::as_object) {
+        record.binding_launcher = binding
+            .get("launcher")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .trim()
+            .to_string();
+        record.binding_key_id = binding
+            .get("launcherKeyId")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .trim()
+            .to_string();
+    }
 
     let self_id = record.id.to_lowercase();
     for field in DEPENDENCY_FIELDS {

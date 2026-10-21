@@ -3638,5 +3638,14 @@
   "装备": "Ausrüstung",
   "皮肤": "Skins",
   "动画": "Animationen",
-  "声音": "Sound"
+  "声音": "Sound",
+  "面板还没有交战结算记录": "Das Panel hat noch keine Kampfabrechnungen",
+  "这一场没有记录到参战方": "Für diesen Kampf wurden keine beteiligten Fraktionen erfasst",
+  "这一场只有结算，没有逐舰明细 —— 事件流只回补最近一段，明细落在窗口之外。": "Dieser Kampf hat nur eine Abrechnung, keine Einzelheiten je Schiff — der Ereignisstrom füllt nur den jüngsten Abschnitt nach, die Einzelheiten liegen außerhalb des Fensters.",
+  "共 {n} 场交战，其中 {m} 场有逐舰明细（事件流只回补最近一段，其余只有结算）。": "Insgesamt {n} Kämpfe, davon {m} mit Einzelheiten je Schiff (der Ereignisstrom füllt nur den jüngsten Abschnitt nach; die übrigen haben nur Abrechnungen).",
+  "只有结算": "nur Abrechnung",
+  "本阵营参战舰船": "Eingesetzte Schiffe dieser Seite",
+  "这一方的参战舰船还没有记录": "Für diese Seite sind noch keine eingesetzten Schiffe erfasst",
+  "有 {n} 支舰队查不到舰型构成（舰队已解散或面板没有它的记录），上面的数量少算了它们。": "Für {n} Flotten ließ sich die Schiffstyp-Zusammensetzung nicht ermitteln (aufgelöst oder im Panel nicht erfasst); die Zahlen oben zählen sie nicht mit.",
+  "参战舰船来自舰队当前构成：战斗结束后舰队可能已补员或改编，属近似记录。": "Die eingesetzten Schiffe stammen aus der aktuellen Zusammensetzung der Flotten — nach einem Kampf kann eine Flotte aufgefüllt oder umstrukturiert worden sein; das ist eine Näherung."
 }

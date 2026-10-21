@@ -569,6 +569,28 @@ async fn start_main_server(app: &AppHandle) -> Result<Value, String> {
                 .to_string(),
         ));
     }
+    // 启动器许可（grant）：向模组证明「本进程是由官方启动器拉起的」。
+    //
+    // 三条约束，细节见 `crate::launcher_grant` 的模块注释：
+    //   - **只读本地缓存、不联网**：它就在起服务端的路径上，绝不能把游戏启动卡在许可上；
+    //   - **拿不到就什么都不发**：让模组按自己的姿态降级，而不是让启动器去猜或去拦；
+    //   - **降级阀门的值必须是签名令牌**：裸字符串等于给竞品开门（实测可复现）。
+    env_vars.push((
+        "EVEJS_LAUNCHER_ID".to_string(),
+        crate::launcher_grant::LAUNCHER_ID.to_string(),
+    ));
+    if let Some(grant) = crate::launcher_grant::grant_env(&state.runtime) {
+        env_vars.push(("EVEJS_LAUNCHER_GRANT".to_string(), grant));
+    }
+    if let Some(token) = crate::launcher_grant::observe_token(&state.runtime) {
+        env_vars.push(("EVEJS_FACTIONSIM_GUARD_MODE".to_string(), token));
+    }
+    if crate::launcher_grant::hard_machine_binding() {
+        env_vars.push((
+            "EVEJS_FACTIONSIM_GUARD_HARD_MACHINE".to_string(),
+            "1".to_string(),
+        ));
+    }
 
     set_state(
         app,

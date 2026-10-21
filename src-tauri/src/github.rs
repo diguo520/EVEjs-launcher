@@ -1002,22 +1002,40 @@ fn preserve_listing_shots(token: &str, owner: &str, repo_name: &str, next_json: 
 /// 返回 `None` 表示"不用改，照新清单原样写"。
 fn merge_listing_shots(next_json: &str, previous_json: Option<&str>) -> Option<String> {
     let next = serde_json::from_str::<Value>(next_json).ok()?;
-    // 新清单自己带了 shots → 以它为准（作者删掉本地图 = 想撤下截图，这时就该删）
-    if next.get("shots").is_some() {
-        return None;
-    }
     let previous = serde_json::from_str::<Value>(previous_json?).ok()?;
-    let shots = previous.get("shots")?.clone();
-    // 旧的那份也是空数组就没什么可保的
-    if !shots
-        .as_array()
-        .map(|list| !list.is_empty())
-        .unwrap_or(false)
-    {
+    // shots 与 banner 是两条独立的媒体字段（前者详情灯箱的面板截图，后者精选位背景）。
+    // 规则一致：新清单自己带了就以它为准，没带就把旧的那份留下来。
+    // 旧清单的 shots 只有非空数组才值得保（空数组等于"作者没图"，不必留空壳）
+    let shots = previous.get("shots").filter(|value| {
+        value
+            .as_array()
+            .map(|list| !list.is_empty())
+            .unwrap_or(false)
+    });
+    let mut merged = next;
+    let mut changed = false;
+    if merged.get("shots").is_none() {
+        if let (Some(shots), Some(object)) = (shots, merged.as_object_mut()) {
+            object.insert("shots".into(), shots.clone());
+            changed = true;
+        }
+    }
+    // 横幅（shots/Banner/ 里那张横图）：旧清单有、新清单没带，就保住它
+    let banner = previous.get("banner").filter(|value| {
+        value
+            .as_str()
+            .map(|text| !text.trim().is_empty())
+            .unwrap_or(false)
+    });
+    if merged.get("banner").is_none() {
+        if let (Some(banner), Some(object)) = (banner, merged.as_object_mut()) {
+            object.insert("banner".into(), banner.clone());
+            changed = true;
+        }
+    }
+    if !changed {
         return None;
     }
-    let mut merged = next;
-    merged.as_object_mut()?.insert("shots".into(), shots);
     serde_json::to_string_pretty(&merged)
         .ok()
         .map(|text| text + "\n")
@@ -1448,6 +1466,36 @@ mod tests {
 
         let next2 = "{\"id\":\"demo\",\"shots\":[\"shots/99.webp\"]}";
         assert!(merge_listing_shots(next2, Some(previous)).is_none());
+    }
+
+    #[test]
+    fn merge_listing_shots_keeps_previous_banner() {
+        // 新清单没带 banner，旧的有 → 保住（作者换台机器发版不该把精选背景抹掉）
+        let next = "{\"id\":\"demo\",\"version\":\"1.0.1\"}";
+        let previous = "{\"id\":\"demo\",\"banner\":\"shots/Banner/banner.jpg\"}";
+        let merged = merge_listing_shots(next, Some(previous)).expect("应该合并");
+        let value: Value = serde_json::from_str(&merged).unwrap();
+        assert_eq!(value["banner"], json!("shots/Banner/banner.jpg"));
+    }
+
+    #[test]
+    fn merge_listing_shots_defers_to_next_banner() {
+        // 新清单自己带了 banner → 以它为准（作者换图/撤图）
+        let next = "{\"id\":\"demo\",\"banner\":\"shots/Banner/new.png\"}";
+        let previous = "{\"id\":\"demo\",\"banner\":\"shots/Banner/old.jpg\"}";
+        assert!(merge_listing_shots(next, Some(previous)).is_none());
+    }
+
+    #[test]
+    fn merge_listing_shots_merges_shots_and_banner_together() {
+        // 两个字段各自缺失时都要保住
+        let next = "{\"id\":\"demo\"}";
+        let previous =
+            "{\"id\":\"demo\",\"shots\":[\"shots/a.webp\"],\"banner\":\"shots/Banner/b.jpg\"}";
+        let merged = merge_listing_shots(next, Some(previous)).expect("应该合并");
+        let value: Value = serde_json::from_str(&merged).unwrap();
+        assert_eq!(value["shots"][0], json!("shots/a.webp"));
+        assert_eq!(value["banner"], json!("shots/Banner/b.jpg"));
     }
 
     #[test]

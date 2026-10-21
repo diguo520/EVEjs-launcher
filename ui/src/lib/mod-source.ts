@@ -27,7 +27,7 @@ import {
   ratingFromStarCount,
   readmeParagraphs,
 } from "./mod-logic"
-import { modShotUrls } from "./mod-media"
+import { modBannerUrl, modShotUrls } from "./mod-media"
 import type { ModChangelog, ModEntry, ModReview, ModReviewState } from "./mock"
 
 const BYTES_PER_MB = 1024 * 1024
@@ -207,6 +207,8 @@ export function fromMarket(mod: RawMarketMod): ModEntry {
     changelog: marketChangelog(mod),
     // 截图：作者仓库 shots/ 里的图，按索引给的文件名拼地址（见 lib/mod-media.ts）
     shots: modShotUrls(mod),
+    // 精选横幅：作者仓库 shots/Banner/ 里的横版图；没有就是 null，精选位退回本地兜底
+    banner: modBannerUrl(mod),
     mine: false,
     inMarket: true,
   }

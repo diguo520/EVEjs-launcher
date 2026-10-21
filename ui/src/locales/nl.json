@@ -3638,5 +3638,14 @@
   "装备": "Uitrusting",
   "皮肤": "Skins",
   "动画": "Animaties",
-  "声音": "Geluid"
+  "声音": "Geluid",
+  "面板还没有交战结算记录": "Het paneel heeft nog geen gevechtsafrekeningen",
+  "这一场没有记录到参战方": "Voor dit gevecht zijn geen deelnemende facties vastgelegd",
+  "这一场只有结算，没有逐舰明细 —— 事件流只回补最近一段，明细落在窗口之外。": "Dit gevecht heeft alleen een afrekening, geen detail per schip — de gebeurtenisstroom vult alleen het recentste stuk aan, het detail valt buiten het venster.",
+  "共 {n} 场交战，其中 {m} 场有逐舰明细（事件流只回补最近一段，其余只有结算）。": "{n} gevechten in totaal, waarvan {m} met detail per schip (de gebeurtenisstroom vult alleen het recentste stuk aan; de rest heeft alleen afrekeningen).",
+  "只有结算": "alleen afrekening",
+  "本阵营参战舰船": "Ingenomen schepen van deze zijde",
+  "这一方的参战舰船还没有记录": "Voor deze zijde zijn nog geen ingezette schepen vastgelegd",
+  "有 {n} 支舰队查不到舰型构成（舰队已解散或面板没有它的记录），上面的数量少算了它们。": "Van {n} vlooten is de scheepstype-samenstelling niet te vinden (opgeheven of niet in het paneel); de aantallen hierboven tellen ze niet mee.",
+  "参战舰船来自舰队当前构成：战斗结束后舰队可能已补员或改编，属近似记录。": "Ingenomen schepen komen uit de huidige samenstelling van de vloot — na een gevecht kan een vloot zijn aangevuld of heringedeeld; dit is een benadering."
 }

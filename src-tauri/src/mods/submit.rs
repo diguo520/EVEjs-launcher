@@ -378,25 +378,18 @@ fn looks_like_shot(name: &str) -> bool {
 /// 目录不存在、或者里面没有图片文件，就返回空 —— 索引里不会出现 `shots` 字段，
 /// 界面也就不画截图区（与"绝大多数模组暂时没图"的现状一致）。
 pub(crate) fn shots_for_listing(repo_root: &Path, folder: &str) -> Vec<(String, PathBuf)> {
-    let safe = sanitize_folder_name(folder);
-    let safe = if safe.is_empty() {
-        folder.to_string()
-    } else {
-        safe
-    };
-    if safe.is_empty() {
-        return Vec::new();
-    }
-    let Some(dir) = crate::mods::join_within(&mods_root(repo_root), &safe) else {
+    let Some(shots_dir) = shots_dir_of(repo_root, folder) else {
         return Vec::new();
     };
-    let Ok(entries) = std::fs::read_dir(dir.join("shots")) else {
+    let Ok(entries) = std::fs::read_dir(&shots_dir) else {
         return Vec::new();
     };
 
     let mut files: Vec<(String, PathBuf)> = Vec::new();
     for entry in entries.flatten() {
         let path = entry.path();
+        // 子目录（目前只有 `Banner/`）不进截图列表：横幅是精选位的背景图，
+        // 构图与尺寸都和详情里的面板截图不同，混进灯箱会让顺序与观感都变差。
         if !path.is_file() {
             continue;
         }
@@ -412,6 +405,107 @@ pub(crate) fn shots_for_listing(repo_root: &Path, folder: &str) -> Vec<(String, 
     // 不同机器上同一批图排出来的首图不一样，卡片/灯箱的顺序就会跳。
     files.sort_by(|a, b| a.0.cmp(&b.0));
     files.truncate(MAX_LISTING_SHOTS);
+    files
+}
+
+/// `mods/<folder>/shots` 的绝对路径（防目录穿越）；目录不存在也算拿不到。
+fn shots_dir_of(repo_root: &Path, folder: &str) -> Option<PathBuf> {
+    let safe = sanitize_folder_name(folder);
+    let safe = if safe.is_empty() {
+        folder.to_string()
+    } else {
+        safe
+    };
+    if safe.is_empty() {
+        return None;
+    }
+    let dir = crate::mods::join_within(&mods_root(repo_root), &safe)?;
+    let shots = dir.join("shots");
+    if shots.is_dir() {
+        Some(shots)
+    } else {
+        None
+    }
+}
+
+/// 精选横幅目录名（大小写不敏感匹配）。与渲染层 `ui/src/lib/mod-media.ts` 的
+/// `MOD_BANNER_DIR` 对齐，改一边记得改另一边。
+pub(crate) const BANNER_DIR: &str = "Banner";
+
+/// 一次最多带几张横幅候选（多分辨率的同一张图，取最合适的）。
+const MAX_LISTING_BANNERS: usize = 4;
+
+/// 扫描 `mods/<folder>/shots/Banner/`，返回 **(作者仓库里的相对路径, 本地绝对路径)**。
+///
+/// 横幅是精选位（市场顶部三个）的背景图，与 `shots/` 根目录下的面板截图是**两类东西**：
+/// 前者要 16:5 左右的宽图，后者是竖版/方版面板。所以单独走一条收集链路，
+/// 发布时写进清单的 `banner` 字段，而不是塞进 `shots` 数组。
+///
+/// 排序规则：**优先像素更宽的**（文件名里带 `1920x600` / `1280x400` 这类尺寸的更容易被选中），
+/// 其次按路径字典序。这样作者丢一组多分辨率图进去，精选位自然用最清晰的那张。
+pub(crate) fn banner_for_listing(repo_root: &Path, folder: &str) -> Vec<(String, PathBuf)> {
+    let Some(shots_dir) = shots_dir_of(repo_root, folder) else {
+        return Vec::new();
+    };
+    let Ok(entries) = std::fs::read_dir(&shots_dir) else {
+        return Vec::new();
+    };
+
+    // 目录名大小写不敏感：作者可能写成 banner/ 或 BANNER/
+    let Some(banner_dir) = entries.flatten().map(|entry| entry.path()).find(|path| {
+        path.is_dir()
+            && path
+                .file_name()
+                .and_then(|value| value.to_str())
+                .map(|name| name.eq_ignore_ascii_case(BANNER_DIR))
+                .unwrap_or(false)
+    }) else {
+        return Vec::new();
+    };
+
+    let Ok(banner_entries) = std::fs::read_dir(&banner_dir) else {
+        return Vec::new();
+    };
+    let mut files: Vec<(String, PathBuf)> = Vec::new();
+    for entry in banner_entries.flatten() {
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+        let Some(name) = path.file_name().and_then(|value| value.to_str()) else {
+            continue;
+        };
+        if !looks_like_shot(name) {
+            continue;
+        }
+        files.push((format!("shots/{BANNER_DIR}/{name}"), path));
+    }
+    // 宽图优先：文件名里的 `<宽>x<高>` 越大越靠前；没有尺寸标记的按字典序垫后
+    files.sort_by(|a, b| {
+        let width_of = |relative: &str| -> u32 {
+            relative
+                .rsplit('/')
+                .next()
+                .and_then(|name| {
+                    let lower = name.to_ascii_lowercase();
+                    let (left, _) = lower.split_once('x')?;
+                    let digits: String = left
+                        .chars()
+                        .rev()
+                        .take_while(|c| c.is_ascii_digit())
+                        .collect::<String>()
+                        .chars()
+                        .rev()
+                        .collect();
+                    digits.parse::<u32>().ok()
+                })
+                .unwrap_or(0)
+        };
+        width_of(&b.0)
+            .cmp(&width_of(&a.0))
+            .then_with(|| a.0.cmp(&b.0))
+    });
+    files.truncate(MAX_LISTING_BANNERS);
     files
 }
 
@@ -768,7 +862,11 @@ pub fn prepare_submission(repo_root: &Path, runtime: &RuntimePaths, input: &Valu
 
     let (listed_readme, listed_highlights) = readme_for_listing(repo_root, &folder);
     // 截图：作者把图丢进 mods/<id>/shots/ 就自动带上，不用手编 JSON
-    let shot_files = shots_for_listing(repo_root, &folder);
+    let mut shot_files = shots_for_listing(repo_root, &folder);
+    // 精选横幅：shots/Banner/ 下的横版图，写进清单的 `banner` 字段（不进 shots 数组）
+    let banner_files = banner_for_listing(repo_root, &folder);
+    // 横幅也要跟着上传到作者仓库，否则清单里的地址取不到图
+    shot_files.extend(banner_files.iter().cloned());
     let changelog = text_field(input, "changelog");
     let description = {
         let value = text_field(input, "description");
@@ -850,15 +948,20 @@ pub fn prepare_submission(repo_root: &Path, runtime: &RuntimePaths, input: &Valu
             .take(10)
             .collect::<String>()),
     );
-    // 只有真有图才写这个键：空数组会让索引里出现 shots: []，界面还要为它做一次判断
-    if !shot_files.is_empty() {
-        index_draft.insert(
-            "shots".into(),
-            json!(shot_files
-                .iter()
-                .map(|(relative, _)| relative.clone())
-                .collect::<Vec<_>>()),
-        );
+    // 只有真有图才写这个键：空数组会让索引里出现 shots: []，界面还要为它做一次判断。
+    // 注意这里只列 `shots/` 根目录下的面板截图 —— 横幅在 shots/Banner/ 下，单独写 `banner`，
+    // 否则详情灯箱里会混进一张构图完全不同的横图。
+    let panel_shots: Vec<String> = shot_files
+        .iter()
+        .filter(|(relative, _)| !relative.starts_with(&format!("shots/{BANNER_DIR}/")))
+        .map(|(relative, _)| relative.clone())
+        .collect();
+    if !panel_shots.is_empty() {
+        index_draft.insert("shots".into(), json!(panel_shots));
+    }
+    // 精选横幅：取宽度最大的那一张（banner_for_listing 已按宽度降序）
+    if let Some((relative, _)) = banner_files.first() {
+        index_draft.insert("banner".into(), json!(relative));
     }
 
     let item = json!({
@@ -1869,6 +1972,89 @@ mod tests {
         assert!(!names.iter().any(|n| n.ends_with("10.png")));
         // 本地路径必须真的指得到文件（发布时要读它上传）
         assert!(files.iter().all(|(_, absolute)| absolute.is_file()));
+    }
+
+    #[test]
+    fn banner_listing_collects_shots_banner_and_prefers_wider() {
+        let runtime = temp_runtime("banner");
+        let repo = runtime.root.join("repo");
+        let dir = repo.join("mods").join("demo");
+        std::fs::create_dir_all(dir.join("shots").join("Banner")).unwrap();
+        // 面板截图（根目录）：不该出现在 banner 里
+        std::fs::write(dir.join("shots").join("panel.png"), b"x").unwrap();
+        // 横幅：三种分辨率 + 一个非图片
+        for name in [
+            "banner.jpg",
+            "banner-1280x400.png",
+            "banner-1920x600.png",
+            "notes.txt",
+        ] {
+            std::fs::write(dir.join("shots").join("Banner").join(name), b"x").unwrap();
+        }
+
+        let banners = banner_for_listing(&repo, "demo");
+        let names: Vec<String> = banners.iter().map(|(rel, _)| rel.clone()).collect();
+
+        // 只收图片，非图片不进
+        assert!(!names.iter().any(|n| n.ends_with(".txt")), "{names:?}");
+        // 相对路径统一带 shots/Banner/ 前缀
+        assert!(
+            names.iter().all(|n| n.starts_with("shots/Banner/")),
+            "{names:?}"
+        );
+        // 面板截图不能被当成横幅
+        assert!(!names.iter().any(|n| n.ends_with("panel.png")), "{names:?}");
+        // 宽图优先：1920 排在 1280 前面，没尺寸标记的垫后
+        assert_eq!(names[0], "shots/Banner/banner-1920x600.png", "{names:?}");
+        assert_eq!(names[1], "shots/Banner/banner-1280x400.png", "{names:?}");
+        // 本地路径必须真的指得到文件（发布时要读它上传）
+        assert!(banners.iter().all(|(_, absolute)| absolute.is_file()));
+    }
+
+    #[test]
+    fn banner_listing_matches_directory_name_case_insensitively() {
+        let runtime = temp_runtime("banner-case");
+        let repo = runtime.root.join("repo");
+        let dir = repo.join("mods").join("demo");
+        // 作者写成小写 banner/ 也要认
+        std::fs::create_dir_all(dir.join("shots").join("banner")).unwrap();
+        std::fs::write(dir.join("shots").join("banner").join("a.png"), b"x").unwrap();
+
+        let names: Vec<String> = banner_for_listing(&repo, "demo")
+            .iter()
+            .map(|(rel, _)| rel.clone())
+            .collect();
+        assert_eq!(names.len(), 1, "{names:?}");
+        assert!(names[0].starts_with("shots/Banner/"), "{names:?}");
+    }
+
+    #[test]
+    fn banner_listing_is_empty_without_the_banner_folder() {
+        let runtime = temp_runtime("banner-none");
+        let repo = runtime.root.join("repo");
+        let dir = repo.join("mods").join("demo");
+        std::fs::create_dir_all(dir.join("shots")).unwrap();
+        std::fs::write(dir.join("shots").join("panel.png"), b"x").unwrap();
+        // 只有面板截图、没有 Banner/ → 空（清单里不出现 banner 键）
+        assert!(banner_for_listing(&repo, "demo").is_empty());
+        assert!(banner_for_listing(&repo, "missing").is_empty());
+    }
+
+    #[test]
+    fn shots_listing_ignores_the_banner_subdirectory() {
+        let runtime = temp_runtime("shots-skip-banner");
+        let repo = runtime.root.join("repo");
+        let dir = repo.join("mods").join("demo");
+        std::fs::create_dir_all(dir.join("shots").join("Banner")).unwrap();
+        std::fs::write(dir.join("shots").join("panel.png"), b"x").unwrap();
+        std::fs::write(dir.join("shots").join("Banner").join("wide.png"), b"x").unwrap();
+
+        // 横幅不能混进详情灯箱的截图列表
+        let names: Vec<String> = shots_for_listing(&repo, "demo")
+            .iter()
+            .map(|(rel, _)| rel.clone())
+            .collect();
+        assert_eq!(names, vec!["shots/panel.png".to_string()], "{names:?}");
     }
 
     #[test]

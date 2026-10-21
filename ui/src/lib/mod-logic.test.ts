@@ -15,6 +15,9 @@ import {
   localFolderOf,
   intervalText,
   marketCounts,
+  featuredMods,
+  featuredScore,
+  FEATURED_SLOTS,
   MOD_CATEGORIES,
   normalizeModCategory,
   marketVersionDiff,
@@ -706,5 +709,64 @@ describe("formatCount（星标数按国际单位缩写）", () => {
     expect(formatCount(1_200_000)).toBe("1.2M")
     expect(formatCount(2_500_000_000)).toBe("2.5B")
     expect(formatCount(Number.NaN)).toBe("0")
+  })
+})
+
+describe("精选位（下载量 + 星星综合分）", () => {
+  const mod = (id: string, downloads: number, ratingCount = 0) =>
+    ({ id, name: id, downloads, ratingCount, ratingAvg: ratingCount > 0 ? 5 : 0 }) as unknown as ModEntry
+
+  it("综合分 = 下载量 + 星标人数", () => {
+    expect(featuredScore(mod("a", 100, 5))).toBe(105)
+    expect(featuredScore(mod("b", 0, 0))).toBe(0)
+  })
+
+  it("取综合分最高的 3 个", () => {
+    const mods = [mod("low", 10, 0), mod("top", 500, 9), mod("mid", 200, 3), mod("tiny", 1, 0)]
+    const picked = featuredMods(mods)
+    expect(picked.map((m) => m.id)).toEqual(["top", "mid", "low"])
+  })
+
+  it("候选只有 3 个（不多给）", () => {
+    const mods = Array.from({ length: 10 }, (_, i) => mod("m" + i, 100 - i, 0))
+    expect(featuredMods(mods)).toHaveLength(FEATURED_SLOTS)
+    expect(FEATURED_SLOTS).toBe(3)
+  })
+
+  it("总分相等时下载量多者优先", () => {
+    // 100+10 与 105+5 都是 110，但后者下载更多
+    const mods = [mod("moreStars", 100, 10), mod("moreDownloads", 105, 5)]
+    expect(featuredMods(mods).map((m) => m.id)).toEqual(["moreDownloads", "moreStars"])
+  })
+
+  it("完全并列时按 id 字典序，顺序稳定", () => {
+    const mods = [mod("z", 50, 5), mod("a", 50, 5), mod("m", 50, 5)]
+    expect(featuredMods(mods).map((m) => m.id)).toEqual(["a", "m", "z"])
+    // 多次调用结果一致
+    expect(featuredMods(mods).map((m) => m.id)).toEqual(featuredMods(mods).map((m) => m.id))
+  })
+
+  it("星标全为 0 时退化成按下载量排，不会乱序", () => {
+    const mods = [mod("a", 10, 0), mod("b", 300, 0), mod("c", 50, 0), mod("d", 1, 0)]
+    expect(featuredMods(mods).map((m) => m.id)).toEqual(["b", "c", "a"])
+  })
+
+  it("模组不足 3 个就少给，不拿占位符凑数", () => {
+    expect(featuredMods([mod("only", 5)])).toHaveLength(1)
+    expect(featuredMods([])).toHaveLength(0)
+  })
+
+  it("不就地修改入参", () => {
+    const mods = [mod("a", 1), mod("b", 9), mod("c", 5)]
+    const before = mods.map((m) => m.id)
+    featuredMods(mods)
+    expect(mods.map((m) => m.id)).toEqual(before)
+  })
+
+  it("异常数值不会污染排序（NaN / 负数按 0 算）", () => {
+    const bad = { id: "bad", name: "bad", downloads: NaN, ratingCount: -3 } as unknown as ModEntry
+    expect(featuredScore(bad)).toBe(0)
+    const mods = [bad, mod("good", 10, 1)]
+    expect(featuredMods(mods).map((m) => m.id)).toEqual(["good", "bad"])
   })
 })

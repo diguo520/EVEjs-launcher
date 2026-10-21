@@ -73,6 +73,13 @@ pub fn set_mod_order(runtime: &RuntimePaths, folders: &[String]) -> Value {
 
 /* ------------------------------ 注入计划 ------------------------------ */
 
+/// 是否拦截「绑定到别的启动器」的模组。
+///
+/// **默认关闭是刻意的**：见 docs/faction-sim启动器侧改动单-2026-10-21.md §5.3 的「上线顺序」——
+/// 第一步只下发 grant、不启用任何拦截。打开它会让用户不再加载这类模组，属于行为变化，
+/// 必须等引入 grant 的那个启动器版本普及到位（enforce 的固有上限见同一节）。
+const ENFORCE_MOD_BINDING: bool = false;
+
 struct Skip {
     id: String,
     reason: String,
@@ -109,6 +116,21 @@ pub fn plan_loaders(repo_root: &Path, runtime: &RuntimePaths) -> Value {
             skipped.push(Skip {
                 id: item.id.clone(),
                 reason: format!("签名校验失败: {}", item.signature_error),
+            });
+            continue;
+        }
+        // 声明了绑定、但不是发给本启动器的 → 不加载。
+        //
+        // ⚠️ 由 `ENFORCE_MOD_BINDING` 把关，默认**关闭**（见该常量的注释）。
+        // 注意方向：这一路保护的是「我们的用户装到了别人的包」，
+        // 它挡不住「竞品拿我们的模组」——那只能靠模组侧守卫 + 许可。
+        if ENFORCE_MOD_BINDING
+            && !item.binding_launcher.is_empty()
+            && item.binding_launcher != crate::launcher_grant::LAUNCHER_ID
+        {
+            skipped.push(Skip {
+                id: item.id.clone(),
+                reason: format!("该模组绑定到其它启动器：{}", item.binding_launcher),
             });
             continue;
         }

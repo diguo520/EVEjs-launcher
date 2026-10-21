@@ -508,6 +508,11 @@ export interface ModEntry {
    * 空数组 / 缺省表示这个模组没有图，卡片与详情都不画截图区。
    */
   shots?: string[]
+  /**
+   * 精选横幅背景图地址（作者仓库 `shots/Banner/` 里的横版图，见 `lib/mod-media.ts`）。
+   * 缺省 / null 表示这个模组没有横幅，市场顶部精选位退回本地兜底横幅。
+   */
+  banner?: string | null
 }
 
 export const MODS: ModEntry[] = [

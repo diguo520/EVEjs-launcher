@@ -20,6 +20,7 @@ pub mod health;
 pub mod hotreload;
 pub mod init;
 pub mod ipc;
+pub mod launcher_grant;
 pub mod legacy;
 pub mod log;
 pub mod logarchive;
@@ -190,6 +191,20 @@ pub fn run() {
 
     builder
         .setup(move |app| {
+            // 启动器许可续期：**刻意放在后台线程**，不在启动关键路径上。
+            //
+            // 三条理由（细节见 launcher_grant.rs 的模块注释）：
+            //   - 许可失败绝不能挡住游戏启动，所以这里不等结果、也不报错；
+            //   - 没到续期窗口就什么都不做，避免每次启动都打一次网络；
+            //   - 签发服务还没落地时 license_endpoint() 为空，refresh 直接返回 false，天然无副作用。
+            if let Some(state) = app.try_state::<AppState>() {
+                let runtime = state.runtime.clone();
+                std::thread::spawn(move || {
+                    if crate::launcher_grant::needs_refresh(&runtime) {
+                        let _ = crate::launcher_grant::refresh_license(&runtime);
+                    }
+                });
+            }
             let page = resolve_ui_page();
             let mut shell = WebviewWindowBuilder::new(app, "main", WebviewUrl::App(page.into()))
                 .title("EVEJS COMMAND")

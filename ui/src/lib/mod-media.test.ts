@@ -3,11 +3,60 @@ import { describe, expect, it } from "vitest"
 import {
   DEFAULT_SHOTS_REF,
   MAX_SHOTS,
+  modBannerUrl,
   modShotUrls,
   repoSlugOf,
   shotUrlOf,
   shotsRefOf,
 } from "@/lib/mod-media"
+
+describe("精选横幅（shots/Banner/）", () => {
+  it("banner 是文件名时拼到 shots/Banner/ 下", () => {
+    expect(modBannerUrl(raw({ banner: "banner.jpg" }))).toBe(
+      "https://cdn.jsdelivr.net/gh/rzwm/evejs-mod-evejs-beijing-time@main/shots/Banner/banner.jpg"
+    )
+  })
+
+  it("banner 已经带 shots/Banner/ 前缀时不再重复拼", () => {
+    expect(modBannerUrl(raw({ banner: "shots/Banner/banner.jpg" }))).toBe(
+      "https://cdn.jsdelivr.net/gh/rzwm/evejs-mod-evejs-beijing-time@main/shots/Banner/banner.jpg"
+    )
+  })
+
+  it("banners 数组按顺序取第一张能用的", () => {
+    expect(modBannerUrl(raw({ banners: ["nope.txt", "banner-1920x600.png"] }))).toBe(
+      "https://cdn.jsdelivr.net/gh/rzwm/evejs-mod-evejs-beijing-time@main/shots/Banner/banner-1920x600.png"
+    )
+  })
+
+  it("banner 优先于 banners", () => {
+    expect(
+      modBannerUrl(raw({ banner: "a.png", banners: ["b.png"] }))
+    ).toContain("/shots/Banner/a.png")
+  })
+
+  it("没有 banner 字段返回 null（精选位退回本地横幅）", () => {
+    expect(modBannerUrl(raw())).toBeNull()
+    expect(modBannerUrl(null)).toBeNull()
+  })
+
+  it("拒绝非图片、绝对路径与 .. 穿越", () => {
+    expect(modBannerUrl(raw({ banner: "evil.exe" }))).toBeNull()
+    expect(modBannerUrl(raw({ banner: "/etc/passwd.png" }))).toBeNull()
+    expect(modBannerUrl(raw({ banner: "../../secret.png" }))).toBeNull()
+  })
+
+  it("只放行白名单图床的完整地址", () => {
+    expect(modBannerUrl(raw({ banner: "https://cdn.jsdelivr.net/gh/a/b@main/x.png" }))).toBe(
+      "https://cdn.jsdelivr.net/gh/a/b@main/x.png"
+    )
+    expect(modBannerUrl(raw({ banner: "https://evil.example/x.png" }))).toBeNull()
+  })
+
+  it("shotsRef 生效（钉版本时）", () => {
+    expect(modBannerUrl(raw({ banner: "b.png", shotsRef: "v1.2.3" }))).toContain("@v1.2.3/")
+  })
+})
 
 const raw = (over: Record<string, unknown> = {}) => ({
   source: "rzwm/evejs-mod-evejs-beijing-time",

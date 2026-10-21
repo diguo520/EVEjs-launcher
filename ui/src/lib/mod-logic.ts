@@ -1328,6 +1328,52 @@ export function marketVersionOf(mod: ModEntry): string {
   return mod.marketVersion || mod.version
 }
 
+/** 精选位一次展示几个（1 个主位 + 2 个次位）。候选池也是这么大 —— 取前 3 就是精选。 */
+export const FEATURED_SLOTS = 3
+
+/**
+ * 精选综合分 = **下载量 + 星星数**。
+ *
+ * 为什么直接相加而不是加权或归一化：
+ *   · 两者都是"有多少人选择了它"的正向信号，量纲在同一数量级（当前真实数据：下载 200–1000，
+ *     星标 0–5），直接相加不需要人为编一个权重；
+ *   · 只按下载量排 → 冷启动的新模组永远上不了精选；只按星标排 → 评价服务没接通时
+ *     （`ratingCount` 全为 0）所有人并列，等于乱序。相加后两种极端都不会发生。
+ *
+ * 星标取 `ratingCount`（打过分的人数）而不是 `ratingAvg`（平均分）：
+ * 平均分是 1–5 的评分刻度，与下载量相加没有意义；人数才和下载量同性质。
+ */
+export function featuredScore(mod: ModEntry): number {
+  const downloads = Number.isFinite(mod.downloads) ? Math.max(0, mod.downloads) : 0
+  const stars = Number.isFinite(mod.ratingCount) ? Math.max(0, mod.ratingCount) : 0
+  return downloads + stars
+}
+
+/**
+ * 按综合分排出精选位（**确定性**，不再随机）。
+ *
+ * 返回长度 ≤ {@link FEATURED_SLOTS}，第一个是主位（大横幅），其余是次位。
+ *
+ * 排序纪律：
+ *   1. 综合分降序；
+ *   2. 平分时**下载量多者优先**（下载是实际安装行为，比打分更硬）；
+ *   3. 再平分时按 `id` 字典序 —— 保证同样的数据每次渲染顺序一致，
+ *      不会因为后端返回顺序变化而让三个位置来回跳。
+ *
+ * 入参 `mods` 应当已经过滤掉下架 / 不在市场的条目，调用方负责。
+ */
+export function featuredMods(mods: ModEntry[], count: number = FEATURED_SLOTS): ModEntry[] {
+  if (mods.length === 0 || count <= 0) return []
+  return [...mods]
+    .sort(
+      (a, b) =>
+        featuredScore(b) - featuredScore(a) ||
+        b.downloads - a.downloads ||
+        a.id.localeCompare(b.id)
+    )
+    .slice(0, count)
+}
+
 /** 按选定口径排序；并列时用下载量兜底，保证顺序稳定 */
 export function sortMods(mods: ModEntry[], sort: ModSort): ModEntry[] {
   if (sort === "default") return mods

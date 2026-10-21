@@ -3638,5 +3638,14 @@
   "装备": "Equipment",
   "皮肤": "Skins",
   "动画": "Animations",
-  "声音": "Sound"
+  "声音": "Sound",
+  "面板还没有交战结算记录": "The panel has no battle settlements yet",
+  "这一场没有记录到参战方": "No participating sides were recorded for this battle",
+  "这一场只有结算，没有逐舰明细 —— 事件流只回补最近一段，明细落在窗口之外。": "This battle has a settlement only, no per-ship detail — the event stream backfills just the most recent stretch, so the detail is outside the window.",
+  "共 {n} 场交战，其中 {m} 场有逐舰明细（事件流只回补最近一段，其余只有结算）。": "{n} battles in total, {m} with per-ship detail (the event stream backfills only the most recent stretch; the rest have settlements only).",
+  "只有结算": "settlement only",
+  "本阵营参战舰船": "This side's committed ships",
+  "这一方的参战舰船还没有记录": "No committed ships recorded for this side yet",
+  "有 {n} 支舰队查不到舰型构成（舰队已解散或面板没有它的记录），上面的数量少算了它们。": "{n} fleets have no ship-type breakdown (disbanded, or the panel has no record of them), so the counts above omit them.",
+  "参战舰船来自舰队当前构成：战斗结束后舰队可能已补员或改编，属近似记录。": "Committed ships come from the fleets' current composition — after a battle a fleet may have been resupplied or reorganised, so this is an approximation."
 }

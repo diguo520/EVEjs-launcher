@@ -27,6 +27,13 @@ export interface ModShotsSource {
 }
 
 export const MOD_SHOTS_DIR = "shots"
+/**
+ * 精选横幅目录：作者把横版背景图放进 `shots/Banner/`，市场顶部三个精选位用它当背景。
+ *
+ * 为什么单独一个目录而不是复用 `shots`：`shots` 里是竖版/方版面板截图（详情弹窗里横排滚动用），
+ * 横幅要的是 16:5 左右的宽图，两者构图完全不同，混在一起会让精选位裁掉关键内容。
+ */
+export const MOD_BANNER_DIR = "Banner"
 export const RAW_HOST = "raw.githubusercontent.com"
 export const CDN_HOST = "cdn.jsdelivr.net"
 /** 市场索引自己就挂在这个 Pages 域名下；作者若把图放进市场仓库，也走它 */
@@ -101,6 +108,64 @@ export function shotUrlOf(
     .join("/")
   // jsDelivr 的 GitHub 镜像格式：/gh/<owner>/<repo>@<ref>/<path>
   return `https://${CDN_HOST}/gh/${slug}@${encodeURIComponent(ref)}/${encoded}`
+}
+
+
+/**
+ * 精选横幅：作者仓库 `shots/Banner/` 里的横版背景图。
+ *
+ * 与截图同样的约束 —— **文件名必须由索引给出**，因为 jsDelivr / raw 都不能从渲染层列目录。
+ * 索引里可以写 `banner`（单个文件名）或 `banners`（数组，按顺序取第一张能用的）。
+ * 相对路径一律拼到 `shots/Banner/` 下；也接受完整 https 地址。
+ */
+export interface ModBannerSource extends ModShotsSource {
+  /** 单张横幅文件名（相对 `shots/Banner/`），或完整 https 地址 */
+  banner?: string
+  /** 多张候选，按顺序取第一张 */
+  banners?: string[]
+}
+
+/** 单张横幅 → 可用地址；不可用返回 null */
+export function bannerUrlOf(slug: string | null, ref: string, entry: unknown): string | null {
+  const text = String(entry ?? "").trim()
+  if (text === "") return null
+  if (text.startsWith("http://") || text.startsWith("https://")) {
+    return isAllowedAbsolute(text) ? text : null
+  }
+  if (slug === null || slug === "") return null
+  const path = text.replace(/^\.\//, "")
+  if (path.startsWith("/") || path.split("/").includes("..")) return null
+  // 已经是 shots/... 或 shots/Banner/... 的完整相对路径就直接用，否则补上目录前缀
+  const relative = path.startsWith(MOD_SHOTS_DIR + "/")
+    ? path
+    : `${MOD_SHOTS_DIR}/${MOD_BANNER_DIR}/${path}`
+  if (!IMAGE_EXT.test(relative)) return null
+  const encoded = relative
+    .split("/")
+    .filter((part) => part !== "")
+    .map((part) => encodeURIComponent(part))
+    .join("/")
+  return `https://${CDN_HOST}/gh/${slug}@${encodeURIComponent(ref)}/${encoded}`
+}
+
+/**
+ * 索引条目 → 精选横幅地址（没有就是 null）。
+ *
+ * 优先 `banner`（单张），其次 `banners`（数组，取第一张能解析的）。
+ * 都没有就返回 null，调用方退回到本地兜底横幅 —— 不能留空白。
+ */
+export function modBannerUrl(raw: ModBannerSource | null | undefined): string | null {
+  if (!raw) return null
+  const slug = repoSlugOf(raw)
+  const ref = shotsRefOf(raw)
+  const single = bannerUrlOf(slug, ref, raw.banner)
+  if (single !== null) return single
+  const list = Array.isArray(raw.banners) ? raw.banners : []
+  for (const entry of list) {
+    const url = bannerUrlOf(slug, ref, entry)
+    if (url !== null) return url
+  }
+  return null
 }
 
 /** 索引条目 → 可渲染的截图地址列表（去重、限量、顺序照索引） */
