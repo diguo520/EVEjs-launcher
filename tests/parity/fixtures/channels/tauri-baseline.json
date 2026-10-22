@@ -172,10 +172,10 @@
       "supported": true
     },
     "metrics:get": {
-      "cpuPercent": 45.320518493652344,
+      "cpuPercent": 100,
       "diskRoot": "<abs-path>",
       "diskTotalGB": 976.5624961853028,
-      "diskUsedGB": 776.0926628112793,
+      "diskUsedGB": 779.7008247375488,
       "gpuDedicatedTotalGB": null,
       "gpuDedicatedUsedGB": null,
       "gpuMemoryTotalGB": null,
@@ -183,31 +183,31 @@
       "gpuPercent": null,
       "gpuSharedUsedGB": null,
       "memTotalGB": 31.855934143066406,
-      "memUsedGB": 14.384918212890623,
-      "netBytesPerSec": 0,
-      "virtualMemTotalGB": 34.7852897644043,
-      "virtualMemUsedGB": 28.506916046142575,
+      "memUsedGB": 14.375545501708984,
+      "netBytesPerSec": 1277724.2864835756,
+      "virtualMemTotalGB": 34.80476760864258,
+      "virtualMemUsedGB": 28.086261749267575,
       "volumes": [
         {
-          "freeGB": 57.68716049194336,
-          "percent": 74.06499009657357,
+          "freeGB": 59.768028259277344,
+          "percent": 73.12947297814884,
           "root": "<abs-path>",
           "totalGB": 222.4296836853027,
-          "usedGB": 164.74252319335938
+          "usedGB": 162.6616554260254
         },
         {
-          "freeGB": 156.86689376831055,
-          "percent": 46.45609956323046,
+          "freeGB": 156.8541259765625,
+          "percent": 46.46045763620388,
           "root": "<abs-path>",
           "totalGB": 292.96874618530273,
-          "usedGB": 136.1018524169922
+          "usedGB": 136.11462020874023
         },
         {
-          "freeGB": 200.46983337402344,
-          "percent": 79.47188898231207,
+          "freeGB": 196.8616714477539,
+          "percent": 79.84136476500532,
           "root": "<abs-path>",
           "totalGB": 976.5624961853028,
-          "usedGB": 776.0926628112793
+          "usedGB": 779.7008247375488
         },
         {
           "freeGB": 390.2404022216797,
@@ -263,10 +263,11 @@
         {
           "category": "玩法",
           "desc": "加载模组后会在游戏本地聊天框看到一条「欢迎回来，飞行员」的信息。",
-          "fileCount": 5,
+          "fileCount": 6,
           "files": [
             "evejs-launcher.mod.json",
             "loader.js",
+            "lib/launcherGuard.js",
             "README.md",
             "CHANGELOG.md",
             "shots/README.md"
@@ -280,7 +281,7 @@
           "id": "broadcast",
           "name": "Welcome Broadcast (Example)",
           "requiresRestart": true,
-          "sizeBytes": 11253,
+          "sizeBytes": 24964,
           "tags": [
             "聊天",
             "新手"
@@ -289,10 +290,11 @@
         {
           "category": "玩法",
           "desc": "同样的加载骨架，业务逻辑留空，适合从零写起",
-          "fileCount": 5,
+          "fileCount": 6,
           "files": [
             "evejs-launcher.mod.json",
             "loader.js",
+            "lib/launcherGuard.js",
             "README.md",
             "CHANGELOG.md",
             "shots/README.md"
@@ -305,7 +307,7 @@
           "id": "blank",
           "name": "Blank Skeleton",
           "requiresRestart": true,
-          "sizeBytes": 9606,
+          "sizeBytes": 23317,
           "tags": []
         }
       ]
