@@ -173,6 +173,11 @@ activation.strategy: "loader_rename"   ← genau dieser Wert
 im Verzeichnis muss loader.js oder loader.js.disabled liegen
 ```
 
+
+🟩 **Das Gerüst bringt diese Launcher-Bindung schon mit** (seit dem 2026-10-22): das erzeugte Mod enthält `lib/launcherGuard.js`, und das Manifest trägt einen `binding`-Block (`enforce: "observe"` als Standard - er protokolliert nur und blockiert nie). Er besagt
+„dieses Mod läuft nur unter dem offiziellen EveJS Launcher“. Zum Aktivieren `enforce` auf `"enforce"` setzen -
+**zuerst das Protokoll lesen**. Es ist der `binding`-Block im Manifest und
+die vollständige Anleitung steht in **Anhang I**.
 ---
 
 ## Schritt 5 ✅ Deine Logik schreiben (`loader.js`)
@@ -367,6 +372,7 @@ Launcher → Mods / Plugins → **Meine Mods**:
 | `author` | ✅ | object | `{ id, name, keyId, publicKey }` (schreibt der Launcher automatisch) |
 | `requires` / `loadAfter` / `loadBefore` / `conflicts` | ⭕ | string[] | Abhängigkeiten und Konflikte (Mod-IDs eintragen) |
 | `compatibility.evejsVersions` | ⭕ | string[] | Kompatible EveJS-Versionen, z. B. `["0.12.8"]` |
+| `binding` | ⭕ | object | erklärt „zu welchem Launcher dieses Mod gehört“: `{ launcher, launcherKeyId, enforce }`. **Fehlt er = nicht erklärt = immer erlaubt** (alte Mods bleiben unberührt). Siehe Anhang I |
 | `signature` | ✅ | object | Signatur (erzeugt der Launcher automatisch) |
 
 # Anhang B: ein lauffähiges Loader-Grundgerüst
@@ -655,3 +661,63 @@ Also: **die Bilder bleiben immer in deinem Repository**; der Markt hält nur ein
 ## Wann es sichtbar wird
 
 Nach erfolgreicher Veröffentlichung wird der Marktindex **sofort beim Merge deiner PR neu gebaut** (ein 6-stündlicher Lauf dient als Absicherung). Der Launcher hält zusätzlich 2 Minuten Cache.
+
+---
+
+# Anhang I: Launcher-Bindung (dieses Mod läuft nur unter dem offiziellen Launcher)
+
+Seit dem 2026-10-22 übergibt der offizielle Launcher eine **signierte Lizenz** (Umgebungsvariable `EVEJS_LAUNCHER_GRANT`).
+Ein Mod, der sie prüft, weiß: der Lauf kommt wirklich vom offiziellen EveJS Launcher und nicht nur von jemandem, der den Server gestartet hat.
+
+**Das Gerüst eines neuen Mods bringt diese Prüfung schon mit** (`lib/launcherGuard.js` und `binding` im Manifest); du entscheidest nur, wann blockiert wird.
+
+## Die drei Felder im Manifest
+
+```json
+"binding": {
+  "launcher": "evejs-launcher",
+  "launcherKeyId": "867242e85fc5",
+  "enforce": "observe"
+}
+```
+
+| Feld | Bedeutung |
+| --- | --- |
+| `launcher` | nur diese Launcher-ID akzeptieren |
+| `launcherKeyId` | **nur ein Hinweis**, nie Teil der Entscheidung; der Prüfschlüssel steht fest in `lib/launcherGuard.js` |
+| `enforce` | `observe` (Standard) = nur protokollieren; `enforce` = bei fehlgeschlagener Prüfung tut das Mod nichts |
+
+## Verwendung
+
+Das Erste, was das `loader.js` des Gerüsts tut:
+
+```js
+if (require("./lib/launcherGuard.js").gate("<deine Mod-ID>")) return;
+```
+
+## Vor dem Umschalten auf enforce
+
+1. Zunächst `observe` lassen: das Ergebnis landet in `server/logs/evejs-mods.log`;
+2. Prüfen, ob `guard` `ok` oder `denied` ist und was `reason` sagt (veralteter Launcher ist der häufigste Fall);
+3. Wenn fast alles `ok` ist, `enforce` auf `enforce` setzen und **erneut signieren und veröffentlichen**.
+
+⚠️ Jede Manifest-Änderung braucht eine **neue Signatur**: JSON ändern ohne neu zu signieren lässt den offiziellen Launcher das ganze Mod überspringen.
+Einfach erneut „Mod veröffentlichen“ klicken - es wird mit deinem `.eve-key` neu signiert und `binding` bleibt erhalten.
+
+## Was sich danach ändert
+
+- Offizieller Launcher (neu genug): lädt normal;
+- **Eine BAT-Datei startet den Server / ein anderer Launcher**: keine Lizenz → unter `enforce` nicht geladen;
+- Offizieller Launcher, aber zu alt: der Dienst verweigert die Signatur → ebenfalls nicht geladen.
+
+## Ein bereits veröffentlichtes Mod nachrüsten
+
+`binding` ist ein **optionaler neuer Schlüssel** (fehlt er = nicht erklärt = immer erlaubt, alte Mods bleiben unberührt). Drei Schritte:
+
+1. `lib/launcherGuard.js` holen (aus dem Gerüst oder einem bereits nachgerüsteten Mod kopieren);
+2. im Einstieg von `loader.js` `gate("<deine Mod-ID>")` ergänzen;
+3. `binding` ins Manifest aufnehmen (zuerst `observe`) und **erneut signieren und veröffentlichen**.
+
+## Beim Schlüsselwechsel
+
+`LAUNCHER_KEYS` wird **nur erweitert**; während der Rotation signiert der Launcher mit beiden Schlüsseln, ein gültiger Eintrag genügt.

@@ -73,6 +73,16 @@ const BUILTIN_LICENSE_KEYS: &[(&str, &str)] = &[(
     "UJXSqYWG/VrWTa03/Ppq3tAgYpOE9VRyQvTyszk5ihg=",
 )];
 
+/// 内置表里的第一把 keyId —— 新模组骨架的 `binding.launcherKeyId` 用它。
+///
+/// 只作**提示**（扫描器不拿它判定），所以表为空时返回空串即可：那时骨架不写 binding。
+pub fn primary_key_id() -> &'static str {
+    BUILTIN_LICENSE_KEYS
+        .first()
+        .map(|(id, _)| *id)
+        .unwrap_or("")
+}
+
 /// 运行时登记的签发公钥（联调 / 测试用，形状对齐 sign::trust_public_key）。
 static RUNTIME_LICENSE_KEYS: LazyLock<Mutex<BTreeMap<String, String>>> =
     LazyLock::new(|| Mutex::new(BTreeMap::new()));

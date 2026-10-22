@@ -34,9 +34,15 @@ pub struct ScaffoldTemplate {
     pub source_patch: &'static [&'static str],
 }
 
+/// 模组模板里的守卫副本：**构建期输入**（`ui/web/mod-template/` 在构建期白名单里，
+/// 跟 `manual/` 一样运行期没人会去取）。留成真实 JS 文件而不是 Rust 字符串数组，
+/// 这样它是一份能 `node --check`、能被测的代码 —— 安全关键的东西不该只活在字符串里。
+const GUARD_SOURCE: &str = include_str!("../../../ui/web/mod-template/launcherGuard.js");
+
 const TEMPLATE_FILES: &[&str] = &[
     "evejs-launcher.mod.json",
     "loader.js",
+    "lib/launcherGuard.js",
     "README.md",
     "CHANGELOG.md",
     "shots/README.md",
@@ -146,6 +152,7 @@ fn template_size_bytes(template: &ScaffoldTemplate) -> u64 {
     total += readme_from(&draft, template).len() as u64;
     total += changelog_from(&draft).len() as u64;
     total += SHOTS_README.len() as u64;
+    total += GUARD_SOURCE.len() as u64;
     total
 }
 
@@ -344,6 +351,7 @@ fn loader_from(draft: &Value, template: &ScaffoldTemplate) -> String {
     let mut lines: Vec<String> = Vec::new();
     for block in [
         super::scaffold_loader::LOADER_HEAD,
+        super::scaffold_loader::LOADER_BINDING_GATE,
         template.source_patch,
         super::scaffold_loader::LOADER_MID,
         biz,
@@ -377,7 +385,24 @@ struct ScaffoldManifest<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     author: Option<ScaffoldAuthor<'a>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    binding: Option<ScaffoldBinding<'a>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     compatibility: Option<ScaffoldCompatibility>,
+}
+
+/// 清单里的 `binding`：这份模组「只归哪个启动器用」+ 判定不通过时的姿态。
+///
+/// **新模组骨架默认带上它**（`enforce: "observe"`）：作者把 `observe` 改成 `enforce`
+/// 就启用了绑定，不用自己翻规范拼字段。`launcherKeyId` 只是提示当前签发公钥，
+/// **不参与任何判定**（判定在 guard 里用内置公钥表做）。
+///
+/// 当前启动器一把签发公钥都没有时不写这一段：那时写出来也只是一个空 keyId。
+#[derive(serde::Serialize)]
+struct ScaffoldBinding<'a> {
+    launcher: &'a str,
+    #[serde(rename = "launcherKeyId")]
+    launcher_key_id: &'a str,
+    enforce: &'a str,
 }
 
 #[derive(serde::Serialize)]
@@ -482,6 +507,19 @@ fn manifest_from(
         None
     };
 
+    // 骨架默认声明「只归官方启动器」但**姿态是 observe**（只记日志、不拦）——
+    // 让作者先在日志里看清有多少次没通过，再自己翻成 enforce。
+    let primary_key_id = crate::launcher_grant::primary_key_id();
+    let binding_block = if primary_key_id.is_empty() {
+        None
+    } else {
+        Some(ScaffoldBinding {
+            launcher: crate::launcher_grant::LAUNCHER_ID,
+            launcher_key_id: primary_key_id,
+            enforce: "observe",
+        })
+    };
+
     let manifest = ScaffoldManifest {
         schema_version: 3,
         id: &draft_str(draft, "id"),
@@ -498,6 +536,7 @@ fn manifest_from(
         tags: &tags,
         conflicts: &draft_strings(draft, "conflicts"),
         author: author_block,
+        binding: binding_block,
         compatibility,
     };
     serde_json::to_string_pretty(&manifest).unwrap_or_default()
@@ -608,6 +647,10 @@ pub fn create_mod(
         )?;
         fs::write(stage.join("README.md"), readme_from(draft, template))?;
         fs::write(stage.join("CHANGELOG.md"), changelog_from(draft))?;
+        // 守卫：模组模板自带的启动器绑定检查（默认 observe，只记日志）
+        let guard_dir = stage.join("lib");
+        fs::create_dir_all(&guard_dir)?;
+        fs::write(guard_dir.join("launcherGuard.js"), GUARD_SOURCE)?;
         // 截图目录：写一份说明把它撑住（空目录在 git / ZIP 里留不住），
         // 作者往里丢图即可，发布时会被 `submit::shots_for_listing` 自动收进清单
         let shots_dir = stage.join("shots");
@@ -1098,6 +1141,7 @@ mod tests {
         ] {
             let text = loader_from(&draft("demo-mod", "示例模组"), template);
             let expected = skeleton::LOADER_HEAD.len()
+                + skeleton::LOADER_BINDING_GATE.len()
                 + template.source_patch.len()
                 + skeleton::LOADER_MID.len()
                 + biz.len()
@@ -1444,9 +1488,9 @@ mod tests {
         assert_eq!(list[0]["id"], json!("broadcast"));
         assert_eq!(list[1]["id"], json!("blank"));
         assert_eq!(list[0]["requiresRestart"], json!(true));
-        // 4 个骨架文件 + `shots/README.md`（截图目录的说明）
-        assert_eq!(list[0]["files"].as_array().unwrap().len(), 5);
-        assert_eq!(list[0]["fileCount"], json!(5));
+        // 4 个骨架文件 + `shots/README.md`（截图目录的说明）+ `lib/launcherGuard.js`（绑定守卫）
+        assert_eq!(list[0]["files"].as_array().unwrap().len(), 6);
+        assert_eq!(list[0]["fileCount"], json!(6));
         assert!(list[0]["files"]
             .as_array()
             .unwrap()

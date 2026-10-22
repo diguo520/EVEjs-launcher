@@ -173,6 +173,11 @@ activation.strategy: "loader_rename"   ← obligatoire
 le dossier doit contenir loader.js ou loader.js.disabled
 ```
 
+
+🟩 **Le squelette embarque déjà ce contrôle de liaison** (depuis le 2026-10-22) : le mod généré contient `lib/launcherGuard.js`, et le manifeste porte un bloc `binding` (`enforce: "observe"` par défaut - il journalise seulement, sans bloquer). Cela dit
+« ce mod ne tourne que sous le lanceur officiel EveJS ». Pour l'activer, passez `enforce` à `"enforce"` -
+**lisez d'abord le journal**. C'est le bloc `binding` du manifeste et
+la marche à suivre complète est dans l'**Annexe I**.
 ---
 
 ## Étape 5 ✅ Écrire votre logique (`loader.js`)
@@ -367,6 +372,7 @@ Lanceur → Mods / plugins → **mes créations** :
 | `author` | ✅ | object | `{ id, name, keyId, publicKey }` (écrit automatiquement par le lanceur) |
 | `requires` / `loadAfter` / `loadBefore` / `conflicts` | ⭕ | string[] | Dépendances et conflits (ids de mods) |
 | `compatibility.evejsVersions` | ⭕ | string[] | Versions EveJS compatibles, par exemple `["0.12.8"]` |
+| `binding` | ⭕ | object | déclare « à quel lanceur ce mod appartient » : `{ launcher, launcherKeyId, enforce }`. **Absent = non déclaré = toujours autorisé** (les anciens mods ne bougent pas). Voir l'Annexe I |
 | `signature` | ✅ | object | Signature (générée automatiquement par le lanceur) |
 
 # Annexe B : un squelette de loader qui fonctionne
@@ -655,3 +661,63 @@ Donc : **les images restent toujours dans votre dépôt** ; le marché ne contie
 ## Quand cela devient visible
 
 Après une publication réussie, l'index du marché est reconstruit **immédiatement à la fusion de votre PR** (avec une exécution planifiée toutes les 6 heures en filet de sécurité). Le lanceur garde en plus un cache de 2 minutes.
+
+---
+
+# Annexe I : liaison au lanceur (ce mod ne tourne que sous le lanceur officiel)
+
+Depuis le 2026-10-22, le lanceur officiel transmet une **licence signée** (variable d'environnement `EVEJS_LAUNCHER_GRANT`).
+Un mod qui la vérifie sait que l'exécution vient bien du lanceur officiel EveJS, et pas seulement de quelqu'un qui a démarré le serveur.
+
+**Le squelette d'un nouveau mod embarque déjà ce contrôle** (`lib/launcherGuard.js` et le bloc `binding` du manifeste) ; il ne reste qu'à décider quand bloquer.
+
+## Les trois champs du manifeste
+
+```json
+"binding": {
+  "launcher": "evejs-launcher",
+  "launcherKeyId": "867242e85fc5",
+  "enforce": "observe"
+}
+```
+
+| Champ | Rôle |
+| --- | --- |
+| `launcher` | n'accepter que cet id de lanceur |
+| `launcherKeyId` | **simple indication**, jamais utilisée pour décider ; la clé de vérification est codée en dur dans `lib/launcherGuard.js` |
+| `enforce` | `observe` (défaut) = journaliser seulement ; `enforce` = le mod ne fait rien si le contrôle échoue |
+
+## Utilisation
+
+La première chose que fait le `loader.js` du squelette :
+
+```js
+if (require("./lib/launcherGuard.js").gate("<id de votre mod>")) return;
+```
+
+## Avant de passer à enforce
+
+1. Gardez `observe` au début : le verdict est écrit dans `server/logs/evejs-mods.log` ;
+2. Regardez si `guard` vaut `ok` ou `denied` et ce que dit `reason` (lanceur non mis à jour, le plus courant) ;
+3. Quand presque tout est `ok`, passez `enforce` à `enforce` et **signez puis publiez à nouveau**.
+
+⚠️ Toute modification du manifeste exige une **nouvelle signature** : changer le JSON sans re-signer fait sauter tout le mod au lanceur officiel.
+Cliquez simplement à nouveau sur « Publier le mod » : la signature est refaite avec votre `.eve-key` et `binding` est conservé.
+
+## Une fois activé
+
+- Lanceur officiel (assez récent) : chargement normal ;
+- **Un .bat qui démarre le serveur / un autre lanceur** : aucune licence → pas chargé sous `enforce` ;
+- Lanceur officiel mais trop ancien : le service refuse de signer → pas chargé non plus.
+
+## Intégrer un mod déjà publié
+
+`binding` est une **clé optionnelle** (absente = non déclaré = toujours autorisé, les anciens mods ne bougent pas). Trois étapes :
+
+1. récupérez `lib/launcherGuard.js` (copiez-le depuis le squelette ou un mod déjà intégré) ;
+2. ajoutez `gate("<id de votre mod>")` à l'entrée de `loader.js` ;
+3. ajoutez `binding` au manifeste (`observe` d'abord) puis **signez et publiez à nouveau**.
+
+## Lors d'une rotation de clé
+
+`LAUNCHER_KEYS` ne fait que **s'agrandir** ; pendant la rotation le lanceur signe avec les deux clés, donc une seule entrée valide suffit.

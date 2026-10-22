@@ -173,6 +173,11 @@ activation.strategy: "loader_rename"   ← obligatoriamente este valor
 en la carpeta debe haber loader.js o loader.js.disabled
 ```
 
+
+🟩 **El esqueleto ya incluye esta comprobación de vinculación** (desde el 2026-10-22): el mod generado contiene `lib/launcherGuard.js`, y el manifiesto lleva un bloque `binding` (`enforce: "observe"` por defecto - solo registra, nunca bloquea). Significa
+«este mod solo funciona bajo el lanzador oficial de EveJS». Para activarlo, cambia `enforce` a `"enforce"` -
+**lee primero el registro**. Es el bloque `binding` del manifiesto y
+la explicación completa está en el **Apéndice I**.
 ---
 
 ## Paso 5 ✅ Escribir tu lógica (`loader.js`)
@@ -367,6 +372,7 @@ Lanzador → Mods / plugins → **Mis mods**:
 | `author` | ✅ | object | `{ id, name, keyId, publicKey }` (lo escribe el lanzador automáticamente) |
 | `requires` / `loadAfter` / `loadBefore` / `conflicts` | ⭕ | string[] | Dependencias y conflictos (se escriben IDs de mods) |
 | `compatibility.evejsVersions` | ⭕ | string[] | Versiones de EveJS compatibles, por ejemplo `["0.12.8"]` |
+| `binding` | ⭕ | object | declara «a qué lanzador pertenece este mod»: `{ launcher, launcherKeyId, enforce }`. **Ausente = sin declarar = siempre permitido** (los mods antiguos no se ven afectados). Ver Apéndice I |
 | `signature` | ✅ | object | Firma (la genera el lanzador automáticamente) |
 
 # Apéndice B: un esqueleto de loader que funciona
@@ -655,3 +661,63 @@ Es decir: **las imágenes siempre están en tu repositorio** y el mercado solo g
 ## Cuándo se ve
 
 Tras una publicación correcta, el índice del mercado se reconstruye **en cuanto se fusiona tu PR** (y hay una ejecución programada cada 6 horas como red de seguridad). El lanzador además guarda 2 minutos de caché.
+
+---
+
+# Apéndice I: vinculación al lanzador (este mod solo funciona bajo el lanzador oficial)
+
+Desde el 2026-10-22 el lanzador oficial entrega una **licencia firmada** (variable de entorno `EVEJS_LAUNCHER_GRANT`).
+Un mod que la verifica sabe que la ejecución viene del lanzador oficial de EveJS, y no solo de alguien que arrancó el servidor.
+
+**El esqueleto de un mod nuevo ya incluye esta comprobación** (`lib/launcherGuard.js` y el bloque `binding` del manifiesto); solo decides cuándo bloquear.
+
+## Los tres campos del manifiesto
+
+```json
+"binding": {
+  "launcher": "evejs-launcher",
+  "launcherKeyId": "867242e85fc5",
+  "enforce": "observe"
+}
+```
+
+| Campo | Significado |
+| --- | --- |
+| `launcher` | aceptar solo este id de lanzador |
+| `launcherKeyId` | **solo una pista**, nunca decide; la clave de verificación está fija en `lib/launcherGuard.js` |
+| `enforce` | `observe` (por defecto) = solo registra; `enforce` = si falla la comprobación el mod no hace nada |
+
+## Cómo se usa
+
+Lo primero que hace el `loader.js` del esqueleto:
+
+```js
+if (require("./lib/launcherGuard.js").gate("<id de tu mod>")) return;
+```
+
+## Antes de pasar a enforce
+
+1. Mantén `observe` al principio: el veredicto va a `server/logs/evejs-mods.log`;
+2. Mira si `guard` es `ok` o `denied` y qué dice `reason` (lanzador sin actualizar es lo más común);
+3. Cuando casi todo sea `ok`, cambia `enforce` a `enforce` y **vuelve a firmar y publicar**.
+
+⚠️ Cualquier cambio en el manifiesto exige **volver a firmar**: editar el JSON sin firmar hace que el lanzador oficial omita el mod entero.
+Basta con pulsar otra vez «Publicar mod»: se vuelve a firmar con tu `.eve-key` y `binding` se conserva tal cual.
+
+## Qué cambia al activarlo
+
+- Lanzador oficial (suficientemente nuevo): carga normal;
+- **Un .bat que arranca el servidor / otro lanzador**: sin licencia → no se carga bajo `enforce`;
+- Lanzador oficial pero demasiado antiguo: el servicio se niega a firmar → tampoco se carga.
+
+## Integrar un mod ya publicado
+
+`binding` es una **clave opcional** (ausente = sin declarar = siempre permitido, los mods antiguos no se ven afectados). Tres pasos:
+
+1. consigue `lib/launcherGuard.js` (cópialo del esqueleto o de cualquier mod ya integrado);
+2. añade `gate("<id de tu mod>")` al inicio de `loader.js`;
+3. añade `binding` al manifiesto (primero `observe`) y **vuelve a firmar y publicar**.
+
+## Al rotar la clave
+
+`LAUNCHER_KEYS` solo **crece**; durante la rotación el lanzador firma con ambas claves, así que basta con que una entrada verifique.
