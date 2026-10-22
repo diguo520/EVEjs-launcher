@@ -1,0 +1,49 @@
+{
+  "version": "0.5.5",
+  "changelog": {
+    "zh": [
+      {
+        "type": "opt",
+        "text": "开机画面停留时间从 20 秒改回 **5 秒** —— 每次启动少等约 15 秒。星图动画本身是循环的，缩短停留不会把动画截在半截。"
+      },
+      {
+        "type": "new",
+        "text": "模组详情里的正文与「功能要点」现在按 **Markdown** 渲染：粗体、`代码`、列表、链接都会正常显示，不再把 `**`、反引号这类符号原样露给用户。"
+      },
+      {
+        "type": "opt",
+        "text": "市场精选大图换了动效：底部有暖色余烬缓慢上浮、边缘一圈呼吸式热辉，左上角图标换成火焰 —— 表达「这是最热门的模组」，同时保留原有的宇宙漂移与青色掠光。"
+      },
+      {
+        "type": "fix",
+        "text": "修正部分模组**下载量显示为 0** 的问题：市场索引偶尔取不到 GitHub 的下载计数；启动器现在会在这种情况下用镜像命中数兜底，精选排序也不会再把它们排到最后。"
+      },
+      {
+        "type": "new",
+        "text": "**模组绑定机制正式生效**：新建模组自动带有启动器校验（`lib/launcherGuard.js` 与清单里的 `binding`），并在模组目录里附带一份给 AI 编码助手的硬性要求（`AGENTS.md`）；投稿上架要求清单声明绑定；**官方启动器不再加载没有声明绑定的模组** —— 受影响的老模组在清单里补上 `binding` 并重新签名发布即可恢复。"
+      }
+    ],
+    "en": [
+      {
+        "type": "opt",
+        "text": "The boot splash now holds for **5 seconds** instead of 20, saving about 15 seconds on every launch. The star-map animation loops, so a shorter hold never cuts it mid-way."
+      },
+      {
+        "type": "new",
+        "text": "A mod's description and feature bullets are now rendered as **Markdown**: bold, `code`, lists and links all display properly instead of showing raw `**` and backticks."
+      },
+      {
+        "type": "opt",
+        "text": "The market hero has a new animation: warm embers drifting upward and a breathing heat halo around the edge, with a flame icon - it reads as \"this is the hottest mod\" while keeping the existing cosmic drift and the cyan sweep."
+      },
+      {
+        "type": "fix",
+        "text": "Fixed mods showing **zero downloads**: the market index occasionally fails to read GitHub's counters; the launcher now falls back to mirror hits in that case, so the featured ranking no longer pushes those mods to the bottom."
+      },
+      {
+        "type": "new",
+        "text": "**Launcher binding is now in force**: a newly created mod ships the launcher check (`lib/launcherGuard.js` plus `binding` in the manifest) and an `AGENTS.md` with hard requirements for AI coding assistants; submitting for listing requires the binding declaration; and **the official launcher no longer loads a mod that does not declare one** - affected mods recover by adding `binding` to their manifest and publishing a new signed version."
+      }
+    ]
+  }
+}

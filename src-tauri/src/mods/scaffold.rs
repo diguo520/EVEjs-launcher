@@ -39,10 +39,19 @@ pub struct ScaffoldTemplate {
 /// 这样它是一份能 `node --check`、能被测的代码 —— 安全关键的东西不该只活在字符串里。
 const GUARD_SOURCE: &str = include_str!("../../../ui/web/mod-template/launcherGuard.js");
 
+/// 给 **AI 编码助手**看的硬性要求：新模组里会落成 `AGENTS.md`。
+///
+/// 为什么源文件叫 `.template` 而不直接叫 `AGENTS.md`：`AGENTS.md` 是编码助手**会自动读取**的名字，
+/// 而这份文件躺在**启动器仓库**里 —— 直接叫 `AGENTS.md` 的话，启动器仓库自己也会把它当工作区指令
+/// 读进去（2026-10-23 实测：刚写完就被自动加载，而内容是说给「模组作者」的）。
+/// 只有生成到模组目录里时才该叫 `AGENTS.md`，所以源文件带扩展名，由 `create_mod` 落盘改名。
+const AGENTS_SOURCE: &str = include_str!("../../../ui/web/mod-template/AGENTS.md.template");
+
 const TEMPLATE_FILES: &[&str] = &[
     "evejs-launcher.mod.json",
     "loader.js",
     "lib/launcherGuard.js",
+    "AGENTS.md",
     "README.md",
     "CHANGELOG.md",
     "shots/README.md",
@@ -153,6 +162,7 @@ fn template_size_bytes(template: &ScaffoldTemplate) -> u64 {
     total += changelog_from(&draft).len() as u64;
     total += SHOTS_README.len() as u64;
     total += GUARD_SOURCE.len() as u64;
+    total += AGENTS_SOURCE.len() as u64;
     total
 }
 
@@ -651,6 +661,8 @@ pub fn create_mod(
         let guard_dir = stage.join("lib");
         fs::create_dir_all(&guard_dir)?;
         fs::write(guard_dir.join("launcherGuard.js"), GUARD_SOURCE)?;
+        // 给 AI 编码助手看的硬性要求：落成模组根目录的 AGENTS.md（源文件带 .template，见常量注释）
+        fs::write(stage.join("AGENTS.md"), AGENTS_SOURCE)?;
         // 截图目录：写一份说明把它撑住（空目录在 git / ZIP 里留不住），
         // 作者往里丢图即可，发布时会被 `submit::shots_for_listing` 自动收进清单
         let shots_dir = stage.join("shots");
@@ -1177,6 +1189,10 @@ mod tests {
         // 默认禁用
         assert!(dir.join(scan::LOADER_DISABLED).is_file());
         assert!(!dir.join(scan::LOADER_ENABLED).exists());
+        // 绑定机制的两个随包文件：守卫本体 + 给 AI 编码助手的硬性要求
+        // （源文件是 `AGENTS.md.template`，生成时改名成 `AGENTS.md` —— 见 `AGENTS_SOURCE` 的注释）
+        assert!(dir.join("lib").join("launcherGuard.js").is_file());
+        assert!(dir.join("AGENTS.md").is_file());
 
         let record = scan::read_mod_dir("demo-mod", &dir);
         assert!(
@@ -1184,6 +1200,10 @@ mod tests {
             "生成的清单必须通过扫描器校验：{}",
             record.error
         );
+        // 新模组**默认就声明了「只归官方启动器」** —— 硬开之后（2026-10-23）
+        // 没有这一段，官方启动器根本不会加载它。这条断言把这个默认行为钉住。
+        assert_eq!(record.binding_launcher, crate::launcher_grant::LAUNCHER_ID);
+
         assert_eq!(record.id, "demo-mod");
         assert_eq!(record.display_name, "演示模组");
         assert_eq!(record.version, "1.2.3");
@@ -1488,9 +1508,10 @@ mod tests {
         assert_eq!(list[0]["id"], json!("broadcast"));
         assert_eq!(list[1]["id"], json!("blank"));
         assert_eq!(list[0]["requiresRestart"], json!(true));
-        // 4 个骨架文件 + `shots/README.md`（截图目录的说明）+ `lib/launcherGuard.js`（绑定守卫）
-        assert_eq!(list[0]["files"].as_array().unwrap().len(), 6);
-        assert_eq!(list[0]["fileCount"], json!(6));
+        // 骨架文件 + `shots/README.md`（截图目录说明）+ `lib/launcherGuard.js`（绑定守卫）
+        // + `AGENTS.md`（给 AI 编码助手的硬性要求）
+        assert_eq!(list[0]["files"].as_array().unwrap().len(), 7);
+        assert_eq!(list[0]["fileCount"], json!(7));
         assert!(list[0]["files"]
             .as_array()
             .unwrap()

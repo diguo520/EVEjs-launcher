@@ -94,6 +94,78 @@ body {
   animation: market-banner-sweep 14s ease-in-out infinite;
 }
 
+/* ============================================================
+   精选位 = 全场最热门（下载量 + 星标综合分第一）。动效分三层，语义各不相同：
+     · `market-banner-drift`（原有）—— 极慢的平移缩放：舷窗外缓慢漂移的矿区，宇宙感；
+     · `market-ember-rise`（新增）—— 底部往上浮的暖色余烬：「热」；
+     · `market-heat-halo`（新增）—— 边缘一圈呼吸式热辉：把视线先吸过去。
+
+   冷色的底子（深空蓝 + 主色青）保持不动，暖色只用来表达热度 —— 有对比才读得出「热」。
+   全部纯 CSS：不加图、不加请求，作者换成任何画风的横幅都不会被带偏。
+   ============================================================ */
+@keyframes market-ember-rise {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0) scale(0.6);
+  }
+  16% {
+    opacity: 0.9;
+  }
+  72% {
+    opacity: 0.55;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(7px, -86px, 0) scale(1.15);
+  }
+}
+
+.market-ember {
+  position: absolute;
+  bottom: -6px;
+  border-radius: 9999px;
+  background: radial-gradient(
+    circle,
+    rgba(255, 214, 150, 0.95) 0%,
+    rgba(255, 138, 76, 0.55) 45%,
+    rgba(255, 96, 48, 0) 72%
+  );
+  box-shadow: 0 0 6px rgba(255, 150, 80, 0.55);
+  animation: market-ember-rise 8s linear infinite;
+  will-change: transform, opacity;
+}
+
+@keyframes market-heat-halo {
+  0%,
+  100% {
+    opacity: 0.32;
+  }
+  50% {
+    opacity: 0.62;
+  }
+}
+
+.market-heat-halo {
+  pointer-events: none;
+  background:
+    radial-gradient(120% 92% at 84% 14%, rgba(255, 146, 78, 0.26) 0%, rgba(255, 146, 78, 0) 60%),
+    radial-gradient(96% 84% at 8% 96%, rgba(255, 196, 120, 0.18) 0%, rgba(255, 196, 120, 0) 58%);
+  animation: market-heat-halo 9.5s ease-in-out infinite;
+  mix-blend-mode: screen;
+}
+
+/* 关掉动效时余烬必须**藏起来**而不是停在起始帧：没有动画就没有关键帧里的 opacity，
+   底层样式又给了它可见的背景 —— 不显式清零会留下几颗静止的亮点。 */
+@media (prefers-reduced-motion: reduce) {
+  .market-ember,
+  .market-heat-halo {
+    animation: none;
+  }
+  .market-ember {
+    opacity: 0;
+  }
+}
+
 /* 弹窗只动透明度：任何 transform 动画都会覆盖 left/top 50% 的居中位移 */
 @keyframes dialog-content-in {
   from {

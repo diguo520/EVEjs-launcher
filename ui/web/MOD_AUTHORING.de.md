@@ -177,7 +177,7 @@ im Verzeichnis muss loader.js oder loader.js.disabled liegen
 🟩 **Das Gerüst bringt diese Launcher-Bindung schon mit** (seit dem 2026-10-22): das erzeugte Mod enthält `lib/launcherGuard.js`, und das Manifest trägt einen `binding`-Block (`enforce: "observe"` als Standard - er protokolliert nur und blockiert nie). Er besagt
 „dieses Mod läuft nur unter dem offiziellen EveJS Launcher“. Zum Aktivieren `enforce` auf `"enforce"` setzen -
 **zuerst das Protokoll lesen**. Es ist der `binding`-Block im Manifest und
-die vollständige Anleitung steht in **Anhang I**.
+die vollständige Anleitung steht in **Anhang I**. Wenn eine KI Ihr Mod schreibt, lassen Sie sie die mitgelieferte `AGENTS.md` lesen.
 ---
 
 ## Schritt 5 ✅ Deine Logik schreiben (`loader.js`)
@@ -667,7 +667,7 @@ Nach erfolgreicher Veröffentlichung wird der Marktindex **sofort beim Merge dei
 # Anhang I: Launcher-Bindung (dieses Mod läuft nur unter dem offiziellen Launcher)
 
 Seit dem 2026-10-22 übergibt der offizielle Launcher eine **signierte Lizenz** (Umgebungsvariable `EVEJS_LAUNCHER_GRANT`).
-Ein Mod, der sie prüft, weiß: der Lauf kommt wirklich vom offiziellen EveJS Launcher und nicht nur von jemandem, der den Server gestartet hat.
+Ein Mod, der sie prüft, weiß: der Lauf kommt wirklich vom offiziellen EveJS Launcher und nicht nur von jemandem, der den Server gestartet hat. (**Auch KI-Coding-Assistenten müssen sich daran halten.**)
 
 **Das Gerüst eines neuen Mods bringt diese Prüfung schon mit** (`lib/launcherGuard.js` und `binding` im Manifest); du entscheidest nur, wann blockiert wird.
 

@@ -177,7 +177,7 @@ le dossier doit contenir loader.js ou loader.js.disabled
 🟩 **Le squelette embarque déjà ce contrôle de liaison** (depuis le 2026-10-22) : le mod généré contient `lib/launcherGuard.js`, et le manifeste porte un bloc `binding` (`enforce: "observe"` par défaut - il journalise seulement, sans bloquer). Cela dit
 « ce mod ne tourne que sous le lanceur officiel EveJS ». Pour l'activer, passez `enforce` à `"enforce"` -
 **lisez d'abord le journal**. C'est le bloc `binding` du manifeste et
-la marche à suivre complète est dans l'**Annexe I**.
+la marche à suivre complète est dans l'**Annexe I**. Si une IA écrit votre mod, faites-lui lire l'`AGENTS.md` fourni avec le squelette.
 ---
 
 ## Étape 5 ✅ Écrire votre logique (`loader.js`)
@@ -667,7 +667,7 @@ Après une publication réussie, l'index du marché est reconstruit **immédiate
 # Annexe I : liaison au lanceur (ce mod ne tourne que sous le lanceur officiel)
 
 Depuis le 2026-10-22, le lanceur officiel transmet une **licence signée** (variable d'environnement `EVEJS_LAUNCHER_GRANT`).
-Un mod qui la vérifie sait que l'exécution vient bien du lanceur officiel EveJS, et pas seulement de quelqu'un qui a démarré le serveur.
+Un mod qui la vérifie sait que l'exécution vient bien du lanceur officiel EveJS, et pas seulement de quelqu'un qui a démarré le serveur. (**Les assistants de codage IA doivent aussi s'y conformer.**)
 
 **Le squelette d'un nouveau mod embarque déjà ce contrôle** (`lib/launcherGuard.js` et le bloc `binding` du manifeste) ; il ne reste qu'à décider quand bloquer.
 

@@ -176,7 +176,7 @@ activation.strategy: "loader_rename"   ← 必须是这个
 🟩 **骨架自带「启动器绑定」检查**（2026-10-22 起）：生成的模组里有 `lib/launcherGuard.js`，
 清单里也有 `binding` 块（默认 `enforce: "observe"` —— 只记日志、不拦）。它的含义是
 「这个模组只认官方 EveJS Launcher」：想启用就把 `enforce` 改成 `"enforce"`，
-**切换前先看日志**。完整说明见 **附录 I**。
+**切换前先看日志**。完整说明见 **附录 I**。用 AI 写模组的，请让它先读骨架里的 `AGENTS.md`。
 
 ---
 
@@ -667,7 +667,7 @@ if (bus && bus.api >= 1) {
 # 附录 I：启动器绑定（这个模组只认官方启动器）
 
 2026-10-22 起，官方启动器会往下传一份**已签名的许可**（环境变量 `EVEJS_LAUNCHER_GRANT`）。
-模组验过它，就知道「这次运行确实来自官方 EveJS Launcher」，而不只是「有人把服务端跑起来了」。
+模组验过它，就知道「这次运行确实来自官方 EveJS Launcher」，而不只是「有人把服务端跑起来了」。（**AI 编码助手也必须照此**）
 
 **新模组的骨架已经自带这套检查**（`lib/launcherGuard.js` + 清单里的 `binding`），你只需决定何时开始拦。
 

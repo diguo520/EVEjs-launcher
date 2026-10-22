@@ -23,6 +23,7 @@ import type {
 import {
   FEATURES_HEADING,
   compareVersions,
+  effectiveDownloads,
   normalizeModCategory,
   ratingFromStarCount,
   readmeParagraphs,
@@ -191,7 +192,11 @@ export function fromMarket(mod: RawMarketMod): ModEntry {
     desc: mod.description || "",
     tags: Array.isArray(mod.tags) ? mod.tags : [],
     needsRestart: mod.requiresRestart !== false,
-    downloads: mod.downloads ?? mod.cdnHits ?? 0,
+    // ⚠️ 不能写成 `mod.downloads ?? mod.cdnHits ?? 0`：索引里的 `downloads` 是**存在且为 0**，
+    // `??` 只在 null/undefined 时兜底，于是一整批"抓失败被写成 0"的模组永远显示 0、
+    // 也永远进不了精选（实测 evejs-automining / autolockfire / faction-sim 都是这种）。
+    // 判定与取舍见 `effectiveDownloads`。
+    downloads: effectiveDownloads(mod),
     // 评价服务的快照并进来的聚合分；服务没接通时后端给的就是 0/0，界面自然显示「暂无评分」
     ratingAvg: ratingCount0(mod.ratingAvg),
     ratingCount: ratingCount0(mod.ratingCount),

@@ -1332,6 +1332,43 @@ export function marketVersionOf(mod: ModEntry): string {
 export const FEATURED_SLOTS = 3
 
 /**
+ * 索引里的「下载量」到底能不能用 —— 不能用就用 CDN 命中数顶上。
+ *
+ * 为什么需要这一步（2026-10-23 实测）：市场索引由 `EVEjs-mods` 仓库构建，逐仓抓
+ * GitHub releases 的资产下载数**求和**（规则本身是对的）。但**抓失败时它会写成 0，而不是报错**，
+ * 于是 `downloads` 同时有两种含义：真的是 0，和"没取到"。实测同一批数据：
+ *
+ *   · 中文文本修复 609 —— GitHub 求和 609，**完全一致**；
+ *   · 任务修复    175 —— GitHub 求和 177；
+ *   · evejs-automining   索引 0 / GitHub **749**；
+ *   · evejs-autolockfire 索引 0 / GitHub **830**；
+ *   · evejs-faction-sim  索引 0 / GitHub **1082**。
+ *
+ * 判据：`downloads` 为 0 **且** `cdnHits` > 0 → 这个 0 是缺的，用 `cdnHits` 顶上。
+ * 两个都是 0 时**无法区分**（新模组真没下载 vs 两个计数都没取到），照实留 0，**不编数字**。
+ *
+ * ⚠️ 这是**止血**，不是根治：它救不了 `cdnHits` 也是 0 的模组（例如 faction-sim：
+ * 真实 1082，两个计数都是 0）。根治在索引侧 —— 构建失败不得写成 0。
+ */
+export function effectiveDownloads(mod: {
+  downloads?: number
+  cdnHits?: number
+}): number {
+  // `Number.isFinite` 的签名是 `(number: unknown)`，**不做类型收窄** —— 必须先用 `typeof` 收窄，
+  // 否则 `Math.max(0, mod.downloads)` 里那个 `number | undefined` 过不了 tsc（vitest 不做类型检查，
+  // 所以单测绿了也说明不了问题）。
+  const downloads =
+    typeof mod.downloads === "number" && Number.isFinite(mod.downloads)
+      ? Math.max(0, mod.downloads)
+      : 0
+  const cdnHits =
+    typeof mod.cdnHits === "number" && Number.isFinite(mod.cdnHits)
+      ? Math.max(0, mod.cdnHits)
+      : 0
+  return downloads === 0 && cdnHits > 0 ? cdnHits : downloads
+}
+
+/**
  * 精选综合分 = **下载量 + 星星数**。
  *
  * 为什么直接相加而不是加权或归一化：

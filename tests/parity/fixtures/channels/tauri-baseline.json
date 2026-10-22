@@ -25,7 +25,7 @@
       "phase": "3-4",
       "platform": "win32",
       "repoRoot": "<abs-path>",
-      "version": "0.5.4"
+      "version": "0.5.5"
     },
     "config:get": {
       "client": {
@@ -172,10 +172,10 @@
       "supported": true
     },
     "metrics:get": {
-      "cpuPercent": 100,
+      "cpuPercent": 32.545310974121094,
       "diskRoot": "<abs-path>",
       "diskTotalGB": 976.5624961853028,
-      "diskUsedGB": 779.7008247375488,
+      "diskUsedGB": 781.9889106750488,
       "gpuDedicatedTotalGB": null,
       "gpuDedicatedUsedGB": null,
       "gpuMemoryTotalGB": null,
@@ -183,31 +183,31 @@
       "gpuPercent": null,
       "gpuSharedUsedGB": null,
       "memTotalGB": 31.855934143066406,
-      "memUsedGB": 14.375545501708984,
-      "netBytesPerSec": 1277724.2864835756,
+      "memUsedGB": 14.694175720214844,
+      "netBytesPerSec": 0,
       "virtualMemTotalGB": 34.80476760864258,
-      "virtualMemUsedGB": 28.086261749267575,
+      "virtualMemUsedGB": 23.607009887695312,
       "volumes": [
         {
-          "freeGB": 59.768028259277344,
-          "percent": 73.12947297814884,
+          "freeGB": 59.790897369384766,
+          "percent": 73.11919147716905,
           "root": "<abs-path>",
           "totalGB": 222.4296836853027,
-          "usedGB": 162.6616554260254
+          "usedGB": 162.63878631591797
         },
         {
-          "freeGB": 156.8541259765625,
-          "percent": 46.46045763620388,
+          "freeGB": 156.89669799804688,
+          "percent": 46.44592638601467,
           "root": "<abs-path>",
           "totalGB": 292.96874618530273,
-          "usedGB": 136.11462020874023
+          "usedGB": 136.07204818725586
         },
         {
-          "freeGB": 196.8616714477539,
-          "percent": 79.84136476500532,
+          "freeGB": 194.5735855102539,
+          "percent": 80.07566476592056,
           "root": "<abs-path>",
           "totalGB": 976.5624961853028,
-          "usedGB": 779.7008247375488
+          "usedGB": 781.9889106750488
         },
         {
           "freeGB": 390.2404022216797,
@@ -263,11 +263,12 @@
         {
           "category": "玩法",
           "desc": "加载模组后会在游戏本地聊天框看到一条「欢迎回来，飞行员」的信息。",
-          "fileCount": 6,
+          "fileCount": 7,
           "files": [
             "evejs-launcher.mod.json",
             "loader.js",
             "lib/launcherGuard.js",
+            "AGENTS.md",
             "README.md",
             "CHANGELOG.md",
             "shots/README.md"
@@ -281,7 +282,7 @@
           "id": "broadcast",
           "name": "Welcome Broadcast (Example)",
           "requiresRestart": true,
-          "sizeBytes": 24964,
+          "sizeBytes": 28355,
           "tags": [
             "聊天",
             "新手"
@@ -290,11 +291,12 @@
         {
           "category": "玩法",
           "desc": "同样的加载骨架，业务逻辑留空，适合从零写起",
-          "fileCount": 6,
+          "fileCount": 7,
           "files": [
             "evejs-launcher.mod.json",
             "loader.js",
             "lib/launcherGuard.js",
+            "AGENTS.md",
             "README.md",
             "CHANGELOG.md",
             "shots/README.md"
@@ -307,7 +309,7 @@
           "id": "blank",
           "name": "Blank Skeleton",
           "requiresRestart": true,
-          "sizeBytes": 23317,
+          "sizeBytes": 26708,
           "tags": []
         }
       ]
@@ -340,7 +342,7 @@
     "terminal:input": null,
     "terminal:resize": null,
     "update:state": {
-      "currentVersion": "0.5.4",
+      "currentVersion": "0.5.5",
       "state": "idle"
     }
   }

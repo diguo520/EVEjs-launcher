@@ -93,6 +93,36 @@ describe("fromMarket / applyLocal / applyMine", () => {
     expect(entry.installed).toBe(false)
   })
 
+  it("索引把下载量写坏成 0 时，用 CDN 命中数兜底（显示与精选排序一起被修好）", () => {
+    // 实测（2026-10-23）：这几个在 GitHub 上有几百次下载，索引却是 0
+    const broken = fromMarket({
+      id: "evejs-automining",
+      displayName: "evejs-AutoMining",
+      version: "1.0.15",
+      downloads: 0,
+      cdnHits: 554,
+    } as unknown as RawMarketMod)
+    expect(broken.downloads).toBe(554)
+
+    // 两个计数都是 0 → 无法区分「真没下载」与「都没取到」，照实留 0，不编数字
+    const unknown = fromMarket({
+      id: "evejs-faction-sim",
+      displayName: "势力模拟",
+      downloads: 0,
+      cdnHits: 0,
+    } as unknown as RawMarketMod)
+    expect(unknown.downloads).toBe(0)
+
+    // 索引本来就对的不许动：中文文本修复 索引 609 / GitHub 求和 609
+    const honest = fromMarket({
+      id: "evejs-cntext-fix",
+      displayName: "中文文本修复",
+      downloads: 609,
+      cdnHits: 55,
+    } as unknown as RawMarketMod)
+    expect(honest.downloads).toBe(609)
+  })
+
   it("本地扫描叠加到市场条目上", () => {
     const merged = applyLocal(entry, {
       id: "demo",

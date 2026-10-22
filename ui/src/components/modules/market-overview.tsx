@@ -3,13 +3,13 @@ import { useState } from "react"
 import {
   ArrowRight,
   Bookmark,
+  Flame,
   FolderOpen,
   Layers3,
   Loader2,
   Package,
   RefreshCw,
   Search,
-  Sparkles,
   Star,
   Upload,
 } from "lucide-react"
@@ -211,6 +211,24 @@ function clipText(text: string, max: number): string {
   return chars.length > max ? `${chars.slice(0, max).join("")}…` : chars.join("")
 }
 
+/**
+ * 精选位的余烬：几颗暖色小点在横幅上缓慢上浮 —— 直读就是「热」。
+ *
+ * 为什么用 DOM 而不是再加一张图：作者横幅可能是**任何**画风，换图/删图随时发生，
+ * 叠加式效果不会被带偏；而且纯 CSS，零资源、零请求。
+ *
+ * 位置与节奏**写死成常量**（不随机）：同一个模组每次渲染观感必须一致，
+ * 否则三个精选位会随重渲染「跳」一下。
+ */
+const MARKET_EMBERS = [
+  { left: "12%", delay: "0s", duration: "7.5s", size: 2 },
+  { left: "26%", delay: "1.6s", duration: "8.6s", size: 1.5 },
+  { left: "41%", delay: "3.1s", duration: "7.0s", size: 2.5 },
+  { left: "58%", delay: "0.8s", duration: "9.2s", size: 1.5 },
+  { left: "72%", delay: "2.4s", duration: "8.0s", size: 2 },
+  { left: "88%", delay: "4.0s", duration: "7.8s", size: 1.5 },
+] as const
+
 export function MarketSpotlight({
   featured,
   secondary,
@@ -248,10 +266,27 @@ export function MarketSpotlight({
           />
           <div className="market-banner-scrim absolute inset-0" />
           <div className="market-banner-sweep absolute inset-y-0 w-1/2" />
+          {/* 精选 = 全场最热门：边缘一层呼吸式热辉，把视线先吸过来。
+              冷色底子不动，暖色只用来表达「热」—— 有对比才读得出。 */}
+          <div className="market-heat-halo absolute inset-0" />
+          {/* 底部上浮的暖色余烬。位置/节奏是常量（见 MARKET_EMBERS），不随机。 */}
+          {MARKET_EMBERS.map((ember) => (
+            <span
+              key={ember.left}
+              className="market-ember"
+              style={{
+                left: ember.left,
+                width: `${ember.size}px`,
+                height: `${ember.size}px`,
+                animationDelay: ember.delay,
+                animationDuration: ember.duration,
+              }}
+            />
+          ))}
         </div>
         <div className="relative flex h-full min-h-0 flex-col p-5 pb-4">
           <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-primary">
-            <Sparkles className="size-3.5" />
+            <Flame className="size-3.5" />
             Editor&apos;s pick
           </div>
           {featured ? (

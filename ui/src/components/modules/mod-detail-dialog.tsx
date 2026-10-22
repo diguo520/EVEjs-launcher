@@ -1,4 +1,6 @@
 import type { ReactNode } from "react"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 import {
   Bookmark,
   Check,
@@ -86,7 +88,16 @@ function FeatureList({ features }: { features: string[] }) {
           className="flex items-start gap-2 text-[12px] leading-relaxed text-muted-foreground"
         >
           <Check className="mt-0.5 size-3.5 shrink-0 text-primary" />
-          <span className="min-w-0">{item}</span>
+          {/* 要点也走一行 Markdown：作者爱在要点里写 `代码` 或 **加粗**，不给它渲染就会露出符号。
+              把 `p` 展平成片段，免得每一条要点都被包成一段、多出一圈上下外边距。 */}
+          <span className="min-w-0">
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={{ p: ({ children }) => <>{children}</> }}
+            >
+              {item}
+            </ReactMarkdown>
+          </span>
         </li>
       ))}
     </ul>
@@ -464,15 +475,21 @@ export function ModDetailDialog({
               title="功能说明"
             >
               {paragraphs.length > 0 ? (
-                <div className="space-y-2">
-                  {paragraphs.map((paragraph) => (
-                    <p
-                      key={paragraph.slice(0, 12)}
-                      className="text-[12px] leading-relaxed text-muted-foreground"
-                    >
-                      {paragraph}
-                    </p>
-                  ))}
+                /*
+                 * 用 Markdown 渲染而不是逐段 `<p>`：作者写的正文里本来就可能带
+                 * `**粗体**`、`` `代码` ``、`- 列表`、链接 —— 当纯文本显示时那些符号
+                 * 原样露在用户眼前，读起来像乱码。
+                 *
+                 * 段落之间补空行再整体渲染（Markdown 靠空行分段）：逐段各渲染一次的话，
+                 * 列表会被切成一个个独立的 `<ul>`，序号与缩进全丢。
+                 *
+                 * 安全：ReactMarkdown **默认不放行原始 HTML**（没装 rehype-raw），
+                 * 模组作者塞的 `<script>` / `<img onerror>` 只会被当文本转义显示。
+                 */
+                <div className="md-body">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {paragraphs.join("\n\n")}
+                  </ReactMarkdown>
                 </div>
               ) : (
                 <p className="text-[12px] leading-relaxed text-muted-foreground">

@@ -176,7 +176,7 @@ The folder must contain loader.js or loader.js.disabled
 🟩 **The skeleton already ships this launcher-binding check** (since 2026-10-22): the generated mod contains `lib/launcherGuard.js`, and the manifest carries a `binding` block (`enforce: "observe"` by default - it only logs and never blocks). It says
 "this mod only runs under the official EveJS Launcher". To turn it on, change `enforce` to `"enforce"` -
 **read the log first**. It is a `binding` block in the manifest and
-the full walkthrough is in **Appendix I**.
+the full walkthrough is in **Appendix I**. If an AI writes your mod, have it read the `AGENTS.md` the skeleton ships.
 ---
 
 ## Step 5 ✅ Write your logic (`loader.js`)
@@ -667,7 +667,7 @@ After a successful publish, the market index is rebuilt **immediately when your 
 # Appendix I: Launcher binding (this mod only runs under the official launcher)
 
 Since 2026-10-22 the official launcher passes down a **signed grant** (the `EVEJS_LAUNCHER_GRANT` env var).
-A mod that verifies it knows the run really came from the official EveJS Launcher, not just from someone who started the server.
+A mod that verifies it knows the run really came from the official EveJS Launcher, not just from someone who started the server. (**AI coding assistants must follow this too.**)
 
 **The skeleton for a new mod already ships this check** (`lib/launcherGuard.js` plus `binding` in the manifest); you only decide when to enforce.
 

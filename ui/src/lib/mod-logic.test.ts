@@ -9,6 +9,7 @@ import {
   clampDesc,
   cooldownText,
   compareVersions,
+  effectiveDownloads,
   hasUpdate,
   isPublished,
   isSemverLike,
@@ -709,6 +710,30 @@ describe("formatCount（星标数按国际单位缩写）", () => {
     expect(formatCount(1_200_000)).toBe("1.2M")
     expect(formatCount(2_500_000_000)).toBe("2.5B")
     expect(formatCount(Number.NaN)).toBe("0")
+  })
+})
+
+describe("下载量缺失的兜底（effectiveDownloads）", () => {
+  it("downloads 是 0、但 cdnHits 有值 → 用 cdnHits", () => {
+    // 索引逐仓抓 GitHub 失败时会**写成 0 而不是报错**，这正是那批"下载量没了"的模组
+    expect(effectiveDownloads({ downloads: 0, cdnHits: 554 })).toBe(554)
+  })
+
+  it("downloads 有值就用它，不看 cdnHits", () => {
+    // 实测：中文文本修复 索引 609 / GitHub 求和 609，完全一致 —— 这种不该被改动
+    expect(effectiveDownloads({ downloads: 609, cdnHits: 55 })).toBe(609)
+  })
+
+  it("两个都是 0 就照实留 0，不编数字", () => {
+    // 新模组真没下载 vs 两个计数都没取到，这里分不出来 —— 宁可显示「暂无」也不猜
+    expect(effectiveDownloads({ downloads: 0, cdnHits: 0 })).toBe(0)
+    expect(effectiveDownloads({})).toBe(0)
+  })
+
+  it("负数 / NaN / 缺失一律按 0 处理", () => {
+    expect(effectiveDownloads({ downloads: -5, cdnHits: 0 })).toBe(0)
+    expect(effectiveDownloads({ downloads: NaN, cdnHits: 12 })).toBe(12)
+    expect(effectiveDownloads({ downloads: undefined, cdnHits: 120 })).toBe(120)
   })
 })
 
