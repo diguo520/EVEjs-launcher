@@ -45,10 +45,18 @@ const LICENSE_FILE: &str = "launcher-license.json";
 /// 安装标识文件（相对 runtime.user_data）。
 const INSTALL_ID_FILE: &str = "launcher-install-id.txt";
 
-/// 距过期不到这个窗口就值得续期（两天）。续期不参与启动关键路径。
-const REFRESH_WINDOW_MS: u64 = 2 * 24 * 60 * 60 * 1000;
+/// 距过期不到这个窗口就值得续期（**两周**）。续期不参与启动关键路径。
+///
+/// 与 90 天有效期配套：每次启动都会试一次，两周窗口 = 过期前有十几次机会。
+/// 那条链路在国内容易超时（见下），一次失败绝不能等于这段许可作废。
+const REFRESH_WINDOW_MS: u64 = 14 * 24 * 60 * 60 * 1000;
 /// 续期请求的超时。它不在启动路径上，但也不该无限挂着。
-const HTTP_TIMEOUT: Duration = Duration::from_secs(8);
+///
+/// **30 秒，不是 8 秒**：国内到 `ping.5318.cm`（Cloudflare）实测就是 8–30 秒
+/// （2026-10-22 实测：`/v1/health` 30s、正式签发 30.6s、版本闸门 403 8.6s）。
+/// 8 秒会大概率在拿到许可之前就放弃；续期不在启动路径上，多等一会儿的代价只是
+/// 后台线程多挂二十秒。
+const HTTP_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// 签发服务地址。**留空表示还没有这个服务**：留空时 refresh_license 直接返回 false，
 /// 启动器只用本地缓存（或什么都不发）。落服务后填真实地址，或用

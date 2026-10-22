@@ -37,8 +37,14 @@ export const DEFAULT_MODS = Object.freeze([
 /** 低于这个版本一律拒签（强制更新）；可用 LICENSE_MIN_LAUNCHER_VERSION 覆盖。 */
 export const DEFAULT_MIN_LAUNCHER_VERSION = "0.5.5"
 
-/** 许可有效期。短一点更安全：泄漏的许可会自己过期。 */
-export const DEFAULT_TTL_DAYS = 30
+/**
+ * 许可有效期。短一点更安全：泄漏的许可会自己过期。
+ *
+ * **90 天，不是 30 天**：国内到 ping.5318.cm 的链路实测 8–30 秒、还会偶发超时，
+ * 而启动器是「距过期两周内、每次启动试一次」。有效期太短会把偶发的网络失败
+ * 放大成「许可过期 → enforce 下模组对该用户失效」。宁可让泄漏窗口长一点。
+ */
+export const DEFAULT_TTL_DAYS = 90
 
 export const MAX_BODY_BYTES = 4 * 1024
 

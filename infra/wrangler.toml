@@ -14,7 +14,7 @@
 # 可选（不配就用 src/license.js 里的缺省）：
 #   LICENSE_MODS                 逗号分隔的授权 mod id 白名单（**别省略**，省略等于授权一切）
 #   LICENSE_MIN_LAUNCHER_VERSION 低于此版本拒签（强制更新的闸门）
-#   LICENSE_TTL_DAYS             许可有效期，缺省 30 天
+#   LICENSE_TTL_DAYS             许可有效期，缺省 90 天（见 license.js：链路慢，别调太短）
 #   npx wrangler deploy
 #
 # CI 里 `database_id` / KV `id` 由 GitHub Actions 的 vars 注入（workflow 会替换占位符），
