@@ -1,0 +1,10 @@
+# 这些文件被 `include_str!` 在**编译期**嵌进 exe，字节长度会直接进构建产物。
+#
+# 为什么必须钉住：Windows runner 的 git 默认 `core.autocrlf=true`，全新检出会把它们转成
+# CRLF；于是同一个 commit 在 CI 与本机编译出的长度不同 —— `mods:templates` 的 `sizeBytes`
+# 就是这么在 CI 上跟基线对不上的（2026-10-23 发 v0.5.5 前实测：CI 24964+339）。
+#
+# 钉成 LF，保证「同一个 commit ⇒ 同一串字节」。其它文件不动：不引入全局 `text=auto`，
+# 免得把别人的行尾约定一起改掉。
+ui/web/mod-template/*.js text eol=lf
+ui/web/MOD_AUTHORING*.md text eol=lf
