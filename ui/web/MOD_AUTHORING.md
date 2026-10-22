@@ -372,7 +372,7 @@ const hubPath = path.join(serverRoot, "src", "services", "chat", "chatHub.js");
 | `author` | ✅ | object | `{ id, name, keyId, publicKey }`（启动器自动写入） |
 | `requires` / `loadAfter` / `loadBefore` / `conflicts` | ⭕ | string[] | 依赖与冲突（写模组 id） |
 | `compatibility.evejsVersions` | ⭕ | string[] | 兼容的 EveJS 版本，如 `["0.12.8"]` |
-| `binding` | ⭕ | object | 声明「只归哪个启动器用」：`{ launcher, launcherKeyId, enforce }`。**缺省 = 没声明 = 一律放行**（老模组不受影响）。见附录 I |
+| `binding` | ⭕ | object | 声明「只归哪个启动器用」：`{ launcher, launcherKeyId, enforce }`。**缺省 = 没声明 = 官方启动器不再加载它**（0.5.5 起；老模组补上这一段才能继续跑）。见附录 I |
 | `signature` | ✅ | object | 签名（启动器自动生成） |
 
 # 附录 B：一个能跑的 loader 骨架
@@ -712,7 +712,7 @@ if (require("./lib/launcherGuard.js").gate("<你的模组 id>")) return;
 
 ## 已上架的模组怎么接入
 
-`binding` 是**可选新增键**（不写 = 没声明 = 一律放行，老模组不受影响）。接入三步：
+`binding` 是**可选新增键**（不写 = 没声明 = 官方启动器不再加载它；老模组补上这一段即可恢复）。接入三步：
 
 1. 拿到 `lib/launcherGuard.js`（从骨架或任一已接入的模组拷）；
 2. 在 `loader.js` 入口加 `gate("<你的模组 id>")`；

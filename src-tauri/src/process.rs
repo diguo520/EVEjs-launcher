@@ -1649,7 +1649,13 @@ mod tests {
                 "version": "1.0.0",
                 "kind": "loader",
                 "restart": "game_server",
-                "activation": { "strategy": "loader_rename" }
+                "activation": { "strategy": "loader_rename" },
+                // 硬开之后（2026-10-23）没声明 binding 的模组不会被注入，夹具要带上
+                "binding": {
+                    "launcher": crate::launcher_grant::LAUNCHER_ID,
+                    "launcherKeyId": crate::launcher_grant::primary_key_id(),
+                    "enforce": "observe"
+                }
             }))
             .unwrap(),
         )

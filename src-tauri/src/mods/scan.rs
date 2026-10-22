@@ -329,7 +329,7 @@ pub struct ModRecord {
     pub evejs_versions: Vec<String>,
     /// 清单里 `binding.launcher`：这份模组声明「只归哪个启动器用」。
     ///
-    /// 缺失 = 没声明（老模组一律原样放行）。它是**可选新增键**，清单校验是逐字段的，
+    /// 缺失 = 没声明 —— **从 2026-10-23 起等价于「不加载」**（见 `plan::ENFORCE_MOD_BINDING`）：
     /// 多了这个键**绝不能报 error**。见 docs/faction-sim启动器侧改动单-2026-10-21.md §4.3。
     pub binding_launcher: String,
     /// 清单里 `binding.launcherKeyId`：只是提示当前签发公钥，**不参与任何判定**。

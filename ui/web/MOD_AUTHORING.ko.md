@@ -372,7 +372,7 @@ const hubPath = path.join(serverRoot, "src", "services", "chat", "chatHub.js");
 | `author` | ✅ | object | `{ id, name, keyId, publicKey }`(런처가 자동 기록) |
 | `requires` / `loadAfter` / `loadBefore` / `conflicts` | ⭕ | string[] | 의존과 충돌(모드 id 기입) |
 | `compatibility.evejsVersions` | ⭕ | string[] | 호환 EveJS 버전, 예 `["0.12.8"]` |
-| `binding` | ⭕ | object | «어느 런처 전용인지» 선언: `{ launcher, launcherKeyId, enforce }`. **미기재 = 미선언 = 항상 허용** (기존 모드 무영향). 부록 I 참조 |
+| `binding` | ⭕ | object | «어느 런처 전용인지» 선언: `{ launcher, launcherKeyId, enforce }`. **미기재 = 미선언 = 공식 런처가 로드하지 않습니다** (0.5.5 부터. 기존 모드는 이 블록만 추가하면 복구). 부록 I 참조 |
 | `signature` | ✅ | object | 서명(런처가 자동 생성) |
 
 # 부록 B: 실제로 동작하는 loader 골격
@@ -712,7 +712,7 @@ if (require("./lib/launcherGuard.js").gate("<당신의 모드 id>")) return;
 
 ## 이미 올린 모드의 도입
 
-`binding` 은 **선택적 추가 키** (미기재 = 미선언 = 항상 허용, 기존 모드 무영향). 세 단계:
+`binding` 은 **선택적 추가 키** (미기재 = 미선언 = 공식 런처가 로드하지 않습니다. 기존 모드는 이 블록만 추가). 세 단계:
 
 1. `lib/launcherGuard.js` 확보 (골격 또는 이미 도입한 모드에서 복사);
 2. `loader.js` 진입점에 `gate("<당신의 모드 id>")` 추가;

@@ -73,12 +73,24 @@ pub fn set_mod_order(runtime: &RuntimePaths, folders: &[String]) -> Value {
 
 /* ------------------------------ 注入计划 ------------------------------ */
 
-/// 是否拦截「绑定到别的启动器」的模组。
+/// **模组必须声明「只归官方 EveJS Launcher 用」才会被加载**（2026-10-23 硬开）。
 ///
-/// **默认关闭是刻意的**：见 docs/faction-sim启动器侧改动单-2026-10-21.md §5.3 的「上线顺序」——
-/// 第一步只下发 grant、不启用任何拦截。打开它会让用户不再加载这类模组，属于行为变化，
-/// 必须等引入 grant 的那个启动器版本普及到位（enforce 的固有上限见同一节）。
-const ENFORCE_MOD_BINDING: bool = false;
+/// 三态：
+///   · 声明了 `binding.launcher = evejs-launcher` → 加载；
+///   · 声明了别的启动器 → 拒绝；
+///   · **完全没声明** → 拒绝（这一条是关键：老模组必须补上 `binding` 才能继续跑）。
+///
+/// 为什么敢硬开：上游（作者侧）已经先落地了两件事 ——
+///   · 「创建模组」生成的骨架自带守卫与 `binding`（2026-10-22）；
+///   · 投稿审核要求清单必须有绑定声明（同日）。
+/// 也就是说**新模组不会再出现「没声明」这个状态**，剩下的只有存量模组。
+///
+/// ⚠️ 这是**破坏性变更**：存量里没声明的模组本版起不再加载。用户看到的理由是
+/// 可操作的（指向模组制作教程附录 I），作者补 3 行 JSON 并重签即可恢复。
+///
+/// **故意不留环境变量后门**：留了就等于发一张「教用户绕过」的通行证，
+/// 而这条策略的全部价值就在于它没有开关。真出问题就发修订版。
+const ENFORCE_MOD_BINDING: bool = true;
 
 struct Skip {
     id: String,
@@ -119,18 +131,24 @@ pub fn plan_loaders(repo_root: &Path, runtime: &RuntimePaths) -> Value {
             });
             continue;
         }
-        // 声明了绑定、但不是发给本启动器的 → 不加载。
+        // 没声明「只归官方启动器」= 不加载（三态见 `ENFORCE_MOD_BINDING` 的注释）。
         //
-        // ⚠️ 由 `ENFORCE_MOD_BINDING` 把关，默认**关闭**（见该常量的注释）。
-        // 注意方向：这一路保护的是「我们的用户装到了别人的包」，
-        // 它挡不住「竞品拿我们的模组」——那只能靠模组侧守卫 + 许可。
-        if ENFORCE_MOD_BINDING
-            && !item.binding_launcher.is_empty()
-            && item.binding_launcher != crate::launcher_grant::LAUNCHER_ID
-        {
+        // 方向要记住：这一路保护的是「**我们的用户**装到了别人的包 / 没接入的包」，
+        // 它挡不住「竞品拿走我们的模组」——那只能靠模组侧守卫 + 许可。
+        // 但反过来，硬开之后**作者想在我们的用户里跑就必须接入**，这就够了。
+        if ENFORCE_MOD_BINDING && item.binding_launcher != crate::launcher_grant::LAUNCHER_ID {
+            let reason = if item.binding_launcher.is_empty() {
+                "这个模组没有声明「只归官方 EveJS Launcher 用」（清单里缺 binding），本启动器不再加载它。\
+                 模组作者在清单里补上 binding（launcher / launcherKeyId / enforce）并重新签名发布后即可恢复；\
+                 新建模组时启动器生成的骨架已经自带这一段。\
+                 说明见模组制作教程的「附录 I：启动器绑定」。"
+                    .to_string()
+            } else {
+                format!("该模组绑定到其它启动器：{}", item.binding_launcher)
+            };
             skipped.push(Skip {
                 id: item.id.clone(),
-                reason: format!("该模组绑定到其它启动器：{}", item.binding_launcher),
+                reason,
             });
             continue;
         }
@@ -644,7 +662,14 @@ mod tests {
             "version": "1.0.0",
             "kind": "loader",
             "restart": "none",
-            "activation": { "strategy": "loader_rename" }
+            "activation": { "strategy": "loader_rename" },
+            // 硬开之后（2026-10-23）没这一段就会被跳过，夹具统一带上；
+            // 要测「没声明」的用例自己把它删掉（见 a_mod_without_a_launcher_binding_is_not_planned）。
+            "binding": {
+                "launcher": crate::launcher_grant::LAUNCHER_ID,
+                "launcherKeyId": crate::launcher_grant::primary_key_id(),
+                "enforce": "observe"
+            }
         });
         for (key, value) in extra.as_object().unwrap() {
             base[key] = value.clone();
@@ -836,6 +861,67 @@ mod tests {
         assert!(reasons.contains("缺少依赖: ghost"), "{reasons}");
         assert!(reasons.contains("清单校验失败"), "{reasons}");
         assert!(reasons.contains("签名校验失败"), "{reasons}");
+    }
+
+    /// **硬开（2026-10-23）**：清单里没声明「只归官方启动器」= 不加载。
+    ///
+    /// 这是破坏性变更的钉子：谁把 `ENFORCE_MOD_BINDING` 关回去、或者把「没声明」重新放行，
+    /// 它立刻红。理由文案也得是可操作的（指向教程附录 I）—— 用户看到的就是那一句。
+    #[test]
+    fn a_mod_without_a_launcher_binding_is_not_planned() {
+        let repo = repo_for("plan-needs-binding");
+        let runtime = runtime_for("plan-needs-binding");
+
+        write_mod(
+            &repo,
+            "bound",
+            manifest("bound", json!({})),
+            Some("// bound"),
+        );
+
+        // 没声明：整块删掉 —— 正是存量老模组的样子
+        let mut unbound = manifest("unbound", json!({}));
+        unbound.as_object_mut().unwrap().remove("binding");
+        write_mod(&repo, "unbound", unbound, Some("// unbound"));
+
+        // 声明了别的启动器
+        write_mod(
+            &repo,
+            "other",
+            manifest(
+                "other",
+                json!({ "binding": { "launcher": "some-other-launcher", "enforce": "observe" } }),
+            ),
+            Some("// other"),
+        );
+
+        let plan = plan_loaders(&repo, &runtime);
+        let paths: Vec<String> = plan["paths"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|value| value.as_str().unwrap().to_string())
+            .collect();
+        assert_eq!(
+            paths.len(),
+            1,
+            "只有声明了官方启动器的那个能注入：{paths:?}"
+        );
+        assert!(paths[0].ends_with("bound/loader.js"));
+
+        let reasons: String = plan["skipped"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|item| item["reason"].as_str().unwrap().to_string())
+            .collect::<Vec<_>>()
+            .join(" | ");
+        assert!(reasons.contains("没有声明"), "没声明要被跳过：{reasons}");
+        assert!(reasons.contains("附录 I"), "理由要指向教程：{reasons}");
+        assert!(
+            reasons.contains("绑定到其它启动器"),
+            "绑别人要被跳过：{reasons}"
+        );
     }
 
     #[test]

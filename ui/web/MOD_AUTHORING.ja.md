@@ -372,7 +372,7 @@ const hubPath = path.join(serverRoot, "src", "services", "chat", "chatHub.js");
 | `author` | ✅ | object | `{ id, name, keyId, publicKey }`（ランチャーが自動で書き込み） |
 | `requires` / `loadAfter` / `loadBefore` / `conflicts` | ⭕ | string[] | 依存と衝突（模組 id を書く） |
 | `compatibility.evejsVersions` | ⭕ | string[] | 対応 EveJS バージョン。例 `["0.12.8"]` |
-| `binding` | ⭕ | object | 「どのランチャー専用か」の宣言：`{ launcher, launcherKeyId, enforce }`。**未記載 = 未宣言 = 常に許可**（既存 MOD は無影響）。付録 I 参照 |
+| `binding` | ⭕ | object | 「どのランチャー専用か」の宣言：`{ launcher, launcherKeyId, enforce }`。**未記載 = 未宣言 = 公式ランチャーは読み込みません**（0.5.5 以降。既存 MOD はこのブロックを足せば復帰）。付録 I 参照 |
 | `signature` | ✅ | object | 署名（ランチャーが自動生成） |
 
 # 付録 B：そのまま動く loader スケルトン
@@ -712,7 +712,7 @@ if (require("./lib/launcherGuard.js").gate("<あなたの MOD id>")) return;
 
 ## 既存 MOD の導入手順
 
-`binding` は**任意の追加キー**（未記載 = 未宣言 = 常に許可、既存 MOD は無影響）。3 ステップ：
+`binding` は**任意の追加キー**（未記載 = 未宣言 = 公式ランチャーは読み込みません。既存 MOD はこのブロックを足すだけ）。3 ステップ：
 
 1. `lib/launcherGuard.js` を入手（スケルトンか導入済み MOD からコピー）；
 2. `loader.js` の入口に `gate("<あなたの MOD id>")` を追加；

@@ -372,7 +372,7 @@ Lanceur → Mods / plugins → **mes créations** :
 | `author` | ✅ | object | `{ id, name, keyId, publicKey }` (écrit automatiquement par le lanceur) |
 | `requires` / `loadAfter` / `loadBefore` / `conflicts` | ⭕ | string[] | Dépendances et conflits (ids de mods) |
 | `compatibility.evejsVersions` | ⭕ | string[] | Versions EveJS compatibles, par exemple `["0.12.8"]` |
-| `binding` | ⭕ | object | déclare « à quel lanceur ce mod appartient » : `{ launcher, launcherKeyId, enforce }`. **Absent = non déclaré = toujours autorisé** (les anciens mods ne bougent pas). Voir l'Annexe I |
+| `binding` | ⭕ | object | déclare « à quel lanceur ce mod appartient » : `{ launcher, launcherKeyId, enforce }`. **Absent = non déclaré = le lanceur officiel refuse de le charger** (depuis 0.5.5 ; les anciens mods ajoutent ce bloc pour repartir). Voir l'Annexe I |
 | `signature` | ✅ | object | Signature (générée automatiquement par le lanceur) |
 
 # Annexe B : un squelette de loader qui fonctionne
@@ -712,7 +712,7 @@ Cliquez simplement à nouveau sur « Publier le mod » : la signature est refait
 
 ## Intégrer un mod déjà publié
 
-`binding` est une **clé optionnelle** (absente = non déclaré = toujours autorisé, les anciens mods ne bougent pas). Trois étapes :
+`binding` est une **clé optionnelle** (absente = non déclaré = le lanceur officiel refuse de le charger ; les anciens mods ajoutent ce bloc). Trois étapes :
 
 1. récupérez `lib/launcherGuard.js` (copiez-le depuis le squelette ou un mod déjà intégré) ;
 2. ajoutez `gate("<id de votre mod>")` à l'entrée de `loader.js` ;

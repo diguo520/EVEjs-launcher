@@ -372,7 +372,7 @@ Launcher → Mods / Plugins → **Meine Mods**:
 | `author` | ✅ | object | `{ id, name, keyId, publicKey }` (schreibt der Launcher automatisch) |
 | `requires` / `loadAfter` / `loadBefore` / `conflicts` | ⭕ | string[] | Abhängigkeiten und Konflikte (Mod-IDs eintragen) |
 | `compatibility.evejsVersions` | ⭕ | string[] | Kompatible EveJS-Versionen, z. B. `["0.12.8"]` |
-| `binding` | ⭕ | object | erklärt „zu welchem Launcher dieses Mod gehört“: `{ launcher, launcherKeyId, enforce }`. **Fehlt er = nicht erklärt = immer erlaubt** (alte Mods bleiben unberührt). Siehe Anhang I |
+| `binding` | ⭕ | object | erklärt „zu welchem Launcher dieses Mod gehört“: `{ launcher, launcherKeyId, enforce }`. **Fehlt er = nicht erklärt = der offizielle Launcher lädt es nicht mehr** (ab 0.5.5; alte Mods ergänzen diesen Block). Siehe Anhang I |
 | `signature` | ✅ | object | Signatur (erzeugt der Launcher automatisch) |
 
 # Anhang B: ein lauffähiges Loader-Grundgerüst
@@ -712,7 +712,7 @@ Einfach erneut „Mod veröffentlichen“ klicken - es wird mit deinem `.eve-key
 
 ## Ein bereits veröffentlichtes Mod nachrüsten
 
-`binding` ist ein **optionaler neuer Schlüssel** (fehlt er = nicht erklärt = immer erlaubt, alte Mods bleiben unberührt). Drei Schritte:
+`binding` ist ein **optionaler neuer Schlüssel** (fehlt er = nicht erklärt = der offizielle Launcher lädt es nicht mehr; alte Mods ergänzen diesen Block). Drei Schritte:
 
 1. `lib/launcherGuard.js` holen (aus dem Gerüst oder einem bereits nachgerüsteten Mod kopieren);
 2. im Einstieg von `loader.js` `gate("<deine Mod-ID>")` ergänzen;
