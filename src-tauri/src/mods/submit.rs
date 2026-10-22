@@ -39,6 +39,22 @@ const REVIEW_RECHECK_MAX: usize = 3;
 
 /* ------------------------------ 台账读写 ------------------------------ */
 
+/// 上架前的绑定声明要求：**投稿必须有 binding，且 launcher 指向官方启动器**。
+///
+/// 这条在 2026-10-22 定下（见 docs 与 ui/web/MOD_AUTHORING.md 附录 I）。
+/// 只挡**上架**：本地自己跑不受影响。老模组补 3 行 JSON（launcher / launcherKeyId / enforce）
+/// 再重新签名即可 —— 骨架已经自带，照抄最省事。
+/// 声明合不合格：`None` = 放行。抽成函数是为了能单独测 —— 上面那段门禁只是它的调用点。
+pub(crate) fn binding_required_reason(binding_launcher: &str) -> Option<&'static str> {
+    if binding_launcher == crate::launcher_grant::LAUNCHER_ID {
+        None
+    } else {
+        Some(BINDING_REQUIRED_REASON)
+    }
+}
+
+pub(crate) const BINDING_REQUIRED_REASON: &str = "这个模组还没声明「只归官方启动器用」（清单里缺 binding），不能提交上架。新增模组时启动器生成的骨架已经自带这一段，照抄即可；已有模组补三步：① 把 binding 写进清单（launcher / launcherKeyId / enforce，先写 observe）；② 重新签名；③ 再点一次「发布模组」。完整说明见模组制作教程的「附录 I：启动器绑定」。";
+
 fn submissions_path(runtime: &RuntimePaths) -> PathBuf {
     runtime.user_data.join(SUBMISSIONS_FILE)
 }
@@ -725,6 +741,16 @@ pub fn prepare_submission(repo_root: &Path, runtime: &RuntimePaths, input: &Valu
         return reply;
     }
     let author_id = identity.id.clone();
+
+    // 平台侧坚持：**要上架的模组必须声明「只归官方启动器用」**（2026-10-22 起）。
+    //
+    // 为什么放这里：这是投稿的唯一入口（新投稿与更新都走它），而且在**打包之前**
+    // —— 作者不用白做一遍再被打回。与「本地自己跑」无关：没声明的模组在自己机器上
+    // 照跑，只是上不了架。新增模组的骨架已自带这一段；老模组补 3 行 JSON 再重签即可。
+    // 完整说明见 ui/web/MOD_AUTHORING.md 附录 I。
+    if let Some(reason) = binding_required_reason(&record.binding_launcher) {
+        return json!({ "ok": false, "bindingRequired": true, "reason": reason });
+    }
 
     // 清单里声明了别的作者时不能替他提交
     let manifest = scan::read_manifest(&record.manifest_path).unwrap_or_default();
@@ -2209,5 +2235,23 @@ mod tests {
             "版本号格式必须像 1.0.0"
         );
         assert_eq!(std::fs::read_to_string(&manifest_path).unwrap(), before);
+    }
+
+    /// 上架门禁：**声明了官方启动器才放行**，其余（含老模组的「没声明」）一律带原因拒掉。
+    ///
+    /// 这条钉住的是「平台侧不再接受没绑定的模组上架」这个决定（2026-10-22）。
+    /// 注意它只挡**上架**：模组在自己机器上照跑，`binding_required_reason` 不该被
+    /// 任何运行期路径调用 —— 谁把它搬到加载路径上，这条测试不会拦，但那是设计变更。
+    #[test]
+    fn only_an_official_launcher_binding_may_be_submitted() {
+        assert_eq!(binding_required_reason("evejs-launcher"), None);
+
+        let other = binding_required_reason("some-other-launcher").expect("绑别的启动器必须拒");
+        assert!(other.contains("不能提交上架"));
+        assert!(other.contains("附录 I"), "提示语要指向教程：{other}");
+
+        // 老模组：`binding` 整块缺失 → `binding_launcher` 是空串
+        let missing = binding_required_reason("").expect("没声明也必须拒");
+        assert_eq!(missing, BINDING_REQUIRED_REASON);
     }
 }
