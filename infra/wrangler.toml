@@ -6,6 +6,15 @@
 #   npx wrangler d1 migrations apply evejs-mod-ratings --remote
 #   npx wrangler secret put RATINGS_SIGNING_KEY   # base64(PKCS8 DER)，见 scripts/gen-ratings-key.mjs
 #   npx wrangler secret put RATINGS_KEY_ID
+#
+# 启动器许可签发（POST /launcher/license，见 src/license.js）：**没配就 503（fail closed）**
+#   node scripts/gen-license-key.mjs .keys/launcher-license-key.pem   # 打出下面两行的值
+#   npx wrangler secret put LICENSE_SIGNING_KEY   # base64(PKCS8 DER)
+#   npx wrangler secret put LICENSE_KEY_ID
+# 可选（不配就用 src/license.js 里的缺省）：
+#   LICENSE_MODS                 逗号分隔的授权 mod id 白名单（**别省略**，省略等于授权一切）
+#   LICENSE_MIN_LAUNCHER_VERSION 低于此版本拒签（强制更新的闸门）
+#   LICENSE_TTL_DAYS             许可有效期，缺省 30 天
 #   npx wrangler deploy
 #
 # CI 里 `database_id` / KV `id` 由 GitHub Actions 的 vars 注入（workflow 会替换占位符），

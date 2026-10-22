@@ -53,7 +53,7 @@ const HTTP_TIMEOUT: Duration = Duration::from_secs(8);
 /// 签发服务地址。**留空表示还没有这个服务**：留空时 refresh_license 直接返回 false，
 /// 启动器只用本地缓存（或什么都不发）。落服务后填真实地址，或用
 /// EVEJS_LAUNCHER_LICENSE_URL 临时覆盖（联调用）。
-const DEFAULT_LICENSE_URL: &str = "";
+const DEFAULT_LICENSE_URL: &str = "https://ping.5318.cm/launcher/license";
 
 /// 内置签发公钥表 (keyId, raw 32 字节 base64)：**这是真实签发公钥**。
 ///
@@ -366,22 +366,35 @@ pub fn needs_refresh(runtime: &RuntimePaths) -> bool {
 /// 返回是否真的换到了新许可。任何失败都只是返回 false：旧缓存（如果在有效期内）
 /// 仍然可用，模组照旧工作。
 ///
-/// 请求形状是**暂定**的：真正的接口见改动单 §2.1（POST /launcher/license）。
-/// 目前用 GET + 查询参数占位，等 infra 落地后按契约改成正式形状。
+/// 请求形状按改动单 §2.1：**POST** + JSON 体（`installId` / `machineHash` / `launcherVersion`）。
+/// 服务端的版本闸门会在这里回 403（启动器太旧）—— 那种情况下我们**什么也不做**：
+/// 拿不到新许可，模组那边自然按 enforce 判定，绝不让这一步的失败去挡游戏启动。
 pub fn refresh_license(runtime: &RuntimePaths) -> bool {
     let Some(endpoint) = license_endpoint() else {
         return false;
     };
-    let version = env!("CARGO_PKG_VERSION");
-    let url = format!(
-        "{endpoint}?installId={}&machineHash={}&launcherVersion={}&v={CONTRACT_VERSION}",
-        urlencode(&install_id(runtime)),
-        urlencode(&machine_hash()),
-        urlencode(version)
-    );
-    let Ok(response) = net::get(&url, "application/json", HTTP_TIMEOUT) else {
+    let body = serde_json::json!({
+        "installId": install_id(runtime),
+        "machineHash": machine_hash(),
+        "launcherVersion": env!("CARGO_PKG_VERSION"),
+    });
+    let Ok(payload) = serde_json::to_vec(&body) else {
         return false;
     };
+    let Ok(response) = net::send(
+        "POST",
+        &endpoint,
+        &[("Accept", "application/json")],
+        Some((payload.as_slice(), "application/json")),
+        HTTP_TIMEOUT,
+    ) else {
+        return false;
+    };
+    // 只有 200 才是「拿到了一份许可」；403 是版本闸门，其余是服务端故障。
+    // 三种都只是返回 false：缓存里那份（若还在有效期内）继续用。
+    if response.status != 200 {
+        return false;
+    }
     let Some(value) = response.json() else {
         return false;
     };
@@ -398,19 +411,7 @@ pub fn refresh_license(runtime: &RuntimePaths) -> bool {
     std::fs::write(&path, text.as_bytes()).is_ok()
 }
 
-/// 只做最小转义：查询串里出现的就 installId（UUID）与 machineHash（十六进制）。
-fn urlencode(text: &str) -> String {
-    let mut out = String::with_capacity(text.len());
-    for byte in text.bytes() {
-        match byte {
-            b'0'..=b'9' | b'a'..=b'z' | b'A'..=b'Z' | b'-' | b'_' | b'.' | b'~' => {
-                out.push(byte as char);
-            }
-            other => out.push_str(&format!("%{other:02X}")),
-        }
-    }
-    out
-}
+// （原先的 urlencode 只服务于占位 GET 的查询串；改成 POST 后没有调用点，已删。）
 
 #[cfg(test)]
 mod tests {
@@ -665,5 +666,54 @@ mod tests {
         let text = serde_json::to_string_pretty(&payload).expect("序列化夹具失败");
         std::fs::write(&target, text.as_bytes()).expect("写夹具失败");
         println!("fixture written: {target}");
+    }
+
+    /// **跨语言互操作（正向）**：这份许可是 **Worker 侧 JS（Cloudflare WebCrypto）** 签出来的，
+    /// 这里只问一句「Rust 能不能验过并下发」。
+    ///
+    /// 与上面的 `emit_grant_fixture` 正好是一对：那边是 Rust 签 → JS 验，这条是 JS 签 → Rust 验。
+    /// 钉住的是三边共用同一套规范化（递归 key 升序、摘掉 `sigs`、紧凑 JSON）——
+    /// 任何一边改了排序 / 摘字段 / 紧凑化，这条立刻红。
+    ///
+    /// 夹具由 `infra/test/license.test.mjs` 同一套种子派生（Ed25519 是确定性签名），所以常量稳定；
+    /// `expiresAt` 故意放到 2099，免得这条测试某天自己过期。
+    #[test]
+    fn worker_javascript_signed_grant_verifies_in_rust() {
+        const WORKER_KEY_ID: &str = "ef49ec5bc5a0";
+        const WORKER_PUBLIC_KEY: &str = "AeJxjOMff/hQAMgsXIsq10PtkAToe/zMkIkXfWCfVH8=";
+        const WORKER_SIGNED_GRANT: &str = r#"
+{
+  "expiresAt": "2099-01-01T00:00:00.000Z",
+  "installId": "install-interop01",
+  "issuedAt": "2026-10-22T12:00:00.000Z",
+  "launcher": "evejs-launcher",
+  "launcherVersion": "0.5.5",
+  "machineHash": "cccccccccccccccccccccccccccccccc",
+  "mods": ["evejs-faction-sim", "evejs-npc-fleet", "evejs-perf-fix", "evejs-captains-quarters"],
+  "sigs": [{ "keyId": "ef49ec5bc5a0", "sig": "DmB7OwJroLXMDB9V+5KX7QoM0qFGezAGaZyGQNeCdqGqGIC2sNtOKO70l+6ajqzP2f/JLp9YeOKp1C0HtccjCw==" }],
+  "v": 1
+}"#;
+        let license: Value = serde_json::from_str(WORKER_SIGNED_GRANT).expect("夹具应是合法 JSON");
+        trust_license_key(WORKER_KEY_ID, WORKER_PUBLIC_KEY);
+
+        let runtime = temp_runtime("interop-js");
+        write_license(&runtime, &license);
+        let grant = grant_env(&runtime).expect("Worker 签出来的许可必须被 Rust 验过并下发");
+        let parsed: Value = serde_json::from_str(&grant).expect("grant 必须是 JSON");
+        assert_eq!(
+            parsed.get("launcherVersion").and_then(Value::as_str),
+            Some("0.5.5")
+        );
+        assert_eq!(
+            parsed.get("mods").and_then(Value::as_array).map(Vec::len),
+            Some(4)
+        );
+
+        // 动任何被签名覆盖的字段 → 必须变成「不下发」
+        let mut tampered = license.clone();
+        tampered["mods"] = json!(["evejs-free-lunch"]);
+        let runtime2 = temp_runtime("interop-js-tampered");
+        write_license(&runtime2, &tampered);
+        assert!(grant_env(&runtime2).is_none(), "动过 mods 的许可不该被认");
     }
 }

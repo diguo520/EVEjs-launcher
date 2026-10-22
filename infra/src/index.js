@@ -25,6 +25,7 @@ import {
   upsertSponsor,
 } from "./admin.js"
 import { keyIdFromRaw, signDocument, verifyPayload } from "./canonical.js"
+import { LICENSE_PATH, MAX_BODY_BYTES, issueLicense } from "./license.js"
 import {
   emptyAggregate,
   SNAPSHOT_SCHEMA_VERSION,
@@ -915,6 +916,23 @@ async function handle(request, env, ctx) {
 
   // 写路径一律 POST + JSON + 本机身份签名；返回体不进缓存（同一个人连点两下不该看到上一次的读数）
   if (request.method === "POST") {
+    // 启动器许可签发**单独分流**：请求形状与写接口不同（没有本机身份签名，
+    // 只有 installId / machineHash / launcherVersion），不该走 handleWrite 的校验链。
+    // 它是 fail closed 的：Worker 里没配 LICENSE_SIGNING_KEY 就 503（见 license.js）。
+    if (pathname === LICENSE_PATH) {
+      const raw = await request.text()
+      if (raw.length > MAX_BODY_BYTES) {
+        return json({ ok: false, reason: "请求体太大" }, 413, NO_STORE)
+      }
+      let input
+      try {
+        input = JSON.parse(raw)
+      } catch {
+        return json({ ok: false, reason: "请求体不是合法 JSON" }, 400, NO_STORE)
+      }
+      const result = await issueLicense(env, input)
+      return json(result.body, result.status, NO_STORE)
+    }
     if (!pathname.startsWith("/v1/")) {
       return json({ ok: false, reason: "没有这个路径" }, 404, NO_STORE)
     }
@@ -994,4 +1012,4 @@ export default {
 }
 
 /** 单测与本地脚本复用：不经过 Worker 入口也能单独跑这两个作业 */
-export const __internals = { makeSigner, readReviewRows, reviewIdFromPath, keyIdFromRaw }
+export const __internals = { makeSigner, readReviewRows, reviewIdFromPath, keyIdFromRaw, issueLicense }

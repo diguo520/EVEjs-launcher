@@ -125,3 +125,49 @@ export async function verifyPayload(rawPublicKeyBase64, payload) {
     return false
   }
 }
+
+/* ------------------------------ 启动器许可（grant） ------------------------------
+ *
+ * 许可是**多签**：sigs: [{keyId, sig}]，任一条验过即可（启动器换钥匙时同时用新旧两把签）。
+ * 所以它的签名负载与模组清单不同 —— 摘掉的是 `sigs`（顺带也摘 `sig`，容忍单签写法）。
+ * 规则其余部分完全一致：递归 key 升序、紧凑 JSON。
+ */
+
+/** 去掉顶层 sigs / sig 之后的规范化 JSON —— 启动器许可的签名 / 验签负载 */
+export function canonicalGrantJson(payload) {
+  const clone = { ...payload }
+  delete clone.sigs
+  delete clone.sig
+  return JSON.stringify(canonicalize(clone))
+}
+
+/** 签一份启动器许可：返回要放进 `sigs` 数组里的那一条 */
+export async function signGrant(privateKeyBase64, payload, keyId) {
+  const key = await importPrivateKey(privateKeyBase64)
+  const signature = await crypto.subtle.sign(
+    { name: "Ed25519" },
+    key,
+    encoder.encode(canonicalGrantJson(payload))
+  )
+  return { keyId, sig: bytesToBase64(new Uint8Array(signature)) }
+}
+
+/** 验一份启动器许可：任一 sigs 通过即可；表里没有的 keyId 只算那一条失败 */
+export async function verifyGrant(payload, keys) {
+  const entries = Array.isArray(payload?.sigs) ? payload.sigs : []
+  const data = encoder.encode(canonicalGrantJson(payload))
+  for (const entry of entries) {
+    const keyId = String(entry?.keyId ?? "").trim()
+    const rawPublicKeyBase64 = keys?.[keyId]
+    if (!rawPublicKeyBase64) continue
+    try {
+      const sig = base64ToBytes(entry.sig)
+      if (sig.length !== 64) continue
+      const key = await importPublicKey(rawPublicKeyBase64)
+      if (await crypto.subtle.verify({ name: "Ed25519" }, key, sig, data)) return true
+    } catch {
+      // 这一条不算数，试下一条
+    }
+  }
+  return false
+}
