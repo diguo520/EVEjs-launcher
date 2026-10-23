@@ -1,0 +1,33 @@
+{
+  "version": "0.5.9",
+  "changelog": {
+    "zh": [
+      {
+        "type": "fix",
+        "text": "**空的角色位**改成与**有角色的槽位完全一致**的入口：同样是圆形、同尺寸，同样是**按住约 0.7 秒**沿头像边缘走完进度环才动作（不再是一个方形的文字按钮）。里面画的是空白头像 + 一个加号（虚线边表示空位），可读文本走翻译，任何语言都正确。"
+      },
+      {
+        "type": "fix",
+        "text": "「**这些顺序声明本次没生效**」下面的说明**做了多语言** —— 那些句子原本由后端拼好、界面直接打印，所以切到任何语言都显示中文；现在后端给出键与参数、界面按当前语言渲染，7 种语言都补了译文。（同一个面板里「启动前预检」的标题此前也没走翻译，一并补上。）"
+      },
+      {
+        "type": "opt",
+        "text": "「**运行预检**」按钮固定在同行的**右上角**，窗口拉窄也不会被长文字挤到下一行；「**疑似重叠**」的标题稳定在**图标右侧**，不再换行。"
+      }
+    ],
+    "en": [
+      {
+        "type": "fix",
+        "text": "An **empty character slot** now uses the **same entry as a filled one**: a circle of the same size, and creating a character takes the same **press-and-hold (~0.7s)** with the progress ring - no longer a square text button. Inside is a blank avatar with a plus (dashed border for \"empty\"), and the readable text is translated, so it is correct in any language."
+      },
+      {
+        "type": "fix",
+        "text": "The notes under \"**these order declarations had no effect this time**\" are **translated** now. They used to be composed by the backend and printed verbatim, so they read Chinese in every language; the backend now sends a key plus parameters and the panel renders them in the current language, with all seven catalogs filled in. (The \"preflight\" heading in that panel was not going through translation either - fixed as well.)"
+      },
+      {
+        "type": "opt",
+        "text": "The \"**run preflight**\" button is pinned to the **top-right** of its row, so a narrow window no longer pushes it onto the next line, and the \"**possible overlap**\" heading stays to the **right of its icon** instead of wrapping."
+      }
+    ]
+  }
+}
