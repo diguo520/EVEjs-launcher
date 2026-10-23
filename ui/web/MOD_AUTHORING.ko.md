@@ -174,11 +174,11 @@ activation.strategy: "loader_rename"   ← 반드시 이 값
 ```
 
 
-🟩 **골격에는 이 런처 바인딩 검사가 이미 들어 있습니다**（2026-10-22 부터）：생성된 모드에는 `lib/launcherGuard.js` 가 있고 매니페스트에 `binding` 블록（기본 `enforce: "observe"` = 로그만, 막지 않음）이 있습니다. 의미는
-«이 모드는 공식 EveJS Launcher 전용» 입니다. 켜려면 `enforce` 를 `"enforce"` 로 바꾸세요 -
-**먼저 로그를 확인**하세요. 매니페스트의 `binding` 블록 설명과
-자세한 절차는 **부록 I** 에 있습니다. AI에게 모드를 쓰게 한다면 스켈레톤에 포함된 `AGENTS.md` 를 먼저 읽게 하세요.
----
+🟩 **스켈레톤에 로드 사전 검사가 이미 들어 있습니다**(2026-10-22 이후): 생성된 모드에는 `lib/launcherGuard.js` 가 있고,
+`loader.js` 의 첫 줄이 그 판정이며, 매니페스트에도 대응하는 블록이 있습니다. **이들은 삭제하지 마세요** —— 삭제하면 모드가 로드되지 않습니다.
+기본값은 기록만 합니다. 실제로 켜려면 `enforce` 를 `"enforce"` 로 바꾸고 게시 전에 다시 서명하세요.
+자세한 내용과 두 가지 금지선은 **부록 I** 에 있습니다. AI에게 모드를 쓰게 한다면 스켈레톤의
+`AGENTS.md` 를 먼저 읽게 하세요.
 
 ## 5단계 ✅ 로직 작성(`loader.js`)
 
@@ -319,7 +319,7 @@ const hubPath = path.join(serverRoot, "src", "services", "chat", "chatHub.js");
 | 매니페스트 완전성 | `id` / `displayName` / `version` / `author{id,name,keyId,publicKey}` / `sizeBytes` / `sha256`(64자 hex) / `downloadUrls[]` |
 | ZIP 위치 | **당신 자신의 Release**(인덱스 저장소는 바이너리를 저장하지 않음) |
 | 분류 | 게임플레이 / 경제 / AI / 그래픽 / 도구 중 하나 |
-| 귀속 강제 규칙 | `id` 는 선착순, `author.id` 는 키에 묶임(키를 바꾸면 거부) |
+| 귀속 강제 규칙 | `id` 는 선착순, `author.id` 는 키에 고정됨(키를 바꾸면 거부) |
 | 서버 소스 패치 | 서버 파일을 고치는 모드는 `__evejsMods.register`(부록 G)를 사용해야 함. 직접 `Module.prototype._compile` 을 후킹하면 수정 요구를 받습니다 —— 여러 모드가 각자 후킹하면 서로를 덮어씁니다 |
 
 ## 심사 결과는 어디서 보나
@@ -372,7 +372,7 @@ const hubPath = path.join(serverRoot, "src", "services", "chat", "chatHub.js");
 | `author` | ✅ | object | `{ id, name, keyId, publicKey }`(런처가 자동 기록) |
 | `requires` / `loadAfter` / `loadBefore` / `conflicts` | ⭕ | string[] | 의존과 충돌(모드 id 기입) |
 | `compatibility.evejsVersions` | ⭕ | string[] | 호환 EveJS 버전, 예 `["0.12.8"]` |
-| `binding` | ⭕ | object | «어느 런처 전용인지» 선언: `{ launcher, launcherKeyId, enforce }`. **미기재 = 미선언 = 공식 런처가 로드하지 않습니다** (0.5.5 부터. 기존 모드는 이 블록만 추가하면 복구). 부록 I 참조 |
+| `binding` | ⭕ | object | **반드시 유지**(스켈레톤에 포함). 삭제하면 모드가 로드되지 않으며, 변경 후에는 다시 서명해 게시해야 합니다. 부록 I 참조 |
 | `signature` | ✅ | object | 서명(런처가 자동 생성) |
 
 # 부록 B: 실제로 동작하는 loader 골격
@@ -664,60 +664,27 @@ if (bus && bus.api >= 1) {
 
 ---
 
-# 부록 I: 런처 바인딩 (이 모드는 공식 런처 전용)
+# 부록 I: 모드 로드 사전 검사
 
-2026-10-22 부터 공식 런처는 **서명된 허가증**을 내려보냅니다(환경 변수 `EVEJS_LAUNCHER_GRANT`).
-모드가 이를 검증하면 «서버를 띄운 사람이 있다» 가 아니라 «공식 EveJS Launcher 에서 실행됐다» 를 알 수 있습니다. (**AI 코딩 어시스턴트도 반드시 따라야 합니다.**)
+새 모드의 스켈레톤에는 **이 단계가 이미 들어 있습니다**. 직접 작성할 필요 없이 **지우지 말고 그대로 두면** 됩니다. 요점 3가지:
 
-**새 모드의 골격에는 이 검사가 이미 들어 있습니다** (`lib/launcherGuard.js` 와 매니페스트의 `binding`). 결정할 것은 «언제 실제로 막을지» 뿐입니다.
-
-## 매니페스트의 세 필드
-
-```json
-"binding": {
-  "launcher": "evejs-launcher",
-  "launcherKeyId": "867242e85fc5",
-  "enforce": "observe"
-}
-```
-
-| 필드 | 의미 |
-| --- | --- |
-| `launcher` | 이 런처 id 만 인정 |
-| `launcherKeyId` | **안내용일 뿐** 판정에 쓰이지 않습니다. 검증 키는 `lib/launcherGuard.js` 에 하드코딩되어 있습니다 |
-| `enforce` | `observe`(기본) = 로그만; `enforce` = 판정 실패 시 모드는 아무것도 하지 않음 |
-
-## 사용법
-
-골격의 `loader.js` 는 가장 먼저 이 줄을 실행합니다:
+1. `lib/launcherGuard.js` 는 모드 폴더에 그대로 둡니다(이름 변경·삭제 금지).
+2. `loader.js` 의 **첫 번째 동작**은 반드시 이 한 줄이어야 합니다(id 는 본인 것으로):
 
 ```js
-if (require("./lib/launcherGuard.js").gate("<당신의 모드 id>")) return;
+if (require("./lib/launcherGuard.js").gate("<你的模组 id>")) return;
 ```
 
-## 전환 절차 (enforce 는 서두르지 마세요)
+3. 매니페스트 `evejs-launcher.mod.json` 의 이 블록은 반드시 남겨 둡니다(기본값이 이미 올바르며 보통 손대지 않습니다):
 
-1. 먼저 `observe` 유지: 판정 결과는 `server/logs/evejs-mods.log` 에 기록됩니다;
-2. `guard` 가 `ok` 인지 `denied` 인지, `reason` 이 무엇인지 확인 (런처 미업데이트가 가장 흔함);
-3. 거의 `ok` 가 되면 `enforce` 를 `enforce` 로 바꾸고 **다시 서명해 발행**.
+```json
+"binding": { "launcher": "evejs-launcher", "launcherKeyId": "…", "enforce": "observe" }
+```
 
-⚠️ 매니페스트를 고치면 반드시 **다시 서명**: JSON 만 고치면 공식 런처는 모드를 통째로 건너뜁니다.
-런처의 «모드 발행» 을 한 번 더 누르면 `.eve-key` 로 자동 재서명되고 `binding` 은 그대로 유지됩니다.
+`enforce` 는 `"observe"` 그대로면 충분합니다(기록만 하고 막지 않음). 실제로 막으려면 `"enforce"` 로 바꾸고
+그 뒤 **런처의 「모드 게시」로 다시 서명해 게시**해야 합니다.
 
-## 켜지면 어떻게 되나
+⚠️ 두 가지 금지선: 위 항목 중 하나라도 삭제, 또는 매니페스트를 고치고 다시 서명하지 않음 —— 둘 다 모드가 로드되지 않습니다.
 
-- 공식 런처(충분히 새 버전): 정상 로드;
-- **BAT 로 서버 기동 / 다른 런처**: 허가증이 없음 → `enforce` 에서 로드되지 않음;
-- 공식 런처이지만 너무 오래됨: 서버가 서명을 거부 → 마찬가지로 로드되지 않음.
+이미 등록된 모드를 적용하려면: `lib/launcherGuard.js` 를 복사하고, `loader.js` 에 그 한 줄을 더하고, 매니페스트에 블록을 더한 뒤 다시 서명해 게시합니다.
 
-## 이미 올린 모드의 도입
-
-`binding` 은 **선택적 추가 키** (미기재 = 미선언 = 공식 런처가 로드하지 않습니다. 기존 모드는 이 블록만 추가). 세 단계:
-
-1. `lib/launcherGuard.js` 확보 (골격 또는 이미 도입한 모드에서 복사);
-2. `loader.js` 진입점에 `gate("<당신의 모드 id>")` 추가;
-3. 매니페스트에 `binding` 추가(먼저 `observe`) 후 **다시 서명·발행**.
-
-## 키를 교체할 때
-
-`LAUNCHER_KEYS` 는 **추가만** 가능; 교체 기간에는 새 키와 옛 키로 함께 서명하므로 하나만 통과해도 충분합니다.

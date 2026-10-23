@@ -173,10 +173,10 @@ activation.strategy: "loader_rename"   ← 必须是这个
 目录里必须有 loader.js 或 loader.js.disabled
 ```
 
-🟩 **骨架自带「启动器绑定」检查**（2026-10-22 起）：生成的模组里有 `lib/launcherGuard.js`，
-清单里也有 `binding` 块（默认 `enforce: "observe"` —— 只记日志、不拦）。它的含义是
-「这个模组只认官方 EveJS Launcher」：想启用就把 `enforce` 改成 `"enforce"`，
-**切换前先看日志**。完整说明见 **附录 I**。用 AI 写模组的，请让它先读骨架里的 `AGENTS.md`。
+🟩 **骨架自带「加载前置检查」**（2026-10-22 起）：生成的模组里有 `lib/launcherGuard.js`，
+`loader.js` 第一句是它的判定，清单里也有对应的那一段。**这些别删** —— 删了模组就不被加载。
+默认是「只记日志、不拦」；想真的启用，把 `enforce` 改成 `"enforce"` 再重新签名发布。
+细节与三条红线见 **附录 I**。用 AI 写模组的，让它先读骨架里的 `AGENTS.md`。
 
 ---
 
@@ -319,7 +319,7 @@ const hubPath = path.join(serverRoot, "src", "services", "chat", "chatHub.js");
 | 清单完整性 | `id` / `displayName` / `version` / `author{id,name,keyId,publicKey}` / `sizeBytes` / `sha256`(64 位 hex) / `downloadUrls[]` |
 | ZIP 位置 | 放在**你自己的 Release**（索引仓库不存二进制） |
 | 分类 | 玩法 / 经济 / AI / 画面 / 工具 五选一 |
-| 归属硬规则 | `id` 先到先得；`author.id` 与密钥绑定（换钥匙会被拒） |
+| 归属硬规则 | `id` 先到先得；`author.id` 与密钥锁定（换钥匙会被拒） |
 | 服务端源码补丁 | 改了服务端文件的模组要用 `__evejsMods.register`（附录 G）；自己 hook `Module.prototype._compile` 的会被要求改 —— 多个模组各自挂钩子会互相顶掉 |
 
 ## 你会在哪里看到审核结果
@@ -372,7 +372,7 @@ const hubPath = path.join(serverRoot, "src", "services", "chat", "chatHub.js");
 | `author` | ✅ | object | `{ id, name, keyId, publicKey }`（启动器自动写入） |
 | `requires` / `loadAfter` / `loadBefore` / `conflicts` | ⭕ | string[] | 依赖与冲突（写模组 id） |
 | `compatibility.evejsVersions` | ⭕ | string[] | 兼容的 EveJS 版本，如 `["0.12.8"]` |
-| `binding` | ⭕ | object | 声明「只归哪个启动器用」：`{ launcher, launcherKeyId, enforce }`。**缺省 = 没声明 = 官方启动器不再加载它**（0.5.5 起；老模组补上这一段才能继续跑）。见附录 I |
+| `binding` | ⭕ | object | **必须保留**（骨架已带）。删掉它模组就不会被加载；改动后必须重新签名发布。见附录 I |
 | `signature` | ✅ | object | 签名（启动器自动生成） |
 
 # 附录 B：一个能跑的 loader 骨架
@@ -664,60 +664,27 @@ if (bus && bus.api >= 1) {
 
 ---
 
-# 附录 I：启动器绑定（这个模组只认官方启动器）
+# 附录 I：模组加载前置检查
 
-2026-10-22 起，官方启动器会往下传一份**已签名的许可**（环境变量 `EVEJS_LAUNCHER_GRANT`）。
-模组验过它，就知道「这次运行确实来自官方 EveJS Launcher」，而不只是「有人把服务端跑起来了」。（**AI 编码助手也必须照此**）
+新模组的骨架**已经带好这一步**，你不用自己写 —— 只要**保管好、别删**。要点三条：
 
-**新模组的骨架已经自带这套检查**（`lib/launcherGuard.js` + 清单里的 `binding`），你只需决定何时开始拦。
-
-## 清单里的三个字段
-
-```json
-"binding": {
-  "launcher": "evejs-launcher",
-  "launcherKeyId": "867242e85fc5",
-  "enforce": "observe"
-}
-```
-
-| 字段 | 作用 |
-| --- | --- |
-| `launcher` | 只认这个启动器 id |
-| `launcherKeyId` | **只是提示**，不参与判定；验签用的公钥硬编码在 `lib/launcherGuard.js` 里 |
-| `enforce` | `observe`（默认）= 只记日志；`enforce` = 判定不通过时模组什么都不做 |
-
-## 怎么用
-
-骨架的 `loader.js` 第一件事就是这一行：
+1. `lib/launcherGuard.js` 留在模组目录里，不要改名、不要删；
+2. `loader.js` 的**第一件事**必须是这一行（id 换成你自己的）：
 
 ```js
 if (require("./lib/launcherGuard.js").gate("<你的模组 id>")) return;
 ```
 
-## 切换流程（别急着上 enforce）
+3. 清单 `evejs-launcher.mod.json` 里这一段必须保留（默认值就是对的，一般不用动）：
 
-1. 先保持 `observe`：判定结果写进 `server/logs/evejs-mods.log`；
-2. 看清 `guard` 是 `ok` 还是 `denied`、`reason` 是什么（启动器没更新最常见）；
-3. 绝大多数是 `ok` 之后，把 `enforce` 改成 `enforce`，**重新签名发布**。
+```json
+"binding": { "launcher": "evejs-launcher", "launcherKeyId": "…", "enforce": "observe" }
+```
 
-⚠️ 改任何清单字段都要**重新签名**：手改 JSON 不重签，官方启动器会**整个跳过这个模组**。
-用启动器「发布模组」再点一次即可 —— 它会用 `.eve-key` 自动重签，`binding` 会原样保留。
+`enforce` 保持 `"observe"` 就够用（只记日志、不拦）。想让它真的拦，就改成 `"enforce"`，
+改完**必须用启动器的「发布模组」重新签名发布**。
 
-## 生效之后
+⚠️ 两条红线：删掉上面任何一处，或者改了清单却不重新签名 —— 模组都不会被加载。
 
-- 官方启动器（版本够新）：正常加载；
-- **BAT 直接起服务端 / 别的启动器**：拿不到许可 → `enforce` 下不加载；
-- 官方启动器但版本太旧：服务端拒签 → 同样不加载。
+已上架的模组要接入：把 `lib/launcherGuard.js` 拷进来、`loader.js` 加上那一行、清单补上那一段，然后重新签名发布。
 
-## 已上架的模组怎么接入
-
-`binding` 是**可选新增键**（不写 = 没声明 = 官方启动器不再加载它；老模组补上这一段即可恢复）。接入三步：
-
-1. 拿到 `lib/launcherGuard.js`（从骨架或任一已接入的模组拷）；
-2. 在 `loader.js` 入口加 `gate("<你的模组 id>")`；
-3. 清单加 `binding`（先 `observe`），**重新签名发布**。
-
-## 换钥匙的时候
-
-`LAUNCHER_KEYS` **只增不删**；启动器换钥匙期间会**同时用新旧两把签**，表里任一能验过即可。

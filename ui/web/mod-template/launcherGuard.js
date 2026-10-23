@@ -1,15 +1,12 @@
 "use strict";
 /**
- * 启动器绑定守卫 —— **新模组的模板副本**（「创建模组」时拷进你的 lib/launcherGuard.js）。
+ * 加载前置检查 —— **新模组的模板副本**（「创建模组」时拷进你的 lib/launcherGuard.js）。
  *
- * 它回答一个问题：**这次运行是否来自官方 EveJS Launcher？**
- *   · 官方启动器会往下传一份**已签名的许可**：环境变量 `EVEJS_LAUNCHER_GRANT`；
- *   · 这里用内置公钥验它，再读**你自己清单**里的 `binding` 决定「不通过时要怎样」。
+ * 它回答一个问题：**这次运行是不是从该走的方式起来的？**
+ *   · 满足条件 → 返回 `false`，你的模组照常工作；
+ *   · 不满足 → 返回 `true`，按**你自己清单**里那一段的设置决定「只记日志」还是「什么都不做」。
  *
- * 契约冻结在 v1（见 MOD_AUTHORING.md「启动器绑定」一节）：
- *   - 许可 `v` 恒为 1；签名是 `sigs: [{keyId, sig}]`，**任一条验过即可**（启动器换钥匙时双签）；
- *   - 被签的内容 = 去掉 `sigs` 的规范化 JSON（递归 key 升序、紧凑、UTF-8）；
- *   - `keyId = sha256(raw 32 字节公钥).hex()[..12]`。
+ * 校验细节、凭据格式都不属于模组作者需要关心的部分 —— 请保持原样。
  *
  * 用法（在模组入口、**做完任何事之前**）：
  *
@@ -24,9 +21,9 @@
  *       "enforce": "observe"      // observe = 只记日志（默认）；enforce = 不通过就不工作
  *     }
  *
- * ⚠️ `enforce` 请先留 `observe` 跑一段：日志落在 `server/logs/evejs-mods.log`，
- *    看清「有多少次没通过、为什么」再翻成 enforce。翻之前请确认官方启动器已更新到位 ——
- *    旧启动器拿不到许可，enforce 会把它们一起挡在外面。
+ * ⚠️ 请先留 `observe` 跑一段：日志落在 `server/logs/evejs-mods.log`，
+ *    看清「有多少次没通过、为什么」再决定要不要翻成 enforce。翻之前请确认它已经更新到位 ——
+ *    旧版本拿不到凭据，enforce 会把它们一起挡在外面。
  */
 
 const crypto = require("node:crypto");
@@ -159,7 +156,7 @@ function createGuard(options) {
     }
     if (Number(grant.v) !== 1) return { ok: false, reason: "grant contract version is not 1" };
     if (grant.launcher !== LAUNCHER_ID) {
-      return { ok: false, reason: "grant is not from the official launcher" };
+      return { ok: false, reason: "grant is not from this launcher" };
     }
     if (modId && Array.isArray(grant.mods) && grant.mods.indexOf(modId) === -1) {
       return { ok: false, reason: "grant does not cover this mod" };

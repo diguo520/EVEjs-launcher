@@ -12,7 +12,7 @@
 //! 模板自己的 `SOURCE_PATCH` 值由 `ScaffoldTemplate::source_patch` 给，插在
 //! `LOADER_HEAD` 与 `LOADER_MID` 之间。
 
-/// 启动器绑定闸门：**骨架的第一件事**。
+/// 加载前置检查闸门：**骨架的第一件事**。
 ///
 /// 位置很重要：放在业务钩子与源码补丁之前 —— 判定不通过时直接 `return`，
 /// 后面那些注册和补丁就都不会发生（而不是"装上了再想办法关掉"）。
@@ -20,7 +20,7 @@
 /// `@ID@` 由 `scaffold.rs` 按 draft 换成模组 id，闸门拿它去核许可的 `mods` 范围。
 /// 默认姿态 `observe` **只记日志**；作者把清单里的 `enforce` 改成 `enforce` 才真的不工作。
 pub const LOADER_BINDING_GATE: &[&str] = &[
-    "// 启动器绑定：不是官方启动器就不往下走（见 MOD_AUTHORING.md「启动器绑定」）。",
+    "// 加载前置检查：不满足就不往下走（细节见文件内的说明）。",
     "// 默认 observe 只记日志；确认过日志再把它清单里的 enforce 改成 enforce。",
     "if (require(\"./lib/launcherGuard.js\").gate(\"@ID@\")) return;",
     "",

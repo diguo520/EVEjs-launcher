@@ -1,56 +1,52 @@
 # 给 AI 编码助手：为 EveJS 制作模组时的硬性要求
 
-你在为一个 **EveJS 模组**写代码。这个模组由**官方 EveJS Launcher** 加载，并受
-「**启动器绑定**」机制约束。下面每一条都是**硬性要求**，不要绕过、不要"简化"、
+你在为一个 **EveJS 模组**写代码。下面每一条都是**硬性要求**，不要绕过、不要"简化"、
 不要出于"让它先跑起来"的目的改动它们。
 
-## 1. 不许删掉或削弱 `lib/launcherGuard.js` 与 `binding`
+## 1. 三样东西必须留着：别删、别改名、别绕开
 
-- `loader.js` 的**第一件事**必须是 `require("./lib/launcherGuard.js").gate("<模组 id>")` 的判定；
-  判定为真就直接 `return`，后面**什么都不做**（不挂钩子、不起线程、不开面板）。
-- 清单 `evejs-launcher.mod.json` 的 `binding` 块**必须保留**：
-  `{ "launcher": "evejs-launcher", "launcherKeyId": "…", "enforce": "observe" }`。
-- **不要**把 `enforce` 改成 `"enforce"`，除非人类明确要求（要不要开始拦，由人决定）。
-- **不要**为了让模组跑起来而删掉守卫、跳过 `gate()`、伪造 `EVEJS_LAUNCHER_GRANT`，
-  或把 `LAUNCHER_KEYS` 改空。那是**绕过平台策略**，不是修 bug。
-  若守卫拦住了你的测试，说明**测试环境不对**（要用官方启动器启动服务端），而不是守卫该改。
+- `lib/launcherGuard.js` 留在模组目录里；
+- `loader.js` 的**第一件事**必须是 `require("./lib/launcherGuard.js").gate("<模组 id>")`：
+  判定为真就直接 `return`，后面**什么都不做**（不挂钩子、不起线程、不开面板）；
+- 清单 `evejs-launcher.mod.json` 里这一段必须保留（骨架已写好，一般不用动）：
 
-## 2. 契约冻结在 v1，只能加可选字段
+  `{ "launcher": "evejs-launcher", "launcherKeyId": "…", "enforce": "observe" }`
 
-- 许可 `v` 恒为 1；签名是 `sigs: [{ keyId, sig }]`，**任一条验过即可**（换钥匙时新旧并存）。
-- 被签的内容 = **去掉 `sigs`** 的规范化 JSON（递归 key 升序、紧凑、UTF-8）。
-- `keyId = sha256(原始 32 字节公钥).hex()[..12]`。
-- `LAUNCHER_KEYS` **只增不删**。
+**不要**把 `enforce` 改成 `"enforce"`，除非人类明确要求。
+**不要**删掉检查、跳过 `gate()`、伪造凭据，或把它内置的密钥表改空 —— 那是**绕过平台策略**，
+不是修 bug。检查没通过时，先怀疑**测试环境**（服务端不是从该走的方式起来的），而不是去改检查。
 
-## 3. 清单字段不许乱动
+## 2. 清单字段不许乱动
 
-- `schemaVersion` 必须是 **3**；`activation.strategy` 必须是 `loader_rename`。
-- 清单**改了就必须重新签名**：用启动器的「发布模组」，它会用作者身份自动重签，
-  `binding` 会被原样保留。**手改 JSON 却不重签，官方启动器会整个跳过这个模组。**
+- `schemaVersion` 必须是 **3**；`activation.strategy` 必须是 `loader_rename`；
+- 清单**改了就必须重新签名**：用启动器的「发布模组」，它会用作者身份自动重签，上面那段会原样保留。
+  **手改 JSON 却不重签，模组就不会被加载。**
 
-## 4. 改完自检
+## 3. 改完自检
 
 - 对改过的 JS 跑 `node --check`；
 - 不要新增运行时依赖；不要写到 `mods/<你的模组 id>/` 之外（截图放 `shots/`，横幅放 `shots/Banner/`）；
-- 骨架本来就是能被启动器扫描通过的，**别把它的结构改坏**。
+- 骨架本来就是能通过扫描的，**别把它的结构改坏**。
 
-## 5. 完整说明在哪
+## 4. 完整说明在哪
 
-启动器内「模组制作教程」的 **附录 I：启动器绑定** —— 含三态语义、切换流程、生效后的行为。
+启动器内「模组制作教程」的 **附录 I**。
 
 ---
 
 # For AI coding assistants: hard requirements for an EveJS mod
 
-You are writing code for an **EveJS mod**, loaded by the **official EveJS Launcher** and bound by its
-**launcher-binding** mechanism. Every rule below is **mandatory**: do not bypass it, do not "simplify" it,
-and do not touch it just to make something run.
+You are writing code for an **EveJS mod**. Every rule below is **mandatory**: do not bypass it,
+do not "simplify" it, and do not touch it just to make something run.
 
-- Keep `lib/launcherGuard.js` and keep the `binding` block in `evejs-launcher.mod.json`.
-- The first thing `loader.js` does must stay `require("./lib/launcherGuard.js").gate("<mod id>")`;
-  when it returns true the mod must do nothing at all.
-- Never set `enforce` to `"enforce"` unless a human asks; never delete the guard, skip `gate()`,
-  fake `EVEJS_LAUNCHER_GRANT`, or empty `LAUNCHER_KEYS`. That is bypassing platform policy, not fixing a bug.
-- The grant contract is frozen at v1: add optional fields only. `LAUNCHER_KEYS` only ever grows.
-- After any manifest edit you must re-sign (use the launcher's "Publish mod"); an unsigned edit makes the
-  official launcher skip the whole mod.
+- Keep `lib/launcherGuard.js`, keep the first thing `loader.js` does as
+  `require("./lib/launcherGuard.js").gate("<mod id>")` (on true the mod must do nothing at all),
+  and keep the matching block in `evejs-launcher.mod.json`.
+- Never set `enforce` to `"enforce"` unless a human asks; never delete the check, skip `gate()`,
+  fake a credential, or empty the built-in key table. That is bypassing platform policy, not fixing a bug.
+  If the check fails, suspect the test environment first.
+- `schemaVersion` must stay 3 and `activation.strategy` must stay `loader_rename`; after any manifest
+  edit you must re-sign (use the launcher's "Publish mod"); an unsigned edit means the mod is not loaded.
+- Run `node --check` on the JS you touched; add no runtime dependency; write nothing outside
+  `mods/<your mod id>/`.
+- Details: Appendix I in the launcher's mod-authoring tutorial.

@@ -174,11 +174,11 @@ activation.strategy: "loader_rename"   ← これでなければならない
 ```
 
 
-🟩 **スケルトンにはこのランチャー紐付け検査が最初から入っています**（2026-10-22 以降）：生成された MOD には `lib/launcherGuard.js` があり、マニフェストに `binding` ブロック（既定 `enforce: "observe"` = ログのみで止めません）があります。意味は
-「この MOD は公式 EveJS Launcher 専用」です。有効にするには `enforce` を `"enforce"` に変えてください -
-**まずログを確認**してください。マニフェストの `binding` ブロックの説明と
-詳しい手順は **付録 I** にあります。AI に MOD を書かせる場合は、スケルトン同梱の `AGENTS.md` を先に読ませてください。
----
+🟩 **スケルトンには読み込み前チェックが最初から入っています**（2026-10-22 以降）：生成された MOD には `lib/launcherGuard.js` があり、
+`loader.js` の最初の行がその判定、マニフェストにも対応するブロックがあります。**これらは消さないでください** —— 消すと MOD が読み込まれません。
+既定はログのみ。本当に有効にするには `enforce` を `"enforce"` に変え、公開前に再署名します。
+詳細と 2 つのレッドラインは **付録 I**。AI に MOD を書かせる場合は、先にスケルトンの
+`AGENTS.md` を読ませてください。
 
 ## ステップ 5 ✅ 自分のロジックを書く（`loader.js`）
 
@@ -319,7 +319,7 @@ const hubPath = path.join(serverRoot, "src", "services", "chat", "chatHub.js");
 | マニフェストの完全性 | `id` / `displayName` / `version` / `author{id,name,keyId,publicKey}` / `sizeBytes` / `sha256`（64 桁 hex）/ `downloadUrls[]` |
 | ZIP の場所 | **あなた自身の Release**（索引リポジトリはバイナリを保存しません） |
 | カテゴリ | ゲームプレイ / 経済 / AI / グラフィック / ツール の 5 択 |
-| 帰属の厳格ルール | `id` は早い者勝ち。`author.id` は鍵と結び付く（鍵を替えると拒否） |
+| 帰属の厳格ルール | `id` は早い者勝ち。`author.id` は鍵に固定される（鍵を替えると拒否） |
 | サーバーソースのパッチ | サーバーファイルを書き換える模組は `__evejsMods.register`（付録 G）を使うこと。自分で `Module.prototype._compile` をフックしていると修正を求められます —— 複数の模組が個別にフックすると互いを打ち消します |
 
 ## 審査結果はどこで見るか
@@ -372,7 +372,7 @@ const hubPath = path.join(serverRoot, "src", "services", "chat", "chatHub.js");
 | `author` | ✅ | object | `{ id, name, keyId, publicKey }`（ランチャーが自動で書き込み） |
 | `requires` / `loadAfter` / `loadBefore` / `conflicts` | ⭕ | string[] | 依存と衝突（模組 id を書く） |
 | `compatibility.evejsVersions` | ⭕ | string[] | 対応 EveJS バージョン。例 `["0.12.8"]` |
-| `binding` | ⭕ | object | 「どのランチャー専用か」の宣言：`{ launcher, launcherKeyId, enforce }`。**未記載 = 未宣言 = 公式ランチャーは読み込みません**（0.5.5 以降。既存 MOD はこのブロックを足せば復帰）。付録 I 参照 |
+| `binding` | ⭕ | object | **必ず残す**（スケルトンに含まれています）。削ると MOD が読み込まれません。変更後は再署名と公開が必要。付録 I 参照 |
 | `signature` | ✅ | object | 署名（ランチャーが自動生成） |
 
 # 付録 B：そのまま動く loader スケルトン
@@ -664,60 +664,27 @@ MOD の詳細画面には数枚のスクリーンショットを置けます。�
 
 ---
 
-# 付録 I：ランチャー紐付け（この MOD は公式ランチャー専用）
+# 付録 I：MOD 読み込み前チェック
 
-2026-10-22 以降、公式ランチャーは**署名済みの許可証**を渡します（環境変数 `EVEJS_LAUNCHER_GRANT`）。
-MOD がこれを検証できれば、「サーバーを起動した人がいる」だけでなく「公式 EveJS Launcher からの実行」だと分かります。（**AI コーディングアシスタントも同様に従ってください**）
+新しい MOD のスケルトンは**この手順をすでに含んでいます**。自分で書く必要はなく、**消さずにそのまま残す**だけです。要点は 3 つ：
 
-**新規 MOD のスケルトンにはこの検査が最初から入っています**（`lib/launcherGuard.js` とマニフェストの `binding`）。決めるのは「いつ実際に止めるか」だけです。
-
-## マニフェストの 3 つのフィールド
-
-```json
-"binding": {
-  "launcher": "evejs-launcher",
-  "launcherKeyId": "867242e85fc5",
-  "enforce": "observe"
-}
-```
-
-| フィールド | 意味 |
-| --- | --- |
-| `launcher` | このランチャー ID のみ許可 |
-| `launcherKeyId` | **単なるヒント**で判定には使われません。検証鍵は `lib/launcherGuard.js` に直書きされています |
-| `enforce` | `observe`（既定）= ログのみ；`enforce` = 判定が通らなければ MOD は何もしない |
-
-## 使い方
-
-スケルトンの `loader.js` は最初にこれを実行します：
+1. `lib/launcherGuard.js` は MOD フォルダに残す（改名も削除もしない）。
+2. `loader.js` の**最初の処理**は必ずこの 1 行（id は自分のものに）：
 
 ```js
-if (require("./lib/launcherGuard.js").gate("<あなたの MOD id>")) return;
+if (require("./lib/launcherGuard.js").gate("<你的模组 id>")) return;
 ```
 
-## 切り替えの手順（`enforce` は急がない）
+3. マニフェスト `evejs-launcher.mod.json` のこのブロックは必ず残す（既定値のままで正しい。通常は触らない）：
 
-1. まず `observe` のまま：判定結果は `server/logs/evejs-mods.log` に書かれます；
-2. `guard` が `ok` か `denied` か、`reason` は何か（ランチャー未更新が最多）を確認；
-3. ほぼ `ok` になったら `enforce` を `enforce` にして、**再署名して公開**。
+```json
+"binding": { "launcher": "evejs-launcher", "launcherKeyId": "…", "enforce": "observe" }
+```
 
-⚠️ マニフェストを変えたら必ず**再署名**：署名せずに JSON だけ変えると、公式ランチャーは MOD を丸ごとスキップします。
-ランチャーの「MOD を公開」をもう一度押せば、`.eve-key` で自動再署名され `binding` はそのまま残ります。
+`enforce` は `"observe"` のままで十分（ログのみ、ブロックしない）。本当にブロックしたい場合は `"enforce"` に変え、
+そのあと**ランチャーの「MOD を公開」で再署名して公開**してください。
 
-## 有効になると
+⚠️ レッドライン 2 つ：上記のどれかを消す、またはマニフェストを変えて再署名しない —— どちらでも MOD は読み込まれません。
 
-- 公式ランチャー（十分新しい）：通常どおり読み込み；
-- **BAT でサーバー起動 / 別のランチャー**：許可証がない → `enforce` では読み込まれない；
-- 公式ランチャーだが古すぎる：サーバーが署名を拒否 → 同じく読み込まれない。
+公開済みの MOD を対応させるには：`lib/launcherGuard.js` をコピーし、`loader.js` に 1 行足し、マニフェストにブロックを足して、再署名・公開します。
 
-## 既存 MOD の導入手順
-
-`binding` は**任意の追加キー**（未記載 = 未宣言 = 公式ランチャーは読み込みません。既存 MOD はこのブロックを足すだけ）。3 ステップ：
-
-1. `lib/launcherGuard.js` を入手（スケルトンか導入済み MOD からコピー）；
-2. `loader.js` の入口に `gate("<あなたの MOD id>")` を追加；
-3. マニフェストに `binding` を追加（まず `observe`）して**再署名・公開**。
-
-## 鍵をローテーションするとき
-
-`LAUNCHER_KEYS` は**追加のみ**；ローテーション中は新旧両方の鍵で署名されるので、どれか 1 つが通れば十分です。
