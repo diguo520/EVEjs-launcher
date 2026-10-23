@@ -933,6 +933,16 @@ export interface RawModPlanIgnored {
   id?: string | null
   target: string
   reason: string
+  /**
+   * 说明文本的**键 + 参数**（键即中文原文，见 `lib/i18n.ts` 的口径）。
+   *
+   * 为什么要这样：这类说明是后端在运行期用 `format!` 拼好的句子，界面只是原样打印 ——
+   * 而拼好的句子在 7 个语言包里都没有对应条目，于是**无论切到哪种语言都显示中文**。
+   * 给键 + 参数，界面就能用 `t(key, args)` 翻（2026-10-23）。
+   * `reason` 仍保留一份拼好的中文：老界面直接打印它，不会因为多了两个键就空白。
+   */
+  reasonKey?: string
+  reasonArgs?: Record<string, string>
 }
 
 /** `mods:plan` */

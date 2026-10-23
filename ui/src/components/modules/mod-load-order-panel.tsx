@@ -204,7 +204,7 @@ export function ModLoadOrderPanel({
           {plan.ignored.length > 0 ? (
             <div className="rounded-md border border-warning/40 bg-warning/[0.06] px-2.5 py-1.5">
               <div className="text-[11px] font-semibold text-warning">
-                这些顺序声明本次没生效
+                {t("这些顺序声明本次没生效")}
               </div>
               <ul className="mt-1 space-y-0.5">
                 {plan.ignored.map((item, index) => (
@@ -220,7 +220,8 @@ export function ModLoadOrderPanel({
                       {item.target}
                     </span>
                     <span> · </span>
-                    <span>{item.reason}</span>
+                    {/* 说明走后端给的键 + 参数（键即中文原文）；老的 `reason` 作兜底 */}
+                    <span>{t(item.reasonKey ?? item.reason, item.reasonArgs ?? {})}</span>
                   </li>
                 ))}
               </ul>

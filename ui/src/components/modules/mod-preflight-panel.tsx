@@ -97,20 +97,29 @@ export function ModPreflightPanel({
 
   return (
     <section className="rounded-lg border border-border bg-card/40 p-3.5">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <span className="flex size-7 shrink-0 items-center justify-center rounded-md border border-border bg-background/60">
-          <Radar className="size-4 text-primary" />
-        </span>
-        <div className="min-w-0">
-          <div className="text-[13px] font-semibold text-foreground">启动前预检</div>
+      {/* 图标 + 标题占一侧、按钮占右上角：**整行不换行**（长副标题在左侧内部自己换行），
+          否则窗口一窄按钮就被顶到下一行（2026-10-23 反馈）。 */}
+      <div className="flex items-start justify-between gap-x-3">
+        <div className="flex min-w-0 items-center gap-x-3">
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-md border border-border bg-background/60">
+            <Radar className="size-4 text-primary" />
+          </span>
+          <div className="min-w-0">
+            <div className="text-[13px] font-semibold text-foreground">{t("启动前预检")}</div>
           <div className="text-[11px] text-muted-foreground">
             不启动服务端也能先看一眼：哪些模组会被跳过、哪些在抢同一份服务端文件。静态推测，未经启动验证。
           </div>
+          </div>
         </div>
-        <div className="min-w-2 flex-1" />
-        <Button variant="outline" size="sm" disabled={running} onClick={() => onRun(true)}>
+        <Button
+          variant="outline"
+          size="sm"
+          className="shrink-0"
+          disabled={running}
+          onClick={() => onRun(true)}
+        >
           {running ? <Loader2 className="animate-spin" /> : <Radar />}
-          {running ? "预检中…" : "运行预检"}
+          {running ? t("预检中…") : t("运行预检")}
         </Button>
       </div>
 

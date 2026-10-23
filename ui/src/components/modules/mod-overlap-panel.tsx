@@ -33,7 +33,8 @@ export function ModOverlapPanel({
 
   return (
     <section className="rounded-lg border border-warning/45 bg-warning/10 p-3.5">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+      {/* 图标在左、标题紧跟其右：**不换行**，否则窄窗口下标题会掉到图标下面（2026-10-23 反馈） */}
+      <div className="flex items-start gap-x-3">
         <span className="flex size-7 shrink-0 items-center justify-center rounded-md border border-warning/45 bg-warning/10">
           <Link2 className="size-4 text-warning" />
         </span>

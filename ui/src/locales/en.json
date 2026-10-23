@@ -3647,5 +3647,7 @@
   "本阵营参战舰船": "This side's committed ships",
   "这一方的参战舰船还没有记录": "No committed ships recorded for this side yet",
   "有 {n} 支舰队查不到舰型构成（舰队已解散或面板没有它的记录），上面的数量少算了它们。": "{n} fleets have no ship-type breakdown (disbanded, or the panel has no record of them), so the counts above omit them.",
-  "参战舰船来自舰队当前构成：战斗结束后舰队可能已补员或改编，属近似记录。": "Committed ships come from the fleets' current composition — after a battle a fleet may have been resupplied or reorganised, so this is an approximation."
+  "参战舰船来自舰队当前构成：战斗结束后舰队可能已补员或改编，属近似记录。": "Committed ships come from the fleets' current composition — after a battle a fleet may have been resupplied or reorganised, so this is an approximation.",
+  "{target} 不在已启用的模组里（没安装或已停用），这条顺序声明本次不生效": "{target} is not among the enabled mods (not installed or disabled), so this order declaration has no effect this time",
+  "手动顺序里记着的这个目录已经不存在了（重新装回来它会回到原来的位置）": "The folder recorded in the manual order no longer exists (reinstall it and it goes back to its place)"
 }

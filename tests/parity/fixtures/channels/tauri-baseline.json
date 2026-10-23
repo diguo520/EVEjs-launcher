@@ -172,10 +172,10 @@
       "supported": true
     },
     "metrics:get": {
-      "cpuPercent": 52.30970001220703,
+      "cpuPercent": 33.35589599609375,
       "diskRoot": "<abs-path>",
       "diskTotalGB": 976.5624961853028,
-      "diskUsedGB": 790.044994354248,
+      "diskUsedGB": 790.3891487121582,
       "gpuDedicatedTotalGB": null,
       "gpuDedicatedUsedGB": null,
       "gpuMemoryTotalGB": null,
@@ -183,31 +183,31 @@
       "gpuPercent": null,
       "gpuSharedUsedGB": null,
       "memTotalGB": 31.855934143066406,
-      "memUsedGB": 12.937484741210938,
+      "memUsedGB": 12.98324203491211,
       "netBytesPerSec": 0,
-      "virtualMemTotalGB": 34.89923095703125,
-      "virtualMemUsedGB": 26.606685638427734,
+      "virtualMemTotalGB": 34.899112701416016,
+      "virtualMemUsedGB": 21.56003189086914,
       "volumes": [
         {
-          "freeGB": 65.62537002563477,
-          "percent": 70.49612761285825,
+          "freeGB": 65.59888458251953,
+          "percent": 70.50803494585284,
           "root": "<abs-path>",
           "totalGB": 222.4296836853027,
-          "usedGB": 156.80431365966797
+          "usedGB": 156.8307991027832
         },
         {
-          "freeGB": 156.88679122924805,
-          "percent": 46.44930789647536,
+          "freeGB": 156.90284729003906,
+          "percent": 46.44382742765401,
           "root": "<abs-path>",
           "totalGB": 292.96874618530273,
-          "usedGB": 136.0819549560547
+          "usedGB": 136.06589889526367
         },
         {
-          "freeGB": 186.5175018310547,
-          "percent": 80.90060773789301,
+          "freeGB": 186.17334747314453,
+          "percent": 80.93584914428065,
           "root": "<abs-path>",
           "totalGB": 976.5624961853028,
-          "usedGB": 790.044994354248
+          "usedGB": 790.3891487121582
         },
         {
           "freeGB": 390.2404022216797,

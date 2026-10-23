@@ -292,13 +292,19 @@ pub fn plan_loaders(repo_root: &Path, runtime: &RuntimePaths) -> Value {
                 if enabled_ids.contains(&id.to_lowercase()) {
                     continue;
                 }
+                // 说明文本一律做成「**键 + 参数**」而不是拼好的句子（2026-10-23）：
+                // 界面多语言的键就是**中文原文**（见 ui/src/lib/i18n.ts 的口径），所以这里给
+                // `reasonKey`（带 {target} 占位符的中文模板）+ `reasonArgs`，由界面 t(key, args) 翻。
+                // `reason` 仍然保留一份拼好的中文：老版本界面直接打印它，不会因为多了两个键就空白。
+                let reason_key =
+                    "{target} 不在已启用的模组里（没安装或已停用），这条顺序声明本次不生效";
                 ignored.push(json!({
                     "field": field,
                     "id": item.id,
                     "target": id,
-                    "reason": format!(
-                        "{id} 不在已启用的模组里（没安装或已停用），这条顺序声明本次不生效"
-                    ),
+                    "reasonKey": reason_key,
+                    "reasonArgs": { "target": id },
+                    "reason": reason_key.replace("{target}", id),
                 }));
             }
         }
@@ -307,11 +313,13 @@ pub fn plan_loaders(repo_root: &Path, runtime: &RuntimePaths) -> Value {
         if all_folders.iter().any(|name| name == &folder) {
             continue;
         }
+        let reason_key = "手动顺序里记着的这个目录已经不存在了（重新装回来它会回到原来的位置）";
         ignored.push(json!({
             "field": "order",
             "id": Value::Null,
             "target": folder,
-            "reason": "手动顺序里记着的这个目录已经不存在了（重新装回来它会回到原来的位置）",
+            "reasonKey": reason_key,
+            "reason": reason_key,
         }));
     }
 

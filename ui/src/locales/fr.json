@@ -3647,5 +3647,7 @@
   "本阵营参战舰船": "Vaisseaux engagés de ce camp",
   "这一方的参战舰船还没有记录": "Aucun vaisseau engagé enregistré pour ce camp",
   "有 {n} 支舰队查不到舰型构成（舰队已解散或面板没有它的记录），上面的数量少算了它们。": "{n} flottes n'ont pas de composition par type (dissoutes, ou absentes du panneau) ; les comptes ci-dessus les omettent.",
-  "参战舰船来自舰队当前构成：战斗结束后舰队可能已补员或改编，属近似记录。": "Les vaisseaux engagés proviennent de la composition actuelle des flottes — après un combat, une flotte peut avoir été réapprovisionnée ou réorganisée : il s'agit d'une approximation."
+  "参战舰船来自舰队当前构成：战斗结束后舰队可能已补员或改编，属近似记录。": "Les vaisseaux engagés proviennent de la composition actuelle des flottes — après un combat, une flotte peut avoir été réapprovisionnée ou réorganisée : il s'agit d'une approximation.",
+  "{target} 不在已启用的模组里（没安装或已停用），这条顺序声明本次不生效": "{target} ne fait pas partie des mods activés (non installé ou désactivé) : cette déclaration d'ordre ne s'applique pas cette fois",
+  "手动顺序里记着的这个目录已经不存在了（重新装回来它会回到原来的位置）": "Le dossier enregistré dans l'ordre manuel n'existe plus (réinstallez-le et il retrouvera sa place)"
 }
