@@ -1,6 +1,12 @@
 {
   "name": "repo-mods",
   "note": "模组全链（真写盘）：建脚手架（含 enabled 立即启用路径）→ 列出 → 启用 → 自定义排序 → 注入计划 → 卸载（走回收站）→ 再列出。这里刻意不调 mods:sign / mods:updateMeta：签名块里的 signedAt 是时间戳，会让「两轮改动指纹逐字节一致」这条确定性门禁失去意义；签名与编辑信息由 Rust 单测（plan.rs / scaffold.rs）覆盖。结束时故意留下 e2e-keep 作为残留样本，由还原负责清掉：这样快照 diff 一定非空，才能证明写通道真的落了盘。",
+  "seed": [
+    {
+      "path": "userdata/launcher-settings.json",
+      "content": "{\n  \"modIndexUrls\": [\"http://127.0.0.1:9/\"]\n}\n"
+    }
+  ],
   "steps": [
     { "id": "create-folder", "channel": "mods:createFolder", "args": [], "expect": { "ok": true } },
     { "id": "create-keep", "channel": "mods:create", "args": [{ "templateId": "blank", "id": "e2e-keep", "displayName": "E2E Keep", "version": "1.0.0" }], "expect": { "ok": true } },
