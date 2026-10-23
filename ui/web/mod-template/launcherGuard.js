@@ -32,7 +32,16 @@ const path = require("node:path");
 const os = require("node:os");
 
 const GUARD_VERSION = 1;
-const STATE_KEY = Symbol.for("evejs.launcher.guard.v1");
+const STATE_TAG = "evejs-precheck";
+// 进程级状态的槽位 —— **必须是自己独有的**。
+//
+// 2026-10-23 复盘：这里原来复用了别家守卫的同一个 symbol
+// （`Symbol.for("evejs.launcher.guard.v1")`）。而那个 symbol 是**全局唯一槽位**：
+// 同一个服务端进程里两套守卫只有一个能占住它 —— 谁先加载谁占坑，另一套的调用就会
+// 打到**不兼容的 API** 上（对方 `join(modId, id)` 要两个参数，我们只给一个 → 它抛
+// 「launcher guard participant id is required」→ 模组在加载期直接死掉）。
+// 换成自己的槽位：各用各的，互不干扰。
+const STATE_KEY = Symbol.for("evejs.precheck.v1");
 const LAUNCHER_ID = "evejs-launcher";
 const MANIFEST_NAME = "evejs-launcher.mod.json";
 const CANON_PREFIX = "evejs-machine-v1|";
@@ -282,6 +291,8 @@ function createState() {
   let reported = false;
   const state = Object.freeze({
     version: GUARD_VERSION,
+    // 自有标记：`shared()` 靠它区分「这是我的状态」还是「槽位被别的东西占了」
+    tag: STATE_TAG,
     decide: function (modId) {
       if (!decision) decision = guard.posture(findManifest(__dirname, modId));
       return decision;
@@ -304,7 +315,14 @@ function createState() {
 }
 
 function validState(state) {
-  return Boolean(state) && state.version === GUARD_VERSION && typeof state.decide === "function";
+  // 判据要**足够严**：只认自己造出来的状态。原来只查 `version + decide` 两项，
+  // 于是会把别家守卫的状态当成自己的收下，再调自己的方法 → 直接炸（见 STATE_KEY 的注释）。
+  if (!state || state.version !== GUARD_VERSION || state.tag !== STATE_TAG) return false;
+  return (
+    typeof state.decide === "function" &&
+    typeof state.join === "function" &&
+    typeof state.report === "function"
+  );
 }
 
 /** 一个进程一份状态，所有副本共用；槽被换掉就当作 blocked（改守卫不能让它放行） */

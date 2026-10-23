@@ -172,10 +172,10 @@
       "supported": true
     },
     "metrics:get": {
-      "cpuPercent": 45.13453674316406,
+      "cpuPercent": 44.792118072509766,
       "diskRoot": "<abs-path>",
       "diskTotalGB": 976.5624961853028,
-      "diskUsedGB": 787.6219940185547,
+      "diskUsedGB": 787.8076553344727,
       "gpuDedicatedTotalGB": null,
       "gpuDedicatedUsedGB": null,
       "gpuMemoryTotalGB": null,
@@ -183,31 +183,31 @@
       "gpuPercent": null,
       "gpuSharedUsedGB": null,
       "memTotalGB": 31.855934143066406,
-      "memUsedGB": 13.823116302490234,
+      "memUsedGB": 10.362346649169922,
       "netBytesPerSec": 0,
-      "virtualMemTotalGB": 34.90874099731445,
-      "virtualMemUsedGB": 25.90887451171875,
+      "virtualMemTotalGB": 34.899253845214844,
+      "virtualMemUsedGB": 26.34494400024414,
       "volumes": [
         {
-          "freeGB": 65.60539245605469,
-          "percent": 70.50510913423125,
+          "freeGB": 65.70491790771484,
+          "percent": 70.46036445357029,
           "root": "<abs-path>",
           "totalGB": 222.4296836853027,
-          "usedGB": 156.82429122924805
+          "usedGB": 156.7247657775879
         },
         {
-          "freeGB": 156.89280700683594,
-          "percent": 46.44725451103196,
+          "freeGB": 156.88689422607422,
+          "percent": 46.449272740224906,
           "root": "<abs-path>",
           "totalGB": 292.96874618530273,
-          "usedGB": 136.0759391784668
+          "usedGB": 136.08185195922852
         },
         {
-          "freeGB": 188.94050216674805,
-          "percent": 80.6524925025488,
+          "freeGB": 188.75484085083008,
+          "percent": 80.67150422137306,
           "root": "<abs-path>",
           "totalGB": 976.5624961853028,
-          "usedGB": 787.6219940185547
+          "usedGB": 787.8076553344727
         },
         {
           "freeGB": 390.2404022216797,
@@ -282,7 +282,7 @@
           "id": "broadcast",
           "name": "Welcome Broadcast (Example)",
           "requiresRestart": true,
-          "sizeBytes": 28101,
+          "sizeBytes": 29248,
           "tags": [
             "聊天",
             "新手"
@@ -309,7 +309,7 @@
           "id": "blank",
           "name": "Blank Skeleton",
           "requiresRestart": true,
-          "sizeBytes": 26454,
+          "sizeBytes": 27601,
           "tags": []
         }
       ]
