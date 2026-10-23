@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react"
-import { Gamepad2, Loader2, Square, Trash2 } from "lucide-react"
+import { Loader2, Plus, Square, Trash2 } from "lucide-react"
 
 import { CharacterAvatar } from "@/components/accounts/character-avatar"
 import { StatusDot } from "@/components/common/status-dot"
@@ -258,17 +258,34 @@ export function CharacterSlot({
         )}
       >
         <span className="tabular text-[10px] tracking-[0.1em] text-tertiary">
-          SLOT {index + 1} · 空
+          SLOT {index + 1}
         </span>
-        <Button
-          variant={creatingStep ? "outline" : "default"}
-          size="sm"
+        {/*
+          空的角色位画成「**空白头像 + 一个加号**」：与真头像同尺寸同形状（size-14 / rounded-md），
+          点它就进游戏捏人。
+         
+          为什么不用文字按钮（2026-10-23）：那句话是硬编码中文，切到别的语言时长度一变，
+          这个窄槽位的排版就散；图形化的加号没有任何语言问题，也不再需要翻译。
+          可读文本退到 aria-label / title —— 那两处走 t()，语言齐全。
+        */}
+        <button
+          type="button"
           disabled={!guard.ok || creatingStep !== null}
           onClick={() => onCreate(account.id)}
+          aria-label={creatingStep ? IN_GAME_STEP_LABEL[creatingStep] : t("进入游戏创建角色")}
+          title={creatingStep ? IN_GAME_STEP_LABEL[creatingStep] : t("进入游戏创建角色")}
+          className={cn(
+            "flex size-14 shrink-0 items-center justify-center rounded-md border transition-colors",
+            creatingStep
+              ? "border-primary/45 bg-primary/10 text-primary"
+              : guard.ok
+                ? "border-dashed border-input bg-background/30 text-tertiary hover:border-primary/60 hover:text-primary"
+                : "border-dashed border-input/60 bg-background/10 text-tertiary/60",
+            (!guard.ok || creatingStep !== null) && "cursor-not-allowed"
+          )}
         >
-          {creatingStep ? <Loader2 className="animate-spin" /> : <Gamepad2 />}
-          {creatingStep ? IN_GAME_STEP_LABEL[creatingStep] : "进入游戏创建角色"}
-        </Button>
+          {creatingStep ? <Loader2 className="size-5 animate-spin" /> : <Plus className="size-5" />}
+        </button>
 
         {creatingStep ? (
           <div className="w-full space-y-1.5 px-1">
