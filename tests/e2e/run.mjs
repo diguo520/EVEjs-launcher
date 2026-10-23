@@ -197,6 +197,11 @@ async function runOnce({ exe, scenarioFile, sandbox, outputDir, index, timeoutMs
       EVEJS_E2E_SCENARIO: scenarioFile,
       EVEJS_SELF_TEST_OUT: outFile,
       EVEJS_USER_DATA_DIR: sandbox.userdataDir,
+      // 许可取回必须指向一个**必然立刻失败**的地址：默认地址是公网（ping.5318.cm），
+      // 沙箱里"这一轮网络回得快不快"会决定 `launcher-license.json` 写不写 —— 于是
+      // 「各轮文件改动指纹一致」这条检查会偶发红（2026-10-23 实测：第 2 轮凭空多出这个文件）。
+      // 指向回环上一个没人听的端口 = 连接立刻被拒 → 恒不落盘 → 确定性恢复。
+      EVEJS_LAUNCHER_LICENSE_URL: "http://127.0.0.1:9/",
     },
     stdio: ["ignore", "ignore", "pipe"],
     windowsHide: true,

@@ -1,0 +1,25 @@
+{
+  "version": "0.5.7",
+  "changelog": {
+    "zh": [
+      {
+        "type": "fix",
+        "text": "「我创建的」里改**分类**或**显示名**现在**立刻生效** —— 以前列表会把市场索引里的旧值盖在本地清单之上，得等重新上架、索引重建之后才更新（`version` 一直是对的，分类与名字漏了）。"
+      },
+      {
+        "type": "fix",
+        "text": "发布上架时，**分类 / 标签 / 重启需求**改为以**本地清单**为准 —— 以前发布载荷里不带这三样，于是索引分片里落的分类是默认值「玩法」、标签是空的、重启需求恒为「需要重启」。"
+      }
+    ],
+    "en": [
+      {
+        "type": "fix",
+        "text": "Changing a mod's **category** or **display name** under \"created by me\" now takes effect **immediately** - the list used to merge the market snapshot over the local manifest, so the old value persisted until the mod was re-published and the index rebuilt (`version` was already correct; category and name were not)."
+      },
+      {
+        "type": "fix",
+        "text": "When publishing, **category / tags / requires-restart** now come from the **local manifest** - the publish payload never carried them, so the index shard recorded the default category \"玩法\", empty tags, and \"needs restart\" for every mod."
+      }
+    ]
+  }
+}
