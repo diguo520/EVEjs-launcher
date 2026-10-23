@@ -1,0 +1,33 @@
+{
+  "version": "0.5.6",
+  "changelog": {
+    "zh": [
+      {
+        "type": "fix",
+        "text": "模组市场的「这些模组本次不会加载」说明改成**只讲怎么办**：个别模组还没更新到当前格式时，提示你去请模组作者更新，不再把内部机制写进界面。"
+      },
+      {
+        "type": "fix",
+        "text": "修正新建模组自带的加载检查**日志写错目录**的问题：原来写到 `<安装根>/mods/server/logs/`，按教程去 `server/logs/` 找会**什么都看不到**；现在落在正确位置，并且整行是合法 JSON，方便脚本筛选（字段名与另一套守卫一致）。"
+      },
+      {
+        "type": "opt",
+        "text": "模组制作教程的「附录 I」大幅精简（57 行 → 24 行），只保留「留哪个文件、加哪一行、清单留哪一段、两条红线」；随模组发出的守卫说明与给 AI 助手的 `AGENTS.md` 也一并做了中性化处理。"
+      }
+    ],
+    "en": [
+      {
+        "type": "fix",
+        "text": "The market's \"these mods will not be loaded\" note now says only what to do: when a mod has not been updated to the current format it asks you to have the author update it, instead of writing the internal mechanism onto the screen."
+      },
+      {
+        "type": "fix",
+        "text": "Fixed the load check that ships with a new mod writing its log to the wrong directory - `<install>/mods/server/logs/` instead of `<install>/server/logs/` - so an author looking where the tutorial says would find nothing. It now lands in the right place, and the whole line is valid JSON for scripting (field names match the other guard)."
+      },
+      {
+        "type": "opt",
+        "text": "The tutorial's Appendix I is much shorter (57 lines to 24): keep this file, add this line, leave this block, two red lines. The guard's own notes and the AGENTS.md handed to AI assistants were made neutral in the same pass."
+      }
+    ]
+  }
+}
