@@ -218,7 +218,8 @@ pub fn reviews_for(runtime: &RuntimePaths, mod_id: &str, force: bool) -> Value {
         });
     }
     let payload = fetched.get("payload").cloned().unwrap_or(Value::Null);
-    let local_key_id = crate::author::read_identity()
+    // 用传入的 runtime（与 `list_my_mods` / `forget_submission` 同一条规矩）
+    let local_key_id = crate::author::read_identity_at(runtime)
         .map(|identity| identity.key_id)
         .unwrap_or_default();
     let reviews: Vec<Value> = payload

@@ -163,7 +163,9 @@ pub fn submission_is_mine(
 /// 作者在本地重建同名模组（id 不变）刷新一下，就能重新走「首次提交」上架；仓库与 Release
 /// 都是幂等复用的，不会重复建（见 github::ensure_own_repo / ensure_release）。不可撤销。
 pub fn forget_submission(runtime: &RuntimePaths, id: &str) -> Value {
-    let identity = match author::read_identity() {
+    // 用传入的 runtime（与 `list_my_mods` 同一条规矩）：函数拿到的就是本次要操作的那一份，
+    // 走进程级 `read_identity()` 会与实际操作的目录脱节，测试里直接读不到身份。
+    let identity = match author::read_identity_at(runtime) {
         Ok(identity) => identity,
         Err(_) => {
             return json!({
@@ -733,7 +735,8 @@ pub fn prepare_submission(repo_root: &Path, runtime: &RuntimePaths, input: &Valu
         return json!({ "ok": false, "reason": format!("清单校验失败：{}", record.error) });
     }
 
-    let identity = match author::read_identity() {
+    // 同上：用传入的 runtime
+    let identity = match author::read_identity_at(runtime) {
         Ok(identity) => identity,
         Err(reason) => {
             return json!({ "ok": false, "reason": format!("读不到本机作者身份：{reason}") })
@@ -904,14 +907,32 @@ pub fn prepare_submission(repo_root: &Path, runtime: &RuntimePaths, input: &Valu
             value
         }
     };
+    // 分类 / 标签 / 重启需求 这三个都能在「编辑信息」里改，而**发布载荷里没有它们**
+    // （UI 的 `publish()` 只送 folder / version / changelog / repo）—— 所以一律**以本地清单为准**。
+    //
+    // 以前只看载荷：改了分类再上架，索引分片里落的却是默认值「玩法」；
+    // 标签会变成空数组、重启需求会恒为 true（2026-10-23 报障）。
+    // `description` / `conflicts` 早就是「载荷给了用载荷、没给用清单」，这里把三个对齐。
     let category = {
         let value = text_field(input, "category");
-        if value.is_empty() {
-            "玩法".to_string()
-        } else {
+        if !value.is_empty() {
             value
+        } else if !record.category.trim().is_empty() {
+            record.category.trim().to_string()
+        } else {
+            // 清单也没写（老模组）才落到默认值
+            "玩法".to_string()
         }
     };
+    let tags = input
+        .get("tags")
+        .cloned()
+        .unwrap_or_else(|| json!(record.tags.clone()));
+    // 清单里存的是 `restart`（none / game_server）——与 `manifest_from` 同一套映射
+    let requires_restart = input
+        .get("requiresRestart")
+        .and_then(Value::as_bool)
+        .unwrap_or_else(|| record.restart != "none");
     let input_readme = input.get("readme").cloned().unwrap_or_else(|| json!([]));
     let input_highlights = input
         .get("highlights")
@@ -932,10 +953,7 @@ pub fn prepare_submission(repo_root: &Path, runtime: &RuntimePaths, input: &Valu
     );
     index_draft.insert("description".into(), json!(description));
     index_draft.insert("category".into(), json!(category));
-    index_draft.insert(
-        "tags".into(),
-        input.get("tags").cloned().unwrap_or_else(|| json!([])),
-    );
+    index_draft.insert("tags".into(), tags);
     index_draft.insert(
         "readme".into(),
         if listed_readme.is_empty() {
@@ -953,13 +971,7 @@ pub fn prepare_submission(repo_root: &Path, runtime: &RuntimePaths, input: &Valu
         },
     );
     index_draft.insert("conflicts".into(), conflicts);
-    index_draft.insert(
-        "requiresRestart".into(),
-        json!(input
-            .get("requiresRestart")
-            .and_then(Value::as_bool)
-            .unwrap_or(true)),
-    );
+    index_draft.insert("requiresRestart".into(), json!(requires_restart));
     index_draft.insert("evejsVersions".into(), json!(evejs_versions));
     index_draft.insert("sizeBytes".into(), json!(size_bytes));
     index_draft.insert("sha256".into(), json!(sha256));
@@ -2141,6 +2153,88 @@ mod tests {
         assert!(empty_readme.is_empty());
         assert!(empty_highlights.is_empty());
         let _ = std::fs::remove_dir_all(&runtime.root);
+    }
+
+    /// 发布载荷**不带**的分类 / 标签 / 重启需求，必须从**本地清单**取。
+    ///
+    /// 2026-10-23 报障：改了分类再上架，索引分片里落的却是默认值「玩法」—— 根因是这里只看载荷
+    /// （UI 的 `publish()` 只送 folder / version / changelog / repo），空值就各自落到默认值。
+    /// `description` / `conflicts` 早就是「载荷给了用载荷、没给用清单」，这条把另外三个钉住。
+    #[test]
+    fn prepare_takes_category_tags_and_restart_from_the_manifest() {
+        let runtime = temp_runtime("index-draft-fields");
+        crate::author::get_state(&runtime);
+        // 默认署名「指挥官」不允许发布（见 author::is_publishable_name），测试里先改掉
+        crate::author::set_name(&runtime, "测试作者");
+        let repo = std::env::temp_dir().join(format!(
+            "evejs-submit-repo-{}-{}",
+            std::process::id(),
+            pkg::epoch_ms()
+        ));
+        let dir = repo.join("mods").join("demo");
+        std::fs::create_dir_all(&dir).unwrap();
+        let identity = crate::author::read_identity_at(&runtime).expect("应有本机身份");
+        std::fs::write(
+            dir.join(scan::MANIFEST_NAME),
+            serde_json::to_string_pretty(&json!({
+                "schemaVersion": 3,
+                "id": "demo",
+                "displayName": "演示模组",
+                "version": "1.0.0",
+                "kind": "loader",
+                "restart": "game_server",
+                "activation": { "strategy": "loader_rename" },
+                "category": "经济",
+                "tags": ["市场", "自动化"],
+                "description": "一句话说明",
+                "author": {
+                    "id": identity.id,
+                    "name": identity.name,
+                    "keyId": identity.key_id,
+                    "publicKey": identity.public_key,
+                },
+                "binding": {
+                    "launcher": crate::launcher_grant::LAUNCHER_ID,
+                    "launcherKeyId": crate::launcher_grant::primary_key_id(),
+                    "enforce": "observe",
+                },
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        std::fs::write(dir.join("loader.js"), "// demo").unwrap();
+
+        // 载荷里**故意不写** category / tags / requiresRestart —— 与 UI 的 publish() 一致
+        let reply = prepare_submission(
+            &repo,
+            &runtime,
+            &json!({
+                "folder": "demo",
+                "version": "1.0.1",
+                "changelog": "多一点说明",
+                "repo": "me/demo",
+            }),
+        );
+        assert_eq!(reply["ok"], json!(true), "打包应成功：{reply}");
+        let draft = &reply["item"]["indexDraft"];
+        assert_eq!(
+            draft["category"],
+            json!("经济"),
+            "分类应来自本地清单：{reply}"
+        );
+        assert_eq!(
+            draft["tags"],
+            json!(["市场", "自动化"]),
+            "标签应来自本地清单"
+        );
+        assert_eq!(
+            draft["requiresRestart"],
+            json!(true),
+            "重启需求应来自清单的 restart"
+        );
+
+        let _ = std::fs::remove_dir_all(&runtime.root);
+        let _ = std::fs::remove_dir_all(&repo);
     }
 
     #[test]
