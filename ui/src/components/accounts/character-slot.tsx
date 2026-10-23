@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react"
-import { Loader2, Plus, Square, Trash2 } from "lucide-react"
+import { Plus, Square, Trash2 } from "lucide-react"
 
 import { CharacterAvatar } from "@/components/accounts/character-avatar"
 import { StatusDot } from "@/components/common/status-dot"
@@ -99,7 +99,8 @@ function HoldAvatar({
   label,
   onComplete,
 }: {
-  character: Character
+  /** 有角色就画它的头像；**不传 = 空槽位**，改画「空白头像 + 加号」（2026-10-23） */
+  character?: Character
   disabled: boolean
   label: string
   onComplete: () => void
@@ -157,6 +158,7 @@ function HoldAvatar({
       type="button"
       disabled={disabled}
       aria-label={label}
+      title={label}
       onPointerDown={start}
       onPointerUp={cancel}
       onPointerCancel={cancel}
@@ -193,14 +195,27 @@ function HoldAvatar({
           style={{ filter: holding ? "drop-shadow(0 0 4px hsl(var(--primary) / 0.65))" : undefined }}
         />
       </svg>
-      <CharacterAvatar
-        name={character.name}
-        race={character.race}
-        avatar={character.avatar}
-        size="lg"
-        shape="circle"
-        className="relative z-10 size-[52px]"
-      />
+      {character ? (
+        <CharacterAvatar
+          name={character.name}
+          race={character.race}
+          avatar={character.avatar}
+          size="lg"
+          shape="circle"
+          className="relative z-10 size-[52px]"
+        />
+      ) : (
+        /*
+          空槽位与真头像**同尺寸、同形状、同一个长按入口**：圆形、虚线、中间一个加号。
+          这样两种槽位的手感一致（都是按住头像、走完进度环才动作），而且加号与语言无关。
+        */
+        <span
+          aria-hidden
+          className="relative z-10 flex size-[52px] select-none items-center justify-center overflow-hidden rounded-full border border-dashed border-input bg-background/30 text-tertiary"
+        >
+          <Plus className="size-5" />
+        </span>
+      )}
     </button>
   )
 }
@@ -261,31 +276,17 @@ export function CharacterSlot({
           SLOT {index + 1}
         </span>
         {/*
-          空的角色位画成「**空白头像 + 一个加号**」：与真头像同尺寸同形状（size-14 / rounded-md），
-          点它就进游戏捏人。
+          空槽位用**和有角色的一模一样**的入口：同样大小、同样的圆形头像、同样按住 700ms 走完进度环，
+          只是头像画成空白 + 一个加号，动作换成「进游戏捏人」。
          
-          为什么不用文字按钮（2026-10-23）：那句话是硬编码中文，切到别的语言时长度一变，
-          这个窄槽位的排版就散；图形化的加号没有任何语言问题，也不再需要翻译。
-          可读文本退到 aria-label / title —— 那两处走 t()，语言齐全。
+          为什么不用文字按钮（2026-10-23）：那句话是硬编码中文，切到别的语言时长度一变，这个窄槽位
+          的排版就散；图形化的加号没有任何语言问题，也不再需要翻译。可读文本走 t()，语言齐全。
         */}
-        <button
-          type="button"
+        <HoldAvatar
           disabled={!guard.ok || creatingStep !== null}
-          onClick={() => onCreate(account.id)}
-          aria-label={creatingStep ? IN_GAME_STEP_LABEL[creatingStep] : t("进入游戏创建角色")}
-          title={creatingStep ? IN_GAME_STEP_LABEL[creatingStep] : t("进入游戏创建角色")}
-          className={cn(
-            "flex size-14 shrink-0 items-center justify-center rounded-md border transition-colors",
-            creatingStep
-              ? "border-primary/45 bg-primary/10 text-primary"
-              : guard.ok
-                ? "border-dashed border-input bg-background/30 text-tertiary hover:border-primary/60 hover:text-primary"
-                : "border-dashed border-input/60 bg-background/10 text-tertiary/60",
-            (!guard.ok || creatingStep !== null) && "cursor-not-allowed"
-          )}
-        >
-          {creatingStep ? <Loader2 className="size-5 animate-spin" /> : <Plus className="size-5" />}
-        </button>
+          label={creatingStep ? IN_GAME_STEP_LABEL[creatingStep] : t("进入游戏创建角色")}
+          onComplete={() => onCreate(account.id)}
+        />
 
         {creatingStep ? (
           <div className="w-full space-y-1.5 px-1">
