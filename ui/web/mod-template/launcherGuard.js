@@ -247,19 +247,26 @@ function findManifest(start, modId) {
 
 function appendLog(message) {
   try {
-    const root = path.resolve(__dirname, "..", "..");
+    // 本文件在 `<安装根>/mods/<模组>/lib/` 下 —— 往上**三级**才是安装根。
+    // 2026-10-23 修：原来只往上两级，日志写进了 `<安装根>/mods/server/logs/`，
+    // 作者按教程去 `server/logs/` 看 observe 日志会什么都看不到。
+    const root = path.resolve(__dirname, "..", "..", "..");
     const target = path.join(root, "server", "logs", "evejs-mods.log");
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.appendFileSync(target, new Date().toISOString() + " [launcher-guard] " + message + "\n", "utf8");
   } catch (_) { /* 只读安装不能让日志写失败拖垮模组 */ }
 }
 
-function describe(decision) {
+function describe(decision, participants, modId) {
+  // **整行必须是一段 JSON** —— 方便作者接脚本 / 正则扫日志（原来把 participants
+  // 拼在 JSON 外面，解析会失败）。字段名与另一套守卫保持一致：mod + participants。
   return JSON.stringify({
     guard: decision.ok ? "ok" : "denied",
     posture: decision.posture,
     blocked: decision.blocked,
     reason: decision.reason,
+    mod: modId || undefined,
+    participants: participants,
     launcherVersion: decision.result.launcherVersion || undefined,
     installId: decision.result.installId || undefined,
     machineMismatch: decision.result.machineMismatch || undefined,
@@ -289,7 +296,7 @@ function createState() {
       const current = state.decide(modId);
       if (!current.ok || current.blocked || current.valveIgnored || current.result.machineMismatch) {
         reported = true;
-        appendLog(describe(current) + " participants=" + JSON.stringify(Array.from(participants)));
+        appendLog(describe(current, Array.from(participants), modId));
       }
     },
   });

@@ -138,13 +138,17 @@ pub fn plan_loaders(repo_root: &Path, runtime: &RuntimePaths) -> Value {
         // 但反过来，硬开之后**作者想在我们的用户里跑就必须接入**，这就够了。
         if ENFORCE_MOD_BINDING && item.binding_launcher != crate::launcher_grant::LAUNCHER_ID {
             let reason = if item.binding_launcher.is_empty() {
-                "这个模组没有声明「只归官方 EveJS Launcher 用」（清单里缺 binding），本启动器不再加载它。\
-                 模组作者在清单里补上 binding（launcher / launcherKeyId / enforce）并重新签名发布后即可恢复；\
-                 新建模组时启动器生成的骨架已经自带这一段。\
-                 说明见模组制作教程的「附录 I：启动器绑定」。"
+                // 只说「怎么办」，不说「机制是什么」—— 把实现细节写进用户可见的提示，
+                // 等于给想拆改/倒卖的人一份说明书（2026-10-23 维护者要求）。
+                "这个模组还没有更新到当前版本要求的格式，本次不会加载。\
+                 请让模组作者更新模组后重试 —— 更新到位会自动恢复。"
                     .to_string()
             } else {
-                format!("该模组绑定到其它启动器：{}", item.binding_launcher)
+                // 这一条是「模组明确只服务别人的启动器」，同样只说结论、不解释机制
+                format!(
+                    "这个模组专供其它启动器，本启动器不会加载它。（{}）",
+                    item.binding_launcher
+                )
             };
             skipped.push(Skip {
                 id: item.id.clone(),
@@ -916,11 +920,27 @@ mod tests {
             .map(|item| item["reason"].as_str().unwrap().to_string())
             .collect::<Vec<_>>()
             .join(" | ");
-        assert!(reasons.contains("没有声明"), "没声明要被跳过：{reasons}");
-        assert!(reasons.contains("附录 I"), "理由要指向教程：{reasons}");
         assert!(
-            reasons.contains("绑定到其它启动器"),
+            reasons.contains("本次不会加载"),
+            "没声明要被跳过：{reasons}"
+        );
+        // 用户可见的跳过理由**只说怎么办，不说机制** —— 把实现细节（键名、字段名、
+        // 教程章节）写进这里，等于给想拆改 / 倒卖的人一份说明书（2026-10-23 维护者要求）。
+        // 这条断言把这个约束钉住：以后谁把机制写回提示里，这里就会红。
+        for leaked in ["binding", "launcherKeyId", "enforce", "官方", "附录"] {
+            assert!(
+                !reasons.contains(leaked),
+                "用户可见的跳过理由里不该出现「{leaked}」：{reasons}"
+            );
+        }
+        assert!(
+            reasons.contains("专供其它启动器"),
             "绑别人要被跳过：{reasons}"
+        );
+        // 作者可见的拒绝理由同理：可以讲「去哪抄」，不要复述实现
+        assert!(
+            !crate::mods::submit::BINDING_REQUIRED_REASON.contains("launcherKeyId"),
+            "上架拒绝理由里不该出现字段名"
         );
     }
 

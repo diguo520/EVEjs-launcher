@@ -53,7 +53,9 @@ pub(crate) fn binding_required_reason(binding_launcher: &str) -> Option<&'static
     }
 }
 
-pub(crate) const BINDING_REQUIRED_REASON: &str = "这个模组还没声明「只归官方启动器用」（清单里缺 binding），不能提交上架。新增模组时启动器生成的骨架已经自带这一段，照抄即可；已有模组补三步：① 把 binding 写进清单（launcher / launcherKeyId / enforce，先写 observe）；② 重新签名；③ 再点一次「发布模组」。完整说明见模组制作教程的「附录 I：启动器绑定」。";
+/// 作者可见的拒绝理由：**只讲怎么办，不讲机制**（2026-10-23 维护者要求）。
+/// 具体要补哪几个字段，教程「附录 I」里有现成的可抄块 —— 用户可见的提示不必复述实现细节。
+pub(crate) const BINDING_REQUIRED_REASON: &str = "这个模组还没有更新到当前版本要求的格式，不能提交上架。最省事的是用最新版启动器的「创建模组」骨架照抄；已有模组按模组制作教程「附录 I」补上那一段、重新签名，再点一次「发布模组」。";
 
 fn submissions_path(runtime: &RuntimePaths) -> PathBuf {
     runtime.user_data.join(SUBMISSIONS_FILE)
