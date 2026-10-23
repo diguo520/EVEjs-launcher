@@ -955,7 +955,10 @@ fn ledger_match_for<'a>(
 ///
 /// 索引那一路**只读本地缓存、绝不联网**：否则索引地址不可达时会白等 8~12 秒。
 pub fn list_my_mods(repo_root: &Path, runtime: &RuntimePaths) -> Value {
-    let identity = match author::read_identity() {
+    // 用**传入的 runtime** 读身份：这个函数拿到的 `repo_root` / `runtime` 就是本次要看的那一份，
+    // 走进程级的 `read_identity()` 会与实际扫描的目录脱节（2026-10-23 加回归测试时踩到：
+    // 测试里造好了身份，这里却报「读不到本机作者身份」→ 整张列表空掉）。
+    let identity = match author::read_identity_at(runtime) {
         Ok(identity) => identity,
         Err(_) => return json!({ "ok": false, "items": [], "reason": "读不到本机作者身份" }),
     };
@@ -1035,26 +1038,39 @@ pub fn list_my_mods(repo_root: &Path, runtime: &RuntimePaths) -> Value {
         } else {
             "listed"
         };
+        // 本地有这个模组时：**本地清单说了算**。
+        //
+        // 作者刚在「编辑信息」里改过分类 / 名字，界面必须立刻反映；而索引缓存里那份是
+        // **市场快照**（要等下一次上架 / 索引重建才会更新）。拿快照盖掉本地值的结果就是
+        // 「改了分类，启动器还是显示旧的」——2026-10-23 报障，且 `displayName` 同病。
+        // 索引只负责补市场侧的状态字段（status / listedVersion / prUrl / 审核信息）。
+        // `version` 早就是「本地优先」，这里把这两个对齐成同一口径。
         let display_name = {
-            let value = entry
-                .get("displayName")
-                .and_then(Value::as_str)
-                .unwrap_or_default();
-            if value.is_empty() {
-                id.to_string()
+            let local = item_str(prev, "displayName");
+            if !local.is_empty() {
+                local
             } else {
-                value.to_string()
+                let value = entry
+                    .get("displayName")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default();
+                if value.is_empty() {
+                    id.to_string()
+                } else {
+                    value.to_string()
+                }
             }
         };
         let category = {
-            let value = entry
-                .get("category")
-                .and_then(Value::as_str)
-                .unwrap_or_default();
-            if value.is_empty() {
-                item_str(prev, "category")
+            let local = item_str(prev, "category");
+            if !local.is_empty() {
+                local
             } else {
-                value.to_string()
+                entry
+                    .get("category")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_string()
             }
         };
         let updated_at = entry
@@ -1720,6 +1736,96 @@ mod tests {
         record
     }
 
+    /// 本地清单优先：作者刚在「编辑信息」里改过分类 / 名字，界面必须立刻反映，
+    /// 不能被索引缓存（市场快照）盖回去。
+    ///
+    /// 2026-10-23 报障：改了分类，启动器里还是显示旧的。根因是这一路按「索引优先」取值，
+    /// 而索引要等下一次上架 / 重建才更新。`version` 早就是本地优先，`displayName` / `category`
+    /// 当时漏了 —— 这条测试把它们钉住。
+    #[test]
+    fn local_manifest_wins_over_the_index_snapshot() {
+        let runtime = temp_runtime("local-wins");
+        // 先把本机身份**落盘**（`get_state` 会写 author.json）。
+        // 只调 `ensure_identity_at` 不够：那个只是内存里有，而 `list_my_mods` 走的是
+        // `read_identity_at`（读盘），读不到就直接返回空列表 —— 这条踩过一次。
+        crate::author::get_state(&runtime);
+        let identity = crate::author::read_identity_at(&runtime).expect("应有本机身份");
+        let repo = std::env::temp_dir().join(format!(
+            "evejs-registry-repo-{}-{}",
+            std::process::id(),
+            now_ms()
+        ));
+        let dir = repo.join("mods").join("demo");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join(scan::MANIFEST_NAME),
+            serde_json::to_string_pretty(&json!({
+                "schemaVersion": 3,
+                "id": "demo",
+                "displayName": "新名字",
+                "version": "1.0.0",
+                "kind": "loader",
+                "restart": "none",
+                "activation": { "strategy": "loader_rename" },
+                "category": "经济",
+                "author": {
+                    "id": identity.id,
+                    "name": identity.name,
+                    "keyId": identity.key_id,
+                    "publicKey": identity.public_key,
+                },
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        std::fs::write(dir.join("loader.js"), "// demo").unwrap();
+        // 夹具必须先能过扫描器，否则下面测的就不是合并顺序了
+        let scanned = scan::read_mod_dir("demo", &dir);
+        assert!(scanned.valid, "夹具清单应该合法：{}", scanned.error);
+
+        // 索引缓存里是那份**旧**的市场快照
+        let key = sign::generate_signing_key().expect("应能生成密钥");
+        let key_id = sign::key_id_of(&key);
+        let public_key = sign::public_key_base64(&key);
+        sign::trust_public_key(&key_id, &public_key);
+        let mut index = json!({
+            "schemaVersion": 1,
+            "mods": [{
+                "id": "demo",
+                "version": "1.0.0",
+                "displayName": "旧名字",
+                "category": "玩法",
+                "author": { "id": identity.id, "keyId": key_id, "publicKey": public_key },
+            }]
+        });
+        index["signature"] = json!({
+            "alg": "ed25519",
+            "keyId": key_id,
+            "sig": sign::sign_manifest(&index, &key),
+        });
+        write_cache(&runtime, &index);
+
+        let listing = list_my_mods(&repo, &runtime);
+        assert_eq!(listing["ok"], json!(true), "list_my_mods 应成功：{listing}");
+        let found = listing["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|item| item["id"] == json!("demo"));
+        assert!(found.is_some(), "本地模组应出现在「我创建的」里：{listing}");
+        let item = found.unwrap();
+        assert_eq!(
+            item["displayName"],
+            json!("新名字"),
+            "本地名字应赢过索引快照"
+        );
+        assert_eq!(item["category"], json!("经济"), "本地分类应赢过索引快照");
+        // 市场侧的状态字段仍然由索引提供
+        assert_eq!(item["status"], json!("listed"));
+
+        let _ = std::fs::remove_dir_all(&runtime.root);
+        let _ = std::fs::remove_dir_all(&repo);
+    }
     #[test]
     fn cache_without_signature_is_ignored() {
         let runtime = temp_runtime("unsigned");
