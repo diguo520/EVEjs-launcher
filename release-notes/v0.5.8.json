@@ -1,0 +1,17 @@
+{
+  "version": "0.5.8",
+  "changelog": {
+    "zh": [
+      {
+        "type": "fix",
+        "text": "修正新模组自带守卫的一处**冲突**：它会与另一套守卫（例如 `evejs-faction-sim` 携带的那套）抢占**同一个进程槽位**，于是同时装了后者时，模组会在**加载期直接报错、无法加载**（`launcher guard participant id is required`）。守卫现在使用**自己的槽位**，并带自有标记与更严的校验。"
+      }
+    ],
+    "en": [
+      {
+        "type": "fix",
+        "text": "Fixed a **conflict** in the guard that ships with a new mod: it competed for the **same process slot** as the other guard (the one inside `evejs-faction-sim`), so a mod failed to load with `launcher guard participant id is required` whenever both were installed. The guard now uses **its own slot**, with a self tag and a stricter check."
+      }
+    ]
+  }
+}
