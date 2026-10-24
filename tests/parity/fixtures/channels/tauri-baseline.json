@@ -25,7 +25,7 @@
       "phase": "3-4",
       "platform": "win32",
       "repoRoot": "<abs-path>",
-      "version": "0.5.9"
+      "version": "0.6.0"
     },
     "config:get": {
       "client": {
@@ -172,10 +172,10 @@
       "supported": true
     },
     "metrics:get": {
-      "cpuPercent": 39.42977523803711,
+      "cpuPercent": 17.130752563476562,
       "diskRoot": "<abs-path>",
       "diskTotalGB": 976.5624961853028,
-      "diskUsedGB": 792.617862701416,
+      "diskUsedGB": 797.7873115539551,
       "gpuDedicatedTotalGB": null,
       "gpuDedicatedUsedGB": null,
       "gpuMemoryTotalGB": null,
@@ -183,31 +183,31 @@
       "gpuPercent": null,
       "gpuSharedUsedGB": null,
       "memTotalGB": 31.855934143066406,
-      "memUsedGB": 11.977989196777344,
+      "memUsedGB": 8.893474578857422,
       "netBytesPerSec": 0,
-      "virtualMemTotalGB": 34.899112701416016,
-      "virtualMemUsedGB": 23.215145111083984,
+      "virtualMemTotalGB": 34.8922004699707,
+      "virtualMemUsedGB": 19.327884674072266,
       "volumes": [
         {
-          "freeGB": 65.44950103759766,
-          "percent": 70.57519484216112,
+          "freeGB": 68.09555435180664,
+          "percent": 69.3855814459776,
           "root": "<abs-path>",
           "totalGB": 222.4296836853027,
-          "usedGB": 156.98018264770508
+          "usedGB": 154.3341293334961
         },
         {
-          "freeGB": 157.0628890991211,
-          "percent": 46.38919982277604,
+          "freeGB": 154.48438262939453,
+          "percent": 47.2693300425694,
           "root": "<abs-path>",
           "totalGB": 292.96874618530273,
-          "usedGB": 135.90585708618164
+          "usedGB": 138.4843635559082
         },
         {
-          "freeGB": 183.94463348388672,
-          "percent": 81.16406945767216,
+          "freeGB": 178.77518463134766,
+          "percent": 81.69342102223992,
           "root": "<abs-path>",
           "totalGB": 976.5624961853028,
-          "usedGB": 792.617862701416
+          "usedGB": 797.7873115539551
         },
         {
           "freeGB": 390.2404022216797,
@@ -282,7 +282,7 @@
           "id": "broadcast",
           "name": "Welcome Broadcast (Example)",
           "requiresRestart": true,
-          "sizeBytes": 29248,
+          "sizeBytes": 29266,
           "tags": [
             "聊天",
             "新手"
@@ -309,7 +309,7 @@
           "id": "blank",
           "name": "Blank Skeleton",
           "requiresRestart": true,
-          "sizeBytes": 27601,
+          "sizeBytes": 27619,
           "tags": []
         }
       ]
@@ -342,7 +342,7 @@
     "terminal:input": null,
     "terminal:resize": null,
     "update:state": {
-      "currentVersion": "0.5.9",
+      "currentVersion": "0.6.0",
       "state": "idle"
     }
   }

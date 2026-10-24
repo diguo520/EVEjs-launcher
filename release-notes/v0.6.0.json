@@ -1,0 +1,25 @@
+{
+  "version": "0.6.0",
+  "changelog": {
+    "zh": [
+      {
+        "type": "new",
+        "text": "**「关联模组」和「冲突模组」分成两栏**。「关联模组 id」现在表示**依赖**：缺了会被标「缺少依赖」并跳过，两边都在时只是**排在我前面加载**（不必再单独声明加载顺序）；新增的「冲突模组 id」表示**互斥**：两边都启用时本模组会被跳过。此前只有一栏、而且写进清单的是**冲突**字段 —— 于是「子模组依赖主模组」这种正当关系会被当成冲突，主/子模组根本装不到一起。"
+      },
+      {
+        "type": "fix",
+        "text": "**详情页分成「依赖模组」与「冲突模组」两节**（原来两样都挂在「关联模组」标题下，名字和内容对不上）。同时修掉一个让**依赖在界面上完全看不见**的问题：界面把清单字段搬进列表条目时只搬了冲突、漏了依赖，详情里的依赖项永远显示不出来。"
+      }
+    ],
+    "en": [
+      {
+        "type": "new",
+        "text": "**\"Related mods\" and \"conflicting mods\" are now two separate fields.** \"Related mod ids\" means a **dependency**: if it is missing, the mod is marked as such and skipped, and when both are present the dependency simply **loads first** (no separate load-order declaration needed). The new \"conflicting mod ids\" field means **mutual exclusion**: when both are enabled, this mod is skipped. Before, there was only one field and it wrote the **conflict** key - so a legitimate parent/child dependency was treated as a conflict and the two mods could never be installed together."
+      },
+      {
+        "type": "fix",
+        "text": "**The detail view is split into \"required mods\" and \"conflicting mods\"** (both used to sit under the \"related mods\" heading, which did not match its contents). This also fixes a problem that made **dependencies invisible in the UI**: when the UI copied manifest fields onto list entries it carried conflicts but not requires, so a dependency never showed up."
+      }
+    ]
+  }
+}
