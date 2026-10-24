@@ -149,6 +149,23 @@ export function ModFormDialog({
   const [desc, setDesc] = useState("")
   const [readme, setReadme] = useState("")
   const [features, setFeatures] = useState("")
+  /**
+   * 「关联模组」这一栏写进清单的字段：**requires（依赖）**。
+   *
+   * 2026-10-24 改：这一栏原来写的是 `conflicts`（冲突），于是作者声明「子模组依赖主模组」时，
+   * 启动器按**真冲突**处理（状态栏「与已启用模组冲突」、冲突数 +1）—— 名字叫关联、写的是冲突，
+   * 主/子模组这种正当关系就永远过不去。现在写 `requires`：缺了会被标「缺少依赖」并跳过，
+   * 装了且启用则只是「排在我前面加载」，不再是冲突。
+   * `conflicts` 仍然可以从清单里手写，启动器照旧认；界面不再改动它。
+   */
+  const [requires, setRequires] = useState<string[]>([])
+  const [requireDraft, setRequireDraft] = useState("")
+  /**
+   * 「冲突模组」这一栏写进清单的字段：**conflicts（互斥）**。
+   *
+   * 与上面「关联模组」（依赖）分开成两栏（2026-10-24 定案）：依赖和冲突方向相反，
+   * 挤进一个框迟早误填 —— 原来就是「关联」的名字写进 conflicts，才把主/子模组判成了冲突。
+   */
   const [conflicts, setConflicts] = useState<string[]>([])
   const [conflictDraft, setConflictDraft] = useState("")
   const [build, setBuild] = useState<ModBuildOptions>(DEFAULT_BUILD_OPTIONS)
@@ -182,6 +199,8 @@ export function ModFormDialog({
     const body = mod ? editableReadme(mod) : { intro: "", features: [] }
     setReadme(body.intro)
     setFeatures(body.features.join("\n"))
+    setRequires(parseIdList((mod?.requires ?? []).join(" ")))
+    setRequireDraft("")
     setConflicts(parseIdList((mod?.conflicts ?? []).join(" ")))
     setConflictDraft("")
     setBuild(DEFAULT_BUILD_OPTIONS)
@@ -241,6 +260,7 @@ export function ModFormDialog({
       template: picked.id,
       readme,
       features: parseLines(features),
+      requires: parseIdList([...requires, requireDraft].join(" ")),
       conflicts: parseIdList([...conflicts, conflictDraft].join(" ")),
       build,
     }
@@ -267,8 +287,8 @@ export function ModFormDialog({
   const showIdPrefix = !editing || hasEvejsPrefix(mod?.id ?? "")
   /** 拼上前缀之后的完整标识，冲突自检要用它 */
   const fullId = editing ? (mod?.id ?? "") : id.trim() ? withEvejsPrefix(id.trim()) : ""
-  const conflictCheck = checkConflicts(
-    parseIdList([...conflicts, conflictDraft].join(" ")),
+  const relationCheck = checkConflicts(
+    parseIdList([...requires, requireDraft].join(" ")),
     fullId,
     existingIds
   )
@@ -586,8 +606,38 @@ export function ModFormDialog({
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="mod-form-conflicts">
+              <Label htmlFor="mod-form-relations">
                 关联模组 id（逗号或空格分隔，可留空）
+              </Label>
+              <ModIdInput
+                id="mod-form-relations"
+                value={requires}
+                draft={requireDraft}
+                onValueChange={setRequires}
+                onDraftChange={setRequireDraft}
+                placeholder="other-mod other-mod-2"
+                describedBy="mod-form-relations-help"
+              />
+              <p id="mod-form-relations-help" className="text-[11px] leading-relaxed text-tertiary">
+                可关联多个模组；按逗号、空格或回车确认，最后一段未确认的内容也会随保存写入。
+              </p>
+              {relationCheck.self ? (
+                <p className="text-[11px] text-warning">
+                  关联列表里写了自己，这条声明没有意义，去掉即可。
+                </p>
+              ) : null}
+              {relationCheck.unknown.length > 0 ? (
+                <p className="text-[11px] leading-relaxed text-warning">
+                  模组库里没有{" "}
+                  <span className="tabular">{relationCheck.unknown.join("、")}</span>
+                  ，确认 id 没写错；对方还没发布的话可以照实留着。
+                </p>
+              ) : null}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="mod-form-conflicts">
+                冲突模组 id（逗号或空格分隔，可留空）
               </Label>
               <ModIdInput
                 id="mod-form-conflicts"
@@ -599,20 +649,8 @@ export function ModFormDialog({
                 describedBy="mod-form-conflicts-help"
               />
               <p id="mod-form-conflicts-help" className="text-[11px] leading-relaxed text-tertiary">
-                可关联多个模组；按逗号、空格或回车确认，最后一段未确认的内容也会随保存写入。
+                声明与哪些模组互斥：两边都启用时本模组会被跳过。可留空。
               </p>
-              {conflictCheck.self ? (
-                <p className="text-[11px] text-warning">
-                  关联列表里写了自己，这条声明没有意义，去掉即可。
-                </p>
-              ) : null}
-              {conflictCheck.unknown.length > 0 ? (
-                <p className="text-[11px] leading-relaxed text-warning">
-                  模组库里没有{" "}
-                  <span className="tabular">{conflictCheck.unknown.join("、")}</span>
-                  ，确认 id 没写错；对方还没发布的话可以照实留着。
-                </p>
-              ) : null}
             </div>
 
             {editing ? null : (

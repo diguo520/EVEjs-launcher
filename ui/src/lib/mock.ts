@@ -465,7 +465,9 @@ export interface ModEntry {
    * 所以评价时必须原样报上去；本地扫到的目录算不出这个指纹，只有索引里有。
    */
   pkgSha256?: string
-  /** 与之存在加载冲突的模组 id（互为对方的 id） */
+  /** 声明依赖的模组 id（清单 `requires`）：缺了会被跳过，「关联模组」那一栏写的就是它 */
+  requires?: string[]
+  /** 与之存在加载冲突的模组 id（互为对方的 id）—— 清单 `conflicts`，界面不再改动它 */
   conflicts?: string[]
   /** 冲突原因，按对方 id 索引 */
   conflictReason?: Record<string, string>

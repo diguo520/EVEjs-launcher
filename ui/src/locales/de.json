@@ -3649,5 +3649,10 @@
   "有 {n} 支舰队查不到舰型构成（舰队已解散或面板没有它的记录），上面的数量少算了它们。": "Für {n} Flotten ließ sich die Schiffstyp-Zusammensetzung nicht ermitteln (aufgelöst oder im Panel nicht erfasst); die Zahlen oben zählen sie nicht mit.",
   "参战舰船来自舰队当前构成：战斗结束后舰队可能已补员或改编，属近似记录。": "Die eingesetzten Schiffe stammen aus der aktuellen Zusammensetzung der Flotten — nach einem Kampf kann eine Flotte aufgefüllt oder umstrukturiert worden sein; das ist eine Näherung.",
   "{target} 不在已启用的模组里（没安装或已停用），这条顺序声明本次不生效": "{target} ist nicht unter den aktivierten Mods (nicht installiert oder deaktiviert), diese Reihenfolge-Deklaration greift diesmal nicht",
-  "手动顺序里记着的这个目录已经不存在了（重新装回来它会回到原来的位置）": "Der im manuellen Reihenfolge-Eintrag vermerkte Ordner existiert nicht mehr (nach einer Neuinstallation steht er wieder an seinem Platz)"
+  "手动顺序里记着的这个目录已经不存在了（重新装回来它会回到原来的位置）": "Der im manuellen Reihenfolge-Eintrag vermerkte Ordner existiert nicht mehr (nach einer Neuinstallation steht er wieder an seinem Platz)",
+  "冲突模组 id（逗号或空格分隔，可留空）": "IDs kollidierender Mods (durch Komma oder Leerzeichen getrennt, darf leer bleiben)",
+  "声明与哪些模组互斥：两边都启用时本模组会被跳过。可留空。": "Gibt an, mit welchen Mods dieser Mod unvereinbar ist: Sind beide aktiviert, wird dieser Mod übersprungen. Darf leer bleiben.",
+  "依赖": "Abhängigkeit",
+  "依赖模组": "Benötigte Mods",
+  "冲突模组": "Kollidierende Mods"
 }

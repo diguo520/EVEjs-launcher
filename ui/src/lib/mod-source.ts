@@ -244,9 +244,14 @@ export function applyLocal(entry: ModEntry, mod: RawMod): ModEntry {
       mod.evejsVersions && mod.evejsVersions.length > 0
         ? mod.evejsVersions
         : entry.evejsVersions,
-    // 清单里声明的关联 / 互斥 id 要原样带上：`activeConflicts` 只是「当前两边都启用」的
-    // 子集，把它当声明列表会让「关联了但对方没装 / 没启用」的关系凭空消失 —— 表单里
-    // 明明存过、详情却看不到，还提示保存成功（2026-10-09 报障）。
+    // 清单里声明的**依赖**（`requires`）与**互斥**（`conflicts`）都要原样带上：`activeConflicts`
+    // 只是「当前两边都启用」的子集，把它当声明列表会让「关联了但对方没装 / 没启用」的关系凭空
+    // 消失 —— 表单里明明存过、详情却看不到，还提示保存成功（2026-10-09 报障）。
+    //
+    // 2026-10-24 又修一处同类：这里原来只搬了 `conflicts`，`requires` 压根没进条目 —— 于是那一栏
+    // 叫「关联模组」、界面上却只能看见冲突，依赖声明完全不可见（详情页的 [依赖] 标记永远不出现）。
+    // 现在两个字段各搬各的，语义不再混。
+    requires: mod.requires && mod.requires.length > 0 ? mod.requires : entry.requires,
     conflicts:
       mod.conflicts && mod.conflicts.length > 0
         ? mod.conflicts

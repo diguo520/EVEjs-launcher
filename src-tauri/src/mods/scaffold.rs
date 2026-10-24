@@ -392,6 +392,8 @@ struct ScaffoldManifest<'a> {
     category: &'a str,
     tags: &'a [String],
     conflicts: &'a [String],
+    /// 依赖：写在界面上「关联模组」那一栏，缺了会被跳过（2026-10-24 起界面写这里）
+    requires: &'a [String],
     #[serde(skip_serializing_if = "Option::is_none")]
     author: Option<ScaffoldAuthor<'a>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -545,6 +547,7 @@ fn manifest_from(
         category: &category,
         tags: &tags,
         conflicts: &draft_strings(draft, "conflicts"),
+        requires: &draft_strings(draft, "requires"),
         author: author_block,
         binding: binding_block,
         compatibility,
@@ -924,7 +927,7 @@ pub fn open_authoring_doc(app: &AppHandle, runtime: &RuntimePaths) -> Value {
 
 /// 「编辑信息」：只改**非身份字段**，身份由签名保护。
 ///
-/// 允许改：displayName / description / category / tags / conflicts / requiresRestart，
+/// 允许改：displayName / description / category / tags / conflicts / requires / requiresRestart，
 /// 以及 README.md（readme 正文 + highlights 功能要点；这两项由界面成对提交，
 /// 只带其中一项时另一项按空处理 —— 直接调 IPC 的人要知道这一点）。
 /// 一律不碰：id / version / kind / activation / author（署名）/ signature。
@@ -971,7 +974,7 @@ pub fn update_mod_meta(
         }
     }
     // 数组字段做类型过滤（非字符串项丢掉），与脚手架读 draft 的口径一致
-    for key in ["tags", "conflicts"] {
+    for key in ["tags", "conflicts", "requires"] {
         if patch_object.contains_key(key) {
             manifest.insert(key.to_string(), json!(draft_strings(patch, key)));
         }

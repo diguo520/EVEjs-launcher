@@ -897,6 +897,8 @@ export function ModulesPage({
       tags: input.tags,
       highlights: input.features,
       readme: input.readme,
+      // 「关联模组」= 依赖（requires）；「冲突模组」= 互斥（conflicts）；两者各自独立
+      requires: input.requires,
       conflicts: input.conflicts,
       requiresRestart: input.build.restart,
       // ⚠️ 后端（与现役版 modScaffold.createMod 一致）读的键名是 enabled / sign，
@@ -938,6 +940,7 @@ export function ModulesPage({
       description: input.desc,
       category: input.cat,
       tags: input.tags,
+      requires: input.requires,
       conflicts: input.conflicts,
       requiresRestart: input.build.restart,
       readme: input.readme,
@@ -1038,13 +1041,20 @@ export function ModulesPage({
   const detailTask = downloads.tasks.find((task) => task.modId === detailId)
 
   /**
-   * 详情页的关联模组：把作者写的 id 逐个对回列表里的记录；对不上号的保留成 `mod: null`，
-   * 详情页显式标「未找到」，不静默丢掉这条声明。
+   * 详情页的「关联模组」= **依赖**（requires，界面上那一栏写的）+ **冲突**（conflicts，清单里手写的）。
+   *
+   * 两边的 id 都可能是本地/市场里的模组，也都可以对不上号 —— 对不上号的保留成 `mod: null`，
+   * 详情页显式标「未找到」，不静默丢掉这条声明。同一个 id 两边都写了只显示一条。
    */
   const detailRelations = useMemo<ModRelation[]>(() => {
     if (!detailMod) return []
-    return (detailMod.conflicts ?? []).map((id) => ({
+    const prereq = detailMod.requires ?? []
+    const exclusive = detailMod.conflicts ?? []
+    // 一条 id 只出现一次；两边都写了按**冲突**算（那一条更严厉）
+    const ids = [...new Set([...prereq, ...exclusive])]
+    return ids.map((id) => ({
       id,
+      kind: exclusive.includes(id) ? "conflicts" : "requires",
       mod: mods.find((item) => item.id === id) ?? null,
     }))
   }, [detailMod, mods])

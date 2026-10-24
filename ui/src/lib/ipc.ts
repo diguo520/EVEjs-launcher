@@ -404,7 +404,9 @@ export interface RawMod {
   loadAfter: string[]
   loadBefore: string[]
   missingRequires: string[]
-  /** 清单里声明的关联 / 互斥模组 id（作者写进去的那一份，含尚未安装的） */
+  /** 清单里 `requires` 声明的**依赖**模组 id（作者写进去的那一份，含尚未启用的） */
+  requires: string[]
+  /** 清单里 `conflicts` 声明的**互斥**模组 id（作者写进去的那一份，含尚未安装的） */
   conflicts: string[]
   /** 上面那份声明里「当前两边都启用」的子集，运行时冲突提示只用它 */
   activeConflicts: string[]

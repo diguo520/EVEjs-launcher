@@ -936,7 +936,15 @@ export interface NewModInput {
   readme: string
   /** 功能要点，每行一条，写进 README */
   features: string[]
-  /** 与之冲突的模组 id，可留空 */
+  /**
+   * 「关联模组」那一栏：写进清单 `requires` 的**依赖**模组 id，可留空。
+   * 缺了会被标「缺少依赖」并跳过；填了且目标已启用，只是「排在我前面加载」。
+   */
+  requires: string[]
+  /**
+   * 「冲突模组」那一栏：写进清单 `conflicts` 的**互斥**模组 id，可留空。
+   * 两边都启用时，本模组会被启动器跳过并提示「与已启用模组冲突」。
+   */
   conflicts: string[]
   /** 创建时的构建选项；编辑不重新生成骨架，带默认值即可 */
   build: ModBuildOptions
@@ -1180,6 +1188,7 @@ export function draftMod(
     perms: [],
     readme: readmeOrFallback(input.readme, input.features, desc),
     changelog: [{ version: input.version, date: today, items: ["初始版本"] }],
+    requires: input.requires.length > 0 ? input.requires : undefined,
     conflicts: input.conflicts.length > 0 ? input.conflicts : undefined,
     mine: true,
     review: "draft",
@@ -1196,7 +1205,12 @@ export interface ModPatch {
   readme: string
   /** 功能要点，每行一条 */
   features: string[]
-  /** 与之冲突的模组 id，可留空 */
+  /**
+   * 「关联模组」那一栏：写进清单 `requires` 的**依赖**模组 id，可留空。
+   * 与 `NewModInput.requires` / `NewModInput.conflicts` 同一套语义，本地乐观更新时照搬。
+   */
+  requires: string[]
+  /** 同 `NewModInput.conflicts` */
   conflicts: string[]
 }
 
@@ -1214,6 +1228,7 @@ export function applyModPatch(mod: ModEntry, patch: ModPatch): ModEntry {
     desc: desc || mod.desc,
     tags: patch.tags,
     readme: readmeOrFallback(patch.readme, patch.features, desc),
+    requires: patch.requires.length > 0 ? patch.requires : undefined,
     conflicts: patch.conflicts.length > 0 ? patch.conflicts : undefined,
   }
 }

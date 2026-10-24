@@ -567,6 +567,7 @@ function modOf(folder: string, extra: Partial<RawMod> = {}): RawMod {
     description: "",
     category: "功能",
     tags: [],
+    requires: [],
     authorId: "au-1",
     authorName: "指挥官",
     enabled: true,

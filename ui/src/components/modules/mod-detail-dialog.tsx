@@ -130,12 +130,14 @@ function Section({
  */
 export interface ModRelation {
   id: string
+  /** requires = 依赖（表单「关联模组 id」那一栏）→「依赖模组」小节；conflicts = 互斥（「冲突模组 id」）→「冲突模组」小节 */
+  kind: "requires" | "conflicts"
   mod: ModEntry | null
 }
 
 /**
- * 关联模组一行。已知模组显示名字、版本和安装/启用状态；未知 id 只留原始 id 与「未找到」，
- * 让作者一眼看出自己是不是拼错了。多模组关联时这几张卡按网格并排换行。
+ * 模组关系一行（依赖或互斥，由所在小节的标题区分）。已知模组显示名字、版本和安装/启用状态；
+ * 未知 id 只留原始 id 与「未找到」，让作者一眼看出自己是不是拼错了。多条时这几张卡按网格并排换行。
  */
 function RelationCard({ id, mod: related }: ModRelation) {
   return (
@@ -446,16 +448,40 @@ export function ModDetailDialog({
               </div>
             </Section>
 
-            {/* 作者声明的关联模组：一条可能对应本地/市场里的模组，也可能只是一串 id */}
-            {relations.length > 0 ? (
+            {/*
+              作者声明的模组关系，**分两节**（2026-10-24 定案）：
+                · 依赖（清单 `requires`，表单里那一栏叫「关联模组 id」）—— 缺了会被跳过，且排在我前面加载
+                · 互斥（清单 `conflicts`，表单里那一栏叫「冲突模组 id」）—— 两边都启用时本模组被跳过
+              原来两样都挤在一节里、标题还叫「关联模组」，于是**冲突**也显示在「关联」下面 ——
+              名字和内容对不上正是这次误填的根源，所以标题也一起拆开。
+              一条 id 可能对应本地/市场里的模组，也可能只是一串 id（对不上号的显示「未找到」）。
+            */}
+            {relations.some((relation) => relation.kind === "requires") ? (
               <Section
                 icon={<Link2 className="size-3.5 text-tertiary" />}
-                title="关联模组"
+                title={t("依赖模组")}
               >
                 <div className="grid gap-2 sm:grid-cols-2">
-                  {relations.map((relation) => (
-                    <RelationCard key={relation.id} {...relation} />
-                  ))}
+                  {relations
+                    .filter((relation) => relation.kind === "requires")
+                    .map((relation) => (
+                      <RelationCard key={relation.id} {...relation} />
+                    ))}
+                </div>
+              </Section>
+            ) : null}
+
+            {relations.some((relation) => relation.kind === "conflicts") ? (
+              <Section
+                icon={<Link2 className="size-3.5 text-warning" />}
+                title={t("冲突模组")}
+              >
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {relations
+                    .filter((relation) => relation.kind === "conflicts")
+                    .map((relation) => (
+                      <RelationCard key={relation.id} {...relation} />
+                    ))}
                 </div>
               </Section>
             ) : null}

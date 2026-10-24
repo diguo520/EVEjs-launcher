@@ -3649,5 +3649,10 @@
   "有 {n} 支舰队查不到舰型构成（舰队已解散或面板没有它的记录），上面的数量少算了它们。": "Van {n} vlooten is de scheepstype-samenstelling niet te vinden (opgeheven of niet in het paneel); de aantallen hierboven tellen ze niet mee.",
   "参战舰船来自舰队当前构成：战斗结束后舰队可能已补员或改编，属近似记录。": "Ingenomen schepen komen uit de huidige samenstelling van de vloot — na een gevecht kan een vloot zijn aangevuld of heringedeeld; dit is een benadering.",
   "{target} 不在已启用的模组里（没安装或已停用），这条顺序声明本次不生效": "{target} staat niet bij de geactiveerde mods (niet geïnstalleerd of uitgeschakeld), deze volgorde-declaratie werkt deze keer niet",
-  "手动顺序里记着的这个目录已经不存在了（重新装回来它会回到原来的位置）": "De map die in de handmatige volgorde staat bestaat niet meer (opnieuw installeren zet hem terug op zijn plek)"
+  "手动顺序里记着的这个目录已经不存在了（重新装回来它会回到原来的位置）": "De map die in de handmatige volgorde staat bestaat niet meer (opnieuw installeren zet hem terug op zijn plek)",
+  "冲突模组 id（逗号或空格分隔，可留空）": "ID's van conflicterende mods (komma- of spatiegescheiden, mag leeg blijven)",
+  "声明与哪些模组互斥：两边都启用时本模组会被跳过。可留空。": "Verklaart met welke mods deze mod onverenigbaar is: als beide actief zijn wordt deze mod overgeslagen. Mag leeg blijven.",
+  "依赖": "Vereist",
+  "依赖模组": "Vereiste mods",
+  "冲突模组": "Conflicterende mods"
 }

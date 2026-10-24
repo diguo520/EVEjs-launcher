@@ -3649,5 +3649,10 @@
   "有 {n} 支舰队查不到舰型构成（舰队已解散或面板没有它的记录），上面的数量少算了它们。": "{n} fleets have no ship-type breakdown (disbanded, or the panel has no record of them), so the counts above omit them.",
   "参战舰船来自舰队当前构成：战斗结束后舰队可能已补员或改编，属近似记录。": "Committed ships come from the fleets' current composition — after a battle a fleet may have been resupplied or reorganised, so this is an approximation.",
   "{target} 不在已启用的模组里（没安装或已停用），这条顺序声明本次不生效": "{target} is not among the enabled mods (not installed or disabled), so this order declaration has no effect this time",
-  "手动顺序里记着的这个目录已经不存在了（重新装回来它会回到原来的位置）": "The folder recorded in the manual order no longer exists (reinstall it and it goes back to its place)"
+  "手动顺序里记着的这个目录已经不存在了（重新装回来它会回到原来的位置）": "The folder recorded in the manual order no longer exists (reinstall it and it goes back to its place)",
+  "冲突模组 id（逗号或空格分隔，可留空）": "Conflicting mod ids (comma or space separated, may be empty)",
+  "声明与哪些模组互斥：两边都启用时本模组会被跳过。可留空。": "Declares which mods are mutually exclusive: when both are enabled, this mod is skipped. May be empty.",
+  "依赖": "Requires",
+  "依赖模组": "Required mods",
+  "冲突模组": "Conflicting mods"
 }

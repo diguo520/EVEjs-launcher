@@ -199,6 +199,18 @@ pub fn plan_loaders(repo_root: &Path, runtime: &RuntimePaths) -> Value {
     };
     for item in &candidates {
         let key = item.id.to_lowercase();
+        // 依赖同时也是顺序约束：`requires` 的模组要**排在我前面**加载（2026-10-24）。
+        // 「关联模组」那一栏写的就是 requires，所以作者声明了依赖就不必再单独写一遍 loadAfter；
+        // 循环依赖由下面已有的成环兜底处理（退回用户手动顺序）。
+        for id in &item.requires {
+            if let Some(target) = index_of.get(&id.to_lowercase()) {
+                push_edge(
+                    &mut edges,
+                    key.clone(),
+                    candidates[*target].id.to_lowercase(),
+                );
+            }
+        }
         for id in &item.load_after {
             if let Some(target) = index_of.get(&id.to_lowercase()) {
                 push_edge(
@@ -700,6 +712,37 @@ mod tests {
         if let Some(source) = loader {
             fs::write(dir.join(scan::LOADER_ENABLED), source).unwrap();
         }
+    }
+
+    /// 「关联模组」那一栏写的是 `requires`：它既要保证依赖被启用，也要保证**排在我前面**加载。
+    /// 2026-10-24：作者只声明依赖、不写 loadAfter 时顺序也必须对，否则子模组会先于主模组注入。
+    #[test]
+    fn plan_orders_a_dependency_before_the_mod_that_requires_it() {
+        let repo = repo_for("plan-requires");
+        // 显示名让默认顺序是 b,a；b 只声明依赖 a（**没有** loadAfter）
+        write_mod(
+            &repo,
+            "b",
+            manifest("b", json!({ "displayName": "A-first", "requires": ["a"] })),
+            Some("// b"),
+        );
+        write_mod(
+            &repo,
+            "a",
+            manifest("a", json!({ "displayName": "Z-last" })),
+            Some("// a"),
+        );
+        let runtime = runtime_for("plan-requires");
+        let plan = plan_loaders(&repo, &runtime);
+        let paths: Vec<String> = plan["paths"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|value| value.as_str().unwrap().to_string())
+            .collect();
+        assert_eq!(paths.len(), 2);
+        assert!(paths[0].ends_with("a/loader.js"), "{paths:?}");
+        assert!(paths[1].ends_with("b/loader.js"), "{paths:?}");
     }
 
     #[test]
