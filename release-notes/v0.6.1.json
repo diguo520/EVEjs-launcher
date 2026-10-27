@@ -1,0 +1,27 @@
+{
+  "version": "0.6.1",
+  "changelog": {
+    "zh": [
+      { "type": "new", "text": "模组包支持分片：超过 GitHub 单个发布资产 2 GiB 上限的模组现在可以发布，也能正常安装" },
+      { "type": "new", "text": "作者侧：发布大包时自动切成 1.9 GB 一片上传，每片单独校验，分片清单自动写进索引，不用手工切包" },
+      { "type": "new", "text": "玩家侧：切片包逐片下载、逐片校验，再拼回整包并校验整包 sha256" },
+      { "type": "new", "text": "模组下载支持断点续传：断线、退出或换网之后从断点接着下，不再从头重来" },
+      { "type": "new", "text": "启动器更新不再需要手动点「立即更新」：发现新版本自动下载并显示百分比，下载完点一下即刻安装重启" },
+      { "type": "opt", "text": "安装、上传与启动器更新完成之后，本地不再保留安装包与分片，也不再留更新器副本" },
+      { "type": "opt", "text": "大文件传输的传输超时改为按体积计算（原来是固定 120 秒），慢网下大包也能下完" },
+      { "type": "fix", "text": "修复：模组说明里的相对链接（如 NOTICE.md）不再把界面带到 asset not found，改为在作者仓库里打开" },
+      { "type": "new", "text": "签名会把 loader.js 与 lib/launcherGuard.js 的哈希写进清单的 integrity 段；改过这两个文件必须重新签名发布" }
+    ],
+    "en": [
+      { "type": "new", "text": "Mod packages can now be split: mods larger than the GitHub 2 GiB per-asset limit can be published and installed" },
+      { "type": "new", "text": "Author side: a large package is split into 1.9 GB parts and uploaded automatically, each part verified on its own, and the part list is written into the index - no manual splitting" },
+      { "type": "new", "text": "Player side: split packages are downloaded and verified part by part, then joined back into one package and verified as a whole" },
+      { "type": "new", "text": "Mod downloads resume: after a dropped connection, an exit or a network change the download continues from where it stopped instead of starting over" },
+      { "type": "new", "text": "Launcher updates no longer need the manual Update now click: a new version is downloaded automatically with a percentage, and one click installs it and restarts" },
+      { "type": "opt", "text": "Install, publish and launcher-update no longer keep the package or the parts on disk, and the updater copy is cleaned up as well" },
+      { "type": "opt", "text": "Transfer timeouts are now sized by payload instead of a fixed 120 seconds, so large packages finish on slow links" },
+      { "type": "fix", "text": "Fix: relative links in a mod description (e.g. NOTICE.md) no longer take the shell to asset not found - they open in the author repository" },
+      { "type": "new", "text": "Signing writes the hashes of loader.js and lib/launcherGuard.js into the integrity block of the manifest; changing either file now requires re-signing and publishing" }
+    ]
+  }
+}

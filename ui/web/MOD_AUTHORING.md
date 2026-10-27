@@ -686,5 +686,9 @@ if (require("./lib/launcherGuard.js").gate("<你的模组 id>")) return;
 
 ⚠️ 两条红线：删掉上面任何一处，或者改了清单却不重新签名 —— 模组都不会被加载。
 
+签名时启动器还会把 `loader.js` 与 `lib/launcherGuard.js` 的哈希写进清单的 `integrity` 段。
+所以**改过这两个文件之后必须重新签名发布**，否则模组同样不会被加载 —— 这段不用你维护，
+「发布模组」会自动写好。
+
 已上架的模组要接入：把 `lib/launcherGuard.js` 拷进来、`loader.js` 加上那一行、清单补上那一段，然后重新签名发布。
 

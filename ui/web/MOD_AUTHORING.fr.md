@@ -686,5 +686,9 @@ Laissez `enforce` à `"observe"` (journalisation seule, aucun blocage). Pour qu'
 
 ⚠️ Deux lignes rouges : supprimer l'un des éléments ci-dessus, ou modifier le manifeste sans re-signer - le mod ne sera pas chargé.
 
+À la signature, le launcher écrit aussi les empreintes de `loader.js` et `lib/launcherGuard.js` dans le bloc `integrity` du manifeste.
+Donc **après avoir modifié l'un de ces fichiers, il faut re-signer et republier**, sinon le mod ne sera pas chargé non plus - ce bloc, tu ne le maintiens pas à la main ;
+« Publier le mod » l'écrit automatiquement.
+
 Pour intégrer un mod déjà publié : copiez `lib/launcherGuard.js`, ajoutez la ligne dans `loader.js`, ajoutez le bloc au manifeste, puis re-signez et publiez.
 

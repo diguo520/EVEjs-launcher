@@ -686,5 +686,9 @@ luego **vuelve a firmar y publicar con «Publicar mod» del launcher**.
 
 ⚠️ Dos líneas rojas: quitar cualquiera de los puntos anteriores, o editar el manifiesto sin volver a firmar - el mod no se cargará.
 
+Al firmar, el launcher también escribe los hashes de `loader.js` y `lib/launcherGuard.js` en el bloque `integrity` del manifiesto.
+Por eso, **tras cambiar cualquiera de esos archivos hay que volver a firmar y publicar**, o el mod tampoco se cargará - este bloque no lo mantienes tú;
+«Publicar mod» lo escribe solo.
+
 Para incorporar un mod ya publicado: copia `lib/launcherGuard.js`, añade la línea en `loader.js`, añade el bloque al manifiesto y vuelve a firmar y publicar.
 

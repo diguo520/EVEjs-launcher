@@ -686,5 +686,9 @@ danach **über „Mod veröffentlichen“ im Launcher neu signieren und veröffe
 
 ⚠️ Zwei rote Linien: etwas davon entfernen, oder das Manifest ändern ohne neu zu signieren - der Mod wird dann nicht geladen.
 
+Beim Signieren schreibt der Launcher zusätzlich die Hashes von `loader.js` und `lib/launcherGuard.js` in den `integrity`-Abschnitt des Manifests.
+**Nach einer Änderung an einer dieser Dateien ist daher erneut zu signieren und zu veröffentlichen**, sonst wird der Mod ebenfalls nicht geladen - diesen Abschnitt pflegst du nicht selbst;
+„Mod veröffentlichen“ schreibt ihn automatisch.
+
 Bereits gelistete Mods nachrüsten: `lib/launcherGuard.js` hineinkopieren, die Zeile in `loader.js` ergänzen, den Block im Manifest ergänzen, dann neu signieren und veröffentlichen.
 

@@ -10,6 +10,7 @@ use crate::net;
 use crate::runtime::RuntimePaths;
 use crate::secrets;
 use serde_json::{json, Value};
+use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{LazyLock, Mutex};
@@ -19,7 +20,11 @@ use std::time::Duration;
 const API_TIMEOUT: Duration = Duration::from_secs(20);
 /// `githubPublish.ts::TIMEOUT_MS`：发布链路 30s（上传是它的 4 倍）
 const PUBLISH_TIMEOUT: Duration = Duration::from_secs(30);
-const UPLOAD_TIMEOUT: Duration = Duration::from_secs(120);
+/// GitHub **单个发布资产**的硬上限：2 GiB。超过它的包必须切片，各传一个资产。
+/// 这不是我们拍的数 —— GitHub 文档明确写明 release asset 每条要小于 2 GiB。
+pub const GITHUB_ASSET_LIMIT: u64 = 2 * 1024 * 1024 * 1024;
+/// 我们自己切片的大小：留 100 MB 余量，别正好顶在 2 GiB 上被 GitHub 拒。
+pub const UPLOAD_PART_SIZE: u64 = 1_900_000_000;
 /// 默认索引仓库（对齐 `modSubmit.ts::DEFAULT_INDEX_REPO`）
 pub const DEFAULT_INDEX_REPO: &str = "diguo520/EVEjs-mods";
 pub(crate) const TOKEN_FILE: &str = "github-token.bin";
@@ -1099,10 +1104,13 @@ pub fn upload_release_asset(
     zip_path: &std::path::Path,
     asset_name: &str,
 ) -> Value {
-    let bytes = match std::fs::read(zip_path) {
-        Ok(bytes) => bytes,
+    // 流式上传：body 直接从磁盘按块读（net::send_file 用 ureq 的 File body，
+    // 自动带 Content-Length、不分块）。几十 MB 到几 GB 都不再先进内存。
+    let file = match std::fs::File::open(zip_path) {
+        Ok(file) => file,
         Err(err) => return json!({ "ok": false, "reason": format!("读不到 ZIP：{err}") }),
     };
+    let size = file.metadata().map(|meta| meta.len()).unwrap_or(0);
 
     let assets = call_publish(
         token,
@@ -1134,15 +1142,16 @@ pub fn upload_release_asset(
         encode_uri(asset_name)
     );
     let authorization = format!("Bearer {token}");
-    let response = net::send(
+    let response = net::send_file(
         "POST",
         &url,
         &[
             ("Authorization", authorization.as_str()),
             ("Accept", "application/vnd.github+json"),
         ],
-        Some((&bytes, "application/zip")),
-        UPLOAD_TIMEOUT,
+        file,
+        "application/zip",
+        size,
     );
     let response = match response {
         Ok(response) => response,
@@ -1171,6 +1180,111 @@ pub fn upload_release_asset(
 /// 一次发布：确保仓库 → 写 `evejs-mod.json` → 传截图 → 建 Release → 上传 ZIP。
 /// 全程只动作者自己的仓库，**不碰索引仓库**。
 ///
+/// 上传发布产物：不超过 GitHub 的 2 GiB 就整包传；超过就切片，逐片传。
+///
+/// 返回 `{ok, url, parts:[{name,url,sizeBytes,sha256,mirror}], reason}`。
+/// `parts` 非空时调用方必须把它们写进索引的 `downloadParts`，并且**不能**再把
+/// 「整包资产」的地址塞进 `downloadUrls` —— 那个资产根本不存在（整包超过上限，没传上去）。
+fn upload_release_payload(
+    token: &str,
+    owner: &str,
+    repo_name: &str,
+    release_id: i64,
+    zip_path: &std::path::Path,
+    asset_name: &str,
+) -> Value {
+    let size = std::fs::metadata(zip_path)
+        .map(|meta| meta.len())
+        .unwrap_or(0);
+    if size <= GITHUB_ASSET_LIMIT {
+        let single =
+            upload_release_asset(token, owner, repo_name, release_id, zip_path, asset_name);
+        if !single.get("ok").and_then(Value::as_bool).unwrap_or(false) {
+            return json!({
+                "ok": false,
+                "reason": single.get("reason").cloned().unwrap_or(json!("上传失败")),
+            });
+        }
+        return json!({
+            "ok": true,
+            "url": single.get("url").cloned().unwrap_or(Value::Null),
+            "parts": [],
+        });
+    }
+
+    // 切片：每片一个独立资产；本地分片传完即删（要留的只有作者的源码目录）
+    let mut input = match std::fs::File::open(zip_path) {
+        Ok(file) => file,
+        Err(err) => return json!({ "ok": false, "reason": format!("读不到 ZIP：{err}") }),
+    };
+    let mut buffer = vec![0u8; 8 * 1024 * 1024];
+    let mut parts: Vec<Value> = Vec::new();
+    let mut index = 0usize;
+    loop {
+        let name = format!("{asset_name}.part{:03}", index + 1);
+        let part_path = zip_path.with_file_name(&name);
+        let mut written: u64 = 0;
+        {
+            let mut out = match std::fs::File::create(&part_path) {
+                Ok(file) => file,
+                Err(err) => return json!({ "ok": false, "reason": format!("切片写不进：{err}") }),
+            };
+            while written < UPLOAD_PART_SIZE {
+                let want = (UPLOAD_PART_SIZE - written).min(buffer.len() as u64) as usize;
+                let read = match input.read(&mut buffer[..want]) {
+                    Ok(read) => read,
+                    Err(err) => {
+                        return json!({ "ok": false, "reason": format!("切片读失败：{err}") })
+                    }
+                };
+                if read == 0 {
+                    break;
+                }
+                if let Err(err) = out.write_all(&buffer[..read]) {
+                    return json!({ "ok": false, "reason": format!("切片写失败：{err}") });
+                }
+                written += read as u64;
+            }
+            let _ = out.sync_all();
+        }
+        if written == 0 {
+            let _ = std::fs::remove_file(&part_path);
+            break;
+        }
+        index += 1;
+        let uploaded = upload_release_asset(token, owner, repo_name, release_id, &part_path, &name);
+        if !uploaded.get("ok").and_then(Value::as_bool).unwrap_or(false) {
+            let reason = uploaded.get("reason").cloned().unwrap_or(json!("上传失败"));
+            let _ = std::fs::remove_file(&part_path);
+            return json!({ "ok": false, "reason": format!("第 {index} 片上传失败：{reason}") });
+        }
+        let sha = match crate::mods::pkg::sha256_file(&part_path) {
+            Ok((sha, _)) => sha,
+            Err(reason) => {
+                let _ = std::fs::remove_file(&part_path);
+                return json!({ "ok": false, "reason": format!("第 {index} 片校验失败：{reason}") });
+            }
+        };
+        parts.push(json!({
+            "name": name,
+            "url": uploaded.get("url").cloned().unwrap_or(Value::Null),
+            "sizeBytes": written,
+            "sha256": sha,
+            "mirror": "github",
+        }));
+        // 传完即删：本地不该留下 1.9 GB 的碎片
+        let _ = std::fs::remove_file(&part_path);
+    }
+    if parts.is_empty() {
+        return json!({ "ok": false, "reason": "切片后没有得到任何分片" });
+    }
+    json!({
+        "ok": true,
+        "url": parts[0].get("url").cloned().unwrap_or(Value::Null),
+        "parts": parts,
+    })
+}
+
 /// `extra_files` 是 `(仓库内相对路径, 字节)`：目前只有 `shots/*`。
 /// 它们**传失败不拦发布** —— 图是装饰，不能因为一张图挂了就发不出模组。
 #[allow(clippy::too_many_arguments)]
@@ -1256,7 +1370,8 @@ pub fn publish_to_own_repo(
     }
 
     say("上传 ZIP（最慢的一步，请稍候）", 75);
-    let asset = upload_release_asset(token, owner, repo_name, release_id, zip_path, asset_name);
+    // 超过 GitHub 的 2 GiB 单资产上限就自动切片（`parts` 非空，由调用方写进索引）
+    let asset = upload_release_payload(token, owner, repo_name, release_id, zip_path, asset_name);
     let repo_url = object_field(&repo["repo"], "html_url");
     let release_url = object_field(&release["release"], "html_url");
     if !asset["ok"].as_bool().unwrap_or(false) {
@@ -1278,6 +1393,7 @@ pub fn publish_to_own_repo(
         "repoUrl": repo_url,
         "releaseUrl": release_url,
         "assetUrl": object_field(&asset, "url"),
+        "parts": asset.get("parts").cloned().unwrap_or_else(|| json!([])),
         "repoCreated": repo["created"].as_bool().unwrap_or(false),
     })
 }

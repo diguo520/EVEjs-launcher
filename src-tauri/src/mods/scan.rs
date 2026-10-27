@@ -19,6 +19,13 @@ pub use super::MOD_SOURCE_FILE;
 const MAX_MANIFEST_BYTES: u64 = 1024 * 1024;
 const KINDS: [&str; 4] = ["loader", "source-integrated", "client-package", "settings"];
 const RESTART_VALUES: [&str; 4] = ["none", "game_server", "client", "launcher"];
+/// 没有 `integrity` 记录的老模组是否**拒绝加载**。
+///
+/// 2026-10-24 先默认 false：存量模组是在这个字段存在之前签的，一上来就强制会让它们全部加载不了。
+/// 等新骨架铺开、老模组陆续重签之后再翻成 true（翻的时候要写进发布说明）。
+/// 注意：**有** `integrity` 但**对不上**的模组，无论这个开关怎样都会被拦下。
+pub const ENFORCE_LOADER_INTEGRITY: bool = false;
+
 pub const LOADER_ENABLED: &str = "loader.js";
 pub const LOADER_DISABLED: &str = "loader.js.disabled";
 pub const LOADER_DISABLED_ALT: [&str; 2] = ["loader.js.off", "loader.js.bak"];
@@ -739,11 +746,32 @@ fn read_mod_dir_with(
     }
     record.author_key_id = author_key_id;
 
+    // 完整性记录先取出来：下面验签会把 manifest 移进 Value::Object。
+    // 清单里记的两个文件哈希，与磁盘上现在这两个文件是否一致 —— 签名保护的原本只有清单本身，
+    // 删掉 loader 里那行 `gate()` 不需要重签，这一条补上这个洞（2026-10-24）。
+    let recorded_integrity = manifest.get("integrity").cloned();
+
     let verdict = sign::verify_manifest_signature(&Value::Object(manifest));
     record.signature_state = verdict.state.as_str().to_string();
     record.signature_error = verdict.reason;
     record.signature_key_id = verdict.key_id;
     record.signature_trusted = verdict.trusted;
+
+    match recorded_integrity {
+        Some(recorded) => {
+            if sign::integrity_block(dir) != recorded {
+                problems.push(
+                    "文件被改动过（与签名时记的不一致）：改过 loader.js 或 lib/launcherGuard.js 之后，\
+                     必须用启动器的「发布模组」重新签名发布"
+                        .to_string(),
+                );
+            }
+        }
+        None if ENFORCE_LOADER_INTEGRITY => {
+            problems.push("缺少完整性记录：用启动器的「发布模组」重新签名发布一次即可".to_string());
+        }
+        None => {}
+    }
 
     record.valid = problems.is_empty();
     record.error = problems.join("；");

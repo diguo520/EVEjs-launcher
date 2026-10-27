@@ -8,6 +8,7 @@
 //!     代理环境下的行为与浏览器一致。不启用默认的 rustls，省掉加密后端的体积；
 //!   - 请求是**阻塞**的：调用方（IPC 分发）用 `spawn_blocking` 包一层，不占 tokio 工作线程；
 //!     ureq 没有后台线程，闲置时零开销。
+use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::Path;
 use std::time::Duration;
@@ -42,25 +43,82 @@ impl Response {
 
 /// 下载结果
 pub struct DownloadOutcome {
+    /// 下载完成后本地文件的总字节数（**含**这次续传前已有的那部分）
     pub bytes: u64,
+    /// 这次是从第几字节接着下的（0 = 全新下载）。调用方据此判断「是不是续传」。
+    pub resumed_from: u64,
+}
+
+/// —— 传输超时口径（2026-10-27 改造）——
+///
+/// 老口径是「一个 120s 的总时限走天下」：5 GB 的包要 ≥43 MB/s 才能下完，慢网必死；
+/// 而且它把「连不上」和「下到一半卡住」算成同一个错。
+///
+/// 现在按用途分开，并配合「分段 Range」把单个请求的体量压小（见 `download_cancellable`）：
+///   · 握手（连接 / 发请求 / 收响应头）：30s —— 死掉的主机要快速失败；
+///   · 收/发 body：按**本次请求的体积**算预算（`transfer_budget`），不是拍一个死数；
+///   · 没有「多久没读到数据」的超时可用（ureq 只有总体预算），所以用分段来兜：
+///     一段卡住最多浪费一段的预算，重试还能从断点接着下。
+pub const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(30);
+/// 保底速度：预算 = 60s + 体积 / 这个值（256 KB/s ≈ 慢网下限）
+const MIN_TRANSFER_SPEED: u64 = 256 * 1024;
+/// 预算下限，也是「体积未知」时的兜底
+const TRANSFER_BUDGET_FLOOR: Duration = Duration::from_secs(60);
+/// 分段下载的段大小：每段一个独立的 Range 请求。
+///
+/// 为什么必须分段：ureq 的 `timeout_recv_body` 是**收完整个 body 的总预算**，
+/// 没有「每读一次」的口子。一口气下一整包时，连接卡住只能等预算耗尽（5 GB ≈ 5.7 小时）。
+/// 切成 64 MB 一段之后，每段自己的预算是「64 MB / 256 KB/s ≈ 4 分钟」，
+/// 卡住最多浪费一段；而且段与段之间天然就是断点，重试直接从那一段接着下。
+pub const RANGE_CHUNK: u64 = 64 * 1024 * 1024;
+
+/// 按体积算传输预算：60s 起步 + 体积 / 保底速度。
+pub fn transfer_budget(size_hint: Option<u64>) -> Duration {
+    match size_hint {
+        Some(size) if size > 0 => {
+            TRANSFER_BUDGET_FLOOR + Duration::from_secs(size / MIN_TRANSFER_SPEED)
+        }
+        _ => TRANSFER_BUDGET_FLOOR,
+    }
+}
+
+/// TLS 三件套缺一不可：provider 选 native-tls（未开 rustls 特性时默认值是 rustls，
+/// 会在运行时报「provider is Rustls but feature is not enabled」）；
+/// 根证书必须显式改成 PlatformVerifier，否则默认的 WebPki 会去找我们没启用的
+/// `native-tls-webpki-roots` 内置证书清单 —— 而系统证书库才是我们想要的。
+fn tls_config() -> ureq::tls::TlsConfig {
+    ureq::tls::TlsConfig::builder()
+        .provider(ureq::tls::TlsProvider::NativeTls)
+        .root_certs(ureq::tls::RootCerts::PlatformVerifier)
+        .build()
 }
 
 /// 建一个「一次用完就丢」的 agent：它只是连接池 + 配置，
-/// 而各通道的超时口径不同（索引 8s / API 20s / 下载 120s），按需建更直白。
+/// 而各通道的超时口径不同（索引 8s / API 20s / 更新清单 30s），按需建更直白。
 fn agent(timeout: Duration) -> ureq::Agent {
-    // TLS 三件套缺一不可：provider 选 native-tls（未开 rustls 特性时默认值是 rustls，
-    // 会在运行时报「provider is Rustls but feature is not enabled」）；
-    // 根证书必须显式改成 PlatformVerifier，否则默认的 WebPki 会去找我们没启用的
-    // `native-tls-webpki-roots` 内置证书清单 —— 而系统证书库才是我们想要的。
-    let tls = ureq::tls::TlsConfig::builder()
-        .provider(ureq::tls::TlsProvider::NativeTls)
-        .root_certs(ureq::tls::RootCerts::PlatformVerifier)
-        .build();
     ureq::Agent::config_builder()
         .user_agent(USER_AGENT)
         .timeout_global(Some(timeout))
-        .tls_config(tls)
+        .tls_config(tls_config())
         // 4xx/5xx 不当异常抛：调用方要自己读 status（现役版就是读 res.status）
+        .http_status_as_error(false)
+        .build()
+        .into()
+}
+
+/// 传文件用的 agent：握手快速失败，body 按体积给预算，总时限不再压死。
+fn transfer_agent(size_hint: Option<u64>) -> ureq::Agent {
+    let budget = transfer_budget(size_hint);
+    ureq::Agent::config_builder()
+        .user_agent(USER_AGENT)
+        .timeout_global(None)
+        .timeout_connect(Some(HANDSHAKE_TIMEOUT))
+        .timeout_send_request(Some(HANDSHAKE_TIMEOUT))
+        .timeout_recv_response(Some(HANDSHAKE_TIMEOUT))
+        .timeout_await_100(Some(HANDSHAKE_TIMEOUT))
+        .timeout_recv_body(Some(budget))
+        .timeout_send_body(Some(budget))
+        .tls_config(tls_config())
         .http_status_as_error(false)
         .build()
         .into()
@@ -120,6 +178,14 @@ pub fn send(
             .send(bytes),
         _ => return Err(format!("不支持的请求方法：{method}")),
     };
+    read_response(result, timeout)
+}
+
+/// 把一次请求的结果收成一个 `Response`（状态码 + 整个 body + oauth scopes）。
+fn read_response(
+    result: Result<ureq::http::Response<ureq::Body>, ureq::Error>,
+    timeout: Duration,
+) -> Result<Response, String> {
     let mut response = result.map_err(|err| friendly(&err.to_string(), timeout))?;
     let status = response.status().as_u16();
     let oauth_scopes = response
@@ -177,64 +243,176 @@ pub fn github_api(
 }
 /// 流式下载到本地文件，边下边回报进度（`on_progress(已下字节, 总字节)`）。
 ///
-/// `total` 取 `Content-Length`，取不到就是 `None`（对齐现役版 `content-length` 口径）。
-/// 中途任何失败都留下半截文件，调用方负责清理（现役版也是这样）。
+/// `total` 优先取 `Content-Range` 里的远端总长，其次 `Content-Length`，都没有就是 `None`。
+/// 中途失败**保留**半截文件 —— 下一次调用会从这里接着下（断点续传）。
 pub fn download(
     url: &str,
     dest: &Path,
-    timeout: Duration,
+    size_hint: Option<u64>,
     on_progress: impl FnMut(u64, Option<u64>),
 ) -> Result<DownloadOutcome, String> {
-    download_cancellable(url, dest, timeout, || false, on_progress)
+    download_cancellable(url, dest, size_hint, || false, on_progress)
 }
 
-/// `download` 的可取消版本：每读一块前问一次 `is_cancelled`。
+/// `download` 的可取消 + 可续传版本。
 ///
-/// 为什么要单独开一个函数：`ureq` 的 body reader 没有「中断正在等的 socket」的口子，
-/// 而更新器必须做到「点取消立刻停」，所以只能在块与块之间轮询取消标志。
-/// 取消与网络失败一样回 `Err`，半截文件由调用方删（现役版也是这么做的）。
+/// 三件事：
+///   1. **断点续传**：`dest` 已有半截就带 `Range` 接着下、以 append 写回去；
+///      服务端不认 Range（回 200）时先清空再下，**绝不把两份字节接在一起**。
+///   2. **分段**：每段一个 Range 请求（`RANGE_CHUNK`），于是单次请求的收 body 预算
+///      是分钟级而不是「5 GB 一整条」的小时级；一段卡住最多浪费一段。
+///   3. **可取消**：每读一块前问一次 `is_cancelled`（ureq 没有中断正在等的 socket 的口子）。
+///
+/// 取消与网络失败一样回 `Err`；半截文件保留，等下一次续传。
 pub fn download_cancellable(
     url: &str,
     dest: &Path,
-    timeout: Duration,
+    size_hint: Option<u64>,
     mut is_cancelled: impl FnMut() -> bool,
     mut on_progress: impl FnMut(u64, Option<u64>),
 ) -> Result<DownloadOutcome, String> {
-    let agent = agent(timeout);
-    let mut response = agent
-        .get(url)
-        .call()
-        .map_err(|err| friendly(&err.to_string(), timeout))?;
-    let status = response.status().as_u16();
-    if !(200..300).contains(&status) {
-        return Err(format!("HTTP {status}"));
-    }
-    let total = response
-        .headers()
-        .get("content-length")
-        .and_then(|value| value.to_str().ok())
-        .and_then(|value| value.trim().parse::<u64>().ok());
-    let mut file = std::fs::File::create(dest).map_err(|err| format!("写不进目标文件：{err}"))?;
-    let mut reader = response.body_mut().as_reader();
-    let mut buffer = vec![0u8; 64 * 1024];
-    let mut downloaded: u64 = 0;
+    let resumed_from = std::fs::metadata(dest).map(|meta| meta.len()).unwrap_or(0);
+    let mut written = resumed_from;
+    let mut total = size_hint.filter(|size| *size > 0);
+
     loop {
         if is_cancelled() {
             return Err(CANCELLED.to_string());
         }
-        let read = reader
-            .read(&mut buffer)
-            .map_err(|err| friendly(&err.to_string(), timeout))?;
-        if read == 0 {
+        if let Some(total) = total {
+            if written >= total {
+                break;
+            }
+        }
+
+        let start = written;
+        let end = start.saturating_add(RANGE_CHUNK - 1);
+        let want = end - start + 1;
+        let budget = transfer_budget(Some(want));
+        let mut response = transfer_agent(Some(want))
+            .get(url)
+            .header("Range", &format!("bytes={start}-{end}"))
+            .call()
+            .map_err(|err| friendly(&err.to_string(), budget))?;
+        let status = response.status().as_u16();
+        if status == 416 {
+            // 请求范围整段落在远端末尾之外：本地这份已经到头
             break;
         }
-        file.write_all(&buffer[..read])
-            .map_err(|err| format!("写盘失败：{err}"))?;
-        downloaded += read as u64;
-        on_progress(downloaded, total);
+        if !(200..300).contains(&status) {
+            return Err(format!("HTTP {status}"));
+        }
+        // 206 = 服务端认了 Range，只给这一段的字节；200 = 它不认（或整包比请求的范围还小）
+        let partial = status == 206;
+
+        // 远端总长：Content-Range 最准，其次 Content-Length
+        let header_total = response
+            .headers()
+            .get("content-range")
+            .and_then(|value| value.to_str().ok())
+            .and_then(parse_range_total);
+        let content_length = response
+            .headers()
+            .get("content-length")
+            .and_then(|value| value.to_str().ok())
+            .and_then(|value| value.trim().parse::<u64>().ok());
+
+        let mut file = if partial {
+            OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(dest)
+                .map_err(|err| format!("写不进目标文件：{err}"))?
+        } else {
+            // 不支持 Range：本文件从零重来（半截那份作废，绝不影响正确性）
+            written = 0;
+            File::create(dest).map_err(|err| format!("写不进目标文件：{err}"))?
+        };
+
+        if let Some(size) = header_total {
+            total = Some(size);
+        } else if total.is_none() {
+            if let Some(len) = content_length {
+                total = Some(if partial { written + len } else { len });
+            }
+        }
+
+        let mut reader = response.body_mut().as_reader();
+        let mut buffer = vec![0u8; 64 * 1024];
+        let mut got: u64 = 0;
+        loop {
+            if is_cancelled() {
+                return Err(CANCELLED.to_string());
+            }
+            let read = reader
+                .read(&mut buffer)
+                .map_err(|err| friendly(&err.to_string(), budget))?;
+            if read == 0 {
+                break;
+            }
+            file.write_all(&buffer[..read])
+                .map_err(|err| format!("写盘失败：{err}"))?;
+            written += read as u64;
+            got += read as u64;
+            on_progress(written, total);
+            // 段下够了就收手：服务端有可能给得比请求的多（按整包回），多出来的不能算进去
+            if partial && got >= want {
+                break;
+            }
+        }
+        let _ = file.flush();
+
+        if !partial {
+            // 整包（不支持 Range）已经下完
+            break;
+        }
+        if got < want {
+            // 服务端这一段没给满 = 到远端末尾了
+            break;
+        }
     }
-    let _ = file.flush();
-    Ok(DownloadOutcome { bytes: downloaded })
+
+    Ok(DownloadOutcome {
+        bytes: written,
+        resumed_from,
+    })
+}
+
+/// `Content-Range: bytes 0-67108863/5368709120` → 总长 5368709120；取不到就是 None。
+fn parse_range_total(value: &str) -> Option<u64> {
+    value
+        .rsplit('/')
+        .next()
+        .map(str::trim)
+        .filter(|part| *part != "*")
+        .and_then(|part| part.parse::<u64>().ok())
+}
+
+/// 流式上传一个文件：body 从磁盘按块读，**不把整个文件读进内存**。
+///
+/// 为什么传 `File` 而不是 `&[u8]`：ureq 对 `File` 走 `LengthDelimited`（自动带上
+/// Content-Length、不分块），正是 GitHub 上传发布资产要的口径；换成
+/// `SendBody::from_reader` 的话 size 是 None，会退化成 chunked，GitHub 不一定收。
+pub fn send_file(
+    method: &str,
+    url: &str,
+    headers: &[(&str, &str)],
+    file: File,
+    content_type: &str,
+    size_hint: u64,
+) -> Result<Response, String> {
+    let agent = transfer_agent(Some(size_hint));
+    let upper = method.to_ascii_uppercase();
+    let result = match upper.as_str() {
+        "POST" => with_headers(agent.post(url), headers)
+            .header("Content-Type", content_type)
+            .send(file),
+        "PUT" => with_headers(agent.put(url), headers)
+            .header("Content-Type", content_type)
+            .send(file),
+        _ => return Err(format!("不支持的请求方法：{method}")),
+    };
+    read_response(result, transfer_budget(Some(size_hint)))
 }
 
 #[cfg(test)]
@@ -256,6 +434,177 @@ mod tests {
             friendly("connection refused", Duration::from_secs(8)),
             "connection refused"
         );
+    }
+
+    /// 传输预算按体积走：小包是分钟级，5 GB 这种大包也不再是「一个 120s 的死数」。
+    #[test]
+    fn transfer_budget_scales_with_size() {
+        // 体积未知 → 地板价 60s
+        assert_eq!(transfer_budget(None), Duration::from_secs(60));
+        assert_eq!(transfer_budget(Some(0)), Duration::from_secs(60));
+        // 256 MB：60 + 1024s（256MB / 256KB/s = 1024s）
+        assert_eq!(
+            transfer_budget(Some(256 * 1024 * 1024)),
+            Duration::from_secs(60 + 1024)
+        );
+        // 一段 64 MB：60 + 256s，正是「一段卡住最多浪费这么久」的口径
+        assert_eq!(
+            transfer_budget(Some(RANGE_CHUNK)),
+            Duration::from_secs(60 + 256)
+        );
+        // 5 GB 整包（不分段时）才是小时级 —— 而分段之后每段只按 64 MB 算
+        assert!(transfer_budget(Some(5 * 1024 * 1024 * 1024)) > Duration::from_secs(3600));
+    }
+
+    /// 远端总长从 Content-Range 里取；取不到（* 或没有斜杠）就是 None
+    #[test]
+    fn parse_range_total_reads_remote_size() {
+        assert_eq!(
+            parse_range_total("bytes 0-67108863/5368709120"),
+            Some(5368709120)
+        );
+        assert_eq!(parse_range_total("bytes 0-1/*"), None);
+        assert_eq!(parse_range_total("garbage"), None);
+    }
+
+    /// 一个只会发文件的最小 HTTP 靶子：支持 / 不支持 Range 两种行为都造得出来。
+    /// 只用于测试 —— 真网链路由 `live_https_round_trip`（ignored）冒烟。
+    struct TinyServer {
+        addr: std::net::SocketAddr,
+        ranges: std::sync::Arc<std::sync::Mutex<Vec<Option<String>>>>,
+    }
+
+    impl TinyServer {
+        fn start(payload: Vec<u8>, support_range: bool) -> Self {
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+            let addr = listener.local_addr().expect("addr");
+            let ranges = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+            let records = ranges.clone();
+            std::thread::spawn(move || {
+                for stream in listener.incoming() {
+                    let Ok(mut stream) = stream else { break };
+                    let mut buf = vec![0u8; 4096];
+                    let read = stream.read(&mut buf).unwrap_or(0);
+                    let head = String::from_utf8_lossy(&buf[..read]).to_string();
+                    let range = head
+                        .lines()
+                        .find(|line| line.to_ascii_lowercase().starts_with("range:"))
+                        .map(|line| line.trim().to_string());
+                    records.lock().unwrap().push(range.clone());
+                    let total = payload.len() as u64;
+                    let requested = range.as_deref().and_then(parse_test_range);
+                    let (status, start, end) = match (support_range, requested) {
+                        (true, Some((from, to))) => {
+                            if from >= total {
+                                (416u16, 0u64, 0u64)
+                            } else {
+                                (206, from, to.min(total.saturating_sub(1)))
+                            }
+                        }
+                        _ => (200, 0, total.saturating_sub(1)),
+                    };
+                    let body: &[u8] = if status == 416 {
+                        &[]
+                    } else {
+                        &payload[start as usize..=end as usize]
+                    };
+                    let mut head_text = format!(
+                        "HTTP/1.1 {status}\r\nContent-Length: {}\r\nAccept-Ranges: bytes\r\nConnection: close\r\n",
+                        body.len()
+                    );
+                    if status == 206 {
+                        head_text
+                            .push_str(&format!("Content-Range: bytes {start}-{end}/{total}\r\n"));
+                    }
+                    head_text.push_str("\r\n");
+                    let _ = stream.write_all(head_text.as_bytes());
+                    let _ = stream.write_all(body);
+                    let _ = stream.flush();
+                }
+            });
+            TinyServer { addr, ranges }
+        }
+
+        fn url(&self) -> String {
+            format!("http://{}/pkg.zip", self.addr)
+        }
+
+        fn ranges(&self) -> Vec<Option<String>> {
+            self.ranges.lock().unwrap().clone()
+        }
+    }
+
+    /// `bytes=1234-67108963` / `bytes=1234-` → (1234, 上界)
+    fn parse_test_range(value: &str) -> Option<(u64, u64)> {
+        let spec = value.to_ascii_lowercase();
+        let spec = spec.trim_start_matches("range:").trim();
+        let spec = spec.strip_prefix("bytes=")?;
+        let mut parts = spec.splitn(2, '-');
+        let from = parts.next()?.trim().parse::<u64>().ok()?;
+        let to = parts.next().unwrap_or("").trim();
+        let to = if to.is_empty() {
+            u64::MAX
+        } else {
+            to.parse::<u64>().ok()?
+        };
+        Some((from, to))
+    }
+
+    fn temp_dest(tag: &str) -> std::path::PathBuf {
+        std::env::temp_dir().join(format!("evejs-net-{tag}-{}.bin", std::process::id()))
+    }
+
+    /// 断点续传：本地已有半截 → 带 Range 接着下 → 拼出的整包与源字节一致。
+    #[test]
+    fn download_resumes_from_a_partial_file() {
+        let payload: Vec<u8> = (0..5000u32).map(|n| (n % 251) as u8).collect();
+        let server = TinyServer::start(payload.clone(), true);
+        let dest = temp_dest("resume");
+        std::fs::write(&dest, &payload[..1234]).unwrap();
+        let outcome =
+            download(&server.url(), &dest, Some(payload.len() as u64), |_, _| {}).unwrap();
+        assert_eq!(outcome.resumed_from, 1234);
+        assert_eq!(outcome.bytes, payload.len() as u64);
+        assert_eq!(std::fs::read(&dest).unwrap(), payload);
+        let ranges = server.ranges();
+        let first = ranges
+            .first()
+            .and_then(|item| item.clone())
+            .unwrap_or_default();
+        assert!(
+            first.contains("bytes=1234-"),
+            "第一次请求应当从断点开始：{ranges:?}"
+        );
+        let _ = std::fs::remove_file(&dest);
+    }
+
+    /// 服务端不认 Range（回 200）时必须**从头重写**，绝不能把旧字节留在前面。
+    #[test]
+    fn download_restarts_when_range_is_ignored() {
+        let payload: Vec<u8> = (0..5000u32).map(|n| (n % 241) as u8).collect();
+        let server = TinyServer::start(payload.clone(), false);
+        let dest = temp_dest("no-range");
+        std::fs::write(&dest, b"stale bytes").unwrap();
+        let outcome =
+            download(&server.url(), &dest, Some(payload.len() as u64), |_, _| {}).unwrap();
+        assert_eq!(outcome.bytes, payload.len() as u64);
+        assert_eq!(std::fs::read(&dest).unwrap(), payload);
+        let _ = std::fs::remove_file(&dest);
+    }
+
+    /// 本地已经是完整的一份：连请求都不该发（靠 size_hint 判断，省一次流量）。
+    #[test]
+    fn download_skips_when_local_file_is_complete() {
+        let payload: Vec<u8> = (0..2048u32).map(|n| (n % 239) as u8).collect();
+        let server = TinyServer::start(payload.clone(), true);
+        let dest = temp_dest("complete");
+        std::fs::write(&dest, &payload).unwrap();
+        let outcome =
+            download(&server.url(), &dest, Some(payload.len() as u64), |_, _| {}).unwrap();
+        assert_eq!(outcome.bytes, payload.len() as u64);
+        assert_eq!(outcome.resumed_from, payload.len() as u64);
+        assert!(server.ranges().is_empty(), "已经齐了还发了请求");
+        let _ = std::fs::remove_file(&dest);
     }
 
     #[test]

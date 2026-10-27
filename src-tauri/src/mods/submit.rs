@@ -1094,6 +1094,32 @@ fn assemble_download_urls(asset_url: &str, gitee_url: &str, existing: &[Value]) 
     out
 }
 
+/// 分片包的镜像清单：整包资产**没有**被传上去（超过 GitHub 的 2 GiB 上限），
+/// 所以 `downloadUrls` 里不能留它的地址（那是 404），只留 Gitee 与作者自带的镜像；
+/// 真正的下载来源是 `downloadParts`（逐片地址 + 逐片 sha256）。
+fn assemble_mirror_urls(gitee_url: &str, existing: &[Value]) -> Vec<Value> {
+    let mut out: Vec<Value> = Vec::new();
+    if https_only(gitee_url) {
+        out.push(json!({ "mirror": "gitee", "url": gitee_url, "priority": 1 }));
+    }
+    for extra in existing {
+        let url = text_field(extra, "url");
+        if url.is_empty() || !https_only(&url) {
+            continue;
+        }
+        if out
+            .iter()
+            .any(|item| item.get("url").and_then(Value::as_str) == Some(url.as_str()))
+        {
+            continue;
+        }
+        let mut entry = extra.clone();
+        entry["priority"] = json!(out.len() as i64 + 1);
+        out.push(entry);
+    }
+    out
+}
+
 /// 发布到**作者自己的仓库**：确保仓库 → 写 `evejs-mod.json` → 建 Release → 传 ZIP。
 /// 只动作者自己的仓库，不碰索引仓库；版本更新完全不需要 PR。
 #[allow(clippy::too_many_arguments)]
@@ -1164,7 +1190,21 @@ pub fn publish_own_repo(
         .and_then(Value::as_array)
         .cloned()
         .unwrap_or_default();
-    let download_urls = assemble_download_urls(&asset_url, gitee_url, &existing_urls);
+    // 超过 GitHub 单个资产 2 GiB 上限的包会被切片上传，那时整包资产并不存在，
+    // downloadUrls 里**不能**留它的地址（会 404）；下载来源改由 downloadParts 承担。
+    // 体积取自提交台账（打包那一步写进去的 sizeBytes），这里不再重新读盘
+    let packed_size = item
+        .get("indexDraft")
+        .and_then(|draft| draft.get("sizeBytes"))
+        .and_then(Value::as_u64)
+        .or_else(|| item.get("sizeBytes").and_then(Value::as_u64))
+        .unwrap_or(0);
+    let will_split = packed_size > github::GITHUB_ASSET_LIMIT;
+    let download_urls = if will_split {
+        assemble_mirror_urls(gitee_url, &existing_urls)
+    } else {
+        assemble_download_urls(&asset_url, gitee_url, &existing_urls)
+    };
 
     let draft = item.get("indexDraft").cloned().unwrap_or_else(|| json!({}));
     let mut draft_with_repo = draft.clone();
@@ -1242,12 +1282,28 @@ pub fn publish_own_repo(
     if let Some(index) = find_item_index(&file, id, version) {
         file["items"][index]["sourceRepo"] = json!(format!("{published_owner}/{published_repo}"));
         file["items"][index]["downloadUrls"] = json!(download_urls);
+        let published_parts = published
+            .get("parts")
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default();
         let mut updated_draft = draft;
         if let Some(map) = updated_draft.as_object_mut() {
             map.insert("downloadUrls".into(), json!(download_urls));
             map.insert("repo".into(), json!(repo_url));
+            // 切片上传的分片清单进索引分片：下载端优先读它（见 registry::parts_of）
+            if !published_parts.is_empty() {
+                map.insert(
+                    "downloadParts".into(),
+                    json!({ "total": published_parts.len(), "parts": published_parts }),
+                );
+            }
         }
         file["items"][index]["indexDraft"] = updated_draft;
+        // 上传完即删本地包（用户明确要求：上传后不留包），台账里也清掉路径 ——
+        // 「打开包所在目录」是按 zipPath 判断的，留着一个不存在的路径只会点空。
+        let _ = std::fs::remove_file(&zip_path);
+        file["items"][index]["zipPath"] = json!("");
         let _ = write_submission_file(runtime, &file);
     }
 
@@ -1298,6 +1354,13 @@ fn version_record_json(id: &str, source_repo: &str, item: &Value) -> Value {
             .get("downloadUrls")
             .cloned()
             .unwrap_or_else(|| item.get("downloadUrls").cloned().unwrap_or(json!([]))),
+        // 切片包（>2 GiB）的下载来源。**必须**进版本记录：市场端 build-index.mjs
+        // 会把记录当作权威版本覆盖清单里的下载地址，而它现在只认 downloadUrls ——
+        // 切片包恰恰没有整包 downloadUrls，不透传过去就会被 `没有可用的 https 下载地址` 拒收。
+        "downloadParts": draft
+            .get("downloadParts")
+            .cloned()
+            .unwrap_or_else(|| item.get("downloadParts").cloned().unwrap_or(Value::Null)),
         "author": draft.get("author").cloned().unwrap_or_else(|| json!({})),
         "publishedAt": pick("publishedAt"),
         "submittedAt": pkg::iso_from_ms(pkg::epoch_ms() as u64),

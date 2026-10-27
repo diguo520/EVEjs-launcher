@@ -686,5 +686,9 @@ then **re-sign and publish through the launcher's "Publish mod"**.
 
 ⚠️ Two red lines: remove any of the above, or edit the manifest without re-signing - the mod will not be loaded.
 
+When signing, the launcher also writes the hashes of `loader.js` and `lib/launcherGuard.js` into the manifest's `integrity` block.
+So **after changing either file you must re-sign and publish**, or the mod will likewise not be loaded - you never maintain this block yourself;
+"Publish mod" writes it for you.
+
 Bringing an already-listed mod in: copy `lib/launcherGuard.js` in, add the line to `loader.js`, add the block to the manifest, then re-sign and publish.
 

@@ -1517,6 +1517,8 @@ export function ModulesPage({
           setDetailId(null)
         }}
         onOpenFolder={() => detailMod && void revealModFolder(detailMod)}
+        // 说明正文里的链接：相对路径已在组件里按作者仓库解析好，这里只把它交给系统浏览器
+        onOpenExternal={(url) => void source.openExternal(url)}
         onEdit={() => {
           const id = detailId
           setDetailId(null)

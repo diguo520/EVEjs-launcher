@@ -132,6 +132,8 @@ pub fn run() {
         return;
     }
     let runtime = runtime::RuntimePaths::ensure().expect("无法创建 _launcher 运行时目录");
+    // 上一次自动更新留下的更新包 / 更新器副本：新版启动后立刻清掉（更新完不留包）
+    updater::cleanup_update_temp(&runtime);
     let repo_root = env::resolve_repo_root(&runtime);
     // 全局运行时路径：签名 / 作者身份等「拿不到 AppState」的路径要用（对齐现役版全局 launcherRuntimePaths）
     runtime::install_active(runtime.clone());

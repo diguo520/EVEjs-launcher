@@ -1,6 +1,7 @@
 import type { ReactNode } from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
+import { toast } from "sonner"
 import {
   Bookmark,
   Check,
@@ -60,6 +61,7 @@ import {
   permLabel,
   type ModEntry,
 } from "@/lib/mock"
+import { resolveMarkdownHref } from "@/lib/markdown-link"
 import { cn } from "@/lib/utils"
 import { listSeparator, t } from "@/lib/i18n"
 
@@ -78,8 +80,59 @@ function Readout({ label, value }: { label: string; value: string }) {
   )
 }
 
+/**
+ * Markdown 正文里的链接：**一律由启动器接管，绝不让 WebView 自己去导航**。
+ *
+ * 作者写的说明里常见 `NOTICE.md`、`docs/x.md` 这类相对路径 —— WebView 会按当前页面地址
+ * （渲染层挂在 `react/` 下）把它当成应用资产去加载，点一下整页就变成
+ * `asset not found: react/NOTICE.md`（2026-10-26 报障，用户以为启动器坏了）。
+ *
+ * 所以落点先在渲染层解析：绝对地址与「作者仓库里的文件」都交给系统浏览器打开，
+ * 解析不出来就提示一句，**任何情况下都不放行导航**（见 `lib/markdown-link.ts`）。
+ */
+function MarkdownLink({
+  href,
+  repo,
+  onOpenExternal,
+  children,
+}: {
+  href?: string
+  repo?: string
+  onOpenExternal: (url: string) => void
+  children?: ReactNode
+}) {
+  const target = resolveMarkdownHref(href, repo)
+  return (
+    <a
+      href={href}
+      onClick={(event) => {
+        event.preventDefault()
+        if (target.kind === "external" || target.kind === "repo") {
+          onOpenExternal(target.url)
+          return
+        }
+        if (target.kind === "anchor") {
+          document.getElementById(target.id)?.scrollIntoView({ block: "nearest" })
+          return
+        }
+        toast(t("没有可打开的地址"))
+      }}
+    >
+      {children}
+    </a>
+  )
+}
+
 /** 功能要点：一列能扫的短句，比整段正文先看得进去 */
-function FeatureList({ features }: { features: string[] }) {
+function FeatureList({
+  features,
+  repo,
+  onOpenExternal,
+}: {
+  features: string[]
+  repo?: string
+  onOpenExternal: (url: string) => void
+}) {
   return (
     <ul className="space-y-1.5">
       {features.map((item) => (
@@ -93,7 +146,14 @@ function FeatureList({ features }: { features: string[] }) {
           <span className="min-w-0">
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
-              components={{ p: ({ children }) => <>{children}</> }}
+              components={{
+                p: ({ children }) => <>{children}</>,
+                a: ({ href, children }) => (
+                  <MarkdownLink href={href} repo={repo} onOpenExternal={onOpenExternal}>
+                    {children}
+                  </MarkdownLink>
+                ),
+              }}
             >
               {item}
             </ReactMarkdown>
@@ -187,6 +247,11 @@ export interface ModDetailDialogProps {
   onUninstall: () => void
   /** 在资源管理器里定位这个模组的本地目录（没有本地目录的条目不会显示这个按钮） */
   onOpenFolder: () => void
+  /**
+   * 打开说明正文里的链接。相对路径（`NOTICE.md` 这类）由组件按作者仓库解析成仓库文件页，
+   * 外壳只管把最终地址交给 `shell:openExternal` —— 组件自己不去碰桥。
+   */
+  onOpenExternal: (url: string) => void
   onEdit: () => void
   onDeleteDraft: () => void
   onSubmit: () => void
@@ -219,6 +284,7 @@ export function ModDetailDialog({
   onUpdate,
   onUninstall,
   onOpenFolder,
+  onOpenExternal,
   onEdit,
   onDeleteDraft,
   onSubmit,
@@ -492,7 +558,11 @@ export function ModDetailDialog({
                 icon={<ListChecks className="size-3.5 text-tertiary" />}
                 title="功能要点"
               >
-                <FeatureList features={features} />
+                <FeatureList
+                  features={features}
+                  repo={mod.repo}
+                  onOpenExternal={onOpenExternal}
+                />
               </Section>
             ) : null}
 
@@ -513,7 +583,22 @@ export function ModDetailDialog({
                  * 模组作者塞的 `<script>` / `<img onerror>` 只会被当文本转义显示。
                  */
                 <div className="md-body">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    // 链接一律走 MarkdownLink：相对路径按作者仓库解析，谁都不许把
+                    // WebView 导航到 `react/NOTICE.md` 这种「应用资产」上去
+                    components={{
+                      a: ({ href, children }) => (
+                        <MarkdownLink
+                          href={href}
+                          repo={mod.repo}
+                          onOpenExternal={onOpenExternal}
+                        >
+                          {children}
+                        </MarkdownLink>
+                      ),
+                    }}
+                  >
                     {paragraphs.join("\n\n")}
                   </ReactMarkdown>
                 </div>

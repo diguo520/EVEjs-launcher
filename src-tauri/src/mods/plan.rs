@@ -633,6 +633,13 @@ pub fn sign_mod_folder(repo_root: &Path, folder: &str, runtime: &RuntimePaths) -
         );
     }
 
+    // 完整性：把「加载期必须原样存在」的两个文件（loader / 守卫）的哈希写进清单**再签** ——
+    // 这样它们就被同一份签名保护了。只改 loader 而不重签，加载前就会被拦下（2026-10-24）。
+    draft.insert(
+        "integrity".to_string(),
+        crate::mods::sign::integrity_block(&dir),
+    );
+
     let signature = json!({
         "alg": "ed25519",
         "keyId": me.key_id,
@@ -743,6 +750,46 @@ mod tests {
         assert_eq!(paths.len(), 2);
         assert!(paths[0].ends_with("a/loader.js"), "{paths:?}");
         assert!(paths[1].ends_with("b/loader.js"), "{paths:?}");
+    }
+
+    /// 完整性（2026-10-24）：签名时记下的 loader / 守卫哈希对不上 → 模组不给加载。
+    /// 这堵的正是「删掉 loader 里那行 gate() 就能绕过、而且不用重签」那条路。
+    /// 两条独立：验签管的是清单，这条管的是 loader / 守卫的文件本身。
+    #[test]
+    fn a_tampered_loader_fails_the_integrity_check() {
+        let repo = repo_for("integrity");
+        write_mod(
+            &repo,
+            "guarded",
+            manifest("guarded", json!({})),
+            Some("// 守卫在这里"),
+        );
+        let dir = repo.join("mods").join("guarded");
+
+        // 没有 integrity 字段的老模组照旧可加载（渐进，不砸存量）
+        assert!(
+            scan::read_mod_dir("guarded", &dir).valid,
+            "没有完整性记录时应当保持可加载"
+        );
+
+        // 按「签名时」的口径把两个文件的哈希记进清单（真实签名在签名流程里做）
+        let recorded = crate::mods::sign::integrity_block(&dir);
+        write_mod(
+            &repo,
+            "guarded",
+            manifest("guarded", json!({ "integrity": recorded })),
+            Some("// 守卫在这里"),
+        );
+        assert!(
+            scan::read_mod_dir("guarded", &dir).valid,
+            "原样不动时应当通过"
+        );
+
+        // 只改 loader（模拟把那行 gate() 删掉）
+        std::fs::write(dir.join(scan::LOADER_ENABLED), "// 守卫没了").unwrap();
+        let after = scan::read_mod_dir("guarded", &dir);
+        assert!(!after.valid, "改过 loader 之后不该再通过");
+        assert!(after.error.contains("改动过"), "{}", after.error);
     }
 
     #[test]

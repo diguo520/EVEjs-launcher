@@ -13,11 +13,13 @@
 //!
 //! 为什么手写 PKCS8/PEM 而不引 `pkcs8` crate：Ed25519 的 PKCS8 就是固定 16 字节前缀 +
 //! 种子的确定性结构，写死前缀比多拉一条依赖树更小更稳（且能被黄金夹具验证）。
+use crate::mods::scan;
 use crate::secrets::{base64_decode, base64_encode};
 use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, Mutex};
 
 /// 内置公钥表：**索引签名公钥**（整个模组生态的信任根，keygen 生成 2026-09-22）
@@ -435,6 +437,60 @@ pub fn seed_from_private_key_pem(pem: &str) -> Option<Vec<u8>> {
         }
     }
     found
+}
+
+/// 加载期必须原样存在的两个文件的 sha256，写进清单后**一起被签名保护**（2026-10-24）。
+///
+/// 为什么要有它：清单本身有签名兜底，但 `loader.js` 与 `lib/launcherGuard.js` **不在签名覆盖
+/// 范围内** —— 把 loader 里那行 `gate()` 删掉就能绕过绑定，而且**不需要重签**（清单一个字都不用动）。
+/// 在**签名时**把这两个文件的哈希写进清单，它们就被同一份签名保护了：改一个字，验签照样过，
+/// 但哈希对不上，加载前就会被拦下。
+///
+/// 值是一个 64 位十六进制串，或 `null`（那一刻该文件不存在）。用 `null` 而不是省略这个键，
+/// 是为了让「后来把文件删掉」也能被看出来 —— 哈希变 `null` 是**变化**，不是字段缺失。
+pub fn integrity_block(dir: &Path) -> Value {
+    serde_json::json!({
+        "loaderSha256": file_hash(&loader_path(dir)),
+        "guardSha256": file_hash(&guard_path(dir)),
+    })
+}
+
+/// `lib/launcherGuard.js` 的路径（骨架约定的固定位置）
+fn guard_path(dir: &Path) -> Option<PathBuf> {
+    Some(dir.join("lib").join("launcherGuard.js"))
+}
+
+/// loader 的候选文件名，顺序与 `scan.rs` 一致：**启用的那份优先**（启用/停用只是改文件名，
+/// 内容不变，所以哈希在两种状态下都能对上）。
+fn loader_path(dir: &Path) -> Option<PathBuf> {
+    let mut names: Vec<&str> = vec![scan::LOADER_ENABLED];
+    names.extend(scan::LOADER_DISABLED_ALT.iter().copied());
+    names.push(scan::LOADER_DISABLED);
+    let mut found: Option<PathBuf> = None;
+    for name in names {
+        let path = dir.join(name);
+        if found.is_none() && path.is_file() {
+            found = Some(path);
+        }
+    }
+    found
+}
+
+/// 读文件算 sha256；文件不存在或读不出来都记 `null`
+fn file_hash(path: &Option<PathBuf>) -> Value {
+    let Some(path) = path else {
+        return Value::Null;
+    };
+    let Ok(bytes) = std::fs::read(path) else {
+        return Value::Null;
+    };
+    let mut hasher = Sha256::new();
+    hasher.update(&bytes);
+    let mut hex = String::with_capacity(64);
+    for byte in hasher.finalize() {
+        hex.push_str(&format!("{byte:02x}"));
+    }
+    Value::String(hex)
 }
 
 /// 用签名密钥给 manifest 签名（base64）

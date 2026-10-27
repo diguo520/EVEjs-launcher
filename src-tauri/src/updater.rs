@@ -37,8 +37,9 @@ pub const DEFAULT_MANIFEST_URL: &str =
 
 /// 清单很小，超时按 API 口径给 30s
 const MANIFEST_TIMEOUT: Duration = Duration::from_secs(30);
-/// 更新包可能几十 MB：现役版没有下载超时（只能手动取消），这里给一个宽松上限兜底
-const UPDATE_DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(600);
+/// 自动更新的防抖：检查更新是**定时**跑的（见渲染层 startUpdateWatch），
+/// 同一时刻只允许一个后台下载在跑，免得每次检查都起一个新的。
+static AUTO_DOWNLOAD_ACTIVE: AtomicBool = AtomicBool::new(false);
 
 /// 下载分块大小（与 `net::download` 一致）
 const CHUNK: usize = 64 * 1024;
@@ -477,6 +478,18 @@ pub fn check_for_updates(app: &AppHandle, runtime: &RuntimePaths) -> Value {
         store.asset = Some(asset.clone());
     });
 
+    // 自动更新（用户明确要求：不再手动「立即更新」）：查到就自己在后台下，
+    // 进度经 update:changed 推给界面（百分比就在那里显示）。
+    // 用 swap 防抖：定时检查每跑一次都会走到这里，只有一个下载能起。
+    if available && !AUTO_DOWNLOAD_ACTIVE.swap(true, Ordering::SeqCst) {
+        let app = app.clone();
+        let runtime = runtime.clone();
+        std::thread::spawn(move || {
+            let _ = download_update(&app, &runtime);
+            AUTO_DOWNLOAD_ACTIVE.store(false, Ordering::SeqCst);
+        });
+    }
+
     let mut result = Map::new();
     result.insert("ok".to_string(), json!(true));
     result.insert("available".to_string(), json!(available));
@@ -573,7 +586,8 @@ pub fn download_update(app: &AppHandle, runtime: &RuntimePaths) -> Value {
     let digest = match download_to_file(app, &url, &destination, expected_size, started) {
         Ok(digest) => digest,
         Err(reason) => {
-            let _ = std::fs::remove_file(&destination);
+            // 半截文件**留着**：net 层下次会从这里断点续传（2026-10-27 起）。
+            // 校验不过或用户取消才删（下面 sha256 分支与 cancel 分支各自处理）。
             let cancelled = CANCEL.load(Ordering::SeqCst);
             patch(app, |store| {
                 store.state = if cancelled {
@@ -617,6 +631,20 @@ pub fn download_update(app: &AppHandle, runtime: &RuntimePaths) -> Value {
     json!({ "ok": true, "path": destination.to_string_lossy() })
 }
 
+/// 启动时清掉上一次更新留下的残骸：更新包本体、更新器副本、旧版本目录。
+///
+/// 为什么放在**启动**而不是「替换完立刻删」：替换那一刻包还在被 Go 更新器读，删不得；
+/// 新版本跑起来之后才安全 —— 这也正好对上「更新完不留包」的要求。
+pub fn cleanup_update_temp(runtime: &RuntimePaths) {
+    // 两处都清：下载落在 OS 临时目录（对齐现役版），更新器副本落在 _launcher/temp
+    for root in [
+        std::env::temp_dir().join("EveJS-Launcher-Updater"),
+        runtime.temp.join("EveJS-Launcher-Updater"),
+    ] {
+        let _ = std::fs::remove_dir_all(&root);
+    }
+}
+
 /// 现役版 `tempUpdateDir`：OS 临时目录（不是 `_launcher/temp`，两处就不同，照搬）
 fn update_temp_dir(version: &str) -> PathBuf {
     std::env::temp_dir()
@@ -646,10 +674,12 @@ fn download_to_file(
     match local {
         Some(source) => copy_local(app, &source, destination, expected_size, started)?,
         None => {
+            // 传输预算按「更新包有多大」算，不再用 600s 的死数；断点续传由 net 层负责
+            // （半截文件不再随手删，失败重试从这里接着下）
             net::download_cancellable(
                 url,
                 destination,
-                UPDATE_DOWNLOAD_TIMEOUT,
+                expected_size,
                 || CANCEL.load(Ordering::SeqCst),
                 |downloaded, total| emit_progress(app, downloaded, total, started),
             )?;

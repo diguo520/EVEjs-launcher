@@ -17,8 +17,10 @@ use crate::shell;
 use crate::snapshot::{FETCH_TIMEOUT, TOTAL_BUDGET};
 use serde_json::{json, Map, Value};
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::copy;
 use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 /// 默认索引地址（GitHub Pages 主站 + jsDelivr 镜像）。
 ///
@@ -38,8 +40,9 @@ const CACHE_FILE: &str = "mod-index.json";
 /// 当时又不传 force，用户点了也只是再读一遍这份缓存（2026-09-28 报障的根因）。
 /// 缩短到 2 分钟让自动路径也跟得上；要「立刻同步」就走市场页签与刷新按钮的 force。
 const TTL_MS: u128 = 2 * 60 * 1000;
-/// 单个镜像下载 ZIP 的超时
-const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(120);
+/// 分片下载：进度回报里附带「第几片 / 共几片」，渲染层直接显示；
+/// 单包（不分片）时这两个字段为 null。
+const PART_INDEX_BASE: usize = 1;
 /// 下载安装时写进模组目录的「来源」标记文件（不影响清单校验与签名）
 use super::MOD_SOURCE_FILE;
 
@@ -407,6 +410,19 @@ pub fn download_entry(
     runtime: &RuntimePaths,
     mut on_progress: impl FnMut(Value),
 ) -> Value {
+    let id = entry.get("id").and_then(Value::as_str).unwrap_or_default();
+    let version = entry.get("version").and_then(Value::as_str).unwrap_or("0");
+    let dest_dir = runtime.temp.join("market");
+    let _ = std::fs::create_dir_all(&dest_dir);
+    let dest = dest_dir.join(format!("{id}-{version}.zip"));
+
+    // 分片包优先，而且必须排在「有没有 downloadUrls」的检查**之前**：
+    // 切片上传的包可能一个 downloadUrls 都没有（整包资产根本没传上去），
+    // 它的下载地址全在 downloadParts 里 —— 先查 urls 会把这种包直接判成「没有下载地址」。
+    if let Some(parts) = parts_of(entry) {
+        return download_parts(entry, &parts, &dest, id, &mut on_progress);
+    }
+
     let mut urls: Vec<&Value> = entry
         .get("downloadUrls")
         .and_then(Value::as_array)
@@ -423,11 +439,11 @@ pub fn download_entry(
     // priority 缺省按 99 参与排序（对齐 `Number(a.priority) || 99`）
     urls.sort_by_key(|item| item.get("priority").and_then(Value::as_i64).unwrap_or(99));
 
-    let id = entry.get("id").and_then(Value::as_str).unwrap_or_default();
-    let version = entry.get("version").and_then(Value::as_str).unwrap_or("0");
-    let dest_dir = runtime.temp.join("market");
-    let _ = std::fs::create_dir_all(&dest_dir);
-    let dest = dest_dir.join(format!("{id}-{version}.zip"));
+    // 没有分片清单就按索引登记的体积给传输预算（断点续传由 net 层负责）
+    let size_hint = entry
+        .get("sizeBytes")
+        .and_then(Value::as_u64)
+        .filter(|size| *size > 0);
 
     let want = entry
         .get("sha256")
@@ -446,7 +462,7 @@ pub fn download_entry(
         let total_holder = std::cell::Cell::new(None::<u64>);
         let id_owned = id.to_string();
         let mirror_owned = mirror.clone();
-        let outcome = net::download(&url, &dest, DOWNLOAD_TIMEOUT, |downloaded, total| {
+        let outcome = net::download(&url, &dest, size_hint, |downloaded, total| {
             total_holder.set(total);
             let percent = total
                 .filter(|value| *value > 0)
@@ -495,7 +511,12 @@ pub fn download_entry(
                     "mirror": mirror,
                 });
             }
-            Err(reason) => failures.push(format!("{mirror} → {reason}")),
+            Err(reason) => {
+                // 换镜像前把半截文件丢掉：断点续传只在「同一来源的再次尝试」之间成立，
+                // 把 A 的下到一半当 B 的起点接着写 = 拼出一个 sha256 必然对不上的废包。
+                let _ = std::fs::remove_file(&dest);
+                failures.push(format!("{mirror} → {reason}"));
+            }
         }
     }
 
@@ -512,6 +533,200 @@ pub fn download_entry(
         });
     }
     json!({ "ok": false, "reason": format!("所有镜像都失败了：{}", failures.join("；")) })
+}
+
+/// 分片清单：`downloadParts.parts[]`（每片一个 url，可选 sha256 / sizeBytes）。
+/// 地址必须过 `is_secure_url`（**只认 https**，与整包下载同一条尺子）；一片都不剩就当作没有分片清单。
+fn parts_of(entry: &Value) -> Option<Vec<Value>> {
+    let items = entry.get("downloadParts")?.get("parts")?.as_array()?;
+    let parts: Vec<Value> = items
+        .iter()
+        .filter(|item| is_secure_url(&url_of(item)))
+        .cloned()
+        .collect();
+    if parts.is_empty() {
+        None
+    } else {
+        Some(parts)
+    }
+}
+
+/// 分片下载：逐片下载（可断点续传）→ 逐片校验 → 按顺序拼成整包 → 整包校验 → 删掉分片。
+///
+/// 进度口径：`downloaded` / `total` / `percent` 都是**整包**的，另带 `part` / `parts`
+/// 说明正在下第几片 —— 只看 percent 的话，多片会 0→100% 来回跳，用户以为出错。
+fn download_parts(
+    entry: &Value,
+    parts: &[Value],
+    dest: &Path,
+    id: &str,
+    on_progress: &mut dyn FnMut(Value),
+) -> Value {
+    let want = entry
+        .get("sha256")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_lowercase();
+    let file_name = dest
+        .file_name()
+        .map(|name| name.to_string_lossy().to_string())
+        .unwrap_or_else(|| "package.zip".to_string());
+    let part_total: u64 = parts
+        .iter()
+        .filter_map(|part| part.get("sizeBytes").and_then(Value::as_u64))
+        .sum();
+    let declared_total = entry.get("sizeBytes").and_then(Value::as_u64).unwrap_or(0);
+    let total = if declared_total > 0 {
+        Some(declared_total)
+    } else if part_total > 0 {
+        Some(part_total)
+    } else {
+        None
+    };
+
+    let mut part_paths: Vec<PathBuf> = Vec::with_capacity(parts.len());
+    let mut done: u64 = 0;
+    for (index, part) in parts.iter().enumerate() {
+        let url = url_of(part);
+        let mirror = part
+            .get("mirror")
+            .and_then(Value::as_str)
+            .unwrap_or("分片")
+            .to_string();
+        let label = format!("第 {}/{} 片", index + PART_INDEX_BASE, parts.len());
+        let part_path =
+            dest.with_file_name(format!("{file_name}.part{:03}", index + PART_INDEX_BASE));
+        let hint = part.get("sizeBytes").and_then(Value::as_u64);
+        let outcome = match net::download(&url, &part_path, hint, |downloaded, _| {
+            let overall = done + downloaded;
+            let percent = total
+                .filter(|value| *value > 0)
+                .map(|value| (overall as f64 / value as f64 * 100.0).round() as u64);
+            let mut payload = Map::new();
+            payload.insert("id".into(), json!(id));
+            payload.insert("downloaded".into(), json!(overall));
+            payload.insert(
+                "total".into(),
+                total.map(|value| json!(value)).unwrap_or(Value::Null),
+            );
+            payload.insert(
+                "percent".into(),
+                percent.map(|value| json!(value)).unwrap_or(Value::Null),
+            );
+            payload.insert("mirror".into(), json!(mirror));
+            payload.insert("part".into(), json!(index + PART_INDEX_BASE));
+            payload.insert("parts".into(), json!(parts.len()));
+            on_progress(Value::Object(payload));
+        }) {
+            Ok(outcome) => outcome,
+            Err(reason) => {
+                let _ = std::fs::remove_file(&part_path);
+                return json!({ "ok": false, "reason": format!("{label}下载失败：{reason}") });
+            }
+        };
+        let expect = part
+            .get("sha256")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_lowercase();
+        if !expect.is_empty() {
+            match pkg::sha256_file(&part_path) {
+                Ok((got, _)) if got == expect => {}
+                Ok((got, _)) => {
+                    let _ = std::fs::remove_file(&part_path);
+                    return json!({
+                        "ok": false,
+                        "reason": format!(
+                            "{label}校验失败（期望 {}… 实际 {}…）",
+                            &expect[..expect.len().min(12)],
+                            &got[..got.len().min(12)]
+                        ),
+                    });
+                }
+                Err(reason) => {
+                    let _ = std::fs::remove_file(&part_path);
+                    return json!({ "ok": false, "reason": format!("{label}校验失败：{reason}") });
+                }
+            }
+        }
+        done += outcome.bytes;
+        part_paths.push(part_path);
+    }
+
+    // 拼接 + 整包校验：失败就清场（分片与那条半成品整包都不留）
+    if let Err(reason) = join_parts(&part_paths, dest, &want) {
+        discard_parts(&part_paths, Some(dest));
+        return json!({ "ok": false, "reason": reason });
+    }
+    // 分片用完即删：要留下的是拼好的整包，不是几个 1.9 GB 的碎片
+    discard_parts(&part_paths, None);
+    json!({
+        "ok": true,
+        "zipPath": dest.to_string_lossy(),
+        "mirror": "分片",
+        "parts": parts.len(),
+    })
+}
+
+/// 按顺序把分片拼成整包，再校验整包 sha256。
+///
+/// 单独抽出来是为了**能测**：夹在下载循环里就只能靠真网跑，这里给几个本地文件即可。
+fn join_parts(part_paths: &[PathBuf], dest: &Path, want: &str) -> Result<(), String> {
+    let mut merged = File::create(dest).map_err(|err| format!("拼接目标写不进：{err}"))?;
+    for path in part_paths {
+        let mut input =
+            File::open(path).map_err(|err| format!("读不到分片 {}：{err}", path.display()))?;
+        copy(&mut input, &mut merged).map_err(|err| format!("拼接失败：{err}"))?;
+    }
+    let _ = merged.sync_all();
+    drop(merged);
+
+    if !want.is_empty() {
+        match pkg::sha256_file(dest) {
+            Ok((got, _)) if got == want => {}
+            Ok((got, _)) => {
+                return Err(format!(
+                    "拼接后整包 sha256 不匹配（期望 {}… 实际 {}…）",
+                    &want[..want.len().min(12)],
+                    &got[..got.len().min(12)]
+                ));
+            }
+            Err(reason) => return Err(format!("整包校验失败：{reason}")),
+        }
+    }
+    Ok(())
+}
+
+/// 清场：分片一律删；`dest` 给了就一并删（失败时那条半成品整包）
+fn discard_parts(part_paths: &[PathBuf], dest: Option<&Path>) {
+    for path in part_paths {
+        let _ = std::fs::remove_file(path);
+    }
+    if let Some(dest) = dest {
+        let _ = std::fs::remove_file(dest);
+    }
+}
+
+/// 装完就把包删掉：`temp/market` 不该长期留着几百 MB 的 ZIP。
+/// 失败时**保留** —— 下一次重试能从断点接着下，不用重来一遍。
+fn discard_package(zip_path: &str) {
+    if zip_path.is_empty() {
+        return;
+    }
+    let path = Path::new(zip_path);
+    let _ = std::fs::remove_file(path);
+    // 分片包中断时可能留下 .partNNN，同一个前缀的一并扫掉
+    if let (Some(dir), Some(name)) = (path.parent(), path.file_name()) {
+        let prefix = format!("{}.part", name.to_string_lossy());
+        if let Ok(items) = std::fs::read_dir(dir) {
+            for item in items.flatten() {
+                let file_name = item.file_name().to_string_lossy().to_string();
+                if file_name.starts_with(&prefix) {
+                    let _ = std::fs::remove_file(item.path());
+                }
+            }
+        }
+    }
 }
 
 fn url_of(item: &Value) -> String {
@@ -598,6 +813,8 @@ pub fn install_entry(
         };
         if ok {
             record_market_source(repo_root, folder, entry);
+            // 装完即删包：本地不留 ZIP（用户明确要求）；失败时保留，下次从断点续传
+            discard_package(&zip_path);
         }
         return json!({
             "ok": ok,
@@ -625,6 +842,8 @@ pub fn install_entry(
             }
         };
         record_market_source(repo_root, folder, entry);
+        // 装完即删包（同上）：失败时保留，供下一次续传
+        discard_package(&zip_path);
     }
     json!({
         "ok": ok,
@@ -1922,6 +2141,75 @@ mod tests {
             vec!["https://mirror.example/mod-index.json".to_string()]
         );
         let _ = std::fs::remove_dir_all(&runtime.root);
+    }
+
+    /// 分片拼接：按顺序首尾相接 → 整包 sha256 对得上 → 分片删掉。
+    /// 这条被测的是**真磁盘 I/O**，不是纯函数：分片读错/顺序错都会在这里露出来。
+    #[test]
+    fn join_parts_merges_in_order_and_discards() {
+        let dir = std::env::temp_dir().join(format!("evejs-join-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let part1 = dir.join("a.zip.part001");
+        let part2 = dir.join("a.zip.part002");
+        std::fs::write(&part1, b"hello ").unwrap();
+        std::fs::write(&part2, b"world").unwrap();
+        let expect = dir.join("expect.bin");
+        std::fs::write(&expect, b"hello world").unwrap();
+        let (want, _) = pkg::sha256_file(&expect).unwrap();
+
+        let dest = dir.join("a.zip");
+        join_parts(&[part1.clone(), part2.clone()], &dest, &want).unwrap();
+        assert_eq!(std::fs::read(&dest).unwrap(), b"hello world");
+
+        discard_parts(&[part1.clone(), part2.clone()], None);
+        assert!(!part1.exists() && !part2.exists());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// 整包 sha256 对不上必须报错（调用方据此清场），绝不能把废包交给安装流程。
+    #[test]
+    fn join_parts_rejects_a_wrong_whole_hash() {
+        let dir = std::env::temp_dir().join(format!("evejs-join-bad-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let part1 = dir.join("a.zip.part001");
+        let part2 = dir.join("a.zip.part002");
+        std::fs::write(&part1, b"hello ").unwrap();
+        std::fs::write(&part2, b"world").unwrap();
+        let dest = dir.join("a.zip");
+        let wrong = "f".repeat(64);
+
+        let err = join_parts(&[part1.clone(), part2.clone()], &dest, &wrong).unwrap_err();
+        assert!(err.contains("不匹配"), "{err}");
+        // 失败清场由调用方做：分片与那条半成品整包一起删
+        discard_parts(&[part1.clone(), part2.clone()], Some(&dest));
+        assert!(!dest.exists() && !part1.exists() && !part2.exists());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// 分片清单只认 https（或本机回环）；一片都不剩就当没有分片清单。
+    #[test]
+    fn parts_of_requires_secure_urls() {
+        let entry = json!({
+            "downloadParts": { "total": 2, "parts": [
+                { "url": "https://example.com/a.zip.001", "sizeBytes": 10, "sha256": "aa" },
+                { "url": "https://example.com/a.zip.002", "sizeBytes": 10, "sha256": "bb" }
+            ] }
+        });
+        assert_eq!(parts_of(&entry).map(|parts| parts.len()), Some(2));
+
+        // 非 https 的那片被丢掉；全被丢掉就等于没有分片清单
+        let mixed = json!({
+            "downloadParts": { "parts": [
+                { "url": "http://example.com/a.zip.001" },
+                { "url": "https://example.com/a.zip.002" }
+            ] }
+        });
+        assert_eq!(parts_of(&mixed).map(|parts| parts.len()), Some(1));
+        let none = json!({ "downloadParts": { "parts": [ { "url": "ftp://a/b" } ] } });
+        assert!(parts_of(&none).is_none());
+        assert!(parts_of(&json!({})).is_none());
     }
 
     #[test]
