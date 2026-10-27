@@ -1,0 +1,11 @@
+{
+  "version": "0.6.2",
+  "changelog": {
+    "zh": [
+      { "type": "opt", "text": "模组「功能说明」里的链接不再做成超链接：只显示 Markdown 里那行文字（如 NOTICE.md），点了不会有任何反应，也不会再把界面带到 asset not found" }
+    ],
+    "en": [
+      { "type": "opt", "text": "Links inside a mod description are no longer clickable: only the text from the Markdown is shown (e.g. NOTICE.md), clicking does nothing, and the shell can no longer end up on asset not found" }
+    ]
+  }
+}

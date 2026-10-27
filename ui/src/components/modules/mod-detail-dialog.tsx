@@ -1,7 +1,6 @@
 import type { ReactNode } from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
-import { toast } from "sonner"
 import {
   Bookmark,
   Check,
@@ -61,7 +60,6 @@ import {
   permLabel,
   type ModEntry,
 } from "@/lib/mock"
-import { resolveMarkdownHref } from "@/lib/markdown-link"
 import { cn } from "@/lib/utils"
 import { listSeparator, t } from "@/lib/i18n"
 
@@ -81,58 +79,19 @@ function Readout({ label, value }: { label: string; value: string }) {
 }
 
 /**
- * Markdown 正文里的链接：**一律由启动器接管，绝不让 WebView 自己去导航**。
+ * 说明正文里的链接**只留文字，不做超链接**（2026-10-27 用户要求）。
  *
- * 作者写的说明里常见 `NOTICE.md`、`docs/x.md` 这类相对路径 —— WebView 会按当前页面地址
- * （渲染层挂在 `react/` 下）把它当成应用资产去加载，点一下整页就变成
- * `asset not found: react/NOTICE.md`（2026-10-26 报障，用户以为启动器坏了）。
- *
- * 所以落点先在渲染层解析：绝对地址与「作者仓库里的文件」都交给系统浏览器打开，
- * 解析不出来就提示一句，**任何情况下都不放行导航**（见 `lib/markdown-link.ts`）。
+ * 作者的 README 里常见 `[NOTICE.md](NOTICE.md)`、`[官网](https://…)` 这类写法。做成可点的
+ * `<a>` 曾经出过事：相对路径被 WebView 当成「应用资产」去加载，点一下整页就变成
+ * `asset not found: react/NOTICE.md`（2026-10-26 报障）。现在的口径最省事也最不容易出事 ——
+ * 只把 Markdown 里的那行字原样显示成文字（`NOTICE.md`），不画 `<a>`、不绑点击，点哪儿都没反应。
  */
-function MarkdownLink({
-  href,
-  repo,
-  onOpenExternal,
-  children,
-}: {
-  href?: string
-  repo?: string
-  onOpenExternal: (url: string) => void
-  children?: ReactNode
-}) {
-  const target = resolveMarkdownHref(href, repo)
-  return (
-    <a
-      href={href}
-      onClick={(event) => {
-        event.preventDefault()
-        if (target.kind === "external" || target.kind === "repo") {
-          onOpenExternal(target.url)
-          return
-        }
-        if (target.kind === "anchor") {
-          document.getElementById(target.id)?.scrollIntoView({ block: "nearest" })
-          return
-        }
-        toast(t("没有可打开的地址"))
-      }}
-    >
-      {children}
-    </a>
-  )
+function LinkText({ children }: { children?: ReactNode }) {
+  return <span>{children}</span>
 }
 
 /** 功能要点：一列能扫的短句，比整段正文先看得进去 */
-function FeatureList({
-  features,
-  repo,
-  onOpenExternal,
-}: {
-  features: string[]
-  repo?: string
-  onOpenExternal: (url: string) => void
-}) {
+function FeatureList({ features }: { features: string[] }) {
   return (
     <ul className="space-y-1.5">
       {features.map((item) => (
@@ -148,11 +107,8 @@ function FeatureList({
               remarkPlugins={[remarkGfm]}
               components={{
                 p: ({ children }) => <>{children}</>,
-                a: ({ href, children }) => (
-                  <MarkdownLink href={href} repo={repo} onOpenExternal={onOpenExternal}>
-                    {children}
-                  </MarkdownLink>
-                ),
+                // 链接只留文字（见 LinkText）
+                a: ({ children }) => <LinkText>{children}</LinkText>,
               }}
             >
               {item}
@@ -247,11 +203,7 @@ export interface ModDetailDialogProps {
   onUninstall: () => void
   /** 在资源管理器里定位这个模组的本地目录（没有本地目录的条目不会显示这个按钮） */
   onOpenFolder: () => void
-  /**
-   * 打开说明正文里的链接。相对路径（`NOTICE.md` 这类）由组件按作者仓库解析成仓库文件页，
-   * 外壳只管把最终地址交给 `shell:openExternal` —— 组件自己不去碰桥。
-   */
-  onOpenExternal: (url: string) => void
+
   onEdit: () => void
   onDeleteDraft: () => void
   onSubmit: () => void
@@ -284,7 +236,6 @@ export function ModDetailDialog({
   onUpdate,
   onUninstall,
   onOpenFolder,
-  onOpenExternal,
   onEdit,
   onDeleteDraft,
   onSubmit,
@@ -558,11 +509,7 @@ export function ModDetailDialog({
                 icon={<ListChecks className="size-3.5 text-tertiary" />}
                 title="功能要点"
               >
-                <FeatureList
-                  features={features}
-                  repo={mod.repo}
-                  onOpenExternal={onOpenExternal}
-                />
+                <FeatureList features={features} />
               </Section>
             ) : null}
 
@@ -585,19 +532,8 @@ export function ModDetailDialog({
                 <div className="md-body">
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
-                    // 链接一律走 MarkdownLink：相对路径按作者仓库解析，谁都不许把
-                    // WebView 导航到 `react/NOTICE.md` 这种「应用资产」上去
-                    components={{
-                      a: ({ href, children }) => (
-                        <MarkdownLink
-                          href={href}
-                          repo={mod.repo}
-                          onOpenExternal={onOpenExternal}
-                        >
-                          {children}
-                        </MarkdownLink>
-                      ),
-                    }}
+                    // 链接只留文字：不画 <a>、不绑点击（理由见 LinkText）
+                    components={{ a: ({ children }) => <LinkText>{children}</LinkText> }}
                   >
                     {paragraphs.join("\n\n")}
                   </ReactMarkdown>

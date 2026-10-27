@@ -214,8 +214,6 @@ export function fromMarket(mod: RawMarketMod): ModEntry {
     shots: modShotUrls(mod),
     // 精选横幅：作者仓库 shots/Banner/ 里的横版图；没有就是 null，精选位退回本地兜底
     banner: modBannerUrl(mod),
-    // 作者仓库：说明正文里的相对链接要靠它才能解析成仓库文件页（见 lib/markdown-link.ts）
-    repo: typeof mod.repo === "string" ? mod.repo : "",
     mine: false,
     inMarket: true,
   }

@@ -515,14 +515,6 @@ export interface ModEntry {
    * 缺省 / null 表示这个模组没有横幅，市场顶部精选位退回本地兜底横幅。
    */
   banner?: string | null
-  /**
-   * 作者仓库地址（索引条目里的 `repo`）。
-   *
-   * 只用于把说明正文里的**相对链接**（`NOTICE.md`、`docs/x.md`）解析成仓库文件页 ——
-   * 相对路径交给 WebView 会被解析成「应用资产」，点一下整页报 asset not found
-   * （2026-10-26 报障，见 `lib/markdown-link.ts`）。空/缺省表示没有仓库地址，相对链接不给打开。
-   */
-  repo?: string
 }
 
 export const MODS: ModEntry[] = [
