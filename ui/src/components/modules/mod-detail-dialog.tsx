@@ -45,6 +45,7 @@ import { ModReviews } from "@/components/modules/mod-reviews"
 import { ModShots } from "@/components/modules/mod-shots"
 import type { DownloadTask } from "@/hooks/use-mod-downloads"
 import {
+  EMPTY_MOD_README,
   formatCount,
   hasUpdate,
   isPublished,
@@ -540,7 +541,8 @@ export function ModDetailDialog({
                 </div>
               ) : (
                 <p className="text-[12px] leading-relaxed text-muted-foreground">
-                  还没有填写功能说明。
+                  {/* A5：用 mod-logic 里的单一声明，别再抄一份（两处文案会各自漂移） */}
+                  {t(EMPTY_MOD_README)}
                 </p>
               )}
             </Section>

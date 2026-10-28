@@ -3,11 +3,11 @@
   "generatedAt": "2026-10-13T16:52:43.237Z",
   "counts": {
     "invoke": 120,
-    "send": 7,
+    "send": 8,
     "events": 10,
-    "requests": 127,
-    "registered": 82,
-    "apiTotal": 137
+    "requests": 128,
+    "registered": 83,
+    "apiTotal": 138
   },
   "invoke": [
     {
@@ -1017,6 +1017,15 @@
   ],
   "send": [
     {
+      "api": "modsMarketCancel",
+      "channel": "mods:marketCancel",
+      "kind": "send",
+      "signature": "id: string",
+      "params": [
+        "id"
+      ]
+    },
+    {
       "api": "terminalInput",
       "channel": "terminal:input",
       "kind": "send",
@@ -1174,6 +1183,7 @@
       "storeEditor:save"
     ],
     "send": [
+      "mods:marketCancel",
       "window:hideToTray"
     ],
     "events": [

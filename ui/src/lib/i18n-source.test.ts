@@ -15,6 +15,20 @@ import en from "@/locales/en.json"
 
 // @babel/traverse 在 ESM/CJS 下的 interop 形态不统一；这里与 vite.config.ts 保持同一取法。
 const traverse = ((traverseModule as any).default ?? traverseModule) as typeof traverseModule
+/**
+ * 已知边界（M11，2026-10-28）：这道门禁只扫 ui/src 下的 .ts/.tsx 源码字面量，
+ * `ui/src/data/*.json` 这类数据目录不在管辖范围内。实测边界值：
+ *
+ *   items.json     27357 条中文串里 27338 条不在 en 目录（名称/分类）
+ *   npcs.json       5152 / 5153
+ *   templates.json  3443 / 3445
+ *
+ * 后果：非中文界面在「指令手册 / 异常模板 / 击杀榜」这类直接显示数据名的位置会露中文
+ * （物品市场是反例，它按 locale 取 namePair，口径不一致）。
+ *
+ * 为什么不在这次改掉：这是**数据翻译缺口**（两万七千条名字没有英文），不是门禁能修的。
+ * 所以这里把边界写明白，而不是假装看不见 —— 翻译补齐后应把数据目录纳入门禁。
+ */
 const CHINESE = /[\u3400-\u9fff\uf900-\ufaff]/
 const SOURCES = import.meta.glob(
   ["./../*.{ts,tsx}", "./../**/*.{ts,tsx}"],

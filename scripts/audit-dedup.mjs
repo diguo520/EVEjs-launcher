@@ -119,6 +119,15 @@ const PORT_CALL_SITES = [
   ["src-tauri/src/health.rs", "tcp_alive(DEFAULT_MARKET_PORT)", "tcp_alive(40110)"],
   ["src-tauri/src/ipc/mod.rs", "config::DEFAULT_GAME_PORT", "else { 26000 }"],
   ["src-tauri/src/metrics.rs", "crate::config::DEFAULT_GAME_PORT", "else { 26000 }"],
+  // D1（2026-10-28）：process.rs 这两处生产代码原本漏在清单外 —— 同一个「端口单一来源」
+  // 口径在 ipc/mod.rs、metrics.rs 都断言了，偏偏它没被看着，字面量就一直留着。
+  // forbidden 用带上下文的片段（同文件里还有测试夹具，整串数字会误伤）。
+  [
+    "src-tauri/src/process.rs",
+    "config::DEFAULT_GATEWAY_PORT",
+    'is_empty() { "http://127.0.0.1:26002/"',
+  ],
+  ["src-tauri/src/process.rs", "config::DEFAULT_GAME_PORT", "} else { 26000 }"],
 ];
 for (const [file, expected, forbidden] of PORT_CALL_SITES) {
   const text = SRC.get(file) ?? "";

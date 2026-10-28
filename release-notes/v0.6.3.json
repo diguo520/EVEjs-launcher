@@ -1,0 +1,145 @@
+{
+  "version": "0.6.3",
+  "changelog": {
+    "zh": [
+      {
+        "type": "fix",
+        "text": "模组下载的断点续传真的生效了：下载失败不再删掉半截包（只有换到别的下载来源时才丢弃），重试能从断点接着下"
+      },
+      {
+        "type": "fix",
+        "text": "慢网也能把大模组下完：保底速度从 256 KB/s 放宽到 64 KB/s，单次分片从 64 MiB 缩到 16 MiB"
+      },
+      {
+        "type": "fix",
+        "text": "修掉「某个模组版本在这台机器上永远装不上」：校验失败、空文件、本地残包异常时都会清场，不再自锁"
+      },
+      {
+        "type": "fix",
+        "text": "模组的「取消下载」不再是假取消：点了真的会停下来，不会再出现「以为取消了、其实装上了」"
+      },
+      {
+        "type": "fix",
+        "text": "点过「取消」或校验失败过的版本，后台检查不会每半小时又自动重下一次；手动点「立即更新」仍然照下"
+      },
+      {
+        "type": "fix",
+        "text": "已经下载好的更新包不会再被后台检查重新下载，界面也不会每一轮都掉回「立即更新」"
+      },
+      {
+        "type": "fix",
+        "text": "更新包不会再有两次下载同时写同一个文件（会自动互斥），避免下出一个坏包"
+      },
+      {
+        "type": "fix",
+        "text": "更新包下载改成先写临时文件、校验通过才改名，启动时清理不再误删「已经下好、只差点安装」的包"
+      },
+      {
+        "type": "fix",
+        "text": "模组包与分片的临时文件有地方清了：「清空缓存」现在会一并清掉，不再无声占用 GB 级磁盘"
+      },
+      {
+        "type": "fix",
+        "text": "校验 1.9 GB 分片不再把整个文件读进内存（峰值从约 1.8 GB 降到常量级），小内存机器也能装大包"
+      },
+      {
+        "type": "fix",
+        "text": "服务端不支持断点续传（回 200 整包）时，大包不再必然超时；镜像回的区间起点不对会当场识破，而不是拼出一个坏包"
+      },
+      {
+        "type": "fix",
+        "text": "超时提示的数字不再乱报：以前 30 秒失败会写成「请求超时（7307s）」，现在按实际阶段报秒数"
+      },
+      {
+        "type": "opt",
+        "text": "宇宙配置与配置中心里没保存的改动不再因为切页而丢失；关窗口时也会拦截提醒"
+      },
+      {
+        "type": "opt",
+        "text": "服务启动预算从 60 秒放宽到 90 秒（实测空模组就要 51.8 秒、冷缓存首轮 66.4 秒，以前会误报「已超出预算」）"
+      },
+      {
+        "type": "opt",
+        "text": "次级文字（时间戳、说明）对比度从 2.97:1 提到 5.62:1，达到无障碍 AA 标准"
+      },
+      {
+        "type": "opt",
+        "text": "开机画面的「最多等」参数修正（原来比「最少显示」还短，永不生效），后端不回应时能按预期收起"
+      },
+      {
+        "type": "opt",
+        "text": "启动器起服与更新的临时文件命名不再撞名（同一毫秒的两次操作会互相清目录），也顺手消掉了一个偶发的测试失败"
+      }
+    ],
+    "en": [
+      {
+        "type": "fix",
+        "text": "Resumable mod downloads actually work now: a failed attempt no longer deletes the partial file (only switching to another mirror does), so a retry continues where it stopped"
+      },
+      {
+        "type": "fix",
+        "text": "Large mods download over slow links: the transfer floor is now 64 KB/s (was 256) and each range request is 16 MiB (was 64)"
+      },
+      {
+        "type": "fix",
+        "text": "Fixed \"this mod version can never be installed on this machine\": verification failures, empty files and odd leftover packages are now cleaned up instead of self-locking"
+      },
+      {
+        "type": "fix",
+        "text": "Cancelling a mod download really cancels it - the launcher no longer installs a mod you thought you cancelled"
+      },
+      {
+        "type": "fix",
+        "text": "A version you cancelled or that failed verification is no longer re-downloaded automatically every 30 minutes; the manual \"update now\" button still retries"
+      },
+      {
+        "type": "fix",
+        "text": "An already downloaded update package is no longer downloaded again by the background check, and the prompt no longer falls back to \"update now\" every round"
+      },
+      {
+        "type": "fix",
+        "text": "Two update downloads can no longer write the same file at once (they are mutually exclusive), which used to produce a broken package"
+      },
+      {
+        "type": "fix",
+        "text": "Update packages are written to a temporary file and renamed only after verification, so the startup cleanup no longer deletes a package that was downloaded and waiting to install"
+      },
+      {
+        "type": "fix",
+        "text": "Mod packages and split parts can be cleaned up: \"clear cache\" now removes them too instead of letting them occupy gigabytes silently"
+      },
+      {
+        "type": "fix",
+        "text": "Hashing a 1.9 GB split part no longer loads the whole file into memory (peak dropped from about 1.8 GB to constant)"
+      },
+      {
+        "type": "fix",
+        "text": "When a server ignores range requests and returns the whole file, large downloads no longer time out every time; a mirror that reports the wrong range start is detected immediately instead of producing a corrupt package"
+      },
+      {
+        "type": "fix",
+        "text": "Timeout messages no longer print wrong numbers - a 30 second failure used to read \"request timed out (7307s)\""
+      },
+      {
+        "type": "opt",
+        "text": "Unsaved changes in the game configuration and the config centre are no longer lost when switching pages, and closing the window now prompts"
+      },
+      {
+        "type": "opt",
+        "text": "The service start budget was raised from 60s to 90s (measured: 51.8s with no mods, 66.4s on a cold cache, which used to report \"budget exceeded\")"
+      },
+      {
+        "type": "opt",
+        "text": "Secondary text (timestamps, captions) contrast raised from 2.97:1 to 5.62:1, meeting WCAG AA"
+      },
+      {
+        "type": "opt",
+        "text": "Fixed the boot screen \"wait at most\" value (it was shorter than the minimum display and never took effect), so it now closes as intended when the backend stays silent"
+      },
+      {
+        "type": "opt",
+        "text": "Temporary file names for service and update work no longer collide (two operations in the same millisecond used to delete each other's directories), which also removed a flaky test"
+      }
+    ]
+  }
+}

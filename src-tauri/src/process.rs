@@ -256,8 +256,12 @@ pub async fn start_service(app: &AppHandle, service_id: &str) -> Result<Value, S
 
 /* ------------------------------ 启动预算 ------------------------------ */
 
-/// 主服务器启动的基价（现役版 Electron 给的就是 60s）
-const MAIN_START_BASE_MS: u64 = 60_000;
+/// 主服务器启动的基价。
+///
+/// 现役 Electron 给的是 60s，但 2026-10-28 的实测是：**空模组**起服中位就要 51.8s，
+/// 冷缓存首轮 66.4s —— 直接超出 60s，用户首启看到的是「已超出预算 · 仍在等待端口」，
+/// 以为服务卡死了。慢的根因在服务端本体（不在模组），所以基价先给到 90s。
+const MAIN_START_BASE_MS: u64 = 90_000;
 /// 每个模组 loader 追加的预算：NODE_OPTIONS 里每个 `--require` 都是一次真实读盘 + 编译 + 执行
 const MAIN_START_PER_LOADER_MS: u64 = 3_000;
 /// 启动预算的硬上限：模组再多也不能无限等
@@ -1015,7 +1019,8 @@ fn resolve_client_res_files(client_path: &str) -> Option<String> {
 fn apply_client_network_policy(env: &mut BTreeMap<String, String>, proxy_url: &str, ca_pem: &str) {
     let trimmed = proxy_url.trim();
     let proxy = if trimmed.is_empty() {
-        "http://127.0.0.1:26002/".to_string()
+        // D1（2026-10-28）：端口不再写字面量，跟 config.rs 的单一声明走
+        format!("http://127.0.0.1:{}/", crate::config::DEFAULT_GATEWAY_PORT)
     } else {
         trimmed.to_string()
     };
@@ -1368,7 +1373,8 @@ pub async fn start_client(app: &AppHandle, login: Option<ClientLogin>) -> Result
     let game_port = if configured_port > 0 {
         configured_port
     } else {
-        26000
+        // D1：回退值也走单一来源（此前这里是与 ipc/mod.rs、metrics.rs 同款的字面量）
+        crate::config::DEFAULT_GAME_PORT
     };
     args.push(format!("/port:{game_port}"));
 
@@ -1740,13 +1746,14 @@ mod tests {
         assert_eq!(env["EVEJS_NO_PROXY"], "127.0.0.1,localhost,::1");
     }
 
-    /// 启动预算：60s 基价 + 每 loader 3s，封顶 180s（20 个模组 = 120s）
+    /// 启动预算：90s 基价（M10：实测空模组起服就要 51.8s、冷缓存首轮 66.4s）+ 每 loader 3s，
+    /// 封顶 180s（30 个模组 = 180s）。
     #[test]
     fn main_start_budget_grows_with_mods_and_is_capped() {
-        assert_eq!(main_start_budget_ms(0), 60_000);
-        assert_eq!(main_start_budget_ms(1), 63_000);
-        assert_eq!(main_start_budget_ms(20), 120_000);
-        assert_eq!(main_start_budget_ms(40), 180_000);
+        assert_eq!(main_start_budget_ms(0), 90_000);
+        assert_eq!(main_start_budget_ms(1), 93_000);
+        assert_eq!(main_start_budget_ms(20), 150_000);
+        assert_eq!(main_start_budget_ms(30), 180_000);
         assert_eq!(main_start_budget_ms(500), 180_000);
     }
 

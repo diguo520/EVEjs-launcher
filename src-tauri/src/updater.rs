@@ -14,12 +14,13 @@ use crate::config;
 use crate::net;
 use crate::runtime::RuntimePaths;
 use serde_json::{json, Map, Value};
+use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{LazyLock, Mutex, MutexGuard};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
 use tauri::{AppHandle, Emitter, Manager};
 
 /// **通道隔离（S7 §2.2 方案 #2）**：新外壳读 `stable` 通道，**故意**不再与现役 Electron 的
@@ -37,9 +38,84 @@ pub const DEFAULT_MANIFEST_URL: &str =
 
 /// 清单很小，超时按 API 口径给 30s
 const MANIFEST_TIMEOUT: Duration = Duration::from_secs(30);
-/// 自动更新的防抖：检查更新是**定时**跑的（见渲染层 startUpdateWatch），
-/// 同一时刻只允许一个后台下载在跑，免得每次检查都起一个新的。
-static AUTO_DOWNLOAD_ACTIVE: AtomicBool = AtomicBool::new(false);
+/// 用户刚点过「取消」或校验失败的那个版本（M8/M9，2026-10-28）。
+///
+/// 病根：检查更新的排班是「开机 5s、每 30 分钟、窗口聚焦补查」，只要「有新版且没有下载在跑」
+/// 就重起一个线程并清掉 CANCEL —— 用户点完取消，过一会儿它自己又下起来了（还是续传，
+/// 进度从中间跳出来）；校验失败也会每 30 分钟白重下一整包。
+/// 现在把这些版本记下来，自动流程**先别碰它**；手动点「立即更新」不受限（那是明确意愿）。
+static HOLD_VERSION: Mutex<Option<String>> = Mutex::new(None);
+
+/// 记下「先别再自动下这个版本」
+fn hold_version(version: &str) {
+    if version.is_empty() {
+        return;
+    }
+    if let Ok(mut held) = HOLD_VERSION.lock() {
+        *held = Some(version.to_string());
+    }
+}
+
+/// 这个版本现在是不是被「先别自动下」按住
+fn is_held(version: &str) -> bool {
+    HOLD_VERSION
+        .lock()
+        .map(|held| held.as_deref() == Some(version))
+        .unwrap_or(false)
+}
+
+/// 这一轮检查该不该**自动**起下载（N2：抽成纯函数才测得动）。
+///
+/// 全都要满足才起：有新版本、没有下载在跑、同一个版本还没下好、用户没有按住它。
+/// 手动「立即更新」不走这里 —— 那是用户的明确意愿。
+fn should_auto_download(
+    before_state: &str,
+    before_version: Option<&str>,
+    latest: &str,
+    available: bool,
+    held: bool,
+) -> bool {
+    if !available || held {
+        return false;
+    }
+    if before_state == "downloading" {
+        return false;
+    }
+    !(before_state == "ready" && before_version == Some(latest))
+}
+
+/// 手动「立即更新」进来时清掉按住状态
+fn clear_held() {
+    if let Ok(mut held) = HOLD_VERSION.lock() {
+        *held = None;
+    }
+}
+
+/// 下载互斥：**自动下载与手动「立即更新」共用同一个守卫**。
+///
+/// 2026-10-28（H5）修的是：以前只有自动路径用 swap 挡着，而 `update:download`
+/// 走 ipc 直调 `download_update` 完全不过问这个标志 —— 自动线程还没把状态翻成 downloading
+/// 的那一小段窗口里点「立即更新」，就会有两个写者同时按文件长度 append 同一个 exe，
+/// 体积超预期 → sha 校验失败 → 删包重下。现在守卫在 `download_update` 里，两条路都过它。
+static DOWNLOAD_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
+
+/// 拿不到就说明已经有一次更新下载在跑；`Drop` 自动放锁（任何提前 return 都不会漏放）。
+struct DownloadGuard;
+
+impl DownloadGuard {
+    fn acquire() -> Option<Self> {
+        DOWNLOAD_IN_FLIGHT
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .ok()
+            .map(|_| DownloadGuard)
+    }
+}
+
+impl Drop for DownloadGuard {
+    fn drop(&mut self) {
+        DOWNLOAD_IN_FLIGHT.store(false, Ordering::SeqCst);
+    }
+}
 
 /// 下载分块大小（与 `net::download` 一致）
 const CHUNK: usize = 64 * 1024;
@@ -404,6 +480,9 @@ pub fn current_state(app: &AppHandle) -> Value {
 /// 现役版 `cancelUpdateDownload()`：置标志 + 立刻回 idle（下载循环下一块就收手）
 pub fn cancel_download(app: &AppHandle) {
     CANCEL.store(true, Ordering::SeqCst);
+    // M9：记下这个版本，别让 30 分钟后的自动检查又把它拉起来
+    let held = store().latest_version.clone().unwrap_or_default();
+    hold_version(&held);
     patch(app, |store| {
         store.state = "idle".to_string();
         store.message = Some("已取消下载".to_string());
@@ -415,6 +494,14 @@ pub fn cancel_download(app: &AppHandle) {
 /// 现役版 `checkForUpdates()`；返回 `UpdateCheckResult`
 pub fn check_for_updates(app: &AppHandle, runtime: &RuntimePaths) -> Value {
     let current = version_of(app);
+    // N2（复核第二轮，2026-10-29）：这个快照必须在**函数最开头**取 ——
+    // 紧跟的第一次 patch 就把 state 写成 checking，之后任何位置取都只会读到 checking，
+    // 于是「有没有下载在跑 / 同一版本是不是已经下好」两个判断恒为 false，
+    // 5s / 30min / 窗口聚焦每一轮都会再起一个线程、把整包重下一遍。
+    let before = {
+        let snapshot = store();
+        (snapshot.state.clone(), snapshot.latest_version.clone())
+    };
     patch(app, |store| {
         store.state = "checking".to_string();
         store.message = Some("正在检查更新…".to_string());
@@ -457,7 +544,20 @@ pub fn check_for_updates(app: &AppHandle, runtime: &RuntimePaths) -> Value {
         .map(str::to_string);
     let size = asset.get("size").and_then(Value::as_u64);
 
+    // N2 的第二半（复核建议）：同一版本已经下好待安装时，别把 ready 覆盖回 available ——
+    // 界面只认 ready 才画「重启并安装」（update-phase.ts:85），覆盖掉会让用户每轮都看到
+    // 「立即更新」，再点一次就是一次全新的整包下载。
+    let already_ready = before.0 == "ready" && before.1.as_deref() == Some(latest.as_str());
+
     patch(app, |store| {
+        if already_ready && available {
+            store.latest_version = Some(latest.clone());
+            store.channel = channel.clone();
+            store.size = size;
+            store.manifest = Some(remote.clone());
+            store.asset = Some(asset.clone());
+            return;
+        }
         store.state = if available {
             "available".to_string()
         } else {
@@ -481,12 +581,16 @@ pub fn check_for_updates(app: &AppHandle, runtime: &RuntimePaths) -> Value {
     // 自动更新（用户明确要求：不再手动「立即更新」）：查到就自己在后台下，
     // 进度经 update:changed 推给界面（百分比就在那里显示）。
     // 用 swap 防抖：定时检查每跑一次都会走到这里，只有一个下载能起。
-    if available && !AUTO_DOWNLOAD_ACTIVE.swap(true, Ordering::SeqCst) {
+    // H5 改造后这里不再自己占标志（不然会和自己线程里的守卫打架）：
+    // 只跳过「已经在下载 / 已经下好待安装」两种状态，避免每 30 分钟白起一个线程。
+    // M8/M9：用户取消过、或刚校验失败过的那个版本先别自动重下（手动点「立即更新」不受限）
+    let held = is_held(&latest);
+    // N2：判定抽成纯函数 —— 这段判断两轮都栽在同一处，而仓里原本零覆盖
+    if should_auto_download(&before.0, before.1.as_deref(), &latest, available, held) {
         let app = app.clone();
         let runtime = runtime.clone();
         std::thread::spawn(move || {
             let _ = download_update(&app, &runtime);
-            AUTO_DOWNLOAD_ACTIVE.store(false, Ordering::SeqCst);
         });
     }
 
@@ -532,6 +636,13 @@ fn check_failure(app: &AppHandle, current: &str, reason: &str) -> Value {
 
 /// 现役版 `downloadUpdate()`：没检查过就顺手检查一次
 pub fn download_update(app: &AppHandle, runtime: &RuntimePaths) -> Value {
+    // H5：手动与自动两条路都从这里进来，谁先拿到守卫谁下；另一个当场回绝，绝不当第二个写者
+    let Some(_guard) = DownloadGuard::acquire() else {
+        return json!({ "ok": false, "reason": "已有更新包正在下载，请稍候再试" });
+    };
+    // N5（2026-10-28 复核发现）：清按住状态必须**拿到守卫之后** ——
+    // 被守卫回绝的那一次并没有真的下载，不该把「先别自动下」清掉（否则 M9 在这条路径上回归）。
+    clear_held();
     let (manifest, asset) = {
         let store = store();
         (store.manifest.clone(), store.asset.clone())
@@ -573,7 +684,34 @@ pub fn download_update(app: &AppHandle, runtime: &RuntimePaths) -> Value {
         return json!({ "ok": false, "reason": reason });
     }
 
-    let destination = directory.join(format!("launcher-{version}.exe"));
+    // N2 结构性保险（2026-10-29，复核建议）：正式名的包已经在、sha256 也对得上，
+    // 就直接进 ready —— **一个字节都不重下**。这样即使将来状态判断又出错，
+    // 也不会把用户已经下好的更新包重下一遍（N2 这类只靠状态机的判断已经栽过两次）。
+    let final_path = directory.join(format!("launcher-{version}.exe"));
+    let expected_sha = asset
+        .get("sha256")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_lowercase();
+    if final_path.is_file() && !expected_sha.is_empty() {
+        if let Ok((digest, size)) = crate::mods::pkg::sha256_file(&final_path) {
+            if digest == expected_sha {
+                patch(app, |store| {
+                    store.downloaded_path = Some(final_path.clone());
+                    store.state = "ready".to_string();
+                    store.downloaded = Some(size);
+                    store.percent = Some(100.0);
+                    store.message = Some("更新已下载完成".to_string());
+                });
+                return json!({ "ok": true, "path": final_path.to_string_lossy() });
+            }
+        }
+    }
+
+    // L4（2026-10-28）：下载先写 `*.part`，sha256 过了再改成正式名。
+    // 这样「启动时清理」能只凭文件名区分「下完待装的包」与「半截包」，
+    // 不必像以前那样整目录删掉（那会把用户已经下好、只差点一下安装的包也删了）。
+    let destination = directory.join(format!("launcher-{version}.exe.part"));
     let url = asset
         .get("url")
         .and_then(Value::as_str)
@@ -608,7 +746,23 @@ pub fn download_update(app: &AppHandle, runtime: &RuntimePaths) -> Value {
         .to_lowercase();
     if !expected.is_empty() && digest.to_lowercase() != expected {
         let _ = std::fs::remove_file(&destination);
+        // M8：校验失败多半是链路问题，别让 30 分钟一次的检查白重下一整包
+        hold_version(&version);
         let reason = "更新包 SHA256 校验失败".to_string();
+        patch(app, |store| {
+            store.state = "error".to_string();
+            store.message = Some(reason.clone());
+        });
+        return json!({ "ok": false, "reason": reason });
+    }
+
+    // 校验过了才落正式名（L4）
+    let destination = directory.join(format!("launcher-{version}.exe"));
+    if let Err(err) = std::fs::rename(
+        directory.join(format!("launcher-{version}.exe.part")),
+        &destination,
+    ) {
+        let reason = format!("更新包改名失败：{err}");
         patch(app, |store| {
             store.state = "error".to_string();
             store.message = Some(reason.clone());
@@ -641,7 +795,56 @@ pub fn cleanup_update_temp(runtime: &RuntimePaths) {
         std::env::temp_dir().join("EveJS-Launcher-Updater"),
         runtime.temp.join("EveJS-Launcher-Updater"),
     ] {
-        let _ = std::fs::remove_dir_all(&root);
+        cleanup_one_root(&root);
+    }
+}
+
+/// 清一个根目录（L4）：**半截包（`*.part`）一律删**；已下好待安装的包只留最新那一个。
+///
+/// 以前是整目录 `remove_dir_all` —— 把用户「已经下好、只差点一下安装」的包也一起删了，
+/// 重启一次就得重下 11 MB。改成 `*.part` + 校验后改名之后，判别只看文件名就够了。
+fn cleanup_one_root(root: &Path) {
+    let Ok(entries) = fs::read_dir(root) else {
+        return;
+    };
+    let mut complete: Vec<(PathBuf, SystemTime)> = Vec::new();
+    let mut dirs: Vec<PathBuf> = Vec::new();
+    for dir in entries.flatten() {
+        let path = dir.path();
+        if !path.is_dir() {
+            continue;
+        }
+        dirs.push(path.clone());
+        let Ok(files) = fs::read_dir(&path) else {
+            continue;
+        };
+        for file in files.flatten() {
+            let file_path = file.path();
+            let name = file.file_name().to_string_lossy().to_string();
+            if name.ends_with(".part") {
+                let _ = fs::remove_file(&file_path);
+                continue;
+            }
+            if name.starts_with("launcher-") && name.ends_with(".exe") {
+                let stamp = file
+                    .metadata()
+                    .and_then(|meta| meta.modified())
+                    .unwrap_or(SystemTime::UNIX_EPOCH);
+                complete.push((file_path, stamp));
+            }
+        }
+    }
+    complete.sort_by_key(|(_, stamp)| *stamp);
+    let keep_dir = complete
+        .pop()
+        .and_then(|(path, _)| path.parent().map(PathBuf::from));
+    for (path, _) in complete {
+        let _ = fs::remove_file(path);
+    }
+    for dir in dirs {
+        if Some(&dir) != keep_dir.as_ref() {
+            let _ = fs::remove_dir_all(&dir);
+        }
     }
 }
 
@@ -883,10 +1086,65 @@ mod tests {
     fn temp_dir(tag: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!(
             "evejs-updater-{tag}-{}",
-            crate::mods::pkg::epoch_ms()
+            crate::mods::pkg::temp_suffix()
         ));
         std::fs::create_dir_all(&dir).unwrap();
         dir
+    }
+
+    /// N2 回归：同一版本已经下好待安装 → 不要再下；换成更新的版本 → 照常下。
+    ///
+    /// 这条门两轮复核都栽过（快照取晚了 → 判断恒 false → 每轮整包重下），此前零覆盖。
+    #[test]
+    fn auto_download_skips_the_version_that_is_already_ready() {
+        assert!(!should_auto_download(
+            "ready",
+            Some("0.6.3"),
+            "0.6.3",
+            true,
+            false
+        ));
+        assert!(should_auto_download(
+            "ready",
+            Some("0.6.2"),
+            "0.6.3",
+            true,
+            false
+        ));
+        assert!(should_auto_download(
+            "available",
+            Some("0.6.3"),
+            "0.6.3",
+            true,
+            false
+        ));
+    }
+
+    /// 有下载在跑、被用户按住、或本来就没有新版本，都不该起线程
+    #[test]
+    fn auto_download_waits_while_one_is_running_or_held() {
+        assert!(!should_auto_download(
+            "downloading",
+            None,
+            "0.6.3",
+            true,
+            false
+        ));
+        assert!(!should_auto_download("idle", None, "0.6.3", true, true));
+        assert!(!should_auto_download("idle", None, "0.6.3", false, false));
+    }
+
+    /// H5 回归：更新下载守卫必须**排他**，而且任何提前 return 都要放锁。
+    /// 以前只有自动路径占标志、手动 `update:download` 直调不受约束，两个写者会写坏同一个 exe。
+    #[test]
+    fn download_guard_is_exclusive_and_releases() {
+        let first = DownloadGuard::acquire().expect("第一次应当拿到守卫");
+        assert!(
+            DownloadGuard::acquire().is_none(),
+            "第二次必须被拒（否则又是两个写者）"
+        );
+        drop(first);
+        assert!(DownloadGuard::acquire().is_some(), "放锁之后应当能再拿");
     }
 
     #[test]

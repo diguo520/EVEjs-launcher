@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 
 import { t } from "@/lib/i18n"
 import { call, hasIpc } from "@/lib/ipc"
+import { markUnsaved, sameDraft } from "@/lib/unsaved"
 import {
   draftDiff,
   draftOf,
@@ -52,10 +53,34 @@ export interface GameConfigState {
  *
  * 浏览器里（没有桥）不假装成功：读拿不到就停在空态，保存直接回「不在启动器里」。
  */
+/**
+ * 草稿的**会话级缓存**（H4）：页面切走时整棵子树会被卸载，草稿只放 useState 里就一起没了。
+ * 放模块级 → 切页、重挂载都还在；save / discard / reload 时按各自语义改写它。
+ */
+let DRAFT_CACHE: GameConfigDraft | null = null
+/** 服务端最近一次给的那份草稿：用来判断「当前草稿有没有改动」 */
+let SERVER_DRAFT: GameConfigDraft | null = null
+
+/** 缓存里那份草稿是不是已经被改过（用于重挂载时**不要**覆盖用户的改动） */
+function cacheHasEdits(): boolean {
+  return DRAFT_CACHE !== null && SERVER_DRAFT !== null && !sameDraft(DRAFT_CACHE, SERVER_DRAFT)
+}
+
 export function useGameConfig(): GameConfigState {
   const live = hasIpc()
   const [snapshot, setSnapshot] = useState<GameConfigSnapshot | null>(null)
-  const [draft, setDraft] = useState<GameConfigDraft>({})
+  const [draft, setDraftState] = useState<GameConfigDraft>(() => DRAFT_CACHE ?? {})
+  /** 包一层：每次改动都同步进模块缓存，切页回来还在（H4）；值/更新函数两种写法都支持 */
+  const setDraft = useCallback(
+    (next: GameConfigDraft | ((prev: GameConfigDraft) => GameConfigDraft)) => {
+      setDraftState((prev) => {
+        const value = typeof next === "function" ? next(prev) : next
+        DRAFT_CACHE = value
+        return value
+      })
+    },
+    []
+  )
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -72,10 +97,16 @@ export function useGameConfig(): GameConfigState {
         setSnapshot(reply ?? null)
         if (!reply || reply.ok !== true) {
           setError(reply?.reason ?? "后端没有回包")
-          setDraft({})
+          // 读失败也别把草稿清空（H4）：那等于替用户丢掉他刚改的东西
+          if (!cacheHasEdits()) setDraft({})
         } else {
           setError(null)
-          setDraft(draftOf(reply.values))
+          const fresh = draftOf(reply.values)
+          // 切页回来会重挂载并自动 reload：**有未保存改动时不能用服务端值覆盖草稿**，
+          // 否则「悄悄丢改动」只是换了个地方发生（H4）
+          const keepEdits = cacheHasEdits()
+          SERVER_DRAFT = fresh
+          if (!keepEdits) setDraft(fresh)
         }
       } catch (reason) {
         setError(reason instanceof Error ? reason.message : String(reason))
@@ -103,10 +134,22 @@ export function useGameConfig(): GameConfigState {
   }, [])
 
   const discard = useCallback(() => {
-    setDraft(draftOf(snapshot?.values))
+    const fresh = draftOf(snapshot?.values)
+    SERVER_DRAFT = fresh
+    setDraft(fresh)
   }, [snapshot])
 
   const pending = draftDiff(definitions, draft, values)
+
+  /**
+   * 登记「本页有未保存改动」（H4）：窗口关闭时由 App 的 beforeunload 拦住。
+   * 注意**不在卸载时清掉** —— 草稿还在模块缓存里，切页不算「离开」；
+   * 只有 save / discard 之后（本地不再脏）才该归零。
+   */
+  const localDirty = !sameDraft(draft, SERVER_DRAFT ?? {})
+  useEffect(() => {
+    markUnsaved("game-config", localDirty)
+  }, [localDirty])
 
   const save = useCallback(async (): Promise<GameConfigSaveReply> => {
     if (!live) return { ok: false, reason: t("当前不在启动器窗口里") }
@@ -125,7 +168,9 @@ export function useGameConfig(): GameConfigState {
       }
       // 写成功后用服务端回读的值当新基准：磁盘才是真相，界面不自己猜
       setSnapshot((prev) => (prev ? { ...prev, values: reply.values ?? prev.values, sources: reply.sources ?? prev.sources } : prev))
-      setDraft(draftOf(reply.values ?? values))
+      const fresh = draftOf(reply.values ?? values)
+      SERVER_DRAFT = fresh
+      setDraft(fresh)
       return { ok: true, backupDir: reply.backupDir, saved: reply.saved }
     } catch (reason) {
       return { ok: false, reason: reason instanceof Error ? reason.message : String(reason) }

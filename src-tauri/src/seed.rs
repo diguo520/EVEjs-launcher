@@ -101,8 +101,10 @@ mod tests {
     use super::*;
 
     fn temp_dir(tag: &str) -> PathBuf {
-        let dir =
-            std::env::temp_dir().join(format!("evejs-seed-{tag}-{}", crate::mods::pkg::epoch_ms()));
+        let dir = std::env::temp_dir().join(format!(
+            "evejs-seed-{tag}-{}",
+            crate::mods::pkg::temp_suffix()
+        ));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         dir

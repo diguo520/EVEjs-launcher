@@ -167,6 +167,7 @@
     updateCheck: function () { return request("update:check", []); },
     updateDownload: function () { return request("update:download", []); },
     updateState: function () { return request("update:state", []); },
+    modsMarketCancel: function (id) { fire("mods:marketCancel", [id]); },
     terminalInput: function (tabId, data) { fire("terminal:input", [tabId, data]); },
     terminalResize: function (tabId, cols, rows) { fire("terminal:resize", [tabId, cols, rows]); },
     updateCancel: function () { fire("update:cancel", []); },

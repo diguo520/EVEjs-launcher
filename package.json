@@ -1,7 +1,7 @@
 {
   "name": "evejs-launcher-shell",
   "private": true,
-  "version": "0.6.2",
+  "version": "0.6.3",
   "description": "EvEJS 启动器 · Tauri 2 外壳（Rust） + legacy 渲染层（原样复用现役版 HTML/JS）",
   "scripts": {
     "contract": "node scripts/extract-contract.mjs && node scripts/gen-contract.mjs",
@@ -24,6 +24,7 @@
     "e2e:update": "node tests/e2e/run.mjs --repeats 1 --keep",
     "reach": "node scripts/audit-legacy-reachability.mjs --src \"E:/Games/EveJS-v0.12.8/launcher/launcher\"",
     "dup": "npx --yes jscpd@4 --min-lines 10 --min-tokens 70 --threshold 1 --reporters console --ignore \"**/ui/web/**,**/ui/dist/**,**/vendor/**,**/src-tauri/gen/**,**/src-tauri/target/**,**/node_modules/**,**/docs/**,**/.audit/**\" --format \"javascript,typescript,rust\" .",
+    "dup:legacy": "npx --yes jscpd@4 --min-lines 10 --min-tokens 70 --threshold 100 --reporters console --ignore \"**/ui/dist/**,**/src-tauri/gen/**,**/src-tauri/target/**,**/node_modules/**,**/docs/**,**/.audit/**\"",
     "check:renderer": "node scripts/check-renderer.mjs",
     "ui:build": "node ui/scripts/build-ui.mjs",
     "keys:update": "node scripts/gen-update-key.mjs",

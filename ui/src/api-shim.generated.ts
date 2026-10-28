@@ -156,6 +156,7 @@ export const api = {
   updateCheck: (): Promise<unknown> => request("update:check", []),
   updateDownload: (): Promise<unknown> => request("update:download", []),
   updateState: (): Promise<unknown> => request("update:state", []),
+  modsMarketCancel: (id: string): void => fire("mods:marketCancel", [id]),
   terminalInput: (tabId: string, data: string): void => fire("terminal:input", [tabId, data]),
   terminalResize: (tabId: string, cols: number, rows: number): void => fire("terminal:resize", [tabId, cols, rows]),
   updateCancel: (): void => fire("update:cancel", []),

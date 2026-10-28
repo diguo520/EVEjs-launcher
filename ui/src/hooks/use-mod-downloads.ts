@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 
+import { call } from "@/lib/ipc"
 import { phaseOf, type DownloadPhase } from "@/lib/mod-logic"
 import type { RawDownloadProgress } from "@/lib/ipc"
 import type { ModEntry } from "@/lib/mock"
@@ -143,6 +144,12 @@ export function useModDownloads(
 
   const cancel = useCallback(
     (modId: string) => {
+      // 真取消（H3，2026-10-28）：先让**后端**把下载停下来，再把这一行从列表里撤掉。
+      // 后端每读一块问一次取消标志（`mods:marketCancel`），随即回 ok:false（reason=已取消下载）；
+      // 上面那段收尾逻辑看到「行已经没了」会静默 return，所以不会再弹一次失败提示。
+      void call("modsMarketCancel", modId).catch(() => {
+        /* 桥不可用（浏览器预览 / 老后端）：至少别把行留在那儿 */
+      })
       delete samplesRef.current[modId]
       commit(tasksRef.current.filter((task) => task.modId !== modId))
     },

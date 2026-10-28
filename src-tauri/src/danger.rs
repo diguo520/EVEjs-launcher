@@ -134,6 +134,17 @@ pub fn clear_cache(runtime: &RuntimePaths) -> Value {
         }
     }
 
+    // M6（2026-10-28）：模组包与分片的临时目录（temp/market）从来不在缓存白名单里，
+    // 下载失败或取消一次就可能白占 GB 级磁盘，而用户没有任何按钮能清 —— 一并清掉。
+    let market = runtime.temp.join("market");
+    if market.is_dir() {
+        let size = dir_size(&market);
+        if fs::remove_dir_all(&market).is_ok() {
+            freed += size;
+            removed.push("temp/market（模组包与分片）".to_string());
+        }
+    }
+
     removed.sort();
     kept.sort();
     if failed.is_empty() {

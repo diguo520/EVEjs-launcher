@@ -1192,14 +1192,37 @@ pub fn publish_own_repo(
         .unwrap_or_default();
     // 超过 GitHub 单个资产 2 GiB 上限的包会被切片上传，那时整包资产并不存在，
     // downloadUrls 里**不能**留它的地址（会 404）；下载来源改由 downloadParts 承担。
-    // 体积取自提交台账（打包那一步写进去的 sizeBytes），这里不再重新读盘
-    let packed_size = item
-        .get("indexDraft")
-        .and_then(|draft| draft.get("sizeBytes"))
-        .and_then(Value::as_u64)
-        .or_else(|| item.get("sizeBytes").and_then(Value::as_u64))
-        .unwrap_or(0);
-    let will_split = packed_size > github::GITHUB_ASSET_LIMIT;
+    // N4（2026-10-28 复核后定稿）：切片与否必须和**上传那一步**用同一份证据 ——
+    // 上传看的是盘上真实字节数，这里原来看台账的 sizeBytes，两者错位就会写出
+    // 「指向一个并不存在的整包资产」的下载地址。盘上文件还在就用它；
+    // 已经删了（上传成功后我们会删包）才退回台账体积。
+    let packed_size = Path::new(&text_field(&item, "zipPath"))
+        .metadata()
+        .ok()
+        .map(|meta| meta.len())
+        .filter(|size| *size > 0)
+        .unwrap_or_else(|| {
+            item.get("indexDraft")
+                .and_then(|draft| draft.get("sizeBytes"))
+                .and_then(Value::as_u64)
+                .or_else(|| item.get("sizeBytes").and_then(Value::as_u64))
+                .unwrap_or(0)
+        });
+    // M5（2026-10-28）：切片与否原本只看台账里那个 sizeBytes，而 github 上传时用的是
+    // **盘上真实字节数** —— 两份独立判断一旦错位，就会出现「发布了但 downloadUrls 指着
+    // 一个并不存在的整包资产」。现在只要记录里已经有 downloadParts（上传那步真切了），
+    // 就一律按切片处理，台账体积只作兜底。
+    let recorded_split = item
+        .get("downloadParts")
+        .or_else(|| {
+            item.get("indexDraft")
+                .and_then(|draft| draft.get("downloadParts"))
+        })
+        .and_then(|value| value.get("parts"))
+        .and_then(Value::as_array)
+        .map(|parts| !parts.is_empty())
+        .unwrap_or(false);
+    let will_split = recorded_split || packed_size > github::GITHUB_ASSET_LIMIT;
     let download_urls = if will_split {
         assemble_mirror_urls(gitee_url, &existing_urls)
     } else {

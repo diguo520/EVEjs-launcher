@@ -18,7 +18,7 @@ pub struct ChannelSpec {
     pub kind: ChannelKind,
 }
 
-pub const REQUEST_COUNT: usize = 127;
+pub const REQUEST_COUNT: usize = 128;
 pub const EVENT_COUNT: usize = 10;
 
 #[rustfmt::skip]
@@ -99,6 +99,7 @@ pub const CHANNELS: &[ChannelSpec] = &[
     ChannelSpec { channel: "mods:githubTokenStatus", api: "modsGithubTokenStatus", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "mods:importZip", api: "modsImportZip", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "mods:list", api: "modsList", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "mods:marketCancel", api: "modsMarketCancel", kind: ChannelKind::Send },
     ChannelSpec { channel: "mods:marketInstall", api: "modsMarketInstall", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "mods:marketList", api: "modsMarketList", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "mods:myMods", api: "modsMyMods", kind: ChannelKind::Invoke },

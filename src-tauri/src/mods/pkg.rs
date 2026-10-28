@@ -14,9 +14,11 @@ use crate::runtime::RuntimePaths;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::fs;
+use std::io::Read;
 use std::os::windows::process::CommandExt;
 use std::path::{Component, Path, PathBuf};
 use std::process::Stdio;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 /// 看起来像「用户私有数据」的文件/目录：更新时要保留旧的（新包里的同名文件另存 .new）
 pub const USER_DATA_NAMES: [&str; 7] = [
@@ -49,17 +51,31 @@ pub fn copy_dir_all(source: &Path, dest: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
-/// 文件的 sha256（小写 hex）与体积
+/// 文件的 sha256（小写 hex）与体积。
+///
+/// 2026-10-28（M7）：改成 **1 MiB 缓冲流式**读取。以前是 `fs::read` 把整个文件读进内存，
+/// 1.9 GB 的分片实测峰值 RSS **1825 MB** —— 小内存机器上校验 2 GiB 分片直接 OOM。
 pub fn sha256_file(path: &Path) -> Result<(String, u64), String> {
-    let bytes = fs::read(path).map_err(|err| format!("读取文件失败：{err}"))?;
+    let mut file = fs::File::open(path).map_err(|err| format!("读取文件失败：{err}"))?;
     let mut hasher = Sha256::new();
-    hasher.update(&bytes);
+    let mut buffer = vec![0u8; 1024 * 1024];
+    let mut size: u64 = 0;
+    loop {
+        let read = file
+            .read(&mut buffer)
+            .map_err(|err| format!("读取文件失败：{err}"))?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..read]);
+        size += read as u64;
+    }
     let digest = hasher.finalize();
     let mut hex = String::with_capacity(64);
     for byte in digest {
         hex.push_str(&format!("{byte:02x}"));
     }
-    Ok((hex, bytes.len() as u64))
+    Ok((hex, size))
 }
 
 /// 字节的 sha256（市场包校验用）
@@ -228,6 +244,16 @@ pub fn entry_is_safe(name: &str) -> bool {
         .any(|part| matches!(part, Component::ParentDir))
 }
 /* ------------------------------ 打包 / 导入 / 更新 ------------------------------ */
+
+/// 临时路径专用后缀：毫秒时间戳 + 进程内自增序号。
+///
+/// 为什么不直接用 `epoch_ms()` 拼：并行跑的测试（以及同一毫秒内的两次导入）会撞出同一个
+/// 目录名，而这类路径上几乎都有 `remove_dir_all` —— 会把另一边的目录清掉。
+/// 2026-10-29 全量测试里实测撞出过一次 flake（`import_refuses_tampered_package...`）。
+pub(crate) fn temp_suffix() -> String {
+    static SEQ: AtomicU64 = AtomicU64::new(0);
+    format!("{}-{}", epoch_ms(), SEQ.fetch_add(1, Ordering::Relaxed))
+}
 
 pub(crate) fn epoch_ms() -> u128 {
     std::time::SystemTime::now()
@@ -596,7 +622,7 @@ pub fn import_mod_zip(repo_root: &Path, zip_path: &str, runtime: &RuntimePaths) 
         Err(reason) => return json!({ "ok": false, "reason": reason }),
     };
 
-    let temp_root = runtime.temp.join(format!("mod-import-{}", epoch_ms()));
+    let temp_root = runtime.temp.join(format!("mod-import-{}", temp_suffix()));
     let outcome = (|| -> Result<Value, String> {
         expand_archive(zip, &temp_root)?;
         let package_root = locate_package_root(&temp_root)?;
@@ -691,7 +717,7 @@ pub fn update_mod(repo_root: &Path, zip_path: &str, runtime: &RuntimePaths) -> V
     }
 
     // 1) 先解到临时目录，只为读出 id 与版本
-    let probe_dir = runtime.temp.join(format!("update-probe-{}", epoch_ms()));
+    let probe_dir = runtime.temp.join(format!("update-probe-{}", temp_suffix()));
     if let Err(err) = expand_archive(zip, &probe_dir) {
         cleanup_path(&probe_dir);
         return json!({ "ok": false, "reason": format!("解包失败：{err}") });
@@ -771,7 +797,7 @@ pub fn update_mod(repo_root: &Path, zip_path: &str, runtime: &RuntimePaths) -> V
     let backup_dir = runtime
         .temp
         .join("mod-backup")
-        .join(format!("{folder}-{previous_version}-{}", epoch_ms()));
+        .join(format!("{folder}-{previous_version}-{}", temp_suffix()));
     let backup = (|| -> std::io::Result<()> {
         if let Some(parent) = backup_dir.parent() {
             fs::create_dir_all(parent)?;
@@ -882,7 +908,7 @@ mod tests {
     use super::*;
 
     fn temp_dir(tag: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("evejs-mods-pkg-{tag}-{}", epoch_ms()));
+        let dir = std::env::temp_dir().join(format!("evejs-mods-pkg-{tag}-{}", temp_suffix()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).expect("建临时目录");
         dir

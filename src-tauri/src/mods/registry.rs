@@ -16,10 +16,11 @@ use crate::runtime::RuntimePaths;
 use crate::shell;
 use crate::snapshot::{FETCH_TIMEOUT, TOTAL_BUDGET};
 use serde_json::{json, Map, Value};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::copy;
 use std::path::{Path, PathBuf};
+use std::sync::{LazyLock, Mutex};
 use std::time::Instant;
 
 /// 默认索引地址（GitHub Pages 主站 + jsDelivr 镜像）。
@@ -403,6 +404,66 @@ pub fn find_updates(local_mods: &[scan::ModRecord], index: &Value) -> Vec<Value>
 }
 /* ------------------------------ 下载与安装 ------------------------------ */
 
+/// 被取消掉的下载（H3，2026-10-28）。
+///
+/// 以前界面上的「取消下载」只是把任务从列表里删掉，**后端照下不误** —— 用户以为取消了，
+/// 模组其实已经装上、还可能覆盖了旧版本。现在按钮会先来这里登记一条，
+/// 下载循环每读一块问一次（`net::download_cancellable`），停手后回一个「已取消下载」。
+static CANCELLED: LazyLock<Mutex<HashSet<String>>> = LazyLock::new(|| Mutex::new(HashSet::new()));
+
+/// 取消某个条目的下载（IPC `mods:marketCancel`）
+pub fn cancel_download(id: &str) -> Value {
+    let trimmed = id.trim();
+    if trimmed.is_empty() {
+        return json!({ "ok": false, "reason": "缺少模组 id" });
+    }
+    match CANCELLED.lock() {
+        Ok(mut set) => {
+            set.insert(trimmed.to_string());
+            json!({ "ok": true })
+        }
+        Err(_) => json!({ "ok": false, "reason": "取消标志此刻不可用" }),
+    }
+}
+
+/// 新一轮下载开始前清掉旧标志：上一次的取消不该拦住这一次
+fn clear_cancel(id: &str) {
+    if let Ok(mut set) = CANCELLED.lock() {
+        set.remove(id);
+    }
+}
+
+/// 这一次下载是不是已经被用户取消
+fn is_download_cancelled(id: &str) -> bool {
+    CANCELLED
+        .lock()
+        .map(|set| set.contains(id))
+        .unwrap_or(false)
+}
+
+/// 包文件名的净化（L2）：只留字母数字与 `.-_`，其余换成下划线；空/被剔光就给兜底名。
+fn safe_package_name(id: &str, version: &str) -> String {
+    fn clean(raw: &str, fallback: &str) -> String {
+        let mapped: String = raw
+            .chars()
+            .map(|ch| {
+                if ch.is_ascii_alphanumeric() || ch == '.' || ch == '-' || ch == '_' {
+                    ch
+                } else {
+                    '_'
+                }
+            })
+            .collect();
+        let trimmed = mapped.trim_matches('.').to_string();
+        if trimmed.is_empty() {
+            fallback.to_string()
+        } else {
+            trimmed
+        }
+    }
+    format!("{}-{}", clean(id, "mod"), clean(version, "0"))
+}
+
 /// 下载条目 ZIP：按 priority 试每个镜像 → 校验 sha256 → 返回本地路径。
 /// 进度回调收到的是**数组载荷**要用的那个对象（`mod:downloadProgress`）。
 pub fn download_entry(
@@ -414,7 +475,14 @@ pub fn download_entry(
     let version = entry.get("version").and_then(Value::as_str).unwrap_or("0");
     let dest_dir = runtime.temp.join("market");
     let _ = std::fs::create_dir_all(&dest_dir);
-    let dest = dest_dir.join(format!("{id}-{version}.zip"));
+    // L2（2026-10-28）：id / version 是索引里作者可控的字符串，拼进路径前必须净化 ——
+    // 同一个仓早就在文件夹名上走了 `sanitize_folder_name`，这里却一直是裸拼。
+    let dest = dest_dir.join(format!("{}.zip", safe_package_name(id, version)));
+
+    // F1（2026-10-28 复核发现）：清取消标志必须排在**分片分支之前** ——
+    // 分片包会在这个 early-return 里进 `download_parts`，而 `CANCELLED` 是进程级 static，
+    // 取消过一次的 id 若不清，之后每次安装的第一片都会秒失败（只有重启启动器能恢复）。
+    clear_cancel(id);
 
     // 分片包优先，而且必须排在「有没有 downloadUrls」的检查**之前**：
     // 切片上传的包可能一个 downloadUrls 都没有（整包资产根本没传上去），
@@ -422,7 +490,6 @@ pub fn download_entry(
     if let Some(parts) = parts_of(entry) {
         return download_parts(entry, &parts, &dest, id, &mut on_progress);
     }
-
     let mut urls: Vec<&Value> = entry
         .get("downloadUrls")
         .and_then(Value::as_array)
@@ -434,6 +501,16 @@ pub fn download_entry(
         })
         .unwrap_or_default();
     if urls.is_empty() {
+        // M4（2026-10-28，N3 复核后定稿）：索引里**声明了**分片、却没一片过得了 https 尺子，
+        // 而整包镜像也没有可用的 —— 这才该报「分片地址都不安全」，把真正的原因说出来。
+        // （原来这条早返回排在整包判断之前，会把「分片不安全但整包镜像可用」这种以前能装的情形
+        //   变成硬失败 —— 大包里确实出现过这种混搭索引。）
+        if declared_parts(entry) > 0 {
+            return json!({
+                "ok": false,
+                "reason": "分片清单里的地址都不安全（只接受 https），也没有可用的整包地址"
+            });
+        }
         return json!({ "ok": false, "reason": "这个条目没有可用的下载地址（作者未提供）" });
     }
     // priority 缺省按 99 参与排序（对齐 `Number(a.priority) || 99`）
@@ -452,7 +529,13 @@ pub fn download_entry(
         .to_lowercase();
 
     let mut failures: Vec<String> = Vec::new();
-    for item in urls {
+    for (index, item) in urls.iter().enumerate() {
+        // H2（2026-10-28）：**只有换到下一个来源时**才丢半截文件。
+        // 同一来源的再次尝试必须保留它 —— 断点续传就靠这个文件；
+        // 以前写在 Err 分支里，等于「任何失败都清包」，慢网上永远下不完。
+        if index > 0 {
+            let _ = std::fs::remove_file(&dest);
+        }
         let url = url_of(item);
         let mirror = item
             .get("mirror")
@@ -462,28 +545,36 @@ pub fn download_entry(
         let total_holder = std::cell::Cell::new(None::<u64>);
         let id_owned = id.to_string();
         let mirror_owned = mirror.clone();
-        let outcome = net::download(&url, &dest, size_hint, |downloaded, total| {
-            total_holder.set(total);
-            let percent = total
-                .filter(|value| *value > 0)
-                .map(|value| (downloaded as f64 / value as f64 * 100.0).round() as u64);
-            let mut payload = Map::new();
-            payload.insert("id".into(), json!(id_owned));
-            payload.insert("downloaded".into(), json!(downloaded));
-            payload.insert(
-                "total".into(),
-                total.map(|value| json!(value)).unwrap_or(Value::Null),
-            );
-            payload.insert(
-                "percent".into(),
-                percent.map(|value| json!(value)).unwrap_or(Value::Null),
-            );
-            payload.insert("mirror".into(), json!(mirror_owned));
-            on_progress(Value::Object(payload));
-        });
+        let outcome = net::download_cancellable(
+            &url,
+            &dest,
+            size_hint,
+            || is_download_cancelled(id),
+            |downloaded, total| {
+                total_holder.set(total);
+                let percent = total
+                    .filter(|value| *value > 0)
+                    .map(|value| (downloaded as f64 / value as f64 * 100.0).round() as u64);
+                let mut payload = Map::new();
+                payload.insert("id".into(), json!(id_owned));
+                payload.insert("downloaded".into(), json!(downloaded));
+                payload.insert(
+                    "total".into(),
+                    total.map(|value| json!(value)).unwrap_or(Value::Null),
+                );
+                payload.insert(
+                    "percent".into(),
+                    percent.map(|value| json!(value)).unwrap_or(Value::Null),
+                );
+                payload.insert("mirror".into(), json!(mirror_owned));
+                on_progress(Value::Object(payload));
+            },
+        );
         match outcome {
             Ok(download) => {
                 if download.bytes == 0 {
+                    // 空文件必须清掉：留着它下次会被「长度够」的判定当成已下好（H1 毒缓存）
+                    let _ = std::fs::remove_file(&dest);
                     failures.push(format!("{mirror} → 空文件"));
                     continue;
                 }
@@ -491,6 +582,9 @@ pub fn download_entry(
                     match pkg::sha256_file(&dest) {
                         Ok((got, _)) if got == want => {}
                         Ok((got, _)) => {
+                            // 校验不过的包一律清掉：不清就会变成 H1 的毒缓存 ——
+                            // 「本地够长 → 不发请求 → 直接回 Ok」叠上「校验不过 → 不删」，自锁。
+                            let _ = std::fs::remove_file(&dest);
                             // 只展示前 12 位，和现役版提示保持一致
                             failures.push(format!(
                                 "{mirror} → sha256 不匹配（期望 {}… 实际 {}…）",
@@ -500,6 +594,7 @@ pub fn download_entry(
                             continue;
                         }
                         Err(reason) => {
+                            let _ = std::fs::remove_file(&dest);
                             failures.push(format!("{mirror} → {reason}"));
                             continue;
                         }
@@ -512,9 +607,12 @@ pub fn download_entry(
                 });
             }
             Err(reason) => {
-                // 换镜像前把半截文件丢掉：断点续传只在「同一来源的再次尝试」之间成立，
-                // 把 A 的下到一半当 B 的起点接着写 = 拼出一个 sha256 必然对不上的废包。
-                let _ = std::fs::remove_file(&dest);
+                // 用户点了「取消下载」（H3）：立刻收手，不再试下一个镜像
+                if reason == net::CANCELLED {
+                    return json!({ "ok": false, "reason": "已取消下载" });
+                }
+                // **保留半截文件**：下一次重试会从这里接着下（H2）。
+                // 真正要丢的时刻只有一个 —— 换到下一个来源（见循环开头 index > 0）。
                 failures.push(format!("{mirror} → {reason}"));
             }
         }
@@ -551,6 +649,16 @@ fn parts_of(entry: &Value) -> Option<Vec<Value>> {
     }
 }
 
+/// 索引里声明的分片数（不管地址安不安全）：用来把「一片都没通过校验」说清楚（M4）。
+fn declared_parts(entry: &Value) -> usize {
+    entry
+        .get("downloadParts")
+        .and_then(|value| value.get("parts"))
+        .and_then(Value::as_array)
+        .map(|items| items.len())
+        .unwrap_or(0)
+}
+
 /// 分片下载：逐片下载（可断点续传）→ 逐片校验 → 按顺序拼成整包 → 整包校验 → 删掉分片。
 ///
 /// 进度口径：`downloaded` / `total` / `percent` 都是**整包**的，另带 `part` / `parts`
@@ -576,10 +684,12 @@ fn download_parts(
         .filter_map(|part| part.get("sizeBytes").and_then(Value::as_u64))
         .sum();
     let declared_total = entry.get("sizeBytes").and_then(Value::as_u64).unwrap_or(0);
-    let total = if declared_total > 0 {
-        Some(declared_total)
-    } else if part_total > 0 {
+    // L5（2026-10-28）：分母优先用**分片自己的体积之和**。索引声明的整包 sizeBytes 是作者
+    // 打包时的数，与实际上传的分片总和对不上时，进度会永远停在 100% 之前。
+    let total = if part_total > 0 {
         Some(part_total)
+    } else if declared_total > 0 {
+        Some(declared_total)
     } else {
         None
     };
@@ -597,30 +707,41 @@ fn download_parts(
         let part_path =
             dest.with_file_name(format!("{file_name}.part{:03}", index + PART_INDEX_BASE));
         let hint = part.get("sizeBytes").and_then(Value::as_u64);
-        let outcome = match net::download(&url, &part_path, hint, |downloaded, _| {
-            let overall = done + downloaded;
-            let percent = total
-                .filter(|value| *value > 0)
-                .map(|value| (overall as f64 / value as f64 * 100.0).round() as u64);
-            let mut payload = Map::new();
-            payload.insert("id".into(), json!(id));
-            payload.insert("downloaded".into(), json!(overall));
-            payload.insert(
-                "total".into(),
-                total.map(|value| json!(value)).unwrap_or(Value::Null),
-            );
-            payload.insert(
-                "percent".into(),
-                percent.map(|value| json!(value)).unwrap_or(Value::Null),
-            );
-            payload.insert("mirror".into(), json!(mirror));
-            payload.insert("part".into(), json!(index + PART_INDEX_BASE));
-            payload.insert("parts".into(), json!(parts.len()));
-            on_progress(Value::Object(payload));
-        }) {
+        let outcome = match net::download_cancellable(
+            &url,
+            &part_path,
+            hint,
+            || is_download_cancelled(id),
+            |downloaded, _| {
+                let overall = done + downloaded;
+                let percent = total
+                    .filter(|value| *value > 0)
+                    .map(|value| (overall as f64 / value as f64 * 100.0).round() as u64);
+                let mut payload = Map::new();
+                payload.insert("id".into(), json!(id));
+                payload.insert("downloaded".into(), json!(overall));
+                payload.insert(
+                    "total".into(),
+                    total.map(|value| json!(value)).unwrap_or(Value::Null),
+                );
+                payload.insert(
+                    "percent".into(),
+                    percent.map(|value| json!(value)).unwrap_or(Value::Null),
+                );
+                payload.insert("mirror".into(), json!(mirror));
+                payload.insert("part".into(), json!(index + PART_INDEX_BASE));
+                payload.insert("parts".into(), json!(parts.len()));
+                on_progress(Value::Object(payload));
+            },
+        ) {
             Ok(outcome) => outcome,
             Err(reason) => {
                 let _ = std::fs::remove_file(&part_path);
+                if reason == net::CANCELLED {
+                    // 取消：已下完的分片也一起清掉，别留 GB 级碎片（H3 + 残片清理）
+                    discard_parts(&part_paths, None);
+                    return json!({ "ok": false, "reason": "已取消下载" });
+                }
                 return json!({ "ok": false, "reason": format!("{label}下载失败：{reason}") });
             }
         };
@@ -2188,6 +2309,16 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+    /// L2：作者可控的 id/version 不能带着 `../` 或反斜杠进路径
+    #[test]
+    fn package_name_never_carries_path_separators() {
+        let name = safe_package_name("../../etc/passwd", "1.0.0");
+        assert!(!name.contains('/'), "不能有正斜杠");
+        assert!(!name.contains('\\'), "不能有反斜杠");
+        assert!(name.ends_with("-1.0.0"), "版本要保留");
+        assert_eq!(safe_package_name("", ""), "mod-0");
+    }
+
     /// 分片清单只认 https（或本机回环）；一片都不剩就当没有分片清单。
     #[test]
     fn parts_of_requires_secure_urls() {
@@ -2210,6 +2341,34 @@ mod tests {
         let none = json!({ "downloadParts": { "parts": [ { "url": "ftp://a/b" } ] } });
         assert!(parts_of(&none).is_none());
         assert!(parts_of(&json!({})).is_none());
+    }
+
+    /// F1 回归（2026-10-28）：`clear_cancel(id)` 必须排在分片分支**之前**。
+    ///
+    /// 分片包在 `parts_of` 判断处 early-return 进 `download_parts`；那时若还没清标志，
+    /// 取消过一次的 id 就永远清不掉（进程级 static），第一片秒失败且只能重启恢复。
+    #[test]
+    fn clear_cancel_runs_before_the_parts_branch() {
+        let source = include_str!("registry.rs");
+        let clear = source
+            .find("clear_cancel(id);")
+            .expect("应当有 clear_cancel(id) 调用");
+        let parts = source
+            .find("if let Some(parts) = parts_of(entry)")
+            .expect("应当有分片分支");
+        assert!(clear < parts, "clear_cancel 必须排在分片分支之前（F1）");
+    }
+
+    /// 取消标志的生命周期：取消时记下、新一轮开始前清掉
+    #[test]
+    fn cancel_flag_is_set_then_cleared() {
+        cancel_download("demo-mod");
+        assert!(is_download_cancelled("demo-mod"), "取消后应当被记下");
+        clear_cancel("demo-mod");
+        assert!(
+            !is_download_cancelled("demo-mod"),
+            "新一轮开始前必须清掉旧标志"
+        );
     }
 
     #[test]

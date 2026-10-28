@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { t } from "@/lib/i18n"
 import { Loader2, Save } from "lucide-react"
 import { toast } from "sonner"
@@ -25,6 +25,7 @@ import {
   type ClientConfigDraft,
   type ServerConfigDraft,
 } from "@/lib/config-map"
+import { markUnsaved, sameDraft } from "@/lib/unsaved"
 
 /**
  * 配置中心。
@@ -33,6 +34,15 @@ import {
  * 服务端根目录（config:setRepoRoot）、客户端四项（config:setClient）、
  * 一键启动选项（settings:set + config:setClient.safeWindowed）。
  */
+/**
+ * 草稿的会话级缓存 + 服务端基准（H4）：配置中心切页会卸载，草稿只放 useState 里就没了。
+ * `*_BASE` 记「服务端最近一次给的形态」，用来判断草稿有没有被改过。
+ */
+let SERVER_CACHE: ServerConfigDraft | null = null
+let CLIENT_CACHE: ClientConfigDraft | null = null
+let SERVER_BASE: ServerConfigDraft | null = null
+let CLIENT_BASE: ClientConfigDraft | null = null
+
 export function ConfigPage({
   serverRoot,
   onRootSaved,
@@ -42,18 +52,68 @@ export function ConfigPage({
   onRootSaved: (root: string) => void
 }) {
   const config = useConfig()
-  const [server, setServer] = useState<ServerConfigDraft>(EMPTY_SERVER_DRAFT)
-  const [client, setClient] = useState<ClientConfigDraft>(EMPTY_CLIENT_DRAFT)
+  const [server, setServerState] = useState<ServerConfigDraft>(() => SERVER_CACHE ?? EMPTY_SERVER_DRAFT)
+  const [client, setClientState] = useState<ClientConfigDraft>(() => CLIENT_CACHE ?? EMPTY_CLIENT_DRAFT)
   const [saving, setSaving] = useState(false)
+  /** 表单改动用这两个：同时写进模块缓存，切页回来还是用户填的值（H4） */
+  const setServer = useCallback(
+    (next: ServerConfigDraft | ((prev: ServerConfigDraft) => ServerConfigDraft)) => {
+      setServerState((prev) => {
+        const value = typeof next === "function" ? next(prev) : next
+        SERVER_CACHE = value
+        return value
+      })
+    },
+    []
+  )
+  const setClient = useCallback(
+    (next: ClientConfigDraft | ((prev: ClientConfigDraft) => ClientConfigDraft)) => {
+      setClientState((prev) => {
+        const value = typeof next === "function" ? next(prev) : next
+        CLIENT_CACHE = value
+        return value
+      })
+    },
+    []
+  )
 
-  /** 真配置到手后填草稿；根目录那份跟着外壳走，别处改了（自检修复）也一起对齐 */
+  /**
+   * 真配置到手后填草稿；根目录那份跟着外壳走，别处改了（自检修复）也一起对齐。
+   * **但草稿里已有未保存改动时不覆盖**（H4）—— 切页回来会重跑这里，
+   * 以前它会把用户刚填的值悄悄抹回服务端值。
+   */
   useEffect(() => {
-    setServer(serverDraftFrom(config.bundle, serverRoot))
+    const fresh = serverDraftFrom(config.bundle, serverRoot)
+    const dirty = SERVER_BASE !== null && SERVER_CACHE !== null && !sameDraft(SERVER_CACHE, SERVER_BASE)
+    if (dirty) return
+    SERVER_BASE = fresh
+    SERVER_CACHE = fresh
+    setServerState(fresh)
   }, [config.bundle, serverRoot])
 
   useEffect(() => {
-    setClient(clientDraftFrom(config.bundle))
+    const fresh = clientDraftFrom(config.bundle)
+    const dirty = CLIENT_BASE !== null && CLIENT_CACHE !== null && !sameDraft(CLIENT_CACHE, CLIENT_BASE)
+    if (dirty) return
+    CLIENT_BASE = fresh
+    CLIENT_CACHE = fresh
+    setClientState(fresh)
   }, [config.bundle])
+
+  // 保存成功后把基准挪到当前草稿：本地不再脏，登记处也能归零
+  const markSaved = useCallback(() => {
+    SERVER_BASE = SERVER_CACHE
+    CLIENT_BASE = CLIENT_CACHE
+  }, [])
+
+  /** 登记「配置中心有未保存改动」（H4）：窗口关闭时由 App 的 beforeunload 拦住 */
+  const dirtyServer =
+    SERVER_BASE !== null && SERVER_CACHE !== null && !sameDraft(SERVER_CACHE, SERVER_BASE)
+  const dirtyClient =
+    CLIENT_BASE !== null && CLIENT_CACHE !== null && !sameDraft(CLIENT_CACHE, CLIENT_BASE)
+  useEffect(() => {
+    markUnsaved("config", dirtyServer || dirtyClient)
+  }, [dirtyServer, dirtyClient])
 
   const launch: LaunchOptionsValue = {
     market: startMarketOf(config.settings),
@@ -98,6 +158,7 @@ export function ConfigPage({
         toast.error("客户端配置没写进去", { description: written.reason })
         return
       }
+      markSaved()
       toast.success("配置已保存", { description: "已写入 EvEJSConfig.bat" })
     } finally {
       setSaving(false)

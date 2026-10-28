@@ -20,6 +20,7 @@ import { useLauncherAccounts } from "@/hooks/use-launcher-accounts"
 import { useEnvCheck } from "@/hooks/use-env-check"
 import { useInstalledMods } from "@/hooks/use-installed-mods"
 import { hasIpc } from "@/lib/ipc"
+import { hasUnsaved } from "@/lib/unsaved"
 import { markLegalNoticeSeen, needsLegalNotice } from "@/lib/legal-notice"
 import { DashboardPage } from "@/pages/dashboard-page"
 import { ConsolePage } from "@/pages/console-page"
@@ -56,7 +57,10 @@ import { SettingsPage } from "@/pages/settings-page"
  * 只是少走几轮 —— 所以这个值可以放心调。
  */
 const BOOT_MIN_MS = 5_000
-const BOOT_MAX_MS = 2400
+// M17（2026-10-28）：这个「最多等」的兜底原本是 2400ms，比 BOOT_MIN_MS（5000ms）还小 ——
+// 定时器到点也解不开 booting（还要等 bootMinPassed），等于**永远不生效**。
+// 它本来的意思是「后端迟迟不回也不能一直盖着」，所以给到 8s：比最短显示长、比用户的耐心短。
+const BOOT_MAX_MS = 8000
 const BOOT_FADE_MS = 400
 
 /**
@@ -136,6 +140,22 @@ export function App() {
     const timer = window.setTimeout(() => setSplashMounted(false), BOOT_FADE_MS)
     return () => window.clearTimeout(timer)
   }, [booting])
+
+  /**
+   * 关窗守卫（H4）：还有未保存的改动就拦一下。
+   * 提示文案由**浏览器**给（我们只 preventDefault + 清空 returnValue），
+   * 所以这条修复不需要新增 i18n 条目。
+   * 切页那一半不靠它 —— 草稿已经搬到模块级会话缓存里，切页根本不丢。
+   */
+  useEffect(() => {
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!hasUnsaved()) return
+      event.preventDefault()
+      event.returnValue = ""
+    }
+    window.addEventListener("beforeunload", onBeforeUnload)
+    return () => window.removeEventListener("beforeunload", onBeforeUnload)
+  }, [])
 
   function inspectService(name: string) {
     const svc = launcher.services.find((s) => s.name === name)

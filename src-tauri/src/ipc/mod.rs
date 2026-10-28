@@ -603,6 +603,7 @@ async fn dispatch(
             })
             .await?)
         }
+        "mods:marketCancel" => Ok(mods::registry::cancel_download(&arg_str(args, 0))),
         "mods:myMods" => {
             let repo = root.clone();
             let runtime = state.runtime.clone();

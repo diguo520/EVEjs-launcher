@@ -60,8 +60,12 @@ pub struct DownloadOutcome {
 ///   · 没有「多久没读到数据」的超时可用（ureq 只有总体预算），所以用分段来兜：
 ///     一段卡住最多浪费一段的预算，重试还能从断点接着下。
 pub const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(30);
-/// 保底速度：预算 = 60s + 体积 / 这个值（256 KB/s ≈ 慢网下限）
-const MIN_TRANSFER_SPEED: u64 = 256 * 1024;
+/// 保底速度：预算 = 60s + 体积 / 这个值。
+///
+/// 2026-10-28 从 256 KB/s 下调到 64 KB/s：t4 实测本机 ~110 KiB/s，
+/// 按 256 KB/s 算的话每一段都必然撞超时（用户侧表现就是「大包永远下不完」）。
+/// 64 KB/s 只用于**给慢链路留活路**，不代表我们对速度的期望。
+const MIN_TRANSFER_SPEED: u64 = 64 * 1024;
 /// 预算下限，也是「体积未知」时的兜底
 const TRANSFER_BUDGET_FLOOR: Duration = Duration::from_secs(60);
 /// 分段下载的段大小：每段一个独立的 Range 请求。
@@ -70,7 +74,9 @@ const TRANSFER_BUDGET_FLOOR: Duration = Duration::from_secs(60);
 /// 没有「每读一次」的口子。一口气下一整包时，连接卡住只能等预算耗尽（5 GB ≈ 5.7 小时）。
 /// 切成 64 MB 一段之后，每段自己的预算是「64 MB / 256 KB/s ≈ 4 分钟」，
 /// 卡住最多浪费一段；而且段与段之间天然就是断点，重试直接从那一段接着下。
-pub const RANGE_CHUNK: u64 = 64 * 1024 * 1024;
+/// 2026-10-28 从 64 MiB 收到 16 MiB：段越小，单段预算越短、慢网上越不容易整段超时；
+/// 代价只是请求数变多（5 GB / 16 MiB ≈ 320 次，GitHub 扛得住）。
+pub const RANGE_CHUNK: u64 = 16 * 1024 * 1024;
 
 /// 按体积算传输预算：60s 起步 + 体积 / 保底速度。
 pub fn transfer_budget(size_hint: Option<u64>) -> Duration {
@@ -128,7 +134,18 @@ fn transfer_agent(size_hint: Option<u64>) -> ureq::Agent {
 fn friendly(message: &str, timeout: Duration) -> String {
     let lower = message.to_ascii_lowercase();
     if lower.contains("timeout") || lower.contains("timed out") || lower.contains("deadline") {
-        format!("请求超时（{}s）", timeout.as_secs())
+        // L1（2026-10-28）：以前一律报「传输预算」的秒数 —— 实测 30s 的握手超时被写成
+        // 「请求超时（7307s）」，用户以为还要等两小时。按错误文本判断是哪一段超时，报真实秒数。
+        let (phase, seconds) = if lower.contains("connect") {
+            ("连接", HANDSHAKE_TIMEOUT.as_secs())
+        } else if lower.contains("handshake") || lower.contains("tls") {
+            ("握手", HANDSHAKE_TIMEOUT.as_secs())
+        } else if lower.contains("response") || lower.contains("header") {
+            ("等响应", HANDSHAKE_TIMEOUT.as_secs())
+        } else {
+            ("读数据", timeout.as_secs())
+        };
+        format!("请求超时（{phase} {seconds}s）")
     } else {
         message.to_string()
     }
@@ -271,8 +288,10 @@ pub fn download_cancellable(
     mut is_cancelled: impl FnMut() -> bool,
     mut on_progress: impl FnMut(u64, Option<u64>),
 ) -> Result<DownloadOutcome, String> {
-    let resumed_from = std::fs::metadata(dest).map(|meta| meta.len()).unwrap_or(0);
+    let mut resumed_from = std::fs::metadata(dest).map(|meta| meta.len()).unwrap_or(0);
     let mut written = resumed_from;
+    // 因为「服务端回的区间不对」而重启的次数（M2：最多允许一次）
+    let mut restarted: u32 = 0;
     let mut total = size_hint.filter(|size| *size > 0);
 
     loop {
@@ -280,6 +299,14 @@ pub fn download_cancellable(
             return Err(CANCELLED.to_string());
         }
         if let Some(total) = total {
+            // 本地比远端还长：不可能是合法的半截包（多半是上一次写坏了/被塞了东西）。
+            // 丢掉重来，绝不能让「长度够」当成「已经下好了」—— 那正是 0.6.2 的毒缓存成因。
+            if written > total {
+                let _ = std::fs::remove_file(dest);
+                written = 0;
+                // 这份本地文件作废了，实际是从 0 开始的（t6 复核残留③：口径要如实）
+                resumed_from = 0;
+            }
             if written >= total {
                 break;
             }
@@ -288,8 +315,15 @@ pub fn download_cancellable(
         let start = written;
         let end = start.saturating_add(RANGE_CHUNK - 1);
         let want = end - start + 1;
-        let budget = transfer_budget(Some(want));
-        let mut response = transfer_agent(Some(want))
+        // M1（2026-10-28）：服务端**有权不认 Range**（回 200），这一趟就会把整包读进来。
+        // 从 0 开始的那一次请求按整包体积给预算；续传段仍按一段给（卡住最多浪费一段）。
+        let budget_hint = if start == 0 {
+            want.max(size_hint.unwrap_or(0))
+        } else {
+            want
+        };
+        let budget = transfer_budget(Some(budget_hint));
+        let mut response = transfer_agent(Some(budget_hint))
             .get(url)
             .header("Range", &format!("bytes={start}-{end}"))
             .call()
@@ -304,6 +338,28 @@ pub fn download_cancellable(
         }
         // 206 = 服务端认了 Range，只给这一段的字节；200 = 它不认（或整包比请求的范围还小）
         let partial = status == 206;
+
+        // M2（2026-10-28）：206 必须回**我们请求的那个起点**。说谎的镜像回一段别处的字节，
+        // 拼出来的包 sha256 必然对不上 —— 但那是「运气好被兜住」；这里当场核对，
+        // 对不上就丢掉重来一次（仅一次，避免和坏镜像无限互搏）。
+        if partial {
+            let served_from = response
+                .headers()
+                .get("content-range")
+                .and_then(|value| value.to_str().ok())
+                .and_then(parse_range_start);
+            if let Some(served) = served_from {
+                if served != start {
+                    let _ = std::fs::remove_file(dest);
+                    restarted += 1;
+                    if restarted > 1 {
+                        return Err(format!("服务端回的区间起点是 {served}，不是请求的 {start}"));
+                    }
+                    written = 0;
+                    continue;
+                }
+            }
+        }
 
         // 远端总长：Content-Range 最准，其次 Content-Length
         let header_total = response
@@ -378,6 +434,18 @@ pub fn download_cancellable(
     })
 }
 
+/// `Content-Range: bytes 0-16777215/5368709120` → 起点 0；取不到就是 None。
+///
+/// M2（2026-10-28）用它核对「服务端回的这段是不是我们请求的那段」：
+/// 说谎的镜像回一段别处的内容，拼出来的包 sha256 必然对不上，但那是运气好被兜住，
+/// 这里当场就能发现。
+fn parse_range_start(value: &str) -> Option<u64> {
+    let after_unit = value.trim().strip_prefix("bytes").unwrap_or(value.trim());
+    let range = after_unit.trim().split('/').next()?;
+    let start = range.split('-').next()?;
+    start.trim().parse::<u64>().ok()
+}
+
 /// `Content-Range: bytes 0-67108863/5368709120` → 总长 5368709120；取不到就是 None。
 fn parse_range_total(value: &str) -> Option<u64> {
     value
@@ -421,13 +489,14 @@ mod tests {
 
     #[test]
     fn friendly_translates_timeouts() {
+        // L1 之后文案带阶段名：等响应/握手用 30s 的握手超时，读数据用本次传输预算
         assert_eq!(
             friendly("timed out waiting for response", Duration::from_secs(8)),
-            "请求超时（8s）"
+            "请求超时（等响应 30s）"
         );
         assert_eq!(
             friendly("Deadline has elapsed", Duration::from_secs(20)),
-            "请求超时（20s）"
+            "请求超时（读数据 20s）"
         );
         // 其它错误原样透出，方便用户看到 DSN / 证书之类的真实原因
         assert_eq!(
@@ -442,18 +511,68 @@ mod tests {
         // 体积未知 → 地板价 60s
         assert_eq!(transfer_budget(None), Duration::from_secs(60));
         assert_eq!(transfer_budget(Some(0)), Duration::from_secs(60));
-        // 256 MB：60 + 1024s（256MB / 256KB/s = 1024s）
-        assert_eq!(
-            transfer_budget(Some(256 * 1024 * 1024)),
-            Duration::from_secs(60 + 1024)
-        );
-        // 一段 64 MB：60 + 256s，正是「一段卡住最多浪费这么久」的口径
+        // 一段（RANGE_CHUNK = 16 MiB）按保底速度 64 KiB/s 算 = 256s，加上 60s 底价；
+        // 这正是「一段卡住最多浪费这么久」的口径。
         assert_eq!(
             transfer_budget(Some(RANGE_CHUNK)),
             Duration::from_secs(60 + 256)
         );
-        // 5 GB 整包（不分段时）才是小时级 —— 而分段之后每段只按 64 MB 算
+        // 单调：体积越大预算越宽
+        assert!(transfer_budget(Some(512 * 1024 * 1024)) > transfer_budget(Some(RANGE_CHUNK)));
+        // 5 GB 整包（不分段时）才是小时级 —— 而分段之后每段只按一段算
         assert!(transfer_budget(Some(5 * 1024 * 1024 * 1024)) > Duration::from_secs(3600));
+    }
+
+    /// M2：206 的起点要能核对（说慌的镜像靠它当场识破）
+    #[test]
+    fn parse_range_start_reads_the_served_offset() {
+        assert_eq!(parse_range_start("bytes 0-16777215/5368709120"), Some(0));
+        assert_eq!(
+            parse_range_start("bytes 8388608-16777215/5368709120"),
+            Some(8388608)
+        );
+        assert_eq!(parse_range_start("bytes */5368709120"), None);
+        assert_eq!(parse_range_start("garbage"), None);
+    }
+
+    /// L1：超时文案要区分「握手/等响应」与「读数据」，不能一律报传输预算
+    #[test]
+    fn timeout_message_names_the_phase_that_fired() {
+        let body = Duration::from_secs(7307);
+        assert_eq!(
+            friendly("Network Error: timed out reading response", body),
+            "请求超时（等响应 30s）"
+        );
+        assert_eq!(
+            friendly("timeout: connect timed out", body),
+            "请求超时（连接 30s）"
+        );
+        assert_eq!(
+            friendly("connection reset by peer", body),
+            "connection reset by peer"
+        );
+    }
+
+    /// H1 回归：本地文件比远端**还长**时，不能因为「长度够」就当成已下好 ——
+    /// 必须丢掉重来；否则残包会变成「每次都说成功、校验却永远不过」的毒缓存。
+    #[test]
+    fn download_truncates_a_local_file_longer_than_remote() {
+        let payload: Vec<u8> = (0..3000u32).map(|n| (n % 251) as u8).collect();
+        let server = TinyServer::start(payload.clone(), true);
+        let dest = temp_dest("too-long");
+        let mut bogus = payload.clone();
+        bogus.extend_from_slice(b"GARBAGE-GARBAGE-GARBAGE");
+        std::fs::write(&dest, &bogus).unwrap();
+
+        let outcome =
+            download(&server.url(), &dest, Some(payload.len() as u64), |_, _| {}).unwrap();
+        assert_eq!(outcome.bytes, payload.len() as u64, "应当回到远端长度");
+        assert_eq!(
+            std::fs::read(&dest).unwrap(),
+            payload,
+            "内容必须是干净重下的"
+        );
+        let _ = std::fs::remove_file(&dest);
     }
 
     /// 远端总长从 Content-Range 里取；取不到（* 或没有斜杠）就是 None
