@@ -17,7 +17,6 @@ use crate::mods::scan;
 use crate::secrets::{base64_decode, base64_encode};
 use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
 use serde_json::{Map, Value};
-use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, Mutex};
@@ -385,14 +384,8 @@ pub fn key_id_of(key: &SigningKey) -> String {
 }
 
 pub fn key_id_from_raw(raw: &[u8]) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(raw);
-    let digest = hasher.finalize();
-    let mut hex = String::with_capacity(64);
-    for byte in digest {
-        hex.push_str(&format!("{byte:02x}"));
-    }
-    hex.chars().take(12).collect()
+    // A2：哈希核心与「短哈希」都收在 pkg 里，这里不再抄一遍
+    crate::mods::pkg::short_sha(&crate::mods::pkg::sha256_hex(raw))
 }
 
 /// PKCS8 私钥 PEM（与 Node `export({type:"pkcs8",format:"pem"})` 同结构：64 列换行）
@@ -481,16 +474,11 @@ fn file_hash(path: &Option<PathBuf>) -> Value {
     let Some(path) = path else {
         return Value::Null;
     };
-    let Ok(bytes) = std::fs::read(path) else {
-        return Value::Null;
-    };
-    let mut hasher = Sha256::new();
-    hasher.update(&bytes);
-    let mut hex = String::with_capacity(64);
-    for byte in hasher.finalize() {
-        hex.push_str(&format!("{byte:02x}"));
+    // A2：走 pkg 的**流式**哈希（以前这里 fs::read 全文，1.9 GB 的 loader 会吃满内存）
+    match crate::mods::pkg::sha256_file(path) {
+        Ok((hex, _)) => Value::String(hex),
+        Err(_) => Value::Null,
     }
-    Value::String(hex)
 }
 
 /// 用签名密钥给 manifest 签名（base64）

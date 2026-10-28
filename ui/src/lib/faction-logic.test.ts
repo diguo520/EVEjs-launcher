@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest"
 
+import { attackerOnlyLossEvent } from "@/test/fixtures/faction"
+
 import {
   chunk,
   eventTone,
@@ -618,18 +620,8 @@ describe("faction-logic", () => {
 
     it("分侧舰型损失：只出手没挨打的一方也在，明细为空", () => {
       // 905 号损失没有 battleID，进不了报表；另造一场 b 只出手、一艘没掉
-      const events: FactionEvent[] = [
-        {
-          id: 1,
-          at: 1,
-          factionKey: "a",
-          type: "loss",
-          label: "战损",
-          group: "combat",
-          text: "",
-          payload: { unitID: 1, battleID: 12, systemID: 5, killer: { kind: "engagement", key: "b" } },
-        },
-      ]
+      // B4：这条夹具与 km-page.test 共用（ui/src/test/fixtures/faction.ts）
+      const events = attackerOnlyLossEvent()
       const report = battleReports(events)[0]
       const byKey = new Map(report.sideShipLosses.map((side) => [side.key, side]))
       expect(byKey.get("a")?.lost).toBe(1)

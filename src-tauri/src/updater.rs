@@ -91,31 +91,20 @@ fn clear_held() {
     }
 }
 
-/// 下载互斥：**自动下载与手动「立即更新」共用同一个守卫**。
+/// 更新下载的互斥锁：**自动下载与手动「立即更新」在这里串行**（不是互相拒绝）。
 ///
-/// 2026-10-28（H5）修的是：以前只有自动路径用 swap 挡着，而 `update:download`
-/// 走 ipc 直调 `download_update` 完全不过问这个标志 —— 自动线程还没把状态翻成 downloading
-/// 的那一小段窗口里点「立即更新」，就会有两个写者同时按文件长度 append 同一个 exe，
-/// 体积超预期 → sha 校验失败 → 删包重下。现在守卫在 `download_update` 里，两条路都过它。
-static DOWNLOAD_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
-
-/// 拿不到就说明已经有一次更新下载在跑；`Drop` 自动放锁（任何提前 return 都不会漏放）。
-struct DownloadGuard;
-
-impl DownloadGuard {
-    fn acquire() -> Option<Self> {
-        DOWNLOAD_IN_FLIGHT
-            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
-            .ok()
-            .map(|_| DownloadGuard)
-    }
-}
-
-impl Drop for DownloadGuard {
-    fn drop(&mut self) {
-        DOWNLOAD_IN_FLIGHT.store(false, Ordering::SeqCst);
-    }
-}
+/// 演进史值得留一句，因为它踩过两次：
+///   · 0.6.1 之前只有自动路径用一个 swap 挡着，而 `update:download` 直调 `download_update`
+///     完全不过问 —— 自动线程还没把状态翻成 downloading 的窗口里点「立即更新」，
+///     两个写者会同时按文件长度 append 同一个 exe（体积超预期 → sha 失败 → 删包重下）；
+///   · 2026-10-28（H5）改成原子标志 + 拒绝第二个写者：正确，但**太硬** ——
+///     2026-10-29 的 L8 升级/回滚演练当场翻车：`update:check` 现在会自己起后台下载（自动更新），
+///     紧跟其后的显式 `update:download` 被**拒绝**，三轮两方向全是「已有更新包正在下载」。
+///
+/// 现在是互斥锁：后来者**等**前面的做完（下载本身有各自的超时，不会无限等），
+/// 再走 `download_update` 里的「正式名的包在且 sha 对得上就直接 ready」复用分支 ——
+/// 不重复下载、不报错，演练与真实用户点「立即更新」都得到同一个结局。
+static DOWNLOAD_LOCK: Mutex<()> = Mutex::new(());
 
 /// 下载分块大小（与 `net::download` 一致）
 const CHUNK: usize = 64 * 1024;
@@ -636,12 +625,14 @@ fn check_failure(app: &AppHandle, current: &str, reason: &str) -> Value {
 
 /// 现役版 `downloadUpdate()`：没检查过就顺手检查一次
 pub fn download_update(app: &AppHandle, runtime: &RuntimePaths) -> Value {
-    // H5：手动与自动两条路都从这里进来，谁先拿到守卫谁下；另一个当场回绝，绝不当第二个写者
-    let Some(_guard) = DownloadGuard::acquire() else {
-        return json!({ "ok": false, "reason": "已有更新包正在下载，请稍候再试" });
+    // H5 + L8：手动与自动两条路都从这里进来，**在这里串行**（后来者等前面做完）。
+    // 中毒也照常放行：别的线程 panic 不该把「更新」永久锁死。
+    let _serial = match DOWNLOAD_LOCK.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
     };
-    // N5（2026-10-28 复核发现）：清按住状态必须**拿到守卫之后** ——
-    // 被守卫回绝的那一次并没有真的下载，不该把「先别自动下」清掉（否则 M9 在这条路径上回归）。
+    // N5（2026-10-28 复核发现）：清按住状态必须**拿到锁之后** ——
+    // 被拒绝/排不上队的那一次并没有真的下载，不该把「先别自动下」清掉。
     clear_held();
     let (manifest, asset) = {
         let store = store();
@@ -1084,12 +1075,8 @@ mod tests {
     use super::*;
 
     fn temp_dir(tag: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!(
-            "evejs-updater-{tag}-{}",
-            crate::mods::pkg::temp_suffix()
-        ));
-        std::fs::create_dir_all(&dir).unwrap();
-        dir
+        // B1（2026-10-29）：唯一的实现收在 crate::testdir
+        crate::testdir::temp_dir("updater", tag)
     }
 
     /// N2 回归：同一版本已经下好待安装 → 不要再下；换成更新的版本 → 照常下。
@@ -1134,17 +1121,21 @@ mod tests {
         assert!(!should_auto_download("idle", None, "0.6.3", false, false));
     }
 
-    /// H5 回归：更新下载守卫必须**排他**，而且任何提前 return 都要放锁。
-    /// 以前只有自动路径占标志、手动 `update:download` 直调不受约束，两个写者会写坏同一个 exe。
+    /// H5 + L8 回归：更新下载的互斥锁必须排他、且能正常释放。
+    ///
+    /// 注意语义已经改过：以前是「后来者当场被拒」，L8 演练证明那会把手动「立即更新」
+    /// 变成错误提示；现在后来者**等**（`lock()`），所以这条测试钉的是 try_lock 的排他性。
     #[test]
-    fn download_guard_is_exclusive_and_releases() {
-        let first = DownloadGuard::acquire().expect("第一次应当拿到守卫");
+    fn download_lock_is_exclusive_and_releases() {
+        let first = DOWNLOAD_LOCK
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         assert!(
-            DownloadGuard::acquire().is_none(),
-            "第二次必须被拒（否则又是两个写者）"
+            DOWNLOAD_LOCK.try_lock().is_err(),
+            "占用期间后来者应当拿不到（否则又是两个写者）"
         );
         drop(first);
-        assert!(DownloadGuard::acquire().is_some(), "放锁之后应当能再拿");
+        assert!(DOWNLOAD_LOCK.try_lock().is_ok(), "放锁之后应当能再拿");
     }
 
     #[test]

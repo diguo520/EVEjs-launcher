@@ -1048,13 +1048,7 @@ mod tests {
     use super::*;
 
     fn temp_dir(tag: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!(
-            "evejs-mods-scaffold-{tag}-{}",
-            super::super::pkg::epoch_ms()
-        ));
-        let _ = fs::remove_dir_all(&dir);
-        fs::create_dir_all(&dir).expect("建临时目录");
-        dir
+        crate::testdir::temp_dir("mods-scaffold", tag)
     }
 
     fn runtime_at(root: &Path) -> RuntimePaths {

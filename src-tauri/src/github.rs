@@ -1308,25 +1308,9 @@ pub fn publish_to_own_repo(
         return json!({ "ok": false, "reason": non_empty_or(&object_field(&me, "reason"), "令牌无效") });
     }
 
-    let raw = repo_input
-        .trim()
-        .trim_start_matches("https://github.com/")
-        .trim_start_matches("http://github.com/")
-        .trim_end_matches(".git");
-    let parts: Vec<&str> = raw.split('/').filter(|part| !part.is_empty()).collect();
-    let owner = if parts.len() >= 2 {
-        parts[0]
-    } else {
-        login.as_str()
-    };
-    let repo_name = if parts.len() >= 2 {
-        parts[1]
-    } else if let Some(first) = parts.first() {
-        first
-    } else {
-        default_repo_name
-    };
-    if repo_name.is_empty() || !is_repo_name(repo_name) {
+    // A1：解析与校验都走同一份实现（以前这里内联抄了一遍）
+    let (owner, repo_name) = parse_repo_input(repo_input, &login, default_repo_name);
+    if !is_repo_name(repo_name) {
         return json!({ "ok": false, "reason": "请填写你自己的仓库名（形如 my-evejs-mod，或 owner/my-evejs-mod）" });
     }
 
@@ -1398,7 +1382,37 @@ pub fn publish_to_own_repo(
     })
 }
 
-fn is_repo_name(value: &str) -> bool {
+/// 把用户填的「仓库输入」解析成 `(owner, repo_name)`（A1，2026-10-29）。
+///
+/// 以前 `github.rs` 与 `mods/submit.rs` 各抄了一份**逐字相同**的解析，而且 `submit.rs` 还把
+/// `is_repo_name` 的判据内联重写了一遍 —— 两份口径一旦漂移，就会出现「一边接受、一边拒绝」，
+/// 或者算出的资产地址与实际发布仓库不一致。现在收成一处。
+///
+/// 接受：`owner/name`、`name`、`https://github.com/owner/name(.git)`。
+/// 只给 `name` 时 owner 取当前登录名；都为空时 repo_name 取调用方的缺省名。
+pub fn parse_repo_input<'a>(
+    input: &'a str,
+    login: &'a str,
+    default_repo_name: &'a str,
+) -> (&'a str, &'a str) {
+    let raw = input
+        .trim()
+        .trim_start_matches("https://github.com/")
+        .trim_start_matches("http://github.com/")
+        .trim_end_matches(".git");
+    let parts: Vec<&str> = raw.split('/').filter(|part| !part.is_empty()).collect();
+    let owner = if parts.len() >= 2 { parts[0] } else { login };
+    let repo_name = if parts.len() >= 2 {
+        parts[1]
+    } else if let Some(first) = parts.first() {
+        first
+    } else {
+        default_repo_name
+    };
+    (owner, repo_name)
+}
+
+pub fn is_repo_name(value: &str) -> bool {
     !value.is_empty()
         && value
             .chars()
@@ -1464,6 +1478,23 @@ pub fn default_repo_name_for(id: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A1（2026-10-29）：解析口径要接受三种写法，并且「只给名字」时 owner 落到登录名、
+    /// 空输入时 repo_name 落到调用方的缺省名。以前这段逻辑在两个文件里各抄一份、零覆盖。
+    #[test]
+    fn parse_repo_input_accepts_the_three_shapes() {
+        assert_eq!(
+            parse_repo_input("owner/name", "me", "fb"),
+            ("owner", "name")
+        );
+        assert_eq!(parse_repo_input("  name  ", "me", "fb"), ("me", "name"));
+        assert_eq!(
+            parse_repo_input("https://github.com/owner/name.git", "me", "fb"),
+            ("owner", "name")
+        );
+        assert_eq!(parse_repo_input("", "me", "fb"), ("me", "fb"));
+        assert_eq!(parse_repo_input("a/b/c", "me", "fb"), ("a", "b"));
+    }
 
     #[test]
     fn asset_name_is_ascii_safe() {

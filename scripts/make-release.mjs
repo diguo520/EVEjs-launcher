@@ -27,13 +27,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 
-const ROOT = path.resolve(import.meta.dirname, "..");
-const args = process.argv.slice(2);
-const flag = (name) => args.includes(name);
-function value(name, fallback = null) {
-  const index = args.indexOf(name);
-  return index >= 0 && args[index + 1] ? args[index + 1] : fallback;
-}
+// A4（2026-10-29）：ROOT / args / flag / value / REPO / token 搬到 lib，两个发版脚本共用一份
+import { ROOT, args, authHeaders, flag, readToken as readGitHubToken, resolveRepo, value } from "./lib/github-release.mjs";
 
 if (flag("--help") || flag("-h")) {
   console.log(
@@ -42,19 +37,7 @@ if (flag("--help") || flag("-h")) {
   process.exit(0);
 }
 
-const DEFAULT_REPO = "diguo520/EVEjs-launcher";
-const REPO = (() => {
-  const explicit = value("--repo");
-  if (explicit) return explicit;
-  try {
-    const url = execFileSync("git", ["remote", "get-url", "origin"], { cwd: ROOT, encoding: "utf8" }).trim();
-    const match = url.match(/github\.com[/:]([^/]+\/[^/]+?)(?:\.git)?$/);
-    if (match) return match[1];
-  } catch {
-    /* 没有远端就用默认仓库 */
-  }
-  return DEFAULT_REPO;
-})();
+const REPO = resolveRepo();
 
 const VERSION = (
   value("--version") ?? JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")).version
@@ -69,30 +52,13 @@ function die(text) {
   process.exit(1);
 }
 
+/** 令牌取法在 lib 里，报错口吻用本脚本的 die */
 function token() {
-  const explicit = value("--token") ?? process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN;
-  if (explicit && explicit.trim()) return explicit.trim();
-  try {
-    const out = execFileSync("git", ["credential", "fill"], {
-      cwd: ROOT,
-      input: "protocol=https\nhost=github.com\n\n",
-      encoding: "utf8",
-    });
-    const match = out.match(/^password=(.+)$/m);
-    if (match && match[1].trim()) return match[1].trim();
-  } catch {
-    /* 落到下面的报错 */
-  }
-  return die("没有 GitHub 令牌：传 --token、设 GH_TOKEN，或先让 git 存好 github.com 的凭据");
+  return readGitHubToken(die);
 }
 
 const TOK = DRY ? null : token();
-const headers = (json = false) => ({
-  Authorization: "Bearer " + TOK,
-  "User-Agent": "evejs-release",
-  Accept: "application/vnd.github+json",
-  ...(json ? { "Content-Type": "application/json" } : {}),
-});
+const headers = (json = false) => authHeaders(TOK, { json });
 
 async function gh(method, url, body) {
   const res = await fetch(url.startsWith("http") ? url : "https://api.github.com" + url, {

@@ -2,6 +2,9 @@ import { useCallback, useEffect, useState } from "react"
 import { Archive, ExternalLink } from "lucide-react"
 import { toast } from "sonner"
 
+import { formatBytes } from "@/lib/format"
+import { pad2 as pad } from "@/lib/time"
+
 import { Panel } from "@/components/common/panel"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
@@ -41,10 +44,9 @@ const GROUP_LABEL: Record<string, string> = {
 
 /** 体积读数：存档日志几百 KB 到几十 MB，B / KB / MB 三档够用 */
 function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  const kb = bytes / 1024
-  if (kb < 1024) return `${kb < 100 ? kb.toFixed(1) : Math.round(kb)} KB`
-  return `${(kb / 1024).toFixed(1)} MB`
+  // B2（2026-10-29）：走 lib/format，但保留这处原来的「不兜底」口径（invalid: null）
+  // `nanAsMaxUnit`：非数值输入原来写的是 `NaN MB`（走 MB 档），不是 `NaN B`（复核修正）
+  return formatBytes(bytes, { invalid: null, nanAsMaxUnit: true })
 }
 
 /** 修改时间：MM-DD HH:mm，跨年才带上年份 */
@@ -52,8 +54,7 @@ function formatTime(ms: number): string {
   if (!ms) return "—"
   const date = new Date(ms)
   if (Number.isNaN(date.getTime())) return "—"
-  const pad = (value: number) => String(value).padStart(2, "0")
-  const md = `${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+    const md = `${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
   return date.getFullYear() === new Date().getFullYear() ? md : `${date.getFullYear()}-${md}`
 }
 

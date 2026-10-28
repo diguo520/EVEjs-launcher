@@ -6,12 +6,12 @@ import { envItemsFrom, initKeyOf } from "@/lib/live"
 import { localizeEnvItem } from "@/lib/env-i18n"
 import { useLocale } from "@/components/shell/locale-provider"
 import { CHECK_ITEMS, ENV_META, type CheckItem } from "@/lib/mock"
+import { formatClock } from "@/lib/time"
 
 /** 检测时间戳，格式与日志一致：14:05:32 */
 function stampNow(): string {
-  const d = new Date()
-  const p = (n: number) => String(n).padStart(2, "0")
-  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+  // B3：与日志面板同一个拼法（lib/time）
+  return formatClock(new Date())
 }
 
 export interface EnvCheckState {

@@ -6,30 +6,10 @@ import {
   markAuthoringDocSeen,
   needsAuthoringDocPulse,
   shouldPulseAuthoringDoc,
-  type DocSeenStorage,
 } from "@/lib/mod-doc-seen"
+import { fakeStorage, throwingStorage } from "@/test/fake-storage"
 
-/** 内存版 localStorage：单测不碰真浏览器存储 */
-function fakeStorage(initial: Record<string, string> = {}): DocSeenStorage & {
-  dump: () => Record<string, string>
-} {
-  const map = new Map(Object.entries(initial))
-  return {
-    getItem: (key) => (map.has(key) ? (map.get(key) as string) : null),
-    setItem: (key, value) => void map.set(key, value),
-    dump: () => Object.fromEntries(map),
-  }
-}
-
-/** 隐私模式那种一碰就抛的存储 */
-const throwingStorage: DocSeenStorage = {
-  getItem: () => {
-    throw new Error("SecurityError")
-  },
-  setItem: () => {
-    throw new Error("QuotaExceededError")
-  },
-}
+// B4（2026-10-29）：假存储夹具收在 ui/src/test/fake-storage.ts（与 legal-notice.test 共用）
 
 describe("模组规范的新内容脉冲", () => {
   it("没看过就亮，看过同一修订号就不亮", () => {

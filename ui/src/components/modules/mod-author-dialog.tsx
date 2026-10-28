@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import { t } from "@/lib/i18n"
+import { pad2 as pad } from "@/lib/time"
 import { toast } from "sonner"
 import { BookOpen, Loader2 } from "lucide-react"
 
@@ -37,7 +38,6 @@ function formatStamp(ms: number): string {
   if (!ms || ms <= 0) return "—"
   const d = new Date(ms)
   if (Number.isNaN(d.getTime())) return "—"
-  const pad = (n: number) => String(n).padStart(2, "0")
   return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(
     d.getMinutes()
   )}`

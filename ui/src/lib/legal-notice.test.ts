@@ -4,30 +4,10 @@ import {
   LEGAL_NOTICE_SEEN_KEY,
   markLegalNoticeSeen,
   needsLegalNotice,
-  type LegalNoticeStorage,
 } from "@/lib/legal-notice"
+import { fakeStorage, throwingStorage } from "@/test/fake-storage"
 
-/** 内存版 localStorage：单测不碰真浏览器存储 */
-function fakeStorage(initial: Record<string, string> = {}): LegalNoticeStorage & {
-  dump: () => Record<string, string>
-} {
-  const map = new Map(Object.entries(initial))
-  return {
-    getItem: (key) => (map.has(key) ? (map.get(key) as string) : null),
-    setItem: (key, value) => void map.set(key, value),
-    dump: () => Object.fromEntries(map),
-  }
-}
-
-/** 隐私模式那种一碰就抛的存储 */
-const throwingStorage: LegalNoticeStorage = {
-  getItem: () => {
-    throw new Error("SecurityError")
-  },
-  setItem: () => {
-    throw new Error("QuotaExceededError")
-  },
-}
+// B4（2026-10-29）：假存储夹具收在 ui/src/test/fake-storage.ts（与 mod-doc-seen.test 共用）
 
 describe("法律声明的首次弹出标记", () => {
   it("没存过（第一次启动）就弹，存过就不弹", () => {

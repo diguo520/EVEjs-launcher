@@ -8,6 +8,8 @@
  * 面板自己回的 text / label / name 都是模组写好的中文，启动器原样显示、不重写文案表。
  */
 
+import { pad2 as pad } from "@/lib/time"
+
 /* ------------------------------- 探针 / 状态 ------------------------------- */
 
 export interface FactionAlertCounts {
@@ -1565,9 +1567,9 @@ export function formatUptime(ms: number): string {
   const hours = Math.floor((totalSeconds % 86400) / 3600)
   const minutes = Math.floor((totalSeconds % 3600) / 60)
   const seconds = totalSeconds % 60
-  if (days > 0) return `${days}d ${String(hours).padStart(2, "0")}h`
-  if (hours > 0) return `${hours}h ${String(minutes).padStart(2, "0")}m`
-  if (minutes > 0) return `${minutes}m ${String(seconds).padStart(2, "0")}s`
+  if (days > 0) return `${days}d ${pad(hours)}h`
+  if (hours > 0) return `${hours}h ${pad(minutes)}m`
+  if (minutes > 0) return `${minutes}m ${pad(seconds)}s`
   return `${seconds}s`
 }
 
@@ -1575,7 +1577,6 @@ export function formatUptime(ms: number): string {
 export function formatSimClock(now: number): string {
   if (!Number.isFinite(now) || now <= 0) return "—"
   const at = new Date(now)
-  const pad = (value: number) => String(value).padStart(2, "0")
   return `${pad(at.getMonth() + 1)}-${pad(at.getDate())} ${pad(at.getHours())}:${pad(at.getMinutes())}`
 }
 

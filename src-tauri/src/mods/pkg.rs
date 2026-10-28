@@ -78,6 +78,14 @@ pub fn sha256_file(path: &Path) -> Result<(String, u64), String> {
     Ok((hex, size))
 }
 
+/// 展示用的短哈希：前 12 位（对齐现役版提示口径，也是 keyId 的取法）。
+///
+/// 2026-10-29（A2/A3）：这段「取前 12 位」原本散在 6 处（registry 三对提示 + sign 的 keyId
+/// + submit 的展示串），写法还不统一（有的按字节切、有的按字符取）—— 收成一处。
+pub fn short_sha(hex: &str) -> String {
+    hex.chars().take(12).collect()
+}
+
 /// 字节的 sha256（市场包校验用）
 pub fn sha256_hex(bytes: &[u8]) -> String {
     let mut hasher = Sha256::new();
@@ -908,10 +916,7 @@ mod tests {
     use super::*;
 
     fn temp_dir(tag: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("evejs-mods-pkg-{tag}-{}", temp_suffix()));
-        let _ = fs::remove_dir_all(&dir);
-        fs::create_dir_all(&dir).expect("建临时目录");
-        dir
+        crate::testdir::temp_dir("mods-pkg", tag)
     }
 
     fn runtime_at(root: &Path) -> RuntimePaths {

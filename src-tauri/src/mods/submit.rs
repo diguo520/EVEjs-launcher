@@ -1154,31 +1154,13 @@ pub fn publish_own_repo(
         });
     }
 
-    // 解析 owner/repo，并提前算出确定性的资产地址（tag 与资产名都是确定的）
-    let raw = repo_input
-        .trim()
-        .trim_start_matches("https://github.com/")
-        .trim_start_matches("http://github.com/")
-        .trim_end_matches(".git")
-        .to_string();
-    let parts: Vec<&str> = raw.split('/').filter(|part| !part.is_empty()).collect();
-    let owner = if parts.len() >= 2 {
-        parts[0].to_string()
-    } else {
-        login.clone()
-    };
-    let repo_name = if parts.len() >= 2 {
-        parts[1].to_string()
-    } else if let Some(first) = parts.first() {
-        first.to_string()
-    } else {
-        github::default_repo_name_for(id)
-    };
-    if repo_name.is_empty()
-        || !repo_name
-            .chars()
-            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '.' | '-'))
-    {
+    // A1（2026-10-29）：解析与校验都走 github.rs 的同一份实现 ——
+    // 这里以前抄了一份逐字相同的解析，还把 `is_repo_name` 的判据内联重写了一遍。
+    let default_name = github::default_repo_name_for(id);
+    let (owner, repo_name) = github::parse_repo_input(repo_input, &login, &default_name);
+    let owner = owner.to_string();
+    let repo_name = repo_name.to_string();
+    if !github::is_repo_name(&repo_name) {
         return json!({ "ok": false, "reason": "请填写你自己的仓库名（形如 my-evejs-mod，或 owner/my-evejs-mod）" });
     }
 
@@ -1498,7 +1480,8 @@ pub fn register_source(runtime: &RuntimePaths, id: &str, version: &str) -> Value
         .file_name()
         .map(|name| name.to_string_lossy().to_string())
         .unwrap_or_default();
-    let short_sha: String = text_field(&record, "sha256").chars().take(12).collect();
+    // A3：短哈希统一走 pkg::short_sha（复核发现这处漏收）
+    let short_sha = crate::mods::pkg::short_sha(&text_field(&record, "sha256"));
     let size_bytes = record.get("sizeBytes").and_then(Value::as_u64).unwrap_or(0);
     let pr_body = [
         "### 模组版本审核 / mod release review".to_string(),

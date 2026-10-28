@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 
+import { toMB } from "@/lib/format"
+
 import { Panel, SectionHeading, StatTile } from "@/components/common/panel"
 import { TableList } from "@/components/database/table-list"
 import { TableBrowser } from "@/components/database/table-browser"
@@ -37,10 +39,7 @@ function demoModels(): DbTableModel[] {
   }))
 }
 
-function bytesToMB(bytes: number | undefined): number {
-  if (!bytes || bytes <= 0) return 0
-  return Math.round((bytes / (1024 * 1024)) * 10) / 10
-}
+// B2（2026-10-29）：实现收在 lib/format —— 这张表要的是数字不是文案，所以用 toMB 而不是 formatBytes
 
 export function DatabasePage() {
   const { t } = useLocale()
@@ -225,7 +224,7 @@ export function DatabasePage() {
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile
           label="DB SIZE"
-          value={ipc ? bytesToMB(overview?.sizeBytes) : DB_META.sizeMB}
+          value={ipc ? toMB(overview?.sizeBytes) : DB_META.sizeMB}
           unit="MB"
           tone="telemetry"
           delta="SQLite"

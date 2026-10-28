@@ -322,9 +322,13 @@
       return error;
     }
 
-    function handleAccountCreate(request) {
-      const startedAt = Date.now();
-      const out = {
+    /**
+     * 回包信封的公共头（B8，2026-10-29 复核判定该合）：`handleAccountCreate` 与 `handle`
+     * 原本各写一遍这 10 个字段（jscpd 13 行）。业务字段由调用方 spread 在后面 ——
+     * **键序与原来一致**（先公共头、再各自业务字段），落盘 JSON 不受影响。
+     */
+    function responseBase(request, startedAt) {
+      return {
         api: API,
         hostVersion: HOST_VERSION,
         pid: process.pid,
@@ -335,6 +339,13 @@
         startedAt: startedAt,
         finishedAt: 0,
         elapsedMs: 0,
+      };
+    }
+
+    function handleAccountCreate(request) {
+      const startedAt = Date.now();
+      const out = {
+        ...responseBase(request, startedAt),
         account: null,
         reason: "",
         message: "",
@@ -455,16 +466,7 @@
     function handle(request) {
       const startedAt = Date.now();
       const out = {
-        api: API,
-        hostVersion: HOST_VERSION,
-        pid: process.pid,
-        entry: entry,
-        requestId: String((request && request.requestId) || ""),
-        bootId: bootId,
-        ok: false,
-        startedAt: startedAt,
-        finishedAt: 0,
-        elapsedMs: 0,
+        ...responseBase(request, startedAt),
         scope: null,
         requestedCount: 0,
         reloaded: [],

@@ -43,16 +43,8 @@ function ctxSpy() {
   return { waited, waitUntil: (task) => waited.push(task), passThroughOnException() {} }
 }
 
-/** 一对真能用的 Ed25519 身份（公钥 base64 / keyId / PKCS8 私钥 base64） */
-async function identity() {
-  const pair = await crypto.subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"])
-  const raw = new Uint8Array(await crypto.subtle.exportKey("raw", pair.publicKey))
-  return {
-    publicKey: bytesToBase64(raw),
-    keyId: await keyIdFromRaw(raw),
-    pkcs8: bytesToBase64(new Uint8Array(await crypto.subtle.exportKey("pkcs8", pair.privateKey))),
-  }
-}
+// identity() 收在 ./fixtures.mjs（三个测试文件原本各抄一份）
+import { identity } from "./fixtures.mjs"
 
 test("入口签名把 ctx 接住并往下传", async () => {
   const source = await readFile(new URL("../src/index.js", import.meta.url), "utf8")

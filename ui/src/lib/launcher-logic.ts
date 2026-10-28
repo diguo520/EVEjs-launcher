@@ -3,6 +3,7 @@
  * 与 React 无关，方便单独验证；组件只负责渲染。
  */
 import { t } from "@/lib/i18n"
+import { pad2 as p } from "@/lib/time"
 
 /** 每个账号的角色槽上限 —— 与官方登录器一致 */
 export const MAX_CHARACTERS_PER_ACCOUNT = 3
@@ -387,7 +388,7 @@ export function pickInGamePilot(accounts: Account[]): CharacterDraft {
     accounts.flatMap((a) => a.characters.map((c) => c.name.toLowerCase()))
   )
   for (let n = 1; n <= 99; n++) {
-    const name = `Capsuleer ${String(n).padStart(2, "0")}`
+    const name = `Capsuleer ${p(n)}`
     if (!used.has(name.toLowerCase())) return { ...IN_GAME_PILOTS[0], name }
   }
   return { ...IN_GAME_PILOTS[0], name: `Capsuleer ${Date.now()}` }
@@ -572,7 +573,6 @@ export function formatSp(sp: number): string {
 
 /** 启动器时间戳：2026-09-26 14:05 */
 export function formatStamp(d: Date): string {
-  const p = (n: number) => String(n).padStart(2, "0")
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
 }
 
@@ -586,7 +586,6 @@ export function parseStamp(s: string): number | null {
 
 /** 出生日期：2026-09-26 */
 export function formatDate(d: Date): string {
-  const p = (n: number) => String(n).padStart(2, "0")
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
 }
 

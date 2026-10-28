@@ -552,22 +552,14 @@ pub fn download_entry(
             || is_download_cancelled(id),
             |downloaded, total| {
                 total_holder.set(total);
-                let percent = total
-                    .filter(|value| *value > 0)
-                    .map(|value| (downloaded as f64 / value as f64 * 100.0).round() as u64);
-                let mut payload = Map::new();
-                payload.insert("id".into(), json!(id_owned));
-                payload.insert("downloaded".into(), json!(downloaded));
-                payload.insert(
-                    "total".into(),
-                    total.map(|value| json!(value)).unwrap_or(Value::Null),
-                );
-                payload.insert(
-                    "percent".into(),
-                    percent.map(|value| json!(value)).unwrap_or(Value::Null),
-                );
-                payload.insert("mirror".into(), json!(mirror_owned));
-                on_progress(Value::Object(payload));
+                // A3：载荷构造收在 progress_payload
+                on_progress(progress_payload(
+                    &id_owned,
+                    downloaded,
+                    total,
+                    &mirror_owned,
+                    None,
+                ));
             },
         );
         match outcome {
@@ -588,8 +580,8 @@ pub fn download_entry(
                             // 只展示前 12 位，和现役版提示保持一致
                             failures.push(format!(
                                 "{mirror} → sha256 不匹配（期望 {}… 实际 {}…）",
-                                &want[..want.len().min(12)],
-                                &got[..got.len().min(12)]
+                                pkg::short_sha(&want),
+                                pkg::short_sha(&got)
                             ));
                             continue;
                         }
@@ -647,6 +639,41 @@ fn parts_of(entry: &Value) -> Option<Vec<Value>> {
     } else {
         Some(parts)
     }
+}
+
+/// 下载进度的载荷（A3，2026-10-29）。
+///
+/// 单包与分片两条路原本各构造一份（13 + 15 行，percent 公式逐字相同），**因为都低于 jscpd 的
+/// min-tokens 阈值，查重门禁看不见** —— 复核点出来的。收成一处，键的插入顺序与原实现一致。
+///
+/// `part` 给 None 就是单包路径的载荷（不带 `part` / `parts` 两个键）。
+fn progress_payload(
+    id: &str,
+    downloaded: u64,
+    total: Option<u64>,
+    mirror: &str,
+    part: Option<(usize, usize)>,
+) -> Value {
+    let percent = total
+        .filter(|value| *value > 0)
+        .map(|value| (downloaded as f64 / value as f64 * 100.0).round() as u64);
+    let mut payload = Map::new();
+    payload.insert("id".into(), json!(id));
+    payload.insert("downloaded".into(), json!(downloaded));
+    payload.insert(
+        "total".into(),
+        total.map(|value| json!(value)).unwrap_or(Value::Null),
+    );
+    payload.insert(
+        "percent".into(),
+        percent.map(|value| json!(value)).unwrap_or(Value::Null),
+    );
+    payload.insert("mirror".into(), json!(mirror));
+    if let Some((index, parts)) = part {
+        payload.insert("part".into(), json!(index));
+        payload.insert("parts".into(), json!(parts));
+    }
+    Value::Object(payload)
 }
 
 /// 索引里声明的分片数（不管地址安不安全）：用来把「一片都没通过校验」说清楚（M4）。
@@ -714,24 +741,13 @@ fn download_parts(
             || is_download_cancelled(id),
             |downloaded, _| {
                 let overall = done + downloaded;
-                let percent = total
-                    .filter(|value| *value > 0)
-                    .map(|value| (overall as f64 / value as f64 * 100.0).round() as u64);
-                let mut payload = Map::new();
-                payload.insert("id".into(), json!(id));
-                payload.insert("downloaded".into(), json!(overall));
-                payload.insert(
-                    "total".into(),
-                    total.map(|value| json!(value)).unwrap_or(Value::Null),
-                );
-                payload.insert(
-                    "percent".into(),
-                    percent.map(|value| json!(value)).unwrap_or(Value::Null),
-                );
-                payload.insert("mirror".into(), json!(mirror));
-                payload.insert("part".into(), json!(index + PART_INDEX_BASE));
-                payload.insert("parts".into(), json!(parts.len()));
-                on_progress(Value::Object(payload));
+                on_progress(progress_payload(
+                    id,
+                    overall,
+                    total,
+                    &mirror,
+                    Some((index + PART_INDEX_BASE, parts.len())),
+                ));
             },
         ) {
             Ok(outcome) => outcome,
@@ -759,8 +775,8 @@ fn download_parts(
                         "ok": false,
                         "reason": format!(
                             "{label}校验失败（期望 {}… 实际 {}…）",
-                            &expect[..expect.len().min(12)],
-                            &got[..got.len().min(12)]
+                            pkg::short_sha(&expect),
+                            pkg::short_sha(&got)
                         ),
                     });
                 }
@@ -808,8 +824,8 @@ fn join_parts(part_paths: &[PathBuf], dest: &Path, want: &str) -> Result<(), Str
             Ok((got, _)) => {
                 return Err(format!(
                     "拼接后整包 sha256 不匹配（期望 {}… 实际 {}…）",
-                    &want[..want.len().min(12)],
-                    &got[..got.len().min(12)]
+                    pkg::short_sha(want),
+                    pkg::short_sha(&got)
                 ));
             }
             Err(reason) => return Err(format!("整包校验失败：{reason}")),

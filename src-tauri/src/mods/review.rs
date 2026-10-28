@@ -39,23 +39,12 @@ const MAX_REPORT_REASON_CHARS: usize = 500;
 
 /// 写地址：优先设置里的 `modReviewWriteUrls`，否则用默认那一条。
 pub fn write_urls(runtime: &RuntimePaths) -> Vec<String> {
-    let settings = config::read_settings(&runtime.settings_file());
-    if let Some(items) = settings.get("modReviewWriteUrls").and_then(Value::as_array) {
-        let list: Vec<String> = items
-            .iter()
-            .filter_map(Value::as_str)
-            .map(str::trim)
-            .filter(|item| item.starts_with("http://") || item.starts_with("https://"))
-            .map(str::to_string)
-            .collect();
-        if !list.is_empty() {
-            return list;
-        }
-    }
-    DEFAULT_REVIEW_WRITE_URLS
-        .iter()
-        .map(|item| item.to_string())
-        .collect()
+    // A6（2026-10-29）：与 snapshot::urls_from_settings 共用同一份读取口径
+    config::urls_from_settings(
+        &runtime.settings_file(),
+        "modReviewWriteUrls",
+        &DEFAULT_REVIEW_WRITE_URLS,
+    )
 }
 
 /// 把「写入口地址」推导成某个动作的目标地址。

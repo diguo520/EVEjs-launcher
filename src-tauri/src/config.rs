@@ -260,6 +260,28 @@ pub fn read_settings(settings_file: &Path) -> Map<String, Value> {
     }
 }
 
+/// 从设置里读一串地址（A6，2026-10-29）：只认 http/https，一条都不合法就当没给、回落到默认。
+///
+/// `snapshot::urls_from_settings` 与 `mods::review::write_urls` 原本各抄了一份**逐字相同**的实现
+/// （12 行 / 120 tokens，jscpd #8）—— 两份口径一旦漂移，就会出现「评价源认这个键、写入口不认」
+/// 这种只在特定配置下才暴露的错。默认值仍由调用方给（各自语义不同）。
+pub fn urls_from_settings(settings_file: &Path, key: &str, defaults: &[&str]) -> Vec<String> {
+    let settings = read_settings(settings_file);
+    if let Some(items) = settings.get(key).and_then(Value::as_array) {
+        let list: Vec<String> = items
+            .iter()
+            .filter_map(Value::as_str)
+            .map(str::trim)
+            .filter(|item| item.starts_with("http://") || item.starts_with("https://"))
+            .map(str::to_string)
+            .collect();
+        if !list.is_empty() {
+            return list;
+        }
+    }
+    defaults.iter().map(|item| item.to_string()).collect()
+}
+
 pub fn write_settings(settings_file: &Path, patch: &Map<String, Value>) -> Map<String, Value> {
     let mut next = read_settings(settings_file);
     for (key, value) in patch {

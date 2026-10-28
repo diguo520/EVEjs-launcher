@@ -28,6 +28,7 @@ import type {
   RawTokenStatus,
 } from "@/lib/ipc"
 import { t } from "@/lib/i18n"
+import { formatClock } from "@/lib/time"
 import { renderSegments } from "@/lib/log-logic"
 
 /* ------------------------------ 服务端日志 ------------------------------ */
@@ -47,8 +48,8 @@ const LOG_LINE = /^\[([^\]]+)\]\s*\[([A-Za-z]+)\]\s?([\s\S]*)$/
 function clockOf(iso: string): string {
   const parsed = new Date(iso)
   if (Number.isNaN(parsed.getTime())) return "--:--:--"
-  const p = (n: number) => String(n).padStart(2, "0")
-  return `${p(parsed.getHours())}:${p(parsed.getMinutes())}:${p(parsed.getSeconds())}`
+  // B3：HH:MM:SS 的拼法收在 lib/time
+  return formatClock(parsed)
 }
 
 /**
@@ -366,9 +367,7 @@ export type LogDraft = Omit<LogLine, "id">
 
 /** 毫秒时间戳 → 日志面板的 HH:MM:SS（本地时间） */
 function stampOf(ms: number): string {
-  const d = new Date(ms)
-  const p = (n: number) => String(n).padStart(2, "0")
-  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+  return formatClock(new Date(ms))
 }
 
 /**

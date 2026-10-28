@@ -26,6 +26,7 @@ pub mod log;
 pub mod logarchive;
 pub mod market;
 pub mod metrics;
+
 pub mod mods;
 pub mod net;
 pub mod oscrypt;
@@ -39,6 +40,8 @@ pub mod sidecar;
 pub mod snapshot;
 pub mod sponsors;
 pub mod storeeditor;
+#[cfg(test)]
+mod testdir;
 pub mod updater;
 pub mod webview2;
 pub mod win32;

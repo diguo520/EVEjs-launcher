@@ -28,41 +28,15 @@ const STORE_SAVE_TIMEOUT: Duration = Duration::from_secs(60);
 /// 查物品：要现读数据根下 22 MB 的 itemTypes + itemIcons，耗时以解析为主
 const STORE_ITEM_LOOKUP_TIMEOUT: Duration = Duration::from_secs(60);
 
-/// 统一的失败回包：`supported=false` 表示这台机器的服务端没有商城这套东西（不是用法错误）
-fn unsupported(reason: String) -> Value {
-    json!({ "ok": false, "supported": false, "reason": reason })
-}
-
+/// 调一次商城侧车（A7，2026-10-29）：与 gameconfig 逐字相同的流程已收在 `sidecar`，
+/// 超时仍按各自的 SLA 传进来。
 pub(crate) async fn call(
     root: &Path,
     args: Vec<String>,
     stdin: Option<&str>,
     timeout: Duration,
 ) -> Value {
-    let Some(script) = sidecar::script_path(root, STORE_CLI) else {
-        return unsupported(format!("随包侧车 {STORE_CLI} 不存在，无法读写商城"));
-    };
-    match sidecar::run_script(&script, root, &args, stdin, timeout).await {
-        Ok(outcome) => {
-            let text = outcome.stdout.trim();
-            if text.is_empty() {
-                let detail = sidecar::first_line(&outcome.stderr);
-                return unsupported(if detail.is_empty() {
-                    "商城侧车没有任何输出".to_string()
-                } else {
-                    detail
-                });
-            }
-            match serde_json::from_str::<Value>(text) {
-                Ok(value) => value,
-                Err(err) => unsupported(format!(
-                    "商城侧车返回的不是 JSON：{err}（前 200 字符：{}）",
-                    sidecar::truncate(text, 200)
-                )),
-            }
-        }
-        Err(reason) => unsupported(reason),
-    }
+    sidecar::call_sidecar(root, STORE_CLI, "商城", args, stdin, timeout).await
 }
 
 /// 读：整棵商城权威数据 + 摘要 + 配置。纯读，不写盘、不受服务运行状态限制。
@@ -142,13 +116,5 @@ mod tests {
                 || text.contains("`authority.${key}"),
             "侧车必须自检 authority.meta / authority.stores 再整棵覆盖"
         );
-    }
-
-    #[test]
-    fn failure_payload_is_marked_unsupported() {
-        let value = unsupported("boom".to_string());
-        assert_eq!(value["ok"], json!(false));
-        assert_eq!(value["supported"], json!(false));
-        assert_eq!(value["reason"], json!("boom"));
     }
 }

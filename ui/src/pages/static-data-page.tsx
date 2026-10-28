@@ -11,6 +11,9 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 
+import { formatBytes as formatBytesShared } from "@/lib/format"
+import { pad2 as pad } from "@/lib/time"
+
 import { Panel, SectionHeading } from "@/components/common/panel"
 import { useLocale } from "@/components/shell/locale-provider"
 import { Badge } from "@/components/ui/badge"
@@ -449,17 +452,20 @@ function summaryLine(
 }
 
 function formatBytes(bytes: number): string {
-  if (bytes >= 1024 * 1024 * 1024) return (bytes / (1024 * 1024 * 1024)).toFixed(1) + " GB"
-  if (bytes >= 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + " MB"
-  if (bytes >= 1024) return (bytes / 1024).toFixed(0) + " KB"
-  return bytes + " B"
+  // B2（2026-10-29）：有 GB 档、KB 永远取整、不兜底 —— 与 lib/format 的默认值不同，所以在这里写死
+  return formatBytesShared(bytes, {
+    maxUnit: "GB",
+    gbDigits: 1,
+    kbDigits: 0,
+    kbRoundAbove100: false,
+    invalid: null,
+  })
 }
 
 function formatStamp(ms: number): string {
   if (!ms) return "—"
   const date = new Date(ms)
-  const pad = (value: number) => String(value).padStart(2, "0")
-  return (
+    return (
     date.getFullYear() +
     "-" +
     pad(date.getMonth() + 1) +

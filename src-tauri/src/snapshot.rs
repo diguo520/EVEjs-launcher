@@ -36,20 +36,8 @@ pub type Verifier<'a> = &'a dyn Fn(&Value) -> Result<(), String>;
 /// 评价源与补给线源各读各的键（`modRatingUrls` / `sponsorUrls`）：
 /// 用户可能只想换其中一个，绑在一起会逼着两个一起改。
 pub fn urls_from_settings(runtime: &RuntimePaths, key: &str, defaults: &[&str]) -> Vec<String> {
-    let settings = config::read_settings(&runtime.settings_file());
-    if let Some(items) = settings.get(key).and_then(Value::as_array) {
-        let list: Vec<String> = items
-            .iter()
-            .filter_map(Value::as_str)
-            .map(str::trim)
-            .filter(|item| item.starts_with("http://") || item.starts_with("https://"))
-            .map(str::to_string)
-            .collect();
-        if !list.is_empty() {
-            return list;
-        }
-    }
-    defaults.iter().map(|item| item.to_string()).collect()
+    // A6（2026-10-29）：实现收在 config 里，与 review::write_urls 共用同一份口径
+    config::urls_from_settings(&runtime.settings_file(), key, defaults)
 }
 
 /// 读缓存。**缓存也要验签**：验不过就当场删掉、当作没有缓存 —— 与网络那条路共用同一个验签函数。

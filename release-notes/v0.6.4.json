@@ -1,0 +1,17 @@
+{
+  "version": "0.6.4",
+  "changelog": {
+    "zh": [
+      {
+        "type": "fix",
+        "text": "收起侧栏后左下角的更新入口改成按百分比走的环形进度；更新包下好后不再一直转圈，点一下即可重启安装"
+      }
+    ],
+    "en": [
+      {
+        "type": "fix",
+        "text": "The launcher update entry in the collapsed sidebar now shows a ring that follows the download percentage; it stops spinning once the package is ready, and one click restarts to install"
+      }
+    ]
+  }
+}

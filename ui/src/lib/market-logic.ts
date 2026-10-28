@@ -20,6 +20,7 @@ import type {
   RawMarketTypeRow,
 } from "@/lib/ipc"
 import { t } from "@/lib/i18n"
+import { pad2 as pad } from "@/lib/time"
 
 /* ---------------- 列式物品表 ---------------- */
 
@@ -377,7 +378,6 @@ export function formatStamp(iso: string | null | undefined): string {
   if (!iso) return "—"
   const at = new Date(iso)
   if (Number.isNaN(at.getTime())) return "—"
-  const pad = (n: number) => String(n).padStart(2, "0")
   return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())} ${pad(at.getHours())}:${pad(at.getMinutes())}`
 }
 

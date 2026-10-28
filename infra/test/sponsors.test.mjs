@@ -62,16 +62,8 @@ test("币种：三位字母照收并转大写，其余一律退回 CNY", () => {
   assert.equal(normalizeCurrency("USDT"), "CNY")
 })
 
-/** 一对真能用的 Ed25519 身份：私钥进 env、公钥拿来验签 */
-async function identity() {
-  const pair = await crypto.subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"])
-  const raw = new Uint8Array(await crypto.subtle.exportKey("raw", pair.publicKey))
-  return {
-    publicKey: bytesToBase64(raw),
-    keyId: await keyIdFromRaw(raw),
-    pkcs8: bytesToBase64(new Uint8Array(await crypto.subtle.exportKey("pkcs8", pair.privateKey))),
-  }
-}
+// identity() 收在 ./fixtures.mjs（三个测试文件原本各抄一份）
+import { identity } from "./fixtures.mjs"
 
 /** 只够把重建快照这条路径跑起来的 env：D1 给空结果，KV 用内存 Map */
 function fakeEnv(me) {

@@ -11,7 +11,7 @@
 //!   2. 密码**不再进 argv** —— 候选脚本里若有一份支持 `--password-stdin`（约定见
 //!      `vendor/cli/account-cli.js`），就用 stdin 传密码；只有当所有候选都是老脚本时才退回
 //!      argv（老脚本契约无法绕开），并在 [`CliOutcome::password_via_stdin`] 里如实标注。
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::Duration;
@@ -78,6 +78,53 @@ fn script_candidates(repo_root: &Path, name: &str) -> Vec<PathBuf> {
             .join(name),
     );
     candidates
+}
+
+/// 统一的「侧车不可用」回包：`supported=false` 表示这台机器的服务端没有这套东西（不是用法错误）。
+///
+/// A7（2026-10-29）：`gameconfig` 与 `storeeditor` 原本各写了一份**一模一样**的实现
+/// （jscpd #10），收在这里。形状属于 parity 冻结基线，所以只搬不改。
+pub fn unsupported(reason: impl Into<String>) -> Value {
+    json!({ "ok": false, "supported": false, "reason": reason.into() })
+}
+
+/// 调一次本模块的侧车并归一化失败（A7）：脚本不在、没有任何输出、非零退出、JSON 解析失败，
+/// 全都转成 `unsupported(...)`。`what` 是模块的中文名（游戏参数 / 商城），只影响文案。
+///
+/// **超时必须是入参，不在这里统一**：三处 SLA 不同（读配置 30s、写配置 60s 要整表回写、
+/// 查物品 60s）—— 统一超时会静默收紧或放宽别人声明的 SLA。
+pub async fn call_sidecar(
+    root: &Path,
+    script_name: &str,
+    what: &str,
+    args: Vec<String>,
+    stdin: Option<&str>,
+    timeout: Duration,
+) -> Value {
+    let Some(script) = script_path(root, script_name) else {
+        return unsupported(format!("随包侧车 {script_name} 不存在，无法读写{what}"));
+    };
+    match run_script(&script, root, &args, stdin, timeout).await {
+        Ok(outcome) => {
+            let text = outcome.stdout.trim();
+            if text.is_empty() {
+                let detail = first_line(&outcome.stderr);
+                return unsupported(if detail.is_empty() {
+                    format!("{what}侧车没有任何输出")
+                } else {
+                    detail
+                });
+            }
+            match serde_json::from_str::<Value>(text) {
+                Ok(value) => value,
+                Err(err) => unsupported(format!(
+                    "{what}侧车返回的不是 JSON：{err}（前 200 字符：{}）",
+                    truncate(text, 200)
+                )),
+            }
+        }
+        Err(reason) => unsupported(reason),
+    }
 }
 
 /// 第一个存在的候选（无密码命令走这里）
@@ -358,10 +405,17 @@ mod tests {
     use super::*;
 
     fn temp_dir(label: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("evejs-sidecar-{label}"));
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).expect("应能建测试目录");
-        dir
+        // B1：这份原来没有唯一后缀（并行测试会撞名），现在走共享实现
+        crate::testdir::temp_dir("sidecar", label)
+    }
+
+    /// A7：`unsupported` 的形状（`gameconfig` 与 `storeeditor` 原本各有一条逐字相同的断言）
+    #[test]
+    fn unsupported_payload_is_marked() {
+        let value = unsupported("boom");
+        assert_eq!(value["ok"], json!(false));
+        assert_eq!(value["supported"], json!(false));
+        assert_eq!(value["reason"], json!("boom"));
     }
 
     #[test]

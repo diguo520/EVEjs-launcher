@@ -9,6 +9,7 @@
  * 后端没有的东西一律留空（评分、评论、权限清单），页面会画「暂无」，不编数字。
  */
 import { getActiveLocale, type LocaleCode } from "./i18n"
+import { pad2 as pad } from "@/lib/time"
 import type {
   LocalizedReason,
   RawMarketList,
@@ -53,7 +54,6 @@ export function isoDate(ms: number | undefined | null): string {
   if (!ms || ms <= 0) return ""
   const date = new Date(ms)
   if (Number.isNaN(date.getTime())) return ""
-  const pad = (n: number) => String(n).padStart(2, "0")
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
 }
 

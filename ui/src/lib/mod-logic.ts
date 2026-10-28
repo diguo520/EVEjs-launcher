@@ -4,6 +4,7 @@
  */
 import { pinyin } from "pinyin-pro"
 
+import { formatBytes as formatBytesShared } from "@/lib/format"
 import { t } from "@/lib/i18n"
 import type { RawModPreflightReport } from "@/lib/ipc"
 import {
@@ -93,11 +94,8 @@ export const FALLBACK_MOD_TEMPLATES: ModTemplateCard[] = [
  * 0 照实写「0 B」而不是破折号：下载进度这类读数就是从 0 起步的，画成「—」会像是坏了。
  */
 export function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes < 0) return "—"
-  if (bytes < 1024) return `${Math.round(bytes)} B`
-  const kb = bytes / 1024
-  if (kb < 1024) return `${kb >= 100 ? Math.round(kb) : kb.toFixed(1)} KB`
-  return `${(kb / 1024).toFixed(1)} MB`
+  // B2（2026-10-29）：实现收在 lib/format，口径（0 照实写、字节四舍五入）用显式选项保留
+  return formatBytesShared(bytes, { roundBytes: true })
 }
 
 /** 模板卡片上的体积读数：N 个文件 · 约 6.2 KB（后端没给体积时只报文件数） */

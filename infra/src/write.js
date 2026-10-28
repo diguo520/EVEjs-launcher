@@ -144,23 +144,56 @@ export function validateStar(input) {
   if (!IDENTITY_RE.test(identityId)) return fail("identityId 不合法")
   const publicKey = checkPublicKey(input.publicKey)
   if (!publicKey) return fail("publicKey 必须是 32 字节 Ed25519 公钥的 base64")
-  const clock = checkClock(input.at, "at")
-  if (!clock.ok) return clock
-  return { ok: true, payload: { action, modId, identityId, publicKey, at: clock.value } }
+  const identity = checkIdentity(input)
+  if (!identity.ok) return identity
+  return {
+    ok: true,
+    payload: {
+      action,
+      modId: identity.modId,
+      identityId: identity.identityId,
+      publicKey: identity.publicKey,
+      at: identity.at,
+    },
+  }
 }
 
-/** 撤回自己那条评价（人走了想删掉，不该被拒绝） */
-export function validateRetract(input) {
-  if (!input || typeof input !== "object") return fail("请求体不是对象")
+/**
+ * 签名身份那一组的公共校验（B11，2026-10-29）。
+ *
+ * `star.add` / `star.remove` / `review.retract` 三处**逐行相同**（jscpd 报了两处，第三处只是
+ * 中间夹了别的字段）：`modId` / `identityId` / `publicKey` / 时间戳四件套 + 各自的文案。
+ * 收成一处之后，再加动作不会漏掉其中一条 —— 那种漏掉是签名负载少字段，服务端才拒，最难查。
+ *
+ * 返回 `{ ok: false, ... }` 时调用方原样 return；成功时给四个已经过校验的值。
+ */
+function checkIdentity(input, atField = "at") {
   const modId = text(input.modId)
   if (!MOD_ID_RE.test(modId)) return fail("modId 不合法")
   const identityId = text(input.identityId)
   if (!IDENTITY_RE.test(identityId)) return fail("identityId 不合法")
   const publicKey = checkPublicKey(input.publicKey)
   if (!publicKey) return fail("publicKey 必须是 32 字节 Ed25519 公钥的 base64")
-  const clock = checkClock(input.at, "at")
+  const clock = checkClock(input[atField], atField)
   if (!clock.ok) return clock
-  return { ok: true, payload: { action: "review.retract", modId, identityId, publicKey, at: clock.value } }
+  return { ok: true, modId, identityId, publicKey, at: clock.value }
+}
+
+/** 撤回自己那条评价（人走了想删掉，不该被拒绝） */
+export function validateRetract(input) {
+  if (!input || typeof input !== "object") return fail("请求体不是对象")
+  const identity = checkIdentity(input)
+  if (!identity.ok) return identity
+  return {
+    ok: true,
+    payload: {
+      action: "review.retract",
+      modId: identity.modId,
+      identityId: identity.identityId,
+      publicKey: identity.publicKey,
+      at: identity.at,
+    },
+  }
 }
 
 /** 作者回复 / 改回复 */

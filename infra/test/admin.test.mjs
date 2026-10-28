@@ -63,16 +63,8 @@ test("KV 里的名单本体：解析不出来就当没有（手改坏了也不�
   assert.deepEqual(parseSponsorSource('[{"name":"甲","amount":1},null,"x"]'), [{ name: "甲", amount: 1 }])
 })
 
-/** 一对真能用的 Ed25519 身份：私钥进 env、公钥拿来验签 */
-async function identity() {
-  const pair = await crypto.subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"])
-  const raw = new Uint8Array(await crypto.subtle.exportKey("raw", pair.publicKey))
-  return {
-    publicKey: bytesToBase64(raw),
-    keyId: await keyIdFromRaw(raw),
-    pkcs8: bytesToBase64(new Uint8Array(await crypto.subtle.exportKey("pkcs8", pair.privateKey))),
-  }
-}
+// identity() 收在 ./fixtures.mjs（三个测试文件原本各抄一份）
+import { identity } from "./fixtures.mjs"
 
 /** 够跑管理接口与重算快照的 env：D1 给空结果，KV 用内存 Map，令牌由 options 决定 */
 function fakeEnv(me, options = {}) {

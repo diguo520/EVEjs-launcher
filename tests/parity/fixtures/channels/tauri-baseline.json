@@ -25,7 +25,7 @@
       "phase": "3-4",
       "platform": "win32",
       "repoRoot": "<abs-path>",
-      "version": "0.6.3"
+      "version": "0.6.4"
     },
     "config:get": {
       "client": {
@@ -172,10 +172,10 @@
       "supported": true
     },
     "metrics:get": {
-      "cpuPercent": 30.656837463378903,
+      "cpuPercent": 32.44635009765625,
       "diskRoot": "<abs-path>",
       "diskTotalGB": 976.5624961853028,
-      "diskUsedGB": 801.981086730957,
+      "diskUsedGB": 803.7648010253906,
       "gpuDedicatedTotalGB": null,
       "gpuDedicatedUsedGB": null,
       "gpuMemoryTotalGB": null,
@@ -183,31 +183,31 @@
       "gpuPercent": null,
       "gpuSharedUsedGB": null,
       "memTotalGB": 31.855934143066406,
-      "memUsedGB": 16.92269515991211,
+      "memUsedGB": 11.273170471191406,
       "netBytesPerSec": 0,
       "virtualMemTotalGB": 34.480934143066406,
-      "virtualMemUsedGB": 28.49687957763672,
+      "virtualMemUsedGB": 22.166934967041016,
       "volumes": [
         {
-          "freeGB": 56.151161193847656,
-          "percent": 74.75554509474047,
+          "freeGB": 55.953609466552734,
+          "percent": 74.84436045608155,
           "root": "<abs-path>",
           "totalGB": 222.4296836853027,
-          "usedGB": 166.27852249145508
+          "usedGB": 166.47607421875
         },
         {
-          "freeGB": 154.26961517333984,
-          "percent": 47.34263733519059,
+          "freeGB": 154.2090950012207,
+          "percent": 47.3632948875429,
           "root": "<abs-path>",
           "totalGB": 292.96874618530273,
-          "usedGB": 138.6991310119629
+          "usedGB": 138.75965118408203
         },
         {
-          "freeGB": 174.5814094543457,
-          "percent": 82.12286360204244,
+          "freeGB": 172.7976951599121,
+          "percent": 82.30551594650592,
           "root": "<abs-path>",
           "totalGB": 976.5624961853028,
-          "usedGB": 801.981086730957
+          "usedGB": 803.7648010253906
         },
         {
           "freeGB": 417.1986885070801,
@@ -342,7 +342,7 @@
     "terminal:input": null,
     "terminal:resize": null,
     "update:state": {
-      "currentVersion": "0.6.3",
+      "currentVersion": "0.6.4",
       "state": "idle"
     }
   }

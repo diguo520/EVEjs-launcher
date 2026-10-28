@@ -3,7 +3,11 @@
    全部为演示用静态数据，不连接任何真实服务。
    ============================================================ */
 
+import { formatBytes as formatBytesShared } from "@/lib/format"
+
 /* ---------------- 服务 ---------------- */
+
+/* B2（2026-10-29）：体积读数走 lib/format；这里只保留「装机包」的口径（0 视为未知、0.1 MB 以下按 KB） */
 
 export type ServiceState =
   | "running"
@@ -1347,11 +1351,14 @@ export function formatCount(n: number): string {
  * 画破折号，不编一个 0.0 出来：与「下载量」「最近更新」同一个口径。
  */
 export function formatMB(mb: number): string {
-  if (!Number.isFinite(mb) || mb <= 0) return "—"
-  if (mb >= 1024) return `${(mb / 1024).toFixed(2)} GB`
-  if (mb < 0.1) {
-    const kb = mb * 1024
-    return `${kb < 100 ? kb.toFixed(1) : Math.round(kb)} KB`
-  }
-  return `${mb.toFixed(1)} MB`
+  // B2（2026-10-29）：实现在 lib/format；`kbBelowMB: 0.1` 就是 2026-10-16 那次报障的口径，别改
+  return formatBytesShared(mb, {
+    input: "MB",
+    maxUnit: "GB",
+    gbDigits: 2,
+    dashZero: true,
+    kbBelowMB: 0.1,
+    // 复核修正：不足 1 KiB 的包原本也按 KB 读（`0.9 KB`），不能掉到字节档
+    allowBytes: false,
+  })
 }

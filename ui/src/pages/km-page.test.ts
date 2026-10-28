@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 
 import { orderSidesForDisplay, sideTotalsCheck } from "@/pages/km-page"
+import { attackerOnlyLossEvent } from "@/test/fixtures/faction"
 import {
   battleReports,
   type BattleReport,
@@ -73,18 +74,8 @@ describe("KM 双阵营视图", () => {
   })
 
   it("只出手没挨打的一方也进合计（它是 0，但不许消失）", () => {
-    const events: FactionEvent[] = [
-      {
-        id: 1,
-        at: 1,
-        factionKey: "a",
-        type: "loss",
-        label: "战损",
-        group: "combat",
-        text: "",
-        payload: { unitID: 1, battleID: 12, systemID: 5, killer: { kind: "engagement", key: "b" } },
-      },
-    ]
+    // B4：与 faction-logic.test 共用同一条夹具
+    const events = attackerOnlyLossEvent()
     const report = battleReports(events)[0]
     const check = sideTotalsCheck(report)
     expect(check.shipsMatch).toBe(true)
