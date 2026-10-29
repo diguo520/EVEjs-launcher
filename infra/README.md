@@ -160,8 +160,21 @@ node scripts/gen-ratings-key.mjs --from .keys/ratings-key.pem --secret       # �
 ### 4. 部署
 
 ```bash
-npm run deploy      # npx wrangler deploy
+npm run deploy                 # npx wrangler deploy
+npm run migrate:remote         # npx wrangler d1 migrations apply evejs-mod-ratings --remote
 ```
+
+> **2026-10-29 教训：迁移与 Worker 的先后没有万能答案，要看迁移是「加」还是「删」。**
+>
+> | 迁移类型 | 安全顺序 | 为什么 |
+> | --- | --- | --- |
+> | 加（`ADD COLUMN` 等） | **先迁移、后发 Worker** | 新代码会读新列，库还没有就每次读都报错 |
+> | 删（`DROP INDEX` / 删列，且**旧 Worker 依赖它**） | **先发 Worker、后迁移** | 旧代码的 `ON CONFLICT` / 约束依赖没了就每次写都报错 |
+>
+> `infra.yml` 目前是**固定「先迁移、后部署」**（一行紧接着一行，窗口只有一两分钟），
+> 对「删」这一类不够稳。真要做删约束的迁移，正确做法是**拆成两次上线**：
+> 先发一版不再依赖它的 Worker（代码里冲突目标改掉、旧约束留着），下一次再跑删索引的迁移。
+> 这次的 `0004_multi_reviews.sql`（删 `idx_reviews_voter`）就是这种情形 —— 靠 CI 两步之间的窄窗口侥幸没出事。
 
 `wrangler.toml` 里的 `[[routes]] pattern = "ping.5318.cm"` + `custom_domain = true`，
 部署时 Cloudflare 自己在同一个账号里建 CNAME 并签发证书，不用手工加 DNS 记录。
