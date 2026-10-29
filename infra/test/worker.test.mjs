@@ -297,6 +297,58 @@ test("没有评论的模组回一份签名的空分片，而不是 503（503 会
   assert.equal(await verifyPayload(me.publicKey, body), true, "空分片也要签名，启动器才肯收")
 })
 
+test("带 reviewId 的撤回只删那一条，并核对作者归属", async () => {
+  const me = await identity()
+  const reviewId = "rv-1790882024887-29688"
+  const payload = {
+    action: "review.retract",
+    modId: "evejs-autolockfire",
+    identityId: "au-1234",
+    publicKey: me.publicKey,
+    at: Date.now(),
+    reviewId,
+  }
+  const signed = await signDocument(me.pkcs8, payload, me.keyId)
+  const calls = []
+  const env = {
+    DB: {
+      prepare: (sql) => {
+        const statement = {
+          bind: (...args) => {
+            calls.push({ sql, args })
+            return statement
+          },
+          first: async () => (/FROM reviews WHERE id = \?/.test(sql) ? { id: reviewId } : null),
+          all: async () => ({ results: [] }),
+          run: async () => ({ success: true }),
+        }
+        return statement
+      },
+    },
+    SNAPSHOTS: { get: async () => null, put: async () => {} },
+  }
+  const response = await worker.fetch(
+    new Request("https://ping.5318.cm/v1/reviews/retract", {
+      method: "POST",
+      body: JSON.stringify(signed),
+      headers: { "content-type": "application/json" },
+    }),
+    env,
+    ctxSpy()
+  )
+  const body = await response.json()
+  assert.equal(body.ok, true, JSON.stringify(body))
+  // 归属核对：必须按 id 查，并且带上 public_key 一起查（否则能撤别人的评论）
+  const owned = calls.find((call) => /SELECT id FROM reviews WHERE id = \?/.test(call.sql))
+  assert.ok(owned, "应当按 id 定位那一条")
+  assert.ok(/public_key/.test(owned.sql), "并且要核对作者归属")
+  assert.deepEqual(owned.args, [reviewId, "evejs-autolockfire", me.publicKey])
+  // 只删这一条，绝不能走「删自己的全部」那条路
+  const deletes = calls.filter((call) => /DELETE FROM reviews WHERE id IN/.test(call.sql))
+  assert.equal(deletes.length, 1)
+  assert.deepEqual(deletes[0].args, [reviewId])
+})
+
 test("撤回评论顺手删掉挂在它上面的回复（不留孤儿）", async () => {
   const me = await identity()
   const reviewId = "rv-1790882024887-29688"
@@ -341,9 +393,11 @@ test("撤回评论顺手删掉挂在它上面的回复（不留孤儿）", async
   const replies = calls.find((call) => /DELETE FROM replies WHERE review_id IN/.test(call.sql))
   assert.ok(replies, "应该顺手删掉回复，而不是只删评论")
   assert.deepEqual(replies.args, [reviewId])
+  // 2026-10-29：一人一条不再成立 —— 老客户端（负载里没有 reviewId）走「删自己的全部」，
+  // 但落地语句改成按 id 删（先查 id 再 `DELETE ... WHERE id IN`）。
   assert.ok(
-    calls.some((call) => /DELETE FROM reviews WHERE mod_id/.test(call.sql)),
-    "评论本身当然也要删"
+    calls.some((call) => /DELETE FROM reviews WHERE id IN/.test(call.sql)),
+    "评论本身当然也要删（按 id）"
   )
 })
 

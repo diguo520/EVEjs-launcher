@@ -770,7 +770,7 @@
       "api": "modsReviewRetract",
       "channel": "mods:reviewRetract",
       "kind": "invoke",
-      "signature": "input: { modId: string }",
+      "signature": "input: { modId: string; reviewId?: string }",
       "params": [
         "input"
       ]
@@ -789,7 +789,7 @@
       "api": "modsReviewSubmit",
       "channel": "mods:reviewSubmit",
       "kind": "invoke",
-      "signature": "input: { modId: string; version: string; pkgSha256: string; body: string; stars?: number }",
+      "signature": "input: { modId: string; version: string; pkgSha256: string; body: string; stars?: number; reviewId?: string }",
       "params": [
         "input"
       ]

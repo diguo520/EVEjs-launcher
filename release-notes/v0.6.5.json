@@ -1,0 +1,17 @@
+{
+  "version": "0.6.5",
+  "changelog": {
+    "zh": [
+      {
+        "type": "fix",
+        "text": "模组评论不再限制「一人一条」：同一个人可以在同一个模组下写多条，编辑与撤回都按单条处理（旧客户端行为不变）"
+      }
+    ],
+    "en": [
+      {
+        "type": "fix",
+        "text": "Mod reviews are no longer limited to one per user: the same identity can write several reviews on a same mod, and editing or retracting now targets a single review (older clients keep their previous behaviour)"
+      }
+    ]
+  }
+}

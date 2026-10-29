@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS stars (
 );
 CREATE INDEX IF NOT EXISTS idx_stars_mod ON stars (mod_id, created_at DESC);
 
--- 评价：一个人对一个模组只有一条，改分改字都是 UPSERT，不是追加
+-- 评价：一个人对一个模组**可以有多条**（2026-10-29 放开；编辑按 id 覆盖，见 0004 迁移）
 CREATE TABLE IF NOT EXISTS reviews (
   id          TEXT    PRIMARY KEY,           -- 客户端生成的 reviewId，重试的幂等键
   mod_id      TEXT    NOT NULL,
@@ -38,8 +38,9 @@ CREATE TABLE IF NOT EXISTS reviews (
   hide_reason TEXT    NOT NULL DEFAULT ''
 );
 
--- 一人一票：同一个公钥对同一个模组只留一条，改分是覆盖
-CREATE UNIQUE INDEX IF NOT EXISTS idx_reviews_voter ON reviews (mod_id, public_key);
+-- 2026-10-29：**不再一人一条** —— 同一身份可以在同一个模组下写多条评价，
+-- 编辑按评价 id 原地覆盖（见 0004_multi_reviews.sql：旧库用迁移删掉下面这个唯一索引）。
+-- 新建库直接不建它（原来那行是 `CREATE UNIQUE INDEX idx_reviews_voter`）。
 CREATE INDEX IF NOT EXISTS idx_reviews_mod ON reviews (mod_id, updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_reviews_key ON reviews (public_key, updated_at DESC);
 

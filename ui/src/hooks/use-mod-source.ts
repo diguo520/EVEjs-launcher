@@ -140,6 +140,8 @@ export interface ModSourceState {
     version: string
     pkgSha256: string
     body: string
+    /** 改自己那条时带上它的 id（2026-10-29 起一人可以写多条） */
+    reviewId?: string
   }) => Promise<RawWriteAck>
   /** 点星 / 取消星标（GitHub 式：二元、可取消、一人一颗） */
   toggleStar: (modId: string, on: boolean) => Promise<RawWriteAck>
@@ -147,8 +149,8 @@ export interface ModSourceState {
   starredOf: (id: string) => boolean
   /** 正在点星的模组 id，空串表示没有在进行的请求 */
   starBusyId: string
-  /** 撤回自己那条评论（星标是另一件事，要取消得点星标按钮） */
-  retractReview: (modId: string) => Promise<RawWriteAck>
+  /** 撤回自己那条评论（星标是另一件事，要取消得点星标按钮）；`reviewId` 指明撤哪一条 */
+  retractReview: (modId: string, reviewId?: string) => Promise<RawWriteAck>
   /** 作者回复 / 改回复。鉴权在服务端：签名用的 keyId 必须命中该模组的作者 */
   submitReply: (input: { modId: string; reviewId: string; body: string }) => Promise<RawWriteAck>
   /** 撤回作者回复 */
@@ -390,7 +392,7 @@ export function useModSource(): ModSourceState {
   )
 
   const submitReview = useCallback(
-    (input: { modId: string; version: string; pkgSha256: string; body: string }) =>
+    (input: { modId: string; version: string; pkgSha256: string; body: string; reviewId?: string }) =>
       writeReviewAction("modsReviewSubmit", input, input.modId),
     [writeReviewAction]
   )
@@ -419,7 +421,9 @@ export function useModSource(): ModSourceState {
   )
 
   const retractReview = useCallback(
-    (modId: string) => writeReviewAction("modsReviewRetract", { modId }, modId),
+    (modId: string, reviewId?: string) =>
+      // 一人多条之后必须指明撤哪一条；不带 id 时退回旧口径（服务端删自己的全部）
+      writeReviewAction("modsReviewRetract", reviewId ? { modId, reviewId } : { modId }, modId),
     [writeReviewAction]
   )
 

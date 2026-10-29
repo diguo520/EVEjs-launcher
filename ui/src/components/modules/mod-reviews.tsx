@@ -49,30 +49,11 @@ export function Stars({ value, className }: { value: number; className?: string 
  * 我的评论。星标在上面那一行单独点，这里只写文字 —— 两者是独立的两件事，
  * 所以不再有「先点星才展开输入框」的门槛。
  */
-function MyRating({
-  mod,
-  onSubmit,
-}: {
-  mod: ModEntry
-  onSubmit: (input: { body: string }) => void
-}) {
+function MyRating({ onSubmit }: { onSubmit: (input: { body: string }) => void }) {
   const [body, setBody] = useState("")
 
-  const mine = mod.reviews.find((review) => review.mine) ?? null
-
-  if (mine) {
-    return (
-      <div className="rounded-md border border-input bg-background/40 px-3 py-2.5">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-          <span className="text-[12px] font-semibold text-foreground">我的评论</span>
-          <span className="min-w-2 flex-1" />
-          <span className="text-[10px] text-tertiary">
-            想改文字，在下面那条「我的评价」上点修改。
-          </span>
-        </div>
-      </div>
-    )
-  }
+  // 2026-10-29：**不再「一人一条」** —— 以前这里一发现有「我的评价」就把输入框换成一句静态提示，
+  // 用户于是只能改、不能追加。现在输入框一直在：发完就是一条新评论；想改某一条，用列表里那条的「修改」。
 
   return (
     <div className="rounded-md border border-input bg-background/40 px-3 py-2.5">
@@ -470,7 +451,7 @@ export function ModReviews({
 
   return (
     <div className="space-y-2.5">
-      <MyRating mod={mod} onSubmit={onAddReview} />
+      <MyRating onSubmit={onAddReview} />
 
       {total > 0 ? (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">

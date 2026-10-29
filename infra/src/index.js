@@ -587,7 +587,34 @@ async function upsertStar(request, env, input) {
   )
 }
 
-/** 写评价：一人一票（UNIQUE(mod_id, public_key)），改分改字都是覆盖。 */
+/**
+ * 写评价的那条 SQL（2026-10-29 抽成常量：测试要拿**真 SQL** 在真 SQLite 上验冲突语义）。
+ */
+const REVIEW_UPSERT_SQL = `INSERT INTO reviews (id, mod_id, version, pkg_sha256, stars, body, author_name, corp, country,
+                          identity_id, key_id, public_key, sig, created_at, updated_at, edited, hidden, hide_reason)
+     VALUES (?, ?, ?, ?, ?, ?, '', '', ?, ?, ?, ?, ?, ?, ?, 0, 0, '')
+     ON CONFLICT (id) DO UPDATE SET
+       version = excluded.version,
+       pkg_sha256 = excluded.pkg_sha256,
+       stars = excluded.stars,
+       body = excluded.body,
+       country = excluded.country,
+       identity_id = excluded.identity_id,
+       key_id = excluded.key_id,
+       sig = excluded.sig,
+       updated_at = excluded.updated_at,
+       edited = 1,
+       hidden = 0,
+       hide_reason = ''
+     WHERE reviews.public_key = excluded.public_key`
+
+/**
+ * 写评价：**可以写多条**，编辑按评价 id 原地覆盖（2026-10-29 放开，原先是「一人一票」）。
+ *
+ * 冲突目标从 `(mod_id, public_key)` 改成 `id`：客户端带新 id 就插入新行；带自己那条的 id
+ * 就当成编辑（`edited = 1`）。`WHERE reviews.public_key = excluded.public_key` 是**作者守卫** ——
+ * 没有它，拿到别人的 reviewId 就能改别人的正文。
+ */
 async function upsertReview(request, env, input, country) {
   const checked = validateReview(input)
   if (!checked.ok) return json({ ok: false, reason: checked.reason }, 400, NO_STORE)
@@ -616,24 +643,7 @@ async function upsertReview(request, env, input, country) {
   // 评论不再带分值：`reviews.stars` 退化成历史列（CHECK 还在，只能写 1..5）。
   // 老客户端发来的分值原样留着（老客户端读分片时按它渲染），新写的评论一律记 5。
   const legacyScore = Number.isInteger(payload.stars) ? payload.stars : 5
-  await env.DB.prepare(
-    `INSERT INTO reviews (id, mod_id, version, pkg_sha256, stars, body, author_name, corp, country,
-                          identity_id, key_id, public_key, sig, created_at, updated_at, edited, hidden, hide_reason)
-     VALUES (?, ?, ?, ?, ?, ?, '', '', ?, ?, ?, ?, ?, ?, ?, 0, 0, '')
-     ON CONFLICT (mod_id, public_key) DO UPDATE SET
-       version = excluded.version,
-       pkg_sha256 = excluded.pkg_sha256,
-       stars = excluded.stars,
-       body = excluded.body,
-       country = excluded.country,
-       identity_id = excluded.identity_id,
-       key_id = excluded.key_id,
-       sig = excluded.sig,
-       updated_at = excluded.updated_at,
-       edited = 1,
-       hidden = 0,
-       hide_reason = ''`
-  )
+  await env.DB.prepare(REVIEW_UPSERT_SQL)
     .bind(
       payload.reviewId,
       payload.modId,
@@ -675,20 +685,36 @@ async function retractReview(env, input) {
   const verified = await verifySignedWrite(input, payload)
   if (!verified.ok) return json({ ok: false, reason: verified.reason }, 403, NO_STORE)
   // 回复是挂在评论上的：评论没了，回复就成了孤儿（既不显示、也撤不掉，还会一直占着行数）。
-  // 同一 (mod_id, public_key) 只会有一条评论（UNIQUE 约束），所以按查到的 id 删是准的。
-  const removed = await env.DB.prepare("SELECT id FROM reviews WHERE mod_id = ? AND public_key = ?")
-    .bind(payload.modId, payload.publicKey)
-    .all()
-  const reviewIds = (removed?.results ?? []).map((row) => String(row.id ?? "")).filter(Boolean)
+  //
+  // 2026-10-29：一人一条不再成立，所以**按 id 删**（客户端在负载里带上要撤的那条，并核对作者）。
+  // 老客户端不带 reviewId —— 它是按「一人一条」设计的，退回旧口径：删掉自己在这个模组下的全部评价。
+  const wanted = typeof payload.reviewId === "string" ? payload.reviewId.trim() : ""
+  let reviewIds = []
+  if (wanted) {
+    const owned = await env.DB.prepare(
+      "SELECT id FROM reviews WHERE id = ? AND mod_id = ? AND public_key = ?"
+    )
+      .bind(wanted, payload.modId, payload.publicKey)
+      .first()
+    if (!owned?.id) {
+      return json({ ok: false, reason: "这条评价已经不在了（或是别人写的）" }, 404, NO_STORE)
+    }
+    reviewIds = [wanted]
+  } else {
+    const removed = await env.DB.prepare("SELECT id FROM reviews WHERE mod_id = ? AND public_key = ?")
+      .bind(payload.modId, payload.publicKey)
+      .all()
+    reviewIds = (removed?.results ?? []).map((row) => String(row.id ?? "")).filter(Boolean)
+  }
   if (reviewIds.length > 0) {
     const holes = reviewIds.map(() => "?").join(", ")
     await env.DB.prepare(`DELETE FROM replies WHERE review_id IN (${holes})`)
       .bind(...reviewIds)
       .run()
+    await env.DB.prepare(`DELETE FROM reviews WHERE id IN (${holes})`)
+      .bind(...reviewIds)
+      .run()
   }
-  await env.DB.prepare("DELETE FROM reviews WHERE mod_id = ? AND public_key = ?")
-    .bind(payload.modId, payload.publicKey)
-    .run()
   const aggregate = await reviewAggregate(env, payload.modId)
   return json({ ok: true, modId: payload.modId, retracted: true, ...aggregate }, 200, NO_STORE)
 }
@@ -1012,4 +1038,4 @@ export default {
 }
 
 /** 单测与本地脚本复用：不经过 Worker 入口也能单独跑这两个作业 */
-export const __internals = { makeSigner, readReviewRows, reviewIdFromPath, keyIdFromRaw, issueLicense }
+export const __internals = { makeSigner, readReviewRows, reviewIdFromPath, keyIdFromRaw, issueLicense, REVIEW_UPSERT_SQL }

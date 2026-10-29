@@ -85,6 +85,21 @@ fn normalise_body(raw: &str) -> String {
 }
 
 /// 幂等键。服务端只在**第一次**插入时用它，之后改分是 UPSERT，所以够唯一就行。
+/// 提交时用哪个 reviewId（2026-10-29：一人可以写多条之后，这条判定必须有唯一答案）。
+///
+/// · 带了合法的自己那条 id → 沿用它（服务端按 id 原地覆盖 = 编辑）；
+/// · 没带 / 形状不合法 → 新开一条。
+///
+/// 以前无论传什么都换新 id，靠 `UNIQUE(mod_id, public_key)` 才「看起来是编辑」—— 那个约束已经放开。
+fn review_id_for(submitted: &str) -> String {
+    let trimmed = submitted.trim();
+    if trimmed.is_empty() || bad_review_id(trimmed) {
+        new_review_id()
+    } else {
+        trimmed.to_string()
+    }
+}
+
 fn new_review_id() -> String {
     format!("rv-{}-{}", pkg::epoch_ms(), std::process::id())
 }
@@ -265,7 +280,11 @@ pub fn submit_review(runtime: &RuntimePaths, args: &Value) -> Value {
         fields.insert("stars".to_string(), json!(stars));
     }
     fields.insert("body".to_string(), json!(body));
-    fields.insert("reviewId".to_string(), json!(new_review_id()));
+    // 2026-10-29：编辑自己那条时带它的 id（服务端按 **id** 原地覆盖）；不带就新开一条。
+    fields.insert(
+        "reviewId".to_string(),
+        json!(review_id_for(&text_field(args, "reviewId"))),
+    );
     fields.insert("createdAt".to_string(), json!(pkg::epoch_ms() as u64));
     post_signed(runtime, fields, "提交评价")
 }
@@ -300,6 +319,12 @@ pub fn retract_review(runtime: &RuntimePaths, args: &Value) -> Value {
     let mut fields = Map::new();
     fields.insert("action".to_string(), json!("review.retract"));
     fields.insert("modId".to_string(), json!(text_field(args, "modId")));
+    // 2026-10-29：带上「要撤的那一条」—— 一人多条之后，服务端不能再用 (modId, publicKey) 定位。
+    // 不带就退回旧口径（删自己的全部），所以老调用方不受影响。
+    let review_id = text_field(args, "reviewId");
+    if !review_id.is_empty() {
+        fields.insert("reviewId".to_string(), json!(review_id));
+    }
     fields.insert("at".to_string(), json!(pkg::epoch_ms() as u64));
     post_signed(runtime, fields, "撤回评价")
 }
@@ -378,6 +403,18 @@ mod tests {
         assert_eq!(normalise_body("第一行\r\n第二行"), "第一行\n第二行");
         assert_eq!(normalise_body("第一行\r第二行"), "第一行\n第二行");
         assert_eq!(normalise_body("   \n  "), "");
+    }
+
+    /// 一人多条之后：编辑沿用传来的 id，新评论换新 id，形状不合法的 id 也不能被采用
+    #[test]
+    fn review_id_for_keeps_a_valid_edit_and_mints_otherwise() {
+        assert_eq!(
+            review_id_for("rv-1790882024887-29688"),
+            "rv-1790882024887-29688"
+        );
+        assert!(review_id_for("").starts_with("rv-"));
+        assert_ne!(review_id_for("rv-1"), "rv-1", "形状不合法（太短）不能用");
+        assert!(review_id_for("rv 1790882024887").starts_with("rv-"));
     }
 
     #[test]

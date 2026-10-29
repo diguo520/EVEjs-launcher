@@ -184,16 +184,18 @@ export function validateRetract(input) {
   if (!input || typeof input !== "object") return fail("请求体不是对象")
   const identity = checkIdentity(input)
   if (!identity.ok) return identity
-  return {
-    ok: true,
-    payload: {
-      action: "review.retract",
-      modId: identity.modId,
-      identityId: identity.identityId,
-      publicKey: identity.publicKey,
-      at: identity.at,
-    },
+  const payload = {
+    action: "review.retract",
+    modId: identity.modId,
+    identityId: identity.identityId,
+    publicKey: identity.publicKey,
+    at: identity.at,
   }
+  // 2026-10-29：可选带上「要撤的那一条」—— 一人多条之后不能靠 (mod_id, public_key) 定位。
+  // 老客户端没有这个字段，服务端退回「删掉自己的全部」，行为与它当时的模型一致。
+  const reviewId = typeof input.reviewId === "string" ? input.reviewId.trim() : ""
+  if (reviewId) payload.reviewId = reviewId
+  return { ok: true, payload }
 }
 
 /** 作者回复 / 改回复 */

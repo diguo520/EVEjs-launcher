@@ -1,0 +1,14 @@
+-- 2026-10-29：放开「一人一条评价」。
+--
+-- 原来 reviews 上有 UNIQUE(mod_id, public_key)（idx_reviews_voter），Worker 又用
+-- `ON CONFLICT (mod_id, public_key) DO UPDATE` —— 同一个人第二次发布就把第一条**覆盖**掉，
+-- 用户侧看到的就是「只能发一条评论」。
+--
+-- 现在：同一身份可以在同一个模组下写多条；编辑仍按**评价 id** 原地覆盖（Worker 里有作者守卫）。
+-- 星标不受影响：`stars` 表仍是 UNIQUE(mod_id, public_key) + ON CONFLICT DO NOTHING（一人一星）。
+--
+-- **部署顺序：先发 Worker，再跑这条迁移。**
+--   · 新 Worker 在旧 schema 上照样能跑（只是仍受唯一索引限制，不会 500）；
+--   · 旧 Worker 在新 schema 上会 500 —— 它的 `ON CONFLICT (mod_id, public_key)`
+--     在索引被删之后没有能匹配的约束。
+DROP INDEX IF EXISTS idx_reviews_voter;

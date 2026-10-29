@@ -81,7 +81,7 @@ POST /v1/stars/remove       取消星标
 
 | 约束 | 值 | 为什么 |
 | --- | --- | --- |
-| 一人一票 | `UNIQUE(mod_id, public_key)` | 改分是覆盖，不是追加 |
+| 一人可多条（2026-10-29 放开） | 按评价 `id` 冲突 | 同一身份可以写多条；编辑按 id 原地覆盖，服务端核对 `public_key` 归属。迁移见 `migrations/0004_multi_reviews.sql`（**先发 Worker 再跑迁移**：旧 Worker 在新 schema 上会 500） |
 | 一人一星 | `UNIQUE(mod_id, public_key)` on `stars` | 点星是幂等的 `ON CONFLICT DO NOTHING`，取消是删除 |
 | 「装过才能评」 | `pkg_sha256` 必须命中 `mod_versions`（每小时从索引同步） | 本地目录算不出包指纹，只能来自市场索引 |
 | 星标门槛 | `mod_versions` 里有这个 `mod_id` 即可（不要求版本 / 指纹） | 点星不是「装过才能评」，但也别让人给不存在的 id 刷星 |

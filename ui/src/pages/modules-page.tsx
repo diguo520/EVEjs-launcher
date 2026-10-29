@@ -722,10 +722,11 @@ export function ModulesPage({
   }
 
   /**
-   * 写评论 / 改评论走同一条：服务端按 (模组, 公钥) 覆盖，本来就是一人一条。
+   * 写评论 / 改评论走同一条：**一人可以写多条**（2026-10-29 放开）。
+   * 改自己那条时带 `reviewId`，服务端按 id 原地覆盖；不带就是新的一条。
    * v0.5 起评论不带分值 —— 点赞是星标按钮那件事（见 toggleStar）。
    */
-  async function addReview(input: { body: string }) {
+  async function addReview(input: { body: string; reviewId?: string }) {
     const mod = detailMod
     if (!mod) return
     const { version, pkgSha256 } = reviewTarget(mod)
@@ -740,6 +741,7 @@ export function ModulesPage({
       version,
       pkgSha256,
       body: input.body,
+      reviewId: input.reviewId,
     })
     if (!reply.ok) {
       reviewFailed(t("评价没能提交"), reply.reason)
@@ -768,10 +770,10 @@ export function ModulesPage({
     toast.success(on ? t("已收藏") : t("已取消收藏"))
   }
 
-  async function removeReview() {
+  async function removeReview(reviewId?: string) {
     const mod = detailMod
     if (!mod) return
-    const reply = await source.retractReview(mod.id)
+    const reply = await source.retractReview(mod.id, reviewId)
     if (!reply.ok) {
       reviewFailed(t("撤回评价失败"), reply.reason)
       return
@@ -1540,8 +1542,8 @@ export function ModulesPage({
         onReply={(reviewId, body) => void addReply(reviewId, body)}
         onEditReply={(reviewId, body) => void addReply(reviewId, body)}
         onDeleteReply={(reviewId) => void removeReply(reviewId)}
-        onEditReview={(_reviewId, input) => void addReview(input)}
-        onDeleteReview={() => void removeReview()}
+        onEditReview={(reviewId, input) => void addReview({ ...input, reviewId })}
+        onDeleteReview={(reviewId) => void removeReview(reviewId)}
       />
 
       <ModFormDialog
