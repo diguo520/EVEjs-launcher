@@ -38,10 +38,12 @@ function def(partial: Partial<GameConfigDefinition> & { key: string }): GameConf
 }
 
 describe("倍率识别", () => {
-  it("认得 167 条里那 8 个倍率键", () => {
+  it("认得 179 条里那 10 个倍率键", () => {
     const keys = [
       "missionRewardMultiplier",
       "planetSchematicOutputMultiplier",
+      "planetResourceAbundanceMultiplier",
+      "skinrDesignIterationMultiplier",
       "industryJobSpeedMultiplier",
       "skillTrainingSpeed",
       "upwellTimerScale",

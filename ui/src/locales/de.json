@@ -3654,5 +3654,19 @@
   "声明与哪些模组互斥：两边都启用时本模组会被跳过。可留空。": "Gibt an, mit welchen Mods dieser Mod unvereinbar ist: Sind beide aktiviert, wird dieser Mod übersprungen. Darf leer bleiben.",
   "依赖": "Abhängigkeit",
   "依赖模组": "Benötigte Mods",
-  "冲突模组": "Kollidierende Mods"
+  "冲突模组": "Kollidierende Mods",
+  "事件": "Ereignisse",
+  "SKINR 涂装": "SKINR-Skins",
+  "日志保留时长（小时）": "Log-Aufbewahrung (Stunden)",
+  "单个归档日志上限（MB）": "Max. stündliches Log-Archiv (MB)",
+  "启用海关检查": "Zollkontrollen aktivieren",
+  "海关扫描延迟（毫秒）": "Zoll-Scanverzögerung (ms)",
+  "海关投降对话框时限（秒）": "Zeitlimit Zoll-Übergabe (s)",
+  "登录活动编排": "Login-Kampagnen",
+  "行星资源丰度倍率": "Planeten-Ressourcenreichtum-Multiplikator",
+  "SKINR 设计迭代倍率": "SKINR-Design-Iteration-Multiplikator",
+  "启用阵营活动线": "Kampagnenpfad aktivieren",
+  "事件时间表": "Ereignis-Zeitpläne",
+  "Homefront 点位预设": "Homefront-Populationsvorgabe",
+  "Homefront 每种类型点位数": "Homefront-Standorte pro Typ"
 }

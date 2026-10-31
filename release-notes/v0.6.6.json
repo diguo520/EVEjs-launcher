@@ -1,0 +1,17 @@
+{
+  "version": "0.6.6",
+  "changelog": {
+    "zh": [
+      {
+        "type": "new",
+        "text": "游戏参数页补齐 12 个条目的中文名；世界页新增 Homefront 点位预设与每种类型点位数，服务端页补海关检查与日志归档，玩法页新增「事件」与「SKINR 涂装」两个分区"
+      }
+    ],
+    "en": [
+      {
+        "type": "new",
+        "text": "The game-parameter page now names 12 more settings in Chinese: the World tab can set the Homefront population preset and sites per type, the Server tab gains the customs-inspection and log-archive settings, and the Gameplay tab gains Events and SKINR SKINs sections"
+      }
+    ]
+  }
+}

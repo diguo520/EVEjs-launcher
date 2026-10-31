@@ -2,8 +2,12 @@
  * 游戏世界参数的中文标注。
  *
  * 服务端 schema 只给英文说明（`config/*.json` 的 description），而 keys 又全是英文驼峰，
- * 直接把 167 条英文摆给中文用户等于没做界面。这里只做**翻译**：条目 key 不动、值不动、
+ * 直接把 179 条英文摆给中文用户等于没做界面。这里只做**翻译**：条目 key 不动、值不动、
  * 校验不在这里，纯粹是给人看的中文短名。
+ *
+ * 维护口径（2026-10-31）：条目数要与服务端 `config/schema/*.js` 的定义数一致 —— 少一个就会在界面上
+ * 露出英文 key。查缺法：侧车 `read` 出来的 `definitions` 与本文件的 key 取差集（`domain` 字段就是六个文件）。
+ * 服务端升版新增条目时，**这里补短名 + GAME_CONFIG_SECTIONS 补分区名**即可，不需要动任何逻辑。
  *
  * 缺条目时调用方回退到 key 本身（不显示空白），所以服务端新增条目不会让面板崩，
  * 只是那一条暂时显示英文 key。
@@ -40,6 +44,8 @@ export const GAME_CONFIG_SECTIONS: Record<string, string> = {
   missions: "任务",
   subscription: "订阅",
   rewards: "奖励",
+  events: "事件",
+  skinr: "SKINR 涂装",
   combat: "战斗",
   planets: "行星工业",
   wormholes: "虫洞",
@@ -72,6 +78,8 @@ export const GAME_CONFIG_LABELS: Record<string, string> = {
   defaultCountryCode: "默认国家代码",
   logLevel: "日志级别",
   logPacketPayloadDetails: "数据包内容明细日志",
+  logRetentionHours: "日志保留时长（小时）",
+  logArchiveMaxMegabytes: "单个归档日志上限（MB）",
   spaceBubbleDebugEnabled: "空间气泡调试日志",
   spaceMissileDebugEnabled: "导弹与 Destiny 调试日志",
   gameServerBindHost: "游戏服务监听地址",
@@ -84,6 +92,9 @@ export const GAME_CONFIG_LABELS: Record<string, string> = {
   presenceReconcileChatEnabled: "校准本地聊天成员",
   presenceReconcileXmppEnabled: "校准 XMPP 房间在线",
   loginTakeoverEnabled: "允许顶号登录",
+  customsInspectionEnabled: "启用海关检查",
+  customsInspectionScanDelayMs: "海关扫描延迟（毫秒）",
+  customsInspectionPromptTimeoutSeconds: "海关投降对话框时限（秒）",
   imageServerUrl: "图片服务地址",
   imageServerBindHost: "图片服务监听地址",
   microservicesBindHost: "网关 / 微服务监听地址",
@@ -110,11 +121,16 @@ export const GAME_CONFIG_LABELS: Record<string, string> = {
   omegaLicenseEnabled: "默认 Omega 授权",
   dailyLoginRewardsEnabled: "每日登录奖励",
   dailyLoginRewards: "每日登录奖励表",
+  loginCampaigns: "登录活动编排",
   factionStandingLossOnKillEnabled: "击杀势力 NPC 掉声望",
   missionDeclinePenaltyEnabled: "连续拒绝任务有惩罚",
   newCharacterExperienceMode: "新角色教程模式",
   turretHitChanceAdditive: "炮台命中率加成",
   planetSchematicOutputMultiplier: "行星工业产出倍率",
+  planetResourceAbundanceMultiplier: "行星资源丰度倍率",
+  skinrDesignIterationMultiplier: "SKINR 设计迭代倍率",
+  campaignTrailEnabled: "启用阵营活动线",
+  eventSchedules: "事件时间表",
 
   /* ------------------------------ world ------------------------------- */
   wormholesEnabled: "启用虫洞",
@@ -134,6 +150,8 @@ export const GAME_CONFIG_LABELS: Record<string, string> = {
   defaultEmpireSentryGunsEnabled: "帝国区默认哨戒炮",
   universeSiteCountDefault: "每星系默认异常点数量",
   universeSiteCountsByFamily: "按类型覆盖异常点数量",
+  homefrontPopulationPreset: "Homefront 点位预设",
+  homefrontCustomSitesPerType: "Homefront 每种类型点位数",
   deadspaceWarpRestrictionEnabled: "死亡空间跃迁限制",
 
   /* ------------------------------ mining ------------------------------ */

@@ -208,7 +208,7 @@ export function GameConfigPage() {
             flush
             meta={t("{n} 项", { n: group.items.length })}
           >
-            {/* 参数按两列并排铺开：167 条单列排下来太长，宽屏上右半边一直是空的 */}
+            {/* 参数按两列并排铺开：179 条单列排下来太长，宽屏上右半边一直是空的 */}
             <div className="grid grid-cols-1 lg:grid-cols-2 [&>*:last-child]:border-b-0 lg:[&>*:nth-last-child(2):nth-child(odd)]:border-b-0">
               {group.items.map((def) => {
                 const text = gc.draft[def.key] ?? ""
