@@ -91,7 +91,10 @@
       "channel": "log:openArchive",
       "kind": "invoke",
       "signature": "group: string, name: string",
-      "params": ["group", "name"],
+      "params": [
+        "group",
+        "name"
+      ],
       "why": "存档列表里每行那个「打开」：用系统默认程序（记事本 / VSCode / 你关联的编辑器）打开这一份日志。只接受「组 id + 文件名」，真正的路径由后端按 logarchive::collect 现算再按文件名匹配 —— 渲染层给不了路径，所以不存在拿它去打开任意文件。组 id 就是列表里那三个：server / market / client。"
     },
     {
@@ -173,7 +176,9 @@
       "channel": "market:adjustStock",
       "kind": "invoke",
       "signature": "input: { stationId: number; typeId: number; quantity?: number; price?: number; reason?: string }",
-      "params": ["input"],
+      "params": [
+        "input"
+      ],
       "why": "物品市场页的「改价 / 改量」。走的是市场服务**自带**的管理接口 `POST /v1/admin/seed-stock/adjust`（路由见 market-server/src/main.rs，请求体见 market-common 的 AdjustSeedStockRequest），不是自己拿连接写 SQLite —— 服务端处理完会按 (region, system, station, type) 精确失效 region/system/station 摘要与 order_books 缓存，所以**改完立刻生效**：不用重启市场服务，也不用重启客户端，游戏里把市场窗口关掉再打开就是新价。自己写库则拿不到这份失效逻辑（库里的数字变了、服务端内存里的摘要还是旧的，游戏里看不到任何变化），还会跟守护进程抢写锁。代价是这条路径依赖市场服务正在运行：没跑时回「先把市场服务启动起来」。改的是**种子库存**（NPC 那批默认 9999999 的货）；重新跑 BuildMarketSeed*.bat 会把手改值覆盖掉。一次调用只作用于「一个空间站 + 一个物品」，批量由界面按站循环调用；玩家挂单走的是另一套 PlaceOrder / ModifyOrder 接口，不在这里。"
     },
     {
@@ -413,6 +418,33 @@
         "opts"
       ],
       "why": "订阅 / 取消面板的事件流（`GET /api/events/stream`，text/event-stream）。SSE 不是请求-响应模型，进不了普通 IPC，所以由 Rust 侧持一条连接、把每一帧 `data: {...}` 转成 `faction:event` 事件推给渲染层（与既有的 `terminal:data` 同一种做法）。start=false 只停线程。**启动器始终只开一条**：面板最多允许 8 条 SSE 连接，重复订阅会先停旧的。断线后每 3 秒重连一次，重连前重读一次令牌（模组换过库也能接上）。opts.backlog（1–500，模组 maxBacklog 上限）决定初始回补多少条；opts.group 是分组白名单（fleet/combat/intel/territory/economy/logistics/system/other），Rust 侧过滤后再拼进 URL —— KM 页订阅 `{ backlog: 500, group: \\\"combat\\\" }` 才能拿到逐舰损失（loss / killReward）：不过滤时这类事件在混合流里稀疏到 200 条回补里一条都没有，KM 就永远开天窗。"
+    },
+    {
+      "api": "certEnsure",
+      "channel": "cert:ensure",
+      "kind": "invoke",
+      "signature": "",
+      "params": [],
+      "why": "2026-11-01 报障：覆盖式重新部署服务端之后，「重新给客户端打证书」打不上 —— 服务端自带的 Install-EvEJSCerts.ps1 卡在它自己的 node-forge 门上（它在**仓库根**做 require，而根 node_modules 是空的：启动器原来的「主服务器依赖」任务只跑 cd server && npm ci）。这条通道把整条链接进启动器：先自愈前置（安装根缺 node-forge 就补一次 npm ci），再跑同一个服务端脚本（脚本本身幂等：没装过就装、装过就按当前 CA/叶子覆盖两份 cacert.pem 并更新 CurrentUser\\Root），最后读盘复检把结论回给界面。"
+    },
+    {
+      "api": "downloadCancel",
+      "channel": "download:cancel",
+      "kind": "invoke",
+      "signature": "",
+      "params": [],
+      "why": "下载中点「取消」。下载循环是分段的（`net::download_cancellable`），每读一块前问一次这个标志，所以取消最多浪费一段流量，不会整包下完才发现没人要。取消后**半截文件一并删掉**：用户要的是「这个文件」，留个残缺的同名包在盘上只会被当成下好了 —— 下次解压才发现是坏的。只删刚写进去的那一份目标文件，不碰用户目录里别的东西。"
+    },
+    {
+      "api": "downloadSaveAs",
+      "channel": "download:saveAs",
+      "kind": "invoke",
+      "signature": "file: string, suggestedName?: string",
+      "params": [
+        "file",
+        "suggestedName"
+      ],
+      "why": "首页横幅的「客户端种子文件 / 服务端 <版本>」下载入口。用户口径（2026-11-01）：不要跳浏览器，就在启动器里另存为 —— 所以这条通道 = Win32「另存为」对话框（`dialog.rs`，与 `mods:saveText` 同一套）+ `net::download_cancellable`（分段 / 断点续传 / 可取消，与启动器自更新同一套）。入参只有**一个对象名**，域名与 `down/` 前缀拼死在 Rust 侧：既开不了任意主机，也写不到用户选定的目标文件之外（与 `mods::join_within` 同一口径）。同一时刻只允许一条下载，第二次点直接回「已有下载在进行」。目标已存在时先删再下 —— 这里的语义是「覆盖」，把旧文件当半截包续传会拼出坏包。"
     }
   ],
   "send": [
@@ -440,6 +472,11 @@
       "api": "onFactionStreamState",
       "channel": "faction:streamState",
       "why": "事件流的连接状态：`{connected, reason}`。掉线时界面把「动态」标成「已断开（原因）」并自动重连，而不是静默停在最后一帧 —— 静默会让用户以为世界不动了。"
+    },
+    {
+      "api": "onDownloadProgress",
+      "channel": "download:progress",
+      "why": "下载进度帧：`{file, received, total, path}`（`total` 在服务端不给长度时是 null，界面就只报已下字节）。数组载荷，与 `mod:downloadProgress` 同形；下载循环每读完一块回报一次，进度条按 received/total 画。"
     }
   ]
 }

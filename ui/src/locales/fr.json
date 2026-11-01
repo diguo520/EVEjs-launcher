@@ -3668,5 +3668,17 @@
   "启用阵营活动线": "Activer le parcours de campagne",
   "事件时间表": "Calendriers d'événements",
   "Homefront 点位预设": "Préréglage de population Homefront",
-  "Homefront 每种类型点位数": "Sites Homefront par type"
+  "Homefront 每种类型点位数": "Sites Homefront par type",
+  "客户端种子文件": "Fichier torrent du client",
+  "没能打开下载链接": "Impossible d'ouvrir le lien de téléchargement",
+  "重新为客户端安装证书": "Réinstaller le certificat client",
+  "正在重新为客户端安装证书": "Réinstallation du certificat client",
+  "证书已装入客户端": "Certificat installé dans le client",
+  "没装过就装、装过就覆盖，两份信任包都已确认。": "Installé si absent, remplacé s'il existe ; les deux paquets de confiance sont vérifiés.",
+  "证书安装失败": "Échec de l'installation du certificat",
+  "详情见环境自检与日志。": "Voir l'auto-vérification d'environnement et le journal.",
+  "下载": "Télécharger",
+  "服务端版本": "Versions du serveur",
+  "已保存到 {path}": "Enregistré dans {path}",
+  "点「下载」挑个位置，整包就存到本机。": "Cliquez sur Télécharger, choisissez un emplacement : le paquet est enregistré sur cette machine."
 }

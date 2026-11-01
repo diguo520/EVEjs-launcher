@@ -746,7 +746,12 @@ fn market_check(repo_root: &Path) -> serde_json::Value {
 fn client_config_checks(repo_root: &Path) -> (serde_json::Value, serde_json::Value) {
     let client = crate::config::read_client_config(repo_root);
     let client_path_ok = !client.client_path.is_empty() && Path::new(&client.client_path).exists();
-    let ca_ok = !client.ca_pem.is_empty() && Path::new(&client.ca_pem).exists();
+    // 2026-11-01：不再只看「EVEJS_CA_PEM 指向的文件在不在」—— 那看不到客户端那两个信任包，
+    // 换新客户端时永远显示「就绪」。现在按 clientcert 的真状态判：服务端 CA 在 + 客户端两个
+    // cacert.pem 里都含当前 CA（逐字节比 base64），于是「换了客户端」这件事能被发现。
+    let cert = crate::clientcert::status_from_config(repo_root);
+    let ca_ok = cert.installed();
+    let ca_detail = cert.summary();
 
     let client_path = check_item(
         "clientPath",
@@ -772,15 +777,14 @@ fn client_config_checks(repo_root: &Path) -> (serde_json::Value, serde_json::Val
         "客户端证书 CA",
         ca_ok,
         Some(!ca_ok),
-        if ca_ok {
-            "CA 证书就绪".to_string()
-        } else {
-            "CA 证书缺失".to_string()
-        },
+        ca_detail,
         if ca_ok {
             None
         } else {
-            Some("运行 SetupEveJS.bat 或检查 EVEJS_CA_PEM 指向")
+            Some(
+                "点「重新为客户端安装证书」：启动器会先补齐前置依赖（安装根 npm ci）再重装；\
+                 仍未通过就看 docs/证书重装-处置手册.md",
+            )
         },
         None,
     );

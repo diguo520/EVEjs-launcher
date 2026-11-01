@@ -1,0 +1,41 @@
+{
+  "version": "0.6.7",
+  "changelog": {
+    "zh": [
+      {
+        "type": "new",
+        "text": "首页横幅新增两个下载入口：**客户端种子文件**与**服务端**。都由启动器自己下 —— 点一下弹系统「另存为」，选好位置就开始下，横幅上显示进度、随时可取消，不再跳到浏览器。"
+      },
+      {
+        "type": "new",
+        "text": "「服务端」改成版本列表：桶里每个整包一行，版本号最大的那条打「最新」徽标，自己挑一个下（清单写在界面里，往 R2 传了新版本要加一条）。"
+      },
+      {
+        "type": "fix",
+        "text": "客户端证书安装全自动化：环境自检能识别「客户端没装 / 换过客户端」，一键重装会先自动补脚本前置依赖（安装根 npm ci）再跑服务端证书脚本并复检；没装过就装、装过就覆盖，不再出现「重新打证书打不了」"
+      },
+      {
+        "type": "opt",
+        "text": "直连启动客户端时的那一次证书安装不再「跑完不管成败」：现在会读盘复检，结论如实反映到环境自检里。"
+      }
+    ],
+    "en": [
+      {
+        "type": "new",
+        "text": "The console banner now has two download entries: the **client torrent file** and the **server**. Both download inside the launcher — click, pick a location in the native Save-as dialog, and watch the progress bar in the banner (cancel any time). Nothing opens in a browser."
+      },
+      {
+        "type": "new",
+        "text": "Server downloads became a version list: one row per package in the bucket, the highest version marked **Latest** (the list lives in the UI code — add a row after uploading a new version to R2)."
+      },
+      {
+        "type": "fix",
+        "text": "Client certificate installs are fully automatic now: the environment check can tell that a client is missing or has been replaced, and the one-click reinstall heals its own prerequisites (npm ci in the install root), runs the server-side certificate script and verifies the result — installed when absent, overwritten when present, so “the certificate just won't install” is gone."
+      },
+      {
+        "type": "opt",
+        "text": "The certificate step performed when launching a client directly no longer ignores its outcome: it reads the result back and reports it in the environment check."
+      }
+    ]
+  }
+}

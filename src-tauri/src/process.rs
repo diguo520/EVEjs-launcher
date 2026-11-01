@@ -1079,7 +1079,9 @@ fn apply_client_network_policy(env: &mut BTreeMap<String, String>, proxy_url: &s
 }
 
 /// 跑 ClientSETUP 的 PowerShell 脚本（隐藏窗口、120s 超时、失败只取首行）
-async fn run_client_setup_script(
+///
+/// `pub(crate)`：`clientcert::ensure` 也用这个跑证书脚本（那是启动器唯一一处调它的地方）。
+pub(crate) async fn run_client_setup_script(
     script: &Path,
     args: Vec<String>,
     extra_env: Vec<(String, String)>,
@@ -1120,22 +1122,13 @@ async fn run_client_setup_script(
     }
 }
 
-/// Play.bat 每次启动都会跑 Install-EvEJSCerts.ps1；直连客户端时自己补上（失败不阻塞）
-async fn prepare_client_certificate_trust(root: &Path, client_path: &str) {
-    let script = root
-        .join("tools")
-        .join("ClientSETUP")
-        .join("scripts")
-        .join("Install-EvEJSCerts.ps1");
-    if !script.is_file() {
-        return;
-    }
-    let _ = run_client_setup_script(
-        &script,
-        vec!["-ClientPath".to_string(), client_path.to_string()],
-        Vec::new(),
-    )
-    .await;
+/// Play.bat 每次启动都会跑 Install-EvEJSCerts.ps1；直连客户端时自己补上。
+///
+/// 2026-11-01：不再「失败不阻塞、连结果都不看」—— 改走 `clientcert::ensure`：
+/// 先自愈脚本前置（安装根缺 node-forge 就补一次 npm ci），再跑脚本，最后读盘复检；
+/// 结论返回给调用方（启动前那条路仍不阻塞启动，但拿到的是真实结果）。
+async fn prepare_client_certificate_trust(root: &Path, client_path: &str) -> serde_json::Value {
+    crate::clientcert::ensure(root, client_path).await
 }
 
 /// 启动前按配置决定是否重置显示设置（开关默认 off，此时完全不启动 PowerShell）
@@ -1484,9 +1477,12 @@ pub async fn start_client(app: &AppHandle, login: Option<ClientLogin>) -> Result
     Ok(json!({ "ok": true, "reason": "ok", "pid": pid }))
 }
 
-/// 启动前的证书信任 + 显示安全检查（都失败不阻塞启动）
+/// 启动前的证书信任 + 显示安全检查（都失败不阻塞启动）。
+///
+/// 证书那一步会把结论返回出来 —— 失败不挡启动，但环境自检会如实显示「客户端缺少 CA」，
+/// 界面上也有「重新为客户端安装证书」可手动重试。
 async fn await_client_prepare(root: &Path, client: &crate::config::ClientConfig) {
-    prepare_client_certificate_trust(root, &client.client_path).await;
+    let _cert = prepare_client_certificate_trust(root, &client.client_path).await;
     prepare_client_display_safety(root, client).await;
 }
 

@@ -314,6 +314,12 @@ export function diskVolumesFrom(
  * （见 src-tauri/src/init.rs 的 label_of）。其余项（Node、工具链）只能人工装，
  * 所以只给结论不给按钮 —— 原型里那套「点一下就变绿」的假修复不接。
  */
+/**
+ * 这些项的「修复」走**自动证书通道**（cert:ensure）：启动器自己补前置依赖再跑服务端证书脚本，
+ * 不必把用户推进 ClientSETUP 向导。向导仍是兜底（`init:run ca`，见 INIT_KEY）。
+ */
+export const CERT_FIX_IDS = new Set(["caCert"])
+
 const INIT_KEY: Record<string, string> = {
   serverDeps: "deps",
   localDb: "db",
@@ -347,7 +353,9 @@ export function envItemsFrom(report: RawEnvReport | null): CheckItem[] {
         !check.ok && initKey
           ? {
               hint: check.message,
-              action: t("执行「{name}」初始化", { name: check.label }),
+              action: CERT_FIX_IDS.has(check.key)
+                ? t("重新为客户端安装证书")
+                : t("执行「{name}」初始化", { name: check.label }),
               okDetail: check.message,
               done: t("{name} 初始化已执行，重新自检确认结果。", { name: check.label }),
             }

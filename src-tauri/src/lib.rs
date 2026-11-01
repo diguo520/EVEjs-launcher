@@ -8,10 +8,12 @@
 //!     命令白名单只有 launcher_invoke（自检命令仅 `--self-test` 注册），capabilities 只放行 core:event:default。
 pub mod accounts;
 pub mod author;
+pub mod clientcert;
 pub mod config;
 pub mod danger;
 pub mod db;
 pub mod dialog;
+pub mod downloads;
 pub mod env;
 pub mod faction;
 pub mod gameconfig;

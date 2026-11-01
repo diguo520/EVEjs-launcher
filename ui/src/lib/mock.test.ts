@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest"
 
-import { compatibleDeclaration, formatMB } from "@/lib/mock"
+import {
+  DOWNLOADS,
+  SERVER_VERSIONS,
+  compareVersions,
+  compatibleDeclaration,
+  formatMB,
+  latestServerVersion,
+} from "@/lib/mock"
 import { toMB } from "@/lib/mod-source"
 
 describe("formatMB（安装包体积读数）", () => {
@@ -45,5 +52,33 @@ describe("compatibleDeclaration（新模组的兼容声明预设）", () => {
   it("预发布 / 构建后缀不做通配", () => {
     expect(compatibleDeclaration("0.12.8-rc.1")).toBe("0.12.8-rc.1")
     expect(compatibleDeclaration("")).toBe("")
+  })
+})
+
+describe("服务端版本清单（拼进 R2 地址的就是这些对象名）", () => {
+  it("版本号按数值段比大小，不按字典序", () => {
+    expect(compareVersions("261028.1", "261018.1")).toBeGreaterThan(0)
+    expect(compareVersions("261028.1", "261028.1")).toBe(0)
+    // 字典序会把这个比反：字符串上 "26120" < "2619"，数值上 26120 > 2619
+    expect(compareVersions("26120", "2619")).toBeGreaterThan(0)
+    expect(compareVersions("0.12.8", "0.12.10")).toBeLessThan(0)
+    // 认不出的段当 0，不抛错
+    expect(compareVersions("261028.1-rc1", "261028.1")).toBe(0)
+  })
+
+  it("最新那一版 = 版本号最大的那个", () => {
+    const latest = latestServerVersion()
+    expect(latest?.version).toBe("261028.1")
+    for (const entry of SERVER_VERSIONS) {
+      expect(compareVersions(latest!.version, entry.version)).toBeGreaterThanOrEqual(0)
+    }
+  })
+
+  it("对象名都非空、不以斜杠开头、也不带 ..", () => {
+    for (const entry of [DOWNLOADS.clientTorrent, ...SERVER_VERSIONS]) {
+      expect(entry.file.length).toBeGreaterThan(0)
+      expect(entry.file.startsWith("/")).toBe(false)
+      expect(entry.file.includes("..")).toBe(false)
+    }
   })
 })

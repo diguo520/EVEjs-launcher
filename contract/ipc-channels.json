@@ -2,12 +2,12 @@
   "generatedFrom": "E:\\Games\\EveJS-v0.12.8\\launcher\\launcher",
   "generatedAt": "2026-10-13T16:52:43.237Z",
   "counts": {
-    "invoke": 120,
+    "invoke": 123,
     "send": 8,
-    "events": 10,
-    "requests": 128,
-    "registered": 83,
-    "apiTotal": 138
+    "events": 11,
+    "requests": 131,
+    "registered": 84,
+    "apiTotal": 142
   },
   "invoke": [
     {
@@ -154,6 +154,13 @@
       ]
     },
     {
+      "api": "certEnsure",
+      "channel": "cert:ensure",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
       "api": "configRepairClientDisplay",
       "channel": "config:repairClientDisplay",
       "kind": "invoke",
@@ -275,6 +282,23 @@
         "table",
         "limit",
         "offset"
+      ]
+    },
+    {
+      "api": "downloadCancel",
+      "channel": "download:cancel",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "downloadSaveAs",
+      "channel": "download:saveAs",
+      "kind": "invoke",
+      "signature": "file: string, suggestedName?: string",
+      "params": [
+        "file",
+        "suggestedName"
       ]
     },
     {
@@ -770,7 +794,7 @@
       "api": "modsReviewRetract",
       "channel": "mods:reviewRetract",
       "kind": "invoke",
-      "signature": "input: { modId: string; reviewId?: string }",
+      "signature": "input: { modId: string }",
       "params": [
         "input"
       ]
@@ -789,7 +813,7 @@
       "api": "modsReviewSubmit",
       "channel": "mods:reviewSubmit",
       "kind": "invoke",
-      "signature": "input: { modId: string; version: string; pkgSha256: string; body: string; stars?: number; reviewId?: string }",
+      "signature": "input: { modId: string; version: string; pkgSha256: string; body: string; stars?: number }",
       "params": [
         "input"
       ]
@@ -1088,6 +1112,10 @@
       "channel": "app:closeRequested"
     },
     {
+      "api": "onDownloadProgress",
+      "channel": "download:progress"
+    },
+    {
       "api": "onFactionEvent",
       "channel": "faction:event"
     },
@@ -1141,10 +1169,13 @@
       "accounts:logotypes",
       "accounts:online",
       "app:quit",
+      "cert:ensure",
       "danger:cacheSize",
       "danger:clearCache",
       "danger:eraseWorld",
       "danger:resetConfig",
+      "download:cancel",
+      "download:saveAs",
       "faction:action",
       "faction:api",
       "faction:sovereignty",
@@ -1183,11 +1214,11 @@
       "storeEditor:save"
     ],
     "send": [
-      "mods:marketCancel",
       "window:hideToTray"
     ],
     "events": [
       "app:closeRequested",
+      "download:progress",
       "faction:event",
       "faction:streamState"
     ]

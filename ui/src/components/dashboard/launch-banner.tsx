@@ -1,9 +1,14 @@
-import { Loader2, Play, Square } from "lucide-react"
+import { useState } from "react"
+import { Download, HardDriveDownload, Loader2, Play, Square } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { StatusDot } from "@/components/common/status-dot"
+import { DownloadStrip } from "@/components/dashboard/download-strip"
+import { ServerVersionsDialog } from "@/components/dashboard/server-versions-dialog"
+import { useLauncherDownloads } from "@/hooks/use-launcher-downloads"
 import { cn } from "@/lib/utils"
 import { listSeparator, t } from "@/lib/i18n"
+import { DOWNLOADS } from "@/lib/mock"
 
 export function LaunchBanner({
   running,
@@ -23,6 +28,10 @@ export function LaunchBanner({
 }) {
   const allUp = running === total
   const blocked = blockers.length > 0
+
+  /** 下载状态只有一份：种子文件、服务端各版本、版本弹窗里的每一行共用它 */
+  const downloads = useLauncherDownloads()
+  const [versionsOpen, setVersionsOpen] = useState(false)
 
   return (
     <div
@@ -77,6 +86,33 @@ export function LaunchBanner({
         </div>
 
         <div className="flex items-center gap-2">
+          {/* 两个入口都在启动器里「另存为」再下（用户 2026-11-01 口径：不跳浏览器）。
+              种子文件按下载状态按死：Rust 侧同一时刻只接一条，按死比点下去回一句
+              「已有下载在进行」好懂；服务端那一侧点开的是版本列表，列表里每行自己按。 */}
+          <Button
+            variant="outline"
+            size="lg"
+            disabled={downloads.active}
+            title={`${DOWNLOADS.clientTorrent.file} · ${DOWNLOADS.clientTorrent.size}`}
+            onClick={() =>
+              void downloads.start(DOWNLOADS.clientTorrent.file, DOWNLOADS.clientTorrent.file)
+            }
+          >
+            <Download />
+            客户端种子文件
+          </Button>
+          <Button
+            variant="outline"
+            size="lg"
+            title={t("服务端版本")}
+            onClick={() => setVersionsOpen(true)}
+          >
+            <HardDriveDownload />
+            服务端
+          </Button>
+        </div>
+
+        <div className="flex items-center gap-2">
           {/* 门禁挡着就按死：拦不住就不叫门禁。理由就在旁边那行红字里。
               全部服务起来之后同样按死 —— 再点一次只会把已经跑起来的服务重启一遍，
               用户看到的却是「一键启动没反应」或者服务被无谓地打断。 */}
@@ -108,6 +144,19 @@ export function LaunchBanner({
           </Button>
         </div>
       </div>
+
+      {/* 下载进度跟着横幅走：换页回来接着显示（下载本身跑在 Rust 侧，不随界面卸载停） */}
+      {downloads.active ? (
+        <div className="px-4 pb-3.5 pl-5">
+          <DownloadStrip
+            file={downloads.activeFile}
+            progress={downloads.progress}
+            onCancel={downloads.cancel}
+          />
+        </div>
+      ) : null}
+
+      <ServerVersionsDialog open={versionsOpen} onOpenChange={setVersionsOpen} downloads={downloads} />
     </div>
   )
 }

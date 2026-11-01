@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 
 import { call, callOr, hasIpc, subscribe, type RawEnvReport, type RawInitState } from "@/lib/ipc"
-import { envItemsFrom, initKeyOf } from "@/lib/live"
+import { CERT_FIX_IDS, envItemsFrom, initKeyOf } from "@/lib/live"
 import { localizeEnvItem } from "@/lib/env-i18n"
 import { useLocale } from "@/components/shell/locale-provider"
 import { CHECK_ITEMS, ENV_META, type CheckItem } from "@/lib/mock"
@@ -115,9 +115,56 @@ export function useEnvCheck(): EnvCheckState {
     [items, refresh]
   )
 
+  /**
+   * 客户端证书：走**自动通道**（cert:ensure）—— 启动器先自愈脚本前置（安装根 node-forge 缺了就补一次
+   * npm ci），再跑服务端证书脚本，最后读盘复检。没装过就装、装过就覆盖，结果如实报出来。
+   */
+  const ensureCert = useCallback(
+    (id: string) => {
+      const item = items.find((entry) => entry.id === id)
+      if (busyRef.current) {
+        toast.info("已有初始化任务在跑", { description: "等它结束再试。" })
+        return
+      }
+      setBusy({ id, label: item?.fix?.action ?? t("正在重新为客户端安装证书") })
+      void call<{
+        ok?: boolean
+        reason?: string
+        hint?: string
+        detail?: string
+        status?: { installed?: boolean }
+      }>("certEnsure", null)
+        .then((result) => {
+          if (result?.ok) {
+            toast.success(t("证书已装入客户端"), {
+              description: result.detail ?? t("没装过就装、装过就覆盖，两份信任包都已确认。"),
+            })
+            return
+          }
+          const parts = [result?.reason, result?.hint].filter((value): value is string => Boolean(value))
+          toast.error(t("证书安装失败"), {
+            description: parts.length > 0 ? parts.join(" · ") : t("详情见环境自检与日志。"),
+          })
+        })
+        .catch((error: unknown) => {
+          const message = error instanceof Error ? error.message : String(error)
+          toast.error(t("证书安装失败"), { description: message })
+        })
+        .finally(() => {
+          setBusy(null)
+          refresh()
+        })
+    },
+    [items, refresh]
+  )
+
   /** 修复：调后端初始化（init:run），失败就如实报错 */
   const fixOne = useCallback(
     (id: string) => {
+      if (CERT_FIX_IDS.has(id)) {
+        ensureCert(id)
+        return
+      }
       const key = initKeyOf(id)
       const item = items.find((entry) => entry.id === id)
       if (!key) {
@@ -146,7 +193,7 @@ export function useEnvCheck(): EnvCheckState {
         })
         .finally(() => setBusy(null))
     },
-    [items]
+    [ensureCert, items]
   )
 
   /** 一键修复：把所有「缺且有初始化动作」的项依次跑一遍 */

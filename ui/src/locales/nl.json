@@ -3668,5 +3668,17 @@
   "启用阵营活动线": "Campagnepad inschakelen",
   "事件时间表": "Gebeurtenisschema's",
   "Homefront 点位预设": "Homefront-populatievoorinstelling",
-  "Homefront 每种类型点位数": "Homefront-locaties per type"
+  "Homefront 每种类型点位数": "Homefront-locaties per type",
+  "客户端种子文件": "Client-torrentbestand",
+  "没能打开下载链接": "Downloadlink kon niet worden geopend",
+  "重新为客户端安装证书": "Clientcertificaat opnieuw installeren",
+  "正在重新为客户端安装证书": "Clientcertificaat wordt opnieuw geïnstalleerd",
+  "证书已装入客户端": "Certificaat in de client geïnstalleerd",
+  "没装过就装、装过就覆盖，两份信任包都已确认。": "Installeert als het ontbreekt en overschrijft als het bestaat; beide trustbundels gecontroleerd.",
+  "证书安装失败": "Installatie van certificaat mislukt",
+  "详情见环境自检与日志。": "Zie de omgevingszelftest en het log voor details.",
+  "下载": "Downloaden",
+  "服务端版本": "Serverversies",
+  "已保存到 {path}": "Opgeslagen in {path}",
+  "点「下载」挑个位置，整包就存到本机。": "Klik op Downloaden, kies een locatie en het pakket wordt op deze pc opgeslagen."
 }

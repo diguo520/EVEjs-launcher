@@ -3668,5 +3668,17 @@
   "启用阵营活动线": "Enable campaign trail",
   "事件时间表": "Event schedules",
   "Homefront 点位预设": "Homefront population preset",
-  "Homefront 每种类型点位数": "Homefront sites per type"
+  "Homefront 每种类型点位数": "Homefront sites per type",
+  "客户端种子文件": "Client torrent file",
+  "没能打开下载链接": "Could not open the download link",
+  "重新为客户端安装证书": "Reinstall the client certificate",
+  "正在重新为客户端安装证书": "Reinstalling the client certificate",
+  "证书已装入客户端": "Certificate installed in the client",
+  "没装过就装、装过就覆盖，两份信任包都已确认。": "Installed when missing, overwritten when present; both trust bundles verified.",
+  "证书安装失败": "Certificate installation failed",
+  "详情见环境自检与日志。": "See the environment self-check and the log for details.",
+  "下载": "Download",
+  "服务端版本": "Server versions",
+  "已保存到 {path}": "Saved to {path}",
+  "点「下载」挑个位置，整包就存到本机。": "Click Download, pick a location, and the package is saved to this machine."
 }

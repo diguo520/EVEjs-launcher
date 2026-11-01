@@ -111,6 +111,14 @@ async fn dispatch(
         }
         "shell:openExternal" => Ok(json!(open_external(app, &arg_str(args, 0)))),
 
+        /* ------------------------------ 下载 ------------------------------ */
+        // 首页横幅的两个下载入口（客户端种子文件 / 服务端各版本）：都是「另存为」对话框 +
+        // 启动器内下载，不跳浏览器（用户 2026-11-01 口径）。取消只是置标志，由下载循环收手。
+        "download:saveAs" => {
+            Ok(crate::downloads::save_as(app, &arg_str(args, 0), &arg_str(args, 1)).await)
+        }
+        "download:cancel" => Ok(crate::downloads::cancel()),
+
         /* ------------------------- 环境自检 / 健康检查 ------------------------- */
         "env:check" => Ok(env::detect_env(&root).await),
         "health:check" => Ok(json!(health::check_all().await)),
@@ -147,6 +155,9 @@ async fn dispatch(
         "config:setRepoRoot" => Ok(set_repo_root(&state, &arg_str(args, 0))),
         "config:setClient" => Ok(set_client(&root, args.first())),
         "config:repairClientDisplay" => Ok(repair_client_display(&root).await),
+        // 客户端证书信任（本工程扩展，契约见 contract/extensions.json）：
+        // 没装过就装、装过就覆盖；脚本前置（安装根 node-forge）缺了会先补一次 npm ci。
+        "cert:ensure" => Ok(crate::clientcert::ensure_from_config(&root).await),
 
         /* -------------------------- 游戏世界参数 --------------------------- */
         // 规则不在这里：条目定义 / 范围校验 / 原子写全部复用服务端的配置管理器，

@@ -3668,5 +3668,17 @@
   "启用阵营活动线": "Kampagnenpfad aktivieren",
   "事件时间表": "Ereignis-Zeitpläne",
   "Homefront 点位预设": "Homefront-Populationsvorgabe",
-  "Homefront 每种类型点位数": "Homefront-Standorte pro Typ"
+  "Homefront 每种类型点位数": "Homefront-Standorte pro Typ",
+  "客户端种子文件": "Client-Torrent-Datei",
+  "没能打开下载链接": "Download-Link konnte nicht geöffnet werden",
+  "重新为客户端安装证书": "Client-Zertifikat neu installieren",
+  "正在重新为客户端安装证书": "Client-Zertifikat wird neu installiert",
+  "证书已装入客户端": "Zertifikat im Client installiert",
+  "没装过就装、装过就覆盖，两份信任包都已确认。": "Fehlend wird installiert, vorhanden überschrieben; beide Trust-Bundles geprüft.",
+  "证书安装失败": "Zertifikatinstallation fehlgeschlagen",
+  "详情见环境自检与日志。": "Details siehe Umgebungs-Selbsttest und Log.",
+  "下载": "Herunterladen",
+  "服务端版本": "Server-Versionen",
+  "已保存到 {path}": "Gespeichert unter {path}",
+  "点「下载」挑个位置，整包就存到本机。": "Auf „Herunterladen“ klicken, Speicherort wählen – das Paket wird auf diesem Rechner gespeichert."
 }

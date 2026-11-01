@@ -31,6 +31,9 @@ pub const HANDLED: &[&str] = &[
     "author:importKey",
     "author:openKeyFolder",
     "author:setName",
+    // 客户端证书信任（本工程扩展，契约见 contract/extensions.json）：
+    // 没装过就装、装过就覆盖；脚本前置（安装根 node-forge）缺了会自动补 npm ci。
+    "cert:ensure",
     "config:get",
     "config:repairClientDisplay",
     "config:setClient",
@@ -56,6 +59,10 @@ pub const HANDLED: &[&str] = &[
     "database:restore",
     "database:save",
     "database:table",
+    // 首页横幅的下载（本工程扩展，契约见 contract/extensions.json）：
+    // saveAs=另存为对话框 + 启动器内下载；cancel=取消正在进行的下载
+    "download:cancel",
+    "download:saveAs",
     "engage:start",
     "engage:stop",
     "env:check",

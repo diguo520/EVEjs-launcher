@@ -1258,6 +1258,75 @@ export const LAUNCHER_META = {
   repoUrl: "https://github.com/diguo520/EVEjs-launcher",
 }
 
+/* ---------------- 下载（Cloudflare R2） ---------------- */
+
+/**
+ * 下载桶是 Cloudflare R2 的自定义域 `evejs.5318.cm` + `down/` 前缀，这里只写桶内对象名。
+ *
+ * **地址不在这边拼**：下载走启动器自己的「另存为 + 内置下载器」（用户 2026-11-01 口径：
+ * 不跳浏览器），URL 由 Rust 侧按固定域名 + 这里的对象名拼（见 `src-tauri/src/downloads.rs`
+ * 的 `BASE_URL`）。渲染层只给名字，给不了别的地址。
+ *
+ * 文件名为什么写死在仓里：R2 的自定义域不给目录列表，桶里有什么只有名字能说明。
+ * 2026-11-01 实测过这三个对象 —— 种子 609,229 B；服务端 261028.1 是 49,373,650 B
+ * （包里首条就是 `config/server.json` 与 `content-packs/`），261018.1 是 47,225,873 B。
+ */
+export interface DownloadEntry {
+  /** 桶内对象名：大小写与空格必须和 R2 上的一致，改了就是 404 */
+  file: string
+  /** 实测体积，先给用户一个下载前的预期；拿不到就画「—」，不编数字 */
+  size: string
+}
+
+export const DOWNLOADS = {
+  /** 客户端本体走 BitTorrent 分发：种子里的 name 是 `EVE Online - 3396210.zip` */
+  clientTorrent: { file: "EVE Online - 3396210.zip.torrent", size: "595 KB" },
+} satisfies Record<string, DownloadEntry>
+
+/** 服务端整包的一个版本（R2 桶里一个对象） */
+export interface ServerVersion extends DownloadEntry {
+  /** 服务端版本号；0.5.0 起是「日期.构建号」，更早的语义化版本号同样能比大小 */
+  version: string
+}
+
+/**
+ * 服务端整包的各版本：**往桶里传了新版本就在这里加一条**（顺序随意，「最新」由版本号算，
+ * 不靠数组顺序）。现在这两条是 2026-11-01 实测桶里仅有的两个。
+ */
+export const SERVER_VERSIONS: ServerVersion[] = [
+  { file: "EveJS-261028.1.zip", version: "261028.1", size: "47.1 MB" },
+  { file: "EveJS-261018.1.zip", version: "261018.1", size: "45.0 MB" },
+]
+
+/**
+ * 版本号比大小：「261028.1」按 `[261028, 1]` 逐段比**数值**。
+ * 为什么不直接比字符串：字典序会把 `26120` 排在 `2619` 前面，而日期号必须按数值比。
+ * 认不出的段（如 `rc1`）当 0，不抛错 —— 清单是手写的，写错一段不该把界面炸掉。
+ */
+export function compareVersions(left: string, right: string): number {
+  const parse = (value: string) =>
+    value.split(/[.\-+]/).map((part) => {
+      const digits = /^\d+/.exec(part.trim())
+      return digits ? Number(digits[0]) : 0
+    })
+  const a = parse(left)
+  const b = parse(right)
+  for (let index = 0; index < Math.max(a.length, b.length); index += 1) {
+    const diff = (a[index] ?? 0) - (b[index] ?? 0)
+    if (diff !== 0) return diff
+  }
+  return 0
+}
+
+/** 最新那一版（版本列表里打「最新」徽标用）；清单为空回 null，不编一个出来 */
+export function latestServerVersion(): ServerVersion | null {
+  let best: ServerVersion | null = null
+  for (const entry of SERVER_VERSIONS) {
+    if (!best || compareVersions(entry.version, best.version) > 0) best = entry
+  }
+  return best
+}
+
 /**
  * QQ 群入口：关于面板里 GitHub 图标右侧那两个。
  * `badge` 是图标右上角的角标序号（用户认的就是这两个数字），`group` 是群号；

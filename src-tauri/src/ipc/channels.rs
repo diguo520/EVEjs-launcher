@@ -18,8 +18,8 @@ pub struct ChannelSpec {
     pub kind: ChannelKind,
 }
 
-pub const REQUEST_COUNT: usize = 128;
-pub const EVENT_COUNT: usize = 10;
+pub const REQUEST_COUNT: usize = 131;
+pub const EVENT_COUNT: usize = 11;
 
 #[rustfmt::skip]
 pub const CHANNELS: &[ChannelSpec] = &[
@@ -40,6 +40,7 @@ pub const CHANNELS: &[ChannelSpec] = &[
     ChannelSpec { channel: "author:importKey", api: "authorImportKey", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "author:openKeyFolder", api: "authorOpenKeyFolder", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "author:setName", api: "authorSetName", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "cert:ensure", api: "certEnsure", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "config:get", api: "getConfig", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "config:repairClientDisplay", api: "configRepairClientDisplay", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "config:setClient", api: "configSetClient", kind: ChannelKind::Invoke },
@@ -56,6 +57,8 @@ pub const CHANNELS: &[ChannelSpec] = &[
     ChannelSpec { channel: "database:restore", api: "databaseRestore", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "database:save", api: "databaseSaveRow", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "database:table", api: "databaseTable", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "download:cancel", api: "downloadCancel", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "download:saveAs", api: "downloadSaveAs", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "engage:start", api: "engageStart", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "engage:stop", api: "engageStop", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "env:check", api: "envCheck", kind: ChannelKind::Invoke },
@@ -152,6 +155,7 @@ pub const CHANNELS: &[ChannelSpec] = &[
     ChannelSpec { channel: "window:minimize", api: "windowMinimize", kind: ChannelKind::Send },
     ChannelSpec { channel: "window:toggleMaximize", api: "windowToggleMaximize", kind: ChannelKind::Send },
     ChannelSpec { channel: "app:closeRequested", api: "onAppCloseRequested", kind: ChannelKind::Event },
+    ChannelSpec { channel: "download:progress", api: "onDownloadProgress", kind: ChannelKind::Event },
     ChannelSpec { channel: "faction:event", api: "onFactionEvent", kind: ChannelKind::Event },
     ChannelSpec { channel: "faction:streamState", api: "onFactionStreamState", kind: ChannelKind::Event },
     ChannelSpec { channel: "init:changed", api: "onInitChanged", kind: ChannelKind::Event },
