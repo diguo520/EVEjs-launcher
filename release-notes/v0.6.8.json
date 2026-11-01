@@ -1,0 +1,17 @@
+{
+  "version": "0.6.8",
+  "changelog": {
+    "zh": [
+      {
+        "type": "fix",
+        "text": "修掉一个会把服务端整个带走、还可能留下「握着端口却不服务」的僵尸进程的毛病：启动器注入的热重载宿主每 2 秒改写一次在线名单文件，Windows 上杀软或索引器刚碰到新写出的文件时，这次改名会被系统拒绝（EPERM），而旧代码让这个异常顺着定时器冒成未捕获错误 —— 服务端连同 26002 网关一起死（2026-10-25、2026-11-01 各中过一次）。现在改名被拒就退化为原位写，再失败只跳过这一轮；两个定时器里的异常全部兜住；轮询频率也从 2 秒放宽到 5 秒（读方容忍 10 秒）。"
+      }
+    ],
+    "en": [
+      {
+        "type": "fix",
+        "text": "Fixed a bug that could take the whole server down — and leave a zombie holding its ports without serving. The injected hot-reload host rewrites the online-player file every two seconds, and on Windows that rename gets refused (EPERM) whenever antivirus or an indexer touches the freshly written file. The old code let the exception escape a timer as an uncaught error, so the server died together with its gateway on 26002 (hit twice: 2026-10-25 and 2026-11-01). A refused rename now falls back to writing in place, a second failure just skips that round, every timer callback catches its errors, and the poll interval went from 2s to 5s (the reader tolerates 10s)."
+      }
+    ]
+  }
+}

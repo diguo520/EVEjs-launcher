@@ -1284,4 +1284,98 @@ mod tests {
             assert!(!entry.owners.starts_with(' ') && !entry.owners.ends_with(' '));
         }
     }
+
+    /// 2026-11-02 回归：写 \`online.json\` 的「改名覆盖」在 Windows 上会被系统拒绝
+    ///（杀软 / 索引器扫一眼刚写出来的小文件 → \`renameSync\` 报 EPERM / ACCESS_DENIED）。
+    /// 旧 host.js 让这个异常顺着 \`setInterval\` 冒成 uncaughtException，**把整个服务端连同
+    /// 26002 网关一起打死过两次**（2026-10-25、2026-11-01，后者还卡成握着端口的僵尸进程）。
+    ///
+    /// 做法：真起一个 node 跑**真的 host.js**，再用「允许读写、不允许删除」的共享模式占住
+    /// \`online.json\` —— 杀软就是这么占的，也是唯一能让「改名失败而原地写成功」的占法。
+    /// 断言：host 不许退出，且日志里出现「已原地写入」（退化路径真的生效）。
+    /// 依赖本机有 node（与 \`market::tests::live_typeinfo_payload\` 同一口径）。
+    #[cfg(windows)]
+    #[test]
+    fn host_survives_a_locked_state_file() {
+        use std::os::windows::fs::OpenOptionsExt;
+        use std::process::{Command, Stdio};
+        use std::time::{Duration, Instant};
+
+        let work = fixture_root().join("locked-host");
+        let dir = work.join("hotreload");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join(HOST_FILE), HOST_JS).unwrap();
+        write_json(&dir.join(BOOT_FILE), &json!({ "bootId": "locked-test" })).unwrap();
+        // host 的定时器都 unref 了（它假定服务端自己的事件循环撑着进程）。
+        // 这里补一个 ref 的定时器当那个循环，否则裸 node 会立刻正常退出，测不出差别。
+        let entry = "require('./hotreload/host.js');\nsetInterval(function () {}, 1000);\n";
+        std::fs::write(work.join("index.js"), entry).unwrap();
+
+        let out_log = work.join("stdout.log");
+        let err_log = work.join("stderr.log");
+        let mut child = Command::new("node")
+            .arg("index.js")
+            .current_dir(&work)
+            .env("EVEJS_HOTRELOAD_DIR", dir.to_string_lossy().to_string())
+            .env("EVEJS_HOTRELOAD", "1")
+            .stdout(Stdio::from(std::fs::File::create(&out_log).unwrap()))
+            .stderr(Stdio::from(std::fs::File::create(&err_log).unwrap()))
+            .spawn()
+            .expect("本机应有 node");
+
+        let online = dir.join(ONLINE_FILE);
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while !online.is_file() && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        assert!(
+            online.is_file(),
+            "host 没写出 online.json（日志 {}）",
+            out_log.display()
+        );
+
+        // 占住它：FILE_SHARE_READ | FILE_SHARE_WRITE，**不给 DELETE** → 改名过来必失败
+        let holder = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .share_mode(0x1 | 0x2)
+            .open(&online)
+            .unwrap();
+
+        // 等下一次写盘（ONLINE_POLL_MS = 5s）：要么日志出现「已原地写入」，要么进程死给我们看
+        let mut fell_back = false;
+        let deadline = Instant::now() + Duration::from_secs(20);
+        while Instant::now() < deadline {
+            if std::fs::read_to_string(&out_log)
+                .map(|text| text.contains("已原地写入"))
+                .unwrap_or(false)
+            {
+                fell_back = true;
+                break;
+            }
+            if let Ok(Some(status)) = child.try_wait() {
+                let err = std::fs::read_to_string(&err_log).unwrap_or_default();
+                drop(holder);
+                let _ = std::fs::remove_dir_all(&work);
+                panic!(
+                    "改名失败把 host 打死了（{status}）—— 这正是 10-25 / 11-01 两次事故：\n{err}"
+                );
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+
+        let alive = child.try_wait().ok().flatten().is_none();
+        drop(holder);
+        let _ = child.kill();
+        let _ = child.wait();
+        let out = std::fs::read_to_string(&out_log).unwrap_or_default();
+        let err = std::fs::read_to_string(&err_log).unwrap_or_default();
+        let _ = std::fs::remove_dir_all(&work);
+
+        assert!(
+            fell_back,
+            "被占住时没走原地写退化路径\nstdout: {out}\nstderr: {err}"
+        );
+        assert!(alive, "走完退化路径后 host 不该退出");
+    }
 }

@@ -36,7 +36,10 @@
     const API = 1;
     const HOST_VERSION = "1.1.0";
     const POLL_MS = 400;
-    const ONLINE_POLL_MS = 2000;
+    /// 在线名单只给界面看：启动器 `hotreload::online_character_ids` 里 `MAX_STALE_MS = 10_000`，
+    /// 也就是 10 秒内写过就算新鲜。原来这里是 2000 —— 每 2 秒试一次「改名覆盖」，
+    /// 白烧 IO，还把撞上文件锁（见 writeJsonAtomic 的注释）的概率放大 2.5 倍。
+    const ONLINE_POLL_MS = 5000;
 
     const dir = String(process.env.EVEJS_HOTRELOAD_DIR || "").trim();
     if (!dir) return;
@@ -89,11 +92,59 @@
       }
     }
 
+    /** 删临时文件，删不掉也不影响（它只是垃圾，不是数据） */
+    function removeQuietly(file) {
+      try {
+        if (fs.existsSync(file)) fs.unlinkSync(file);
+      } catch (error) {
+        /* 删不掉就算了 */
+      }
+    }
+
+    /**
+     * 原子写：先写临时文件再改名到位。
+     *
+     * **绝不允许抛**（2026-11-02 血的教训）：这里写的只是「给界面看的状态文件」，
+     * 但它跑在 `setInterval` 的回调里。Windows 上 rename 覆盖一个已存在的文件要求目标可删，
+     * 杀软 / 索引器扫一眼刚写出来的小文件就会 ACCESS_DENIED（Node 报 EPERM）——
+     * 异常顺着定时器冒成 uncaughtException，**整个服务端连同 26002 网关一起陪葬**
+     * （2026-10-25 与 2026-11-01 各发生过一次，后者服务端还卡成握着端口的僵尸）。
+     *
+     * 所以失败一律吞掉，按级退化：
+     *   1. 改名失败 → 原地写（原地写不需要 DELETE 权限，代价是短暂不原子）；
+     *   2. 原地写也失败 → 记一行日志、跳过这一轮，下一轮再试。
+     * 读方（启动器 `hotreload::read_json`）读到半截 JSON 只会当「这一轮读不到」，不会用坏数据。
+     */
     function writeJsonAtomic(file, value) {
-      const text = JSON.stringify(value, null, 2) + "\n";
+      let text;
+      try {
+        text = JSON.stringify(value, null, 2) + "\n";
+      } catch (error) {
+        safeLog("状态无法序列化，跳过本轮：" + ((error && error.message) || error));
+        return false;
+      }
       const temp = file + "." + process.pid + ".tmp";
-      fs.writeFileSync(temp, text, "utf8");
-      fs.renameSync(temp, file);
+      try {
+        fs.writeFileSync(temp, text, "utf8");
+        fs.renameSync(temp, file);
+        return true;
+      } catch (error) {
+        removeQuietly(temp);
+        try {
+          fs.writeFileSync(file, text, "utf8");
+          safeLog(
+            "改名被系统拒绝（" + ((error && error.message) || error) + "），已原地写入 " +
+              path.basename(file),
+          );
+          return true;
+        } catch (fallbackError) {
+          safeLog(
+            "写 " + path.basename(file) + " 失败（本轮跳过，下一轮再试）：" +
+              ((fallbackError && fallbackError.message) || fallbackError),
+          );
+          return false;
+        }
+      }
     }
 
     function safeLog(message) {
@@ -241,9 +292,18 @@
         writeState(true, characters);
       }
 
+      /** 定时器里绝不放过异常：一次读盘/写盘失败不该把服务端带走（2026-11-02） */
+      function safeSnapshot() {
+        try {
+          snapshot();
+        } catch (error) {
+          safeLog("在线快照失败（已忽略，下一轮再试）：" + ((error && error.message) || error));
+        }
+      }
+
       writeState(false, []);
-      snapshot();
-      const timer = setInterval(snapshot, ONLINE_POLL_MS);
+      safeSnapshot();
+      const timer = setInterval(safeSnapshot, ONLINE_POLL_MS);
       if (timer && typeof timer.unref === "function") timer.unref();
     }
 
@@ -701,19 +761,24 @@
       }
     }
 
+    // 规律同在线那处定时器：回调里任何异常都不能逃出去（2026-11-02）
     const timer = setInterval(function () {
-      drainIfChanged(
-        requestFile,
-        processingFile,
-        handle,
-        "hotreload",
-      );
-      drainIfChanged(
-        accountRequestFile,
-        accountProcessingFile,
-        handleAccountCreate,
-        "account",
-      );
+      try {
+        drainIfChanged(
+          requestFile,
+          processingFile,
+          handle,
+          "hotreload",
+        );
+        drainIfChanged(
+          accountRequestFile,
+          accountProcessingFile,
+          handleAccountCreate,
+          "account",
+        );
+      } catch (error) {
+        safeLog("请求轮询出错（已忽略）：" + ((error && error.message) || error));
+      }
     }, POLL_MS);
     if (timer && typeof timer.unref === "function") timer.unref();
   } catch (error) {
