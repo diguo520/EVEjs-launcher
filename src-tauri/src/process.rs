@@ -376,6 +376,139 @@ fn shorten_line(line: &str) -> String {
     }
 }
 
+/// 主服务器崩溃时的「点名」：哪个模组、哪个文件把服务端打死的。
+///
+/// 为什么值得单独做：模组的代码跑在服务端进程里，**一个没接住的异常就足以让整个服务端退出**
+/// （2026-11-02：faction-sim 在定时器里读不到自己的 `data/ops.json`，一天打死两次，用户只看到
+/// 「异常退出（exit 1）」，得自己去翻控制台才知道凶手是谁）。取不到证据就回 `None`，不编原因。
+///
+/// `not_before_ms` 是本轮服务的启动时刻：只认这一轮之后写下的报告，免得上一次的崩溃被重新翻出来
+/// 顶在卡片上。
+fn main_server_crash_cause(state: &AppState, not_before_ms: u64) -> Option<String> {
+    let root = state.repo_root();
+    crash_cause_from_report(&root, not_before_ms)
+        .or_else(|| crash_cause_from_console(&state.runtime))
+}
+
+/// 取证一：node 自己的崩溃报告（`<root>/_local/logs/node-reports/`）。
+///
+/// 文件名固定是 `uncaught-exception-<dump 时刻 ms>-<pid>.json`，时刻就在名字里 —— 判新鲜度不用拆日期。
+fn crash_cause_from_report(root: &Path, not_before_ms: u64) -> Option<String> {
+    let dir = root.join("_local").join("logs").join("node-reports");
+    let mut newest: Option<(u64, PathBuf)> = None;
+    for entry in std::fs::read_dir(&dir).ok()?.flatten() {
+        let name = entry.file_name().to_string_lossy().to_string();
+        let Some(stamp) = name
+            .strip_prefix("uncaught-exception-")
+            .and_then(|rest| rest.split('-').next())
+            .and_then(|value| value.parse::<u64>().ok())
+        else {
+            continue;
+        };
+        if not_before_ms > 0 && stamp < not_before_ms {
+            continue;
+        }
+        if newest.as_ref().map(|(at, _)| stamp > *at).unwrap_or(true) {
+            newest = Some((stamp, entry.path()));
+        }
+    }
+    let (_, path) = newest?;
+    let raw = std::fs::read_to_string(path).ok()?;
+    let value: Value = serde_json::from_str(raw.trim_start_matches('\u{feff}')).ok()?;
+    let stack = value.get("javascriptStack")?;
+    let message = stack
+        .get("errorProperties")
+        .and_then(|props| props.get("message"))
+        .and_then(Value::as_str)
+        .or_else(|| stack.get("message").and_then(Value::as_str))?;
+    let frames: Vec<&str> = stack
+        .get("stack")
+        .and_then(Value::as_array)
+        .map(|items| items.iter().filter_map(Value::as_str).collect())
+        .unwrap_or_default();
+    Some(describe_crash(message, &frames))
+}
+
+/// 取证二：启动器自己的控制台存档（报告没写成时，堆栈也留在这一份里）。
+///
+/// 只看每个文件最后 200 行：崩溃永远落在尾部，整份读进来没必要。
+fn crash_cause_from_console(runtime: &crate::runtime::RuntimePaths) -> Option<String> {
+    let dir = crate::logarchive::group_dir(runtime, crate::logarchive::SERVER);
+    let mut newest: Option<(std::time::SystemTime, PathBuf)> = None;
+    for entry in std::fs::read_dir(&dir).ok()?.flatten() {
+        let Ok(meta) = entry.metadata() else { continue };
+        if !meta.is_file() {
+            continue;
+        }
+        let Ok(modified) = meta.modified() else {
+            continue;
+        };
+        if newest
+            .as_ref()
+            .map(|(at, _)| modified > *at)
+            .unwrap_or(true)
+        {
+            newest = Some((modified, entry.path()));
+        }
+    }
+    let (_, path) = newest?;
+    let text = std::fs::read_to_string(path).ok()?;
+    let lines: Vec<&str> = text.lines().collect();
+    let tail = &lines[lines.len().saturating_sub(200)..];
+    let index = tail
+        .iter()
+        .rposition(|line| line.contains("uncaughtException"))?;
+    let detail = tail[index]
+        .split("detail=")
+        .nth(1)
+        .unwrap_or("")
+        .to_string();
+    let frames: Vec<&str> = tail[index + 1..]
+        .iter()
+        .take_while(|line| line.trim_start().starts_with("at "))
+        .copied()
+        .collect();
+    let message = if detail.trim().is_empty() {
+        frames.first().copied().unwrap_or("未捕获异常").to_string()
+    } else {
+        detail
+    };
+    Some(describe_crash(&message, &frames))
+}
+
+/// 从一帧堆栈里挖出「模组目录名 + 模组内文件:行:列」。
+///
+/// 帧形如 `at loadOpsConfig (E:\…\mods\<folder>\lib\…\x.js:86:32)`；
+/// 括号里没有 `mods\` 的（`node:fs` 这类内置帧）一律跳过，不猜。
+fn frame_place(frame: &str) -> Option<(String, String)> {
+    let open = frame.find('(')?;
+    let close = open + frame[open..].find(')')?;
+    let inside = &frame[open + 1..close];
+    let marker = inside.find("mods\\").or_else(|| inside.find("mods/"))?;
+    let rest = inside[marker + 5..].replace('\\', "/");
+    let mut parts = rest.splitn(2, '/');
+    let folder = parts.next()?.to_string();
+    if folder.is_empty() {
+        return None;
+    }
+    Some((folder, parts.next().unwrap_or("").to_string()))
+}
+
+/// 把「错误信息 + 堆栈帧」压成一句能塞进卡片的话：优先点名模组与它在模组里的文件。
+fn describe_crash(message: &str, frames: &[&str]) -> String {
+    let short = shorten_line(message.trim());
+    for frame in frames {
+        if let Some((folder, file)) = frame_place(frame) {
+            return if file.is_empty() {
+                format!("被模组 {folder} 打死：{short}")
+            } else {
+                format!("被模组 {folder} 打死（{file}）：{short}")
+            };
+        }
+    }
+    short
+}
+
 /// 等主服务器端口就绪，每 [`START_PROGRESS_STEP_MS`] 回写一次进度。
 ///
 /// 预算用尽但进程还活着 → 转成无限等（`over_budget`）：**到点不杀**。
@@ -657,7 +790,7 @@ async fn start_main_server(app: &AppHandle) -> Result<Value, String> {
 /// 只在「本以为它在运行」时判崩溃：手动停止会先把状态置成 `stopping`，
 /// 启动失败另有自己的错误路径，都不该被这里覆盖成「异常退出」。
 pub fn on_pty_exit(app: &AppHandle, tab_id: &str, code: i64) {
-    let (service_id, message) = match tab_id {
+    let (service_id, base) = match tab_id {
         "mainServer" => (MAIN_SERVER, format!("主服务器异常退出（exit {code}）")),
         "market" => (MARKET_SERVER, format!("市场服务异常退出（exit {code}）")),
         "client" => (CLIENT, format!("客户端已退出（exit {code}）")),
@@ -668,6 +801,23 @@ pub fn on_pty_exit(app: &AppHandle, tab_id: &str, code: i64) {
     };
     let current = state.services.state_of(service_id);
     if current == "running" || current == "starting" {
+        // 主服务器崩溃时点名凶手：模组代码跑在服务端进程里，一个没接住的异常就能整死服务端。
+        // 只认本轮启动之后写下的证据 —— 上一次的崩溃不能被重新翻出来顶在卡片上。
+        let message = if service_id == MAIN_SERVER {
+            let started = state
+                .services
+                .snapshot()
+                .into_iter()
+                .find(|info| info.id == MAIN_SERVER)
+                .and_then(|info| info.started_at)
+                .unwrap_or(0);
+            match main_server_crash_cause(&state, started) {
+                Some(cause) => format!("{base}：{cause}"),
+                None => base,
+            }
+        } else {
+            base
+        };
         // pid 传 None：update 会在 error 状态下清掉它（等价现役版 `r.ownedPid = undefined`）
         set_state(app, service_id, "error", None, Some(message));
     }
@@ -1778,5 +1928,61 @@ mod tests {
         let cut = shorten_line(&long);
         assert_eq!(cut.chars().count(), 161);
         assert!(cut.ends_with('…'));
+    }
+
+    /// 崩溃点名：帧里第一条落在 `mods\<folder>\…` 的就拿它当凶手（模组名 + 模组内文件）。
+    #[test]
+    fn describe_crash_names_the_mod_and_its_file() {
+        let frames = [
+            "at Object.readFileSync (node:fs:539:20)",
+            "at loadOpsConfig (E:\\Games\\EveJS-261028.1\\mods\\evejs-faction-sim\\lib\\bridge\\ops\\arbiter.js:86:32)",
+            "at Timeout.poll [as _onTimeout] (E:\\Games\\EveJS-261028.1\\mods\\evejs-faction-sim\\lib\\bridge\\travel.js:595:14)",
+        ];
+        let cause = describe_crash(
+            "ENOENT: no such file or directory, open 'E:\\Games\\EveJS-261028.1\\mods\\evejs-faction-sim\\data\\ops.json'",
+            &frames,
+        );
+        assert!(cause.contains("evejs-faction-sim"), "{cause}");
+        assert!(cause.contains("lib/bridge/ops/arbiter.js:86"), "{cause}");
+        assert!(cause.contains("ENOENT"), "{cause}");
+    }
+
+    /// 没有模组帧时不许硬编一个模组出来：照实给回错误信息本身。
+    #[test]
+    fn describe_crash_without_a_mod_frame_keeps_the_message() {
+        let frames = ["at Object.<anonymous> (E:\\somewhere\\server\\index.js:1:1)"];
+        assert_eq!(describe_crash("boom", &frames), "boom");
+    }
+
+    /// 崩溃报告按名字里的 dump 时刻取「本轮之后最近的一份」：旧报告不能顶上来。
+    #[test]
+    fn crash_cause_skips_reports_older_than_this_run() {
+        let root = std::env::temp_dir().join(format!("evejs-crash-cause-{}", std::process::id()));
+        let dir = root.join("_local").join("logs").join("node-reports");
+        std::fs::create_dir_all(&dir).unwrap();
+        let write = |stamp: u64, message: &str| {
+            let body = serde_json::json!({
+                "javascriptStack": {
+                    "errorProperties": { "message": message },
+                    "stack": [
+                        "at loadOpsConfig (E:\\Games\\mods\\evejs-faction-sim\\lib\\bridge\\ops\\arbiter.js:86:32)"
+                    ]
+                }
+            });
+            std::fs::write(
+                dir.join(format!("uncaught-exception-{stamp}-123.json")),
+                body.to_string(),
+            )
+            .unwrap();
+        };
+        write(1000, "旧的一次");
+        write(5000, "新的一次");
+        let latest = crash_cause_from_report(&root, 0).unwrap();
+        assert!(latest.contains("新的一次"), "{latest}");
+        assert!(
+            crash_cause_from_report(&root, 6000).is_none(),
+            "比这一轮还旧的报告不许被点名"
+        );
+        let _ = std::fs::remove_dir_all(&root);
     }
 }

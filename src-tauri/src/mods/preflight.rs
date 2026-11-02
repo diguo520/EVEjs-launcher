@@ -28,6 +28,7 @@ use crate::mods::safe_folder_name;
 use crate::mods::scan::{
     self, LOADER_DISABLED, LOADER_DISABLED_ALT, LOADER_ENABLED, MANIFEST_NAME,
 };
+use crate::mods::scan_cache::{self, FileClaims, ModScanCache};
 use crate::runtime::RuntimePaths;
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
@@ -172,14 +173,29 @@ fn extract_markers(source: &[u8]) -> BTreeSet<String> {
 }
 
 /// 遍历模组目录下的文本文件；`budget` 是共享的总字节预算
-fn walk_text_files(dir: &Path, budget: &mut u64, visit: &mut impl FnMut(&[u8])) {
+/// 访问一个源码文件之后告诉遍历器：这几步怎么继续
+#[derive(PartialEq, Eq)]
+enum SourceVisit {
+    /// 这些字节这一轮已经算过账（扣过预算），可以接着看下一个
+    Consumed,
+    /// 这个文件读不到 / 装不进预算：不扣预算，接着看下一个
+    Skipped,
+    /// 预算用完：立刻收手，别再走剩下的目录了
+    Stop,
+}
+
+/// 遍历模组源码目录：只看「可能是补丁脚本」的文本文件（跳过 6 类大目录、单文件 ≤3 MiB），
+/// 把「模组内相对路径 + 绝对路径 + 体积 + mtime」交给调用方 —— 由它决定读盘还是命中缓存
+/// （见 `scan_cache.rs`）。返回 `true` 表示遍历已收手（预算用完）。
+fn walk_source_files(
+    dir: &Path,
+    root: &Path,
+    visit: &mut impl FnMut(&str, &Path, u64, u64) -> SourceVisit,
+) -> bool {
     let Ok(entries) = fs::read_dir(dir) else {
-        return;
+        return false;
     };
     for entry in entries.flatten() {
-        if *budget == 0 {
-            return;
-        }
         let name = entry.file_name().to_string_lossy().to_string();
         let Ok(meta) = entry.metadata() else {
             continue;
@@ -188,24 +204,27 @@ fn walk_text_files(dir: &Path, budget: &mut u64, visit: &mut impl FnMut(&[u8])) 
             if name.starts_with('.') || SKIP_DIRS.contains(&name.as_str()) {
                 continue;
             }
-            walk_text_files(&entry.path(), budget, visit);
+            if walk_source_files(&entry.path(), root, visit) {
+                return true;
+            }
             continue;
         }
         if !meta.is_file() || meta.len() > MAX_SOURCE_BYTES {
             continue;
         }
-        let Ok(bytes) = fs::read(entry.path()) else {
+        let path = entry.path();
+        let Ok(relative) = path.strip_prefix(root) else {
             continue;
         };
-        if bytes.len() as u64 > *budget {
-            continue;
+        let relative = relative
+            .to_string_lossy()
+            .replace(std::path::MAIN_SEPARATOR, "/");
+        let (size, mtime_ms) = scan_cache::file_stamp(&meta);
+        if visit(&relative, &entry.path(), size, mtime_ms) == SourceVisit::Stop {
+            return true;
         }
-        *budget -= bytes.len() as u64;
-        if std::str::from_utf8(&bytes).is_err() {
-            continue;
-        }
-        visit(&bytes);
     }
+    false
 }
 
 /// 一个模组对服务端源码的主张：声明了哪些文件、每份文件上的基线指纹与注入标记。
@@ -222,25 +241,53 @@ struct ModClaims {
 }
 
 /// 一次遍历同时抠出两样东西：分两遍扫会把 64 MiB 的字节预算算两遍，也会慢一倍。
-fn mod_claims(dir: &Path, budget: &mut u64) -> ModClaims {
-    let mut collected: Vec<(BTreeSet<String>, BTreeSet<String>, BTreeSet<String>)> = Vec::new();
-    walk_text_files(dir, budget, &mut |bytes| {
-        let paths = extract_paths(bytes);
-        if paths.is_empty() {
-            return;
+fn mod_claims(dir: &Path, folder: &str, budget: &mut u64, cache: &mut ModScanCache) -> ModClaims {
+    let mut collected: Vec<FileClaims> = Vec::new();
+    walk_source_files(dir, dir, &mut |relative, abs, size, mtime_ms| {
+        if *budget == 0 {
+            return SourceVisit::Stop;
         }
-        collected.push((paths, extract_hashes(bytes), extract_markers(bytes)));
+        // 装不进这一轮的字节预算：与旧实现一致，跳过且不记账
+        if size > *budget {
+            return SourceVisit::Skipped;
+        }
+        let claims = cache.claims_for(folder, relative, size, mtime_ms, || {
+            let bytes = fs::read(abs).ok()?;
+            // 非 UTF-8 的源码不抠取（但它确实被读了，所以照旧记账 + 进缓存）
+            if std::str::from_utf8(&bytes).is_err() {
+                return Some(FileClaims::default());
+            }
+            let paths: Vec<String> = extract_paths(&bytes).into_iter().collect();
+            if paths.is_empty() {
+                return Some(FileClaims::default());
+            }
+            Some(FileClaims {
+                paths,
+                hashes: extract_hashes(&bytes).into_iter().collect(),
+                markers: extract_markers(&bytes).into_iter().collect(),
+            })
+        });
+        match claims {
+            None => SourceVisit::Skipped,
+            Some(claims) => {
+                *budget -= size;
+                if !claims.paths.is_empty() {
+                    collected.push(claims);
+                }
+                SourceVisit::Consumed
+            }
+        }
     });
 
     let mut claims = ModClaims::default();
-    for (paths, hashes, markers) in collected {
-        for path in paths {
+    for item in collected {
+        for path in item.paths {
             let fingerprints = claims.fingerprints.entry(path.clone()).or_default();
-            for hash in &hashes {
+            for hash in &item.hashes {
                 fingerprints.insert(hash.clone());
             }
             let claimed = claims.markers.entry(path).or_default();
-            for marker in &markers {
+            for marker in &item.markers {
                 claimed.insert(marker.clone());
             }
         }
@@ -251,18 +298,26 @@ fn mod_claims(dir: &Path, budget: &mut u64) -> ModClaims {
 /// 一份服务端文件的指纹集合：原始字节 / LF 归一化 / LF 归一化再去尾部空白。
 ///
 /// 三个都算，因为各模组的口径不一样（0.12.8 与 0.12.9 的差别就是 CRLF 与一次重排版）。
-fn file_fingerprints(abs: &Path) -> Option<BTreeSet<String>> {
-    let bytes = fs::read(abs).ok()?;
-    let mut out = BTreeSet::new();
-    out.insert(pkg::sha256_hex(&bytes));
-    let text = String::from_utf8_lossy(&bytes);
-    let normalized = text.replace("\r\n", "\n");
-    out.insert(pkg::sha256_hex(normalized.as_bytes()));
-    let trimmed = normalized.trim_end();
-    if trimmed != normalized {
-        out.insert(pkg::sha256_hex(trimmed.as_bytes()));
-    }
-    Some(out)
+fn file_fingerprints(abs: &Path, cache: &mut ModScanCache) -> Option<BTreeSet<String>> {
+    let meta = fs::metadata(abs).ok()?;
+    let (size, mtime_ms) = scan_cache::file_stamp(&meta);
+    let prints = cache.fingerprints_for(abs, size, mtime_ms, || {
+        let bytes = fs::read(abs).ok()?;
+        let text = String::from_utf8_lossy(&bytes);
+        let normalized = text.replace("\r\n", "\n");
+        let trimmed = normalized.trim_end();
+        let mut out = vec![
+            pkg::sha256_hex(&bytes),
+            pkg::sha256_hex(normalized.as_bytes()),
+        ];
+        if trimmed != normalized {
+            out.push(pkg::sha256_hex(trimmed.as_bytes()));
+        }
+        out.sort();
+        out.dedup();
+        Some(out)
+    })?;
+    Some(prints.into_iter().collect())
 }
 
 /// 把 `src/...` 落到实际文件：优先 `<根>/server/<src/...>`，其次 `<根>/<src/...>`
@@ -361,6 +416,10 @@ struct TargetRef {
 pub fn static_report(repo_root: &Path, runtime: &RuntimePaths) -> Value {
     let scan_result = scan::scan_mods(repo_root, runtime);
     let ignored = ignored_dirs(&crate::mods::mods_root(repo_root));
+    // 抠取结果与指纹按文件记忆化（见 `scan_cache.rs`）：开关一个模组只会动它自己的
+    // loader 文件名，其余源码文件的抠取结果可以整批复用 —— 预检从「读扫几十 MB」降到
+    // 「只读变化的那几个文件」。
+    let mut cache = ModScanCache::load(runtime);
 
     let mut budget = MAX_TOTAL_BYTES;
     let mut by_target: BTreeMap<String, Vec<TargetRef>> = BTreeMap::new();
@@ -371,7 +430,7 @@ pub fn static_report(repo_root: &Path, runtime: &RuntimePaths) -> Value {
             continue;
         }
         // 同一份文件 + 同一个标记 → 后注册的会被静默跳过，单独收一份做真冲突上报
-        let claims = mod_claims(&item.dir, &mut budget);
+        let claims = mod_claims(&item.dir, &item.folder, &mut budget, &mut cache);
         for (target, markers) in &claims.markers {
             for marker in markers {
                 by_marker
@@ -395,8 +454,8 @@ pub fn static_report(repo_root: &Path, runtime: &RuntimePaths) -> Value {
     let mut shared_count = 0usize;
     let mut stale_count = 0usize;
     for (target, refs) in &by_target {
-        let fingerprints =
-            resolve_server_file(repo_root, target).and_then(|abs| file_fingerprints(&abs));
+        let fingerprints = resolve_server_file(repo_root, target)
+            .and_then(|abs| file_fingerprints(&abs, &mut cache));
         let mut mods_json: Vec<Value> = Vec::new();
         let mut has_stale = false;
         for reference in refs {
@@ -480,6 +539,11 @@ pub fn static_report(repo_root: &Path, runtime: &RuntimePaths) -> Value {
         })
         .collect();
     let marker_conflict_count = marker_conflicts.len();
+
+    // 缓存收尾：丢掉「模组目录 / 服务端文件已经不在了」的条目，再按需落盘。
+    // 顺序放在报告构造之前 —— 报告只用内存里的数据，落盘失败也不影响这一轮结论。
+    cache.prune(&crate::mods::mods_root(repo_root));
+    cache.save(runtime);
 
     json!({
         "ok": true,
@@ -883,7 +947,8 @@ mod tests {
         let repo = repo_for("shared");
         let runtime = runtime_for("shared");
         let abs = write_server_file(&repo, "src/network/tcp/handshake.js", "// server file\r\n");
-        let fingerprints = file_fingerprints(&abs).unwrap();
+        let mut cache = ModScanCache::load(&runtime);
+        let fingerprints = file_fingerprints(&abs, &mut cache).unwrap();
         let raw = pkg::sha256_hex(&fs::read(&abs).unwrap());
         assert!(fingerprints.contains(&raw));
 
@@ -958,5 +1023,83 @@ mod tests {
         let report = static_report(&repo, &runtime);
         assert_eq!(report["summary"]["targets"], 0, "{report}");
         assert_eq!(report["summary"]["scannedMods"], 0, "{report}");
+    }
+
+    /// 2026-11-02 提速回归：缓存只许省时间，不许改结论。
+    ///
+    /// 同一份仓库连跑两次静态预检（第二次全程命中缓存），报告必须逐字段一致；
+    /// 再把模组源码改一改（体积与 mtime 变），报告要跟着变 —— 说明缓存真的失效了。
+    #[test]
+    fn static_report_is_identical_on_a_warm_cache() {
+        let repo = repo_for("cache-stable");
+        let runtime = runtime_for("cache-stable");
+        write_server_file(&repo, "src/network/tcp/handshake.js", "// server file\n");
+        let body =
+            "const P = \"server/src/network/tcp/handshake.js\";\nconst M = \"// demo:patch\";\n";
+        write_mod(&repo, "甲", "jia", body);
+
+        let cold = static_report(&repo, &runtime);
+        let warm = static_report(&repo, &runtime);
+        assert_eq!(cold, warm, "命中缓存的那一趟结论必须一模一样");
+        assert!(
+            runtime.cache.join("mod-claims.json").is_file(),
+            "预检应把抠取结果落盘到 _launcher/cache/mod-claims.json"
+        );
+
+        // 多声明一份服务端文件：体积与 mtime 都变了 → 缓存失效，结论跟着变
+        let more = format!("{body}const Q = \"src/space/runtime.js\";\n");
+        write_mod(&repo, "甲", "jia", &more);
+        let after = static_report(&repo, &runtime);
+        assert_ne!(after, warm, "改过源码之后结论要跟着变");
+        assert_eq!(after["summary"]["targets"], 2, "{after}");
+    }
+
+    /// 真机基准（默认不跑）：在**真实安装**上量一遍静态预检的冷 / 热耗时。
+    /// 手动执行：
+    ///   `EVEJS_ROOT=<服务端目录> cargo test --lib preflight::tests::live_static_report_timing -- --ignored --nocapture`
+    ///
+    /// 「热」= 缓存已经在盘上（正常使用下就是这一档）；「冷」= 先删缓存再跑一次。
+    #[test]
+    #[ignore]
+    fn live_static_report_timing() {
+        let Ok(root) = std::env::var("EVEJS_ROOT") else {
+            println!("跳过：没给 EVEJS_ROOT");
+            return;
+        };
+        let repo = PathBuf::from(&root);
+        let runtime = RuntimePaths::from_root(repo.join("_launcher"), true);
+        let cache_file = runtime.cache.join("mod-claims.json");
+
+        // 分段量：扫描 / 冷抠取 / 热抠取 —— 三段相加才是整趟预检的钱
+        let scan_start = std::time::Instant::now();
+        let scan_result = scan::scan_mods(&repo, &runtime);
+        let scan_ms = scan_start.elapsed().as_millis();
+
+        let _ = fs::remove_file(&cache_file);
+        let cold = std::time::Instant::now();
+        let cold_report = static_report(&repo, &runtime);
+        let cold_ms = cold.elapsed().as_millis();
+
+        let warm = std::time::Instant::now();
+        let warm_report = static_report(&repo, &runtime);
+        let warm_ms = warm.elapsed().as_millis();
+
+        let warm2 = std::time::Instant::now();
+        let warm2_report = static_report(&repo, &runtime);
+        let warm2_ms = warm2.elapsed().as_millis();
+
+        println!(
+            "scan_mods {} ms · 预检冷 {} ms · 预检热 {} ms · 预检热(第三趟) {} ms · 模组 {} 个 / 启用 loader {} / targets {} / ignored {}",
+            scan_ms,
+            cold_ms,
+            warm_ms,
+            warm2_ms,
+            scan_result.mods.len(),
+            cold_report["summary"]["scannedMods"],
+            cold_report["summary"]["targets"],
+            cold_report["summary"]["ignored"],
+        );
+        assert_eq!(cold_report, warm_report, "冷热两趟的结论必须一致");
+        assert_eq!(warm_report, warm2_report, "热跑几趟结论都要一致");
     }
 }

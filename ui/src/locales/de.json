@@ -3680,5 +3680,7 @@
   "下载": "Herunterladen",
   "服务端版本": "Server-Versionen",
   "已保存到 {path}": "Gespeichert unter {path}",
-  "点「下载」挑个位置，整包就存到本机。": "Auf „Herunterladen“ klicken, Speicherort wählen – das Paket wird auf diesem Rechner gespeichert."
+  "点「下载」挑个位置，整包就存到本机。": "Auf „Herunterladen“ klicken, Speicherort wählen – das Paket wird auf diesem Rechner gespeichert.",
+  "清理 {count} 条已不存在的记录": "{count} Einträge entfernen, die es nicht mehr gibt",
+  "已清理 {count} 条已不存在的顺序记录": "{count} veraltete Reihenfolge-Einträge entfernt"
 }

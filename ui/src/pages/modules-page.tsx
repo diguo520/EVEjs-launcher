@@ -389,6 +389,17 @@ export function ModulesPage({
   }, [mods])
 
   /**
+   * 顺序文件里「记着、但本机已经没有」的目录（`field === "order"` 那一类）。
+   *
+   * 这是**设计如此**：顺序文件故意留着已删模组的位次，重装回来能回到原位（后端给的原因
+   * 文案就是这么写的）。所以它们既不是错误、也不会自己消失 —— 得给用户一个「我确定不要了」的出口。
+   */
+  const staleOrderEntries = useMemo(
+    () => (source.plan?.ignored ?? []).filter((item) => item.field === "order"),
+    [source.plan]
+  )
+
+  /**
    * 正在拖的 key 用 ref 存：`dragstart` → `dragover` → `drop` 只隔几个事件 tick，
    * 走 state 的话 drop 里可能还读着上一次渲染的旧值（null），表现就是「拖了没反应」。
    * 另一个 state 只负责画「拖拽中」的半透明提示。
@@ -416,6 +427,24 @@ export function ModulesPage({
     }
     await source.reload()
     toast.success(t("加载顺序已更新"), { description: t("重启服务端后生效。") })
+  }
+
+  /**
+   * 清理顺序文件里已不存在的条目：把当前**存在的**模组按现有位次整份写回去。
+   *
+   * 为什么这样就对了：后端 `mods:list` 返回的顺序本身就是按 `mod-order.json` 排的
+   * （见 `mods/scan.rs` 读顺序文件后 sort），所以 `orderState.all` 天然等于「原顺序 ∩ 现存」——
+   * 写回去既保留相对位次，也保住停用模组的位置（它们同样在 `all` 里）。
+   */
+  async function cleanOrder() {
+    const removed = staleOrderEntries.length
+    const reply = await source.setOrder(orderState.all)
+    if (!reply.ok) {
+      toast.error(t("加载顺序没保存"), { description: reply.reason ?? t("后端没说明原因") })
+      return
+    }
+    await source.reload()
+    toast.success(t("已清理 {count} 条已不存在的顺序记录", { count: removed }))
   }
 
   function dragOverCard(event: DragEvent<HTMLDivElement>, targetKey: string) {
@@ -1455,6 +1484,8 @@ export function ModulesPage({
                 plan={source.plan}
                 enabledOrder={orderState.enabled}
                 onReorder={(next) => void applyOrder(next)}
+                staleOrderCount={staleOrderEntries.length}
+                onCleanOrder={() => void cleanOrder()}
               />
               <div className="space-y-3">
                 <ModOverlapPanel report={overlaps} mods={mods} onDisable={disableMod} />

@@ -3680,5 +3680,7 @@
   "下载": "Downloaden",
   "服务端版本": "Serverversies",
   "已保存到 {path}": "Opgeslagen in {path}",
-  "点「下载」挑个位置，整包就存到本机。": "Klik op Downloaden, kies een locatie en het pakket wordt op deze pc opgeslagen."
+  "点「下载」挑个位置，整包就存到本机。": "Klik op Downloaden, kies een locatie en het pakket wordt op deze pc opgeslagen.",
+  "清理 {count} 条已不存在的记录": "{count} regels verwijderen die niet meer bestaan",
+  "已清理 {count} 条已不存在的顺序记录": "{count} verouderde volgorderegels verwijderd"
 }

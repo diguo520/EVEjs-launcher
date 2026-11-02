@@ -445,30 +445,57 @@ export function useModSource(): ModSourceState {
     [writeReviewAction]
   )
 
-  const load = useCallback(async () => {
+  /**
+   * 核心段：面板上「点完必须立刻对」的两项 —— 列表（启停 / 顺序 / 冲突汇总）与生效顺序。
+   * 写动作之后只等这一段。
+   */
+  const loadCore = useCallback(async () => {
     if (!ipc) return
-    setLoading(true)
-    const [nextList, nextMarket, nextMine, nextSubs, nextAuthor, nextToken, nextTemplates, nextClaims, nextPreflight, nextPlan] =
-      await Promise.all([
-        callOr<RawModList>("modsList", null),
-        callOr<RawMarketList>("modsMarketList", null),
-        callOr<RawMyMods>("modsMyMods", null),
-        callOr<RawMySubmissions>("modsMySubmissions", null),
-        callOr<RawAuthorState>("authorGet", null),
-        callOr<RawTokenStatus>("modsGithubTokenStatus", null),
-        callOr<{ ok: boolean; templates: RawModTemplate[] }>("modsTemplates", null),
-        callOr<RawClaimCandidates>("modsClaimCandidates", null, {
-          offset: 0,
-          limit: CLAIM_PAGE_SIZE,
-          // 页头入口的判据是「本机有没有别人署名的模组」：范围用全部，
-          // 免得组织名下仓库的作者（owner 不是登录名）连入口都看不见
-          scope: "all",
-        }),
-        callOr<RawModPreflightReport>("modsPreflight", null),
-        // 生效顺序（给「加载顺序」面板看）：算起来便宜（一次 scan），跟着每次 reload 一起刷
-        callOr<RawModPlan>("modsPlan", null),
-      ])
+    const [nextList, nextPlan] = await Promise.all([
+      callOr<RawModList>("modsList", null),
+      // 生效顺序（给「加载顺序」面板看）：算起来便宜（一次轻量 scan），跟着核心段一起刷
+      callOr<RawModPlan>("modsPlan", null),
+    ])
     setList(nextList)
+    setPlan(nextPlan)
+    setLoaded(true)
+  }, [ipc])
+
+  /**
+   * 附加 / 诊断段：预检、认领候选、市场、我的模组、投稿、作者、令牌、模板。
+   *
+   * 这些数据**都不会因为「开关一个模组」而变**，可整趟却要跑一遍全量扫描加几 MB 源码的读扫
+   * （2026-11-02 实测：15 个模组 / 1.8 万文件，静态预检一趟约 3.6 s）。所以写动作之后它们改成
+   * 「后台刷」：界面先拿到核心段就放行，这几项晚一两秒到 —— 同一份数据、同一套口径，
+   * 不影响任何功能。
+   */
+  const loadAux = useCallback(async () => {
+    if (!ipc) return
+    const [
+      nextMarket,
+      nextMine,
+      nextSubs,
+      nextAuthor,
+      nextToken,
+      nextTemplates,
+      nextClaims,
+      nextPreflight,
+    ] = await Promise.all([
+      callOr<RawMarketList>("modsMarketList", null),
+      callOr<RawMyMods>("modsMyMods", null),
+      callOr<RawMySubmissions>("modsMySubmissions", null),
+      callOr<RawAuthorState>("authorGet", null),
+      callOr<RawTokenStatus>("modsGithubTokenStatus", null),
+      callOr<{ ok: boolean; templates: RawModTemplate[] }>("modsTemplates", null),
+      callOr<RawClaimCandidates>("modsClaimCandidates", null, {
+        offset: 0,
+        limit: CLAIM_PAGE_SIZE,
+        // 页头入口的判据是「本机有没有别人署名的模组」：范围用全部，
+        // 免得组织名下仓库的作者（owner 不是登录名）连入口都看不见
+        scope: "all",
+      }),
+      callOr<RawModPreflightReport>("modsPreflight", null),
+    ])
     applyMarket(nextMarket)
     setMine(nextMine)
     setSubmissions(nextSubs)
@@ -477,10 +504,30 @@ export function useModSource(): ModSourceState {
     setTemplates(nextTemplates?.templates ?? [])
     setClaims(nextClaims)
     setPreflight(nextPreflight)
-    setPlan(nextPlan)
-    setLoaded(true)
-    setLoading(false)
   }, [ipc, applyMarket])
+
+  /**
+   * 附加段串行队列：连着点两次开关时，两次后台刷新不能互相插队（否则旧快照可能后落地）。
+   * 失败一律吞掉 —— 附加数据读不到就保持界面现状，不清空也不报错（与 callOr 同口径）。
+   */
+  const auxChain = useRef<Promise<void>>(Promise.resolve())
+  const queueAux = useCallback(() => {
+    auxChain.current = auxChain.current
+      .then(() => loadAux())
+      .catch(() => {})
+    return auxChain.current
+  }, [loadAux])
+
+  /** 全量刷新：进面板 / 用户点刷新时走这条（两段都等，与旧行为一致） */
+  const load = useCallback(async () => {
+    if (!ipc) return
+    setLoading(true)
+    try {
+      await Promise.all([loadCore(), queueAux()])
+    } finally {
+      setLoading(false)
+    }
+  }, [ipc, loadCore, queueAux])
 
   /**
    * 运行一次预检。
@@ -571,18 +618,27 @@ export function useModSource(): ModSourceState {
     await load()
   }, [load])
 
-  /** 写动作的统一包装：调真通道 → 成功后重载 */
+  /**
+   * 写动作的统一包装：调真通道 → 成功后刷「核心段」，附加段丢后台。
+   *
+   * 为什么不再 `await load()`：开关一次只需要「列表 + 生效顺序」是对的（几百毫秒），
+   * 而 load() 里那 8 条附加通道加起来要好几秒（预检要读扫几 MB 源码）—— 等它们会把
+   * 「点一下开关」拖成 3–5 秒的等待，而那 8 项没有一个会因为开关而变。
+   */
   const act = useCallback(
     async (name: string, ...args: unknown[]): Promise<RawAck> => {
       try {
         const reply = (await call<RawAck>(name, ...args)) ?? { ok: false, reason: "没有回包" }
-        if (reply.ok) await load()
+        if (reply.ok) {
+          await loadCore()
+          void queueAux()
+        }
         return reply
       } catch (error) {
         return { ok: false, reason: error instanceof Error ? error.message : String(error) }
       }
     },
-    [load]
+    [loadCore, queueAux]
   )
 
   const setEnabled = useCallback(

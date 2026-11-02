@@ -1,5 +1,5 @@
 import { useRef, useState, type DragEvent } from "react"
-import { ChevronDown, ChevronRight, GripVertical, ListOrdered, TriangleAlert } from "lucide-react"
+import { ChevronDown, ChevronRight, GripVertical, ListOrdered, Trash2, TriangleAlert } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -24,11 +24,16 @@ export function ModLoadOrderPanel({
   plan,
   enabledOrder,
   onReorder,
+  staleOrderCount,
+  onCleanOrder,
 }: {
   plan: RawModPlan | null
   /** 用户基准顺序里的「已启用」那一段（folder 列表），拖拽落位用它 */
   enabledOrder: string[]
   onReorder: (next: string[]) => void
+  /** 顺序文件里记着、但本机已经不存在的目录条数（>0 才显示清理按钮） */
+  staleOrderCount: number
+  onCleanOrder: () => void
 }) {
   const [open, setOpen] = useState(true)
   // 正在拖的 folder 用 ref 存：dragstart → dragover → drop 只隔几个事件 tick，
@@ -203,8 +208,24 @@ export function ModLoadOrderPanel({
 
           {plan.ignored.length > 0 ? (
             <div className="rounded-md border border-warning/40 bg-warning/[0.06] px-2.5 py-1.5">
-              <div className="text-[11px] font-semibold text-warning">
-                {t("这些顺序声明本次没生效")}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[11px] font-semibold text-warning">
+                  {t("这些顺序声明本次没生效")}
+                </span>
+                {/* 顺序文件按设计会**故意**留着已删模组的位次（重装回原位），所以清理必须是用户主动点：
+                    后端 `mods:list` 就是按这份顺序排的，把当前列表整份写回去即等于「保留相对顺序 + 剔掉不存在的」。 */}
+                {staleOrderCount > 0 ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-6 gap-1 px-2 text-[11px]"
+                    onClick={onCleanOrder}
+                  >
+                    <Trash2 className="size-3.5" />
+                    {t("清理 {count} 条已不存在的记录", { count: staleOrderCount })}
+                  </Button>
+                ) : null}
               </div>
               <ul className="mt-1 space-y-0.5">
                 {plan.ignored.map((item, index) => (

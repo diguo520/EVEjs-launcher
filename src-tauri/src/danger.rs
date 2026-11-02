@@ -24,12 +24,14 @@ use crate::AppState;
 /// （OSCrypt 密钥）留在同一个运行时 cache 目录下，那份密钥是解密老 GitHub 令牌与
 /// 身份 key 的钥匙。整目录清掉等于让老用户重新配置令牌 —— 正是迁移时明确要避免的事。
 /// 名单外的东西（含 Local State）一律不动。
-const CACHE_WHITELIST: [&str; 5] = [
+const CACHE_WHITELIST: [&str; 6] = [
     "mod-index.json",
     "mod-ratings.json",
     "mod-reviews",
     "sponsors.json",
     "gh-login.json",
+    // 模组源码抠取结果的记忆化（见 mods/scan_cache.rs）：删掉只是让下一次预检重算一遍
+    "mod-claims.json",
 ];
 
 /// 重置配置的超时：侧车要先读 6 个域文件再原子写回，给足时间

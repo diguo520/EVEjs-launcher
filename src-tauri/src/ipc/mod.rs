@@ -475,19 +475,29 @@ async fn dispatch(
         }
 
         /* ------------------------------ 模组管理 ------------------------------ */
+        // 扫描要逐文件 stat（2026-11-02 实测：15 个模组 / 1.8 万文件约 0.9–1.2 s）。同步跑会占住
+        // tokio 工作线程，把同一轮面板加载里别的请求（服务状态、日志、时钟）一起拖住，所以丢阻塞池。
         "mods:list" => {
-            let scan_result = mods::scan::scan_mods(&root, &state.runtime);
-            let mut value = scan_result.to_json();
-            if let Some(map) = value.as_object_mut() {
-                map.insert("repoRoot".to_string(), json!(root.to_string_lossy()));
-                map.insert(
-                    "repoRootLooksValid".to_string(),
-                    json!(env::is_repo_root(&root)),
-                );
-            }
-            Ok(value)
+            let repo = root.clone();
+            let runtime = state.runtime.clone();
+            Ok(blocking(move || {
+                let mut value = mods::scan::scan_mods(&repo, &runtime).to_json();
+                if let Some(map) = value.as_object_mut() {
+                    map.insert("repoRoot".to_string(), json!(repo.to_string_lossy()));
+                    map.insert(
+                        "repoRootLooksValid".to_string(),
+                        json!(env::is_repo_root(&repo)),
+                    );
+                }
+                value
+            })
+            .await?)
         }
-        "mods:plan" => Ok(mods::plan::plan_loaders(&root, &state.runtime)),
+        "mods:plan" => {
+            let repo = root.clone();
+            let runtime = state.runtime.clone();
+            Ok(blocking(move || mods::plan::plan_loaders(&repo, &runtime)).await?)
+        }
         // 启动前预检（本工程扩展）：默认只做静态推测；`{ dryRun: true }` 才把 loader
         // 放进一次性 Node 进程里 require 一遍（能抓出「加载期抛错 → 服务端起不来」）。
         "mods:preflight" => {
@@ -499,7 +509,10 @@ async fn dispatch(
             if dry_run {
                 Ok(mods::preflight::dry_run(&root, &state.runtime).await)
             } else {
-                Ok(mods::preflight::static_report(&root, &state.runtime))
+                // 静态预检同样要全量扫描 + 读扫模组源码（实测一趟约 3.6 s），一样丢阻塞池
+                let repo = root.clone();
+                let runtime = state.runtime.clone();
+                Ok(blocking(move || mods::preflight::static_report(&repo, &runtime)).await?)
             }
         }
         "mods:readme" => Ok(mods::plan::read_mod_readme(&root, &arg_str(args, 0))),

@@ -1,0 +1,33 @@
+{
+  "version": "0.6.9",
+  "changelog": {
+    "zh": [
+      {
+        "type": "opt",
+        "text": "模组开关不再等整套诊断数据：确认提示只等「模组列表 + 生效顺序」，预检 / 市场 / 我的模组 / 认领候选 / 模板 / 作者 / 令牌这 8 条改后台刷（它们本来也不会因为开关一个模组而变）。静态预检的源码抠取结果按「文件 + 体积 + mtime」记忆化（落在 _launcher/cache/mod-claims.json，服务端文件指纹一并缓存），mods:list / mods:plan / mods:preflight 三条重活也从 IPC 的异步线程挪进阻塞池，不再拖住同一轮加载里别的请求。实测（15 个模组 / 1.8 万文件 / 3.9 GB）：预检一趟 939 ms → 218 ms，开关的等待也只剩几百毫秒。"
+      },
+      {
+        "type": "new",
+        "text": "「加载顺序」面板新增「清理 N 条已不存在的记录」按钮：手动顺序文件按设计会留着已删模组的位次（重装回来能回原位），所以它们不会自己消失；现在可以一键剔掉这些「记着但本机已经没有」的条目，其余模组的相对顺序、以及停用模组记着的位置都不动。"
+      },
+      {
+        "type": "new",
+        "text": "主服务器异常退出时直接点名凶手：从 node 崩溃报告与启动器控制台存档里读出触发异常的模组与文件，卡片上不再只有「异常退出（exit 1）」——例如「被模组 evejs-faction-sim 打死（lib/bridge/ops/arbiter.js:86:32）：ENOENT … data\\ops.json」。只认本轮启动之后写下的证据，两处都取不到时照旧只给退出码，不编原因。"
+      }
+    ],
+    "en": [
+      {
+        "type": "opt",
+        "text": "Toggling a mod no longer waits for the whole diagnostic set: the confirmation only waits for the mod list and the effective load order, while preflight / market / my mods / claim candidates / templates / author / token refresh in the background — none of them change when a single mod is toggled. Static preflight now memoises its source extraction per file by size+mtime (in _launcher/cache/mod-claims.json, server-file fingerprints included), and mods:list / mods:plan / mods:preflight moved off the async IPC thread into the blocking pool so they stop stalling other requests in the same load. Measured on 15 mods / 18k files / 3.9 GB: preflight 939 ms → 218 ms, and a toggle now waits only a few hundred milliseconds."
+      },
+      {
+        "type": "new",
+        "text": "The load-order panel gained a \"Remove N entries that no longer exist\" button. The manual order file deliberately keeps a deleted mod's slot so reinstalling it lands back in place — which is why those entries never disappear on their own. The button drops the entries that are recorded but no longer on disk, leaving every other mod's relative order and the recorded slots of disabled mods untouched."
+      },
+      {
+        "type": "new",
+        "text": "When the main server dies abnormally, the card now names the culprit: the mod and file that threw are read from Node's crash reports and the launcher's console archive instead of just \"exited abnormally (exit 1)\" — for example \"killed by mod evejs-faction-sim (lib/bridge/ops/arbiter.js:86:32): ENOENT … data\\ops.json\". Only evidence written after this run started counts, and when both sources come up empty the plain exit code is shown rather than a guess."
+      }
+    ]
+  }
+}

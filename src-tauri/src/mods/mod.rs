@@ -21,6 +21,7 @@ pub mod registry;
 pub mod review;
 pub mod scaffold;
 pub mod scan;
+pub mod scan_cache;
 pub mod sign;
 pub mod submit;
 
