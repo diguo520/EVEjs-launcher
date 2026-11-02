@@ -16,6 +16,7 @@ import { toast } from "sonner"
 
 import { SectionHeading, StatTile } from "@/components/common/panel"
 import { useLocale } from "@/components/shell/locale-provider"
+import { useLauncherVersion } from "@/components/shell/launcher-version"
 import { listSeparator } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -139,6 +140,8 @@ export function ModulesPage({
   const authorName = source.authorName
   const credential = source.credential
   const sourceRepos = source.sourceRepos
+  // 当前服务端版本（不带 `v` 前缀）：只给「当前版本」这一档排序用 —— 支持当前服务端的排前面
+  const { evejsVersionRaw } = useLauncherVersion()
 
   // 导航里这一项叫「模组市场」，进来就该看到市场，而不是已安装清单
   const [tab, setTab] = useState<ModTab>("market")
@@ -324,7 +327,7 @@ export function ModulesPage({
       tag: activeTag,
       favoriteOf,
     })
-    if (tab === "market") return sortMods(pool, sort)
+    if (tab === "market") return sortMods(pool, sort, { serverVersion: evejsVersionRaw })
     // 已安装页：先按**本地扫描位次**排（那就是用户拖出来的加载顺序），再按「启用在前、
     // 停用在后」分组。顺序只在这里用，不去动共享 `mods` 数组 —— 市场页签的默认排序
     // 就是吃那个数组的顺序，动它会连市场页一起带跑（2026-10-10 报障）。
@@ -340,6 +343,7 @@ export function ModulesPage({
     sort,
     activeTag,
     favoriteOf,
+    evejsVersionRaw,
   ])
 
   const installedCount = mods.filter((mod) => mod.installed).length

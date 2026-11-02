@@ -3682,5 +3682,6 @@
   "已保存到 {path}": "Saved to {path}",
   "点「下载」挑个位置，整包就存到本机。": "Click Download, pick a location, and the package is saved to this machine.",
   "清理 {count} 条已不存在的记录": "Remove {count} entries that no longer exist",
-  "已清理 {count} 条已不存在的顺序记录": "Removed {count} stale order entries"
+  "已清理 {count} 条已不存在的顺序记录": "Removed {count} stale order entries",
+  "取消「{label}」筛选": "Clear the \"{label}\" filter"
 }

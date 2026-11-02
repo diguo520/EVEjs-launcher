@@ -1,0 +1,25 @@
+{
+  "version": "0.7.0",
+  "changelog": {
+    "zh": [
+      {
+        "type": "fix",
+        "text": "「当前版本」排序现在名副其实：支持当前服务端的模组排在前面，不支持当前服务端的整段沉底（不隐藏，卡片上照旧画红标）。原先这一档只按模组自己的版本号从高到低排，于是版本号高、却只声明了旧服务端的模组会压过能用的模组。判定沿用卡片那套 serverSupportOf（与外壳同一套规则）：没声明（老模组常见）按「放行」处理、进前排；另外三档排序保持纯口径（「下载最多」就是按下载量）。"
+      },
+      {
+        "type": "opt",
+        "text": "模组市场侧边栏更好用：状态与分类**各自组内的项排成两列**（区块本身仍上下叠放——侧边栏只有 224px，但状态 4 项、分类十来项，两列省下一半竖向空间）；状态里去掉了「未安装」、分类里去掉了「全部」；分类改成点击即筛选、再点一次或点它右边的 X 取消筛选（选中项旁会显示那枚 X）。"
+      }
+    ],
+    "en": [
+      {
+        "type": "fix",
+        "text": "The \"Current version\" sort now means what its name says: mods that support the running server sort first, and the unsupported ones are pushed to the bottom as a block (they stay visible, with the red badge still on their card). The option used to sort by each mod's own version number alone, so a high-versioned mod that only declares an older server could outrank usable ones. Compatibility uses the same rule the card already uses (identical to the shell's): a missing declaration — common for older mods — counts as allowed and stays in the first group, while the other three sorts keep their plain meaning (\"Most downloads\" is still by downloads)."
+      },
+      {
+        "type": "opt",
+        "text": "The mod-market sidebar is easier to use: the status and category groups each lay their items out in two columns (the groups stay stacked — the sidebar is only 224px wide but holds 4 statuses and a dozen categories, so two columns save half the vertical space). \"Not installed\" is gone from the status group and \"All\" from the categories, and a category now filters on click, clears on a second click or via the X that appears on the selected row."
+      }
+    ]
+  }
+}

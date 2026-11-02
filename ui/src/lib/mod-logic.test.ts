@@ -25,6 +25,7 @@ import {
   publishBlockers,
   publishIntervalRemaining,
   ALL_CATEGORY,
+  toggleCategory,
   filterMods,
   modByFolderOrId,
   overlapFlag,
@@ -666,6 +667,62 @@ describe("overlapReport（疑似重叠：改同一份服务端文件 / 撞同一
       "old",
     ])
     expect(MOD_SORT_ORDER).toContain("version")
+  })
+
+  it("当前版本排序：支持当前服务端的在前，不支持的整段沉底（没声明按放行）", () => {
+    const mod = (over: Partial<ModEntry>): ModEntry => ({ ...({} as ModEntry), ...over })
+    const pool = [
+      mod({
+        id: "unsupported-high",
+        version: "9.0.0",
+        marketVersion: "9.0.0",
+        evejsVersions: ["261020.x"],
+        downloads: 500,
+      }),
+      mod({
+        id: "supported-low",
+        version: "1.0.0",
+        marketVersion: "1.0.0",
+        evejsVersions: ["261028.x"],
+        downloads: 1,
+      }),
+      // 没声明（老模组常见）：按「放行」处理，进支持组
+      mod({ id: "unknown", version: "2.0.0", marketVersion: "2.0.0", downloads: 50 }),
+      mod({
+        id: "supported-high",
+        version: "5.0.0",
+        marketVersion: "5.0.0",
+        evejsVersions: ["261028.1"],
+        downloads: 1,
+      }),
+      mod({
+        id: "unsupported-low",
+        version: "0.9.0",
+        marketVersion: "0.9.0",
+        evejsVersions: ["0.12.8"],
+        downloads: 9,
+      }),
+    ]
+    // 组内仍是版本号从高到低：5.0.0 → 2.0.0（没声明也放行）→ 1.0.0；不支持的两条整段在后
+    expect(
+      sortMods(pool, "version", { serverVersion: "261028.1" }).map((item) => item.id)
+    ).toEqual([
+      "supported-high",
+      "unknown",
+      "supported-low",
+      "unsupported-high",
+      "unsupported-low",
+    ])
+    // 其它档不夹带兼容性：「下载最多」照样是下载最多的那条第一，哪怕它不支持
+    expect(sortMods(pool, "downloads").map((item) => item.id)[0]).toBe("unsupported-high")
+    // 还没拿到 app:info（服务端版本为空）时不分区，退回纯版本号排序
+    expect(sortMods(pool, "version").map((item) => item.id)[0]).toBe("unsupported-high")
+  })
+
+  it("分类点击：点没选中的选它，点已选中的取消（回到全部分类）", () => {
+    expect(toggleCategory(ALL_CATEGORY, "界面美化")).toBe("界面美化")
+    expect(toggleCategory("界面美化", "界面美化")).toBe(ALL_CATEGORY)
+    expect(toggleCategory("界面美化", "游戏性")).toBe("游戏性")
   })
 })
 

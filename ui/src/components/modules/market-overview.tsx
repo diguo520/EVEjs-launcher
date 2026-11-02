@@ -12,6 +12,7 @@ import {
   Search,
   Star,
   Upload,
+  X,
 } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -26,9 +27,18 @@ import {
   MOD_SORT_LABEL,
   MOD_SORT_ORDER,
   formatCount,
+  toggleCategory,
   type MarketFilter,
   type ModSort,
 } from "@/lib/mod-logic"
+
+/**
+ * 侧边栏「状态」里的项：去掉「未安装」（2026-11-03 反馈）。
+ *
+ * 为什么只在侧边栏过滤、不动共享常量：`MARKET_FILTER_ORDER` 还喂着工具栏那套分段控件
+ * 与 `marketCounts` 的计数口径，改常量会连带把别处一起改掉 —— 这次要的只是侧边栏少一项。
+ */
+const SIDEBAR_STATUS_ORDER = MARKET_FILTER_ORDER.filter((item) => item !== "available")
 import type { ModEntry } from "@/lib/mock"
 import { t } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
@@ -38,33 +48,56 @@ export interface MarketTagCount {
   count: number
 }
 
+/**
+ * 侧边栏的一行。
+ *
+ * 为什么是「div 里两个 button」而不是「一个 button 里套个 X」：HTML 不允许按钮嵌套，
+ * 内层那个 X 会被浏览器当文本、点不到 —— 拆成两个同级按钮，语义与键盘可达性都正常。
+ */
 function SidebarRow({
   active,
   label,
   count,
   onClick,
+  onClear,
 }: {
   active: boolean
   label: string
   count?: number
   onClick: () => void
+  /** 给了就在「选中」时挂一枚 X：点它直接取消筛选（与「再点一次」等价） */
+  onClear?: () => void
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
+    <div
       className={cn(
-        "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[11px] transition-colors",
+        "flex w-full items-center rounded-sm text-[11px] transition-colors",
         active
           ? "bg-primary/10 font-semibold text-primary"
           : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
       )}
     >
-      <span className="min-w-0 flex-1 truncate">{label}</span>
-      {count === undefined ? null : (
-        <span className="tabular text-[10px] text-tertiary">{count}</span>
-      )}
-    </button>
+      <button
+        type="button"
+        onClick={onClick}
+        className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left"
+      >
+        <span className="min-w-0 flex-1 truncate">{label}</span>
+        {count === undefined ? null : (
+          <span className="tabular text-[10px] text-tertiary">{count}</span>
+        )}
+      </button>
+      {active && onClear ? (
+        <button
+          type="button"
+          onClick={onClear}
+          title={t("取消「{label}」筛选", { label })}
+          className="mr-1 grid size-4 shrink-0 place-items-center rounded-sm text-tertiary transition-colors hover:text-foreground"
+        >
+          <X className="size-3" />
+        </button>
+      ) : null}
+    </div>
   )
 }
 
@@ -109,39 +142,40 @@ export function MarketSidebar({
         />
       </div>
 
+      {/* 两个区块**上下叠放**，要两列的是**每个区块内部的项**（2026-11-03 反馈：不是把两个区块并排）。
+          侧边栏只有 224px 宽，但状态只有 4 项、分类十来项，组内两列能省下一半竖向空间。 */}
       <section>
         <div className="panel-label mb-1">状态</div>
-        <div className="space-y-0.5">
-          {MARKET_FILTER_ORDER.map((item) => (
-            <SidebarRow
-              key={item}
-              active={marketFilter === item}
-              label={t(MARKET_FILTER_LABEL[item])}
-              count={marketCounts[item]}
-              onClick={() => onMarketFilterChange(item)}
-            />
-          ))}
+        <div className="grid grid-cols-2 gap-0.5">
+            {SIDEBAR_STATUS_ORDER.map((item) => (
+              <SidebarRow
+                key={item}
+                active={marketFilter === item}
+                label={t(MARKET_FILTER_LABEL[item])}
+                count={marketCounts[item]}
+                onClick={() => onMarketFilterChange(item)}
+              />
+            ))}
         </div>
       </section>
 
       <section className="min-h-0">
         <div className="panel-label mb-1">分类</div>
-        <div className="max-h-52 space-y-0.5 overflow-y-auto pr-0.5">
-          <SidebarRow
-            active={category === ALL_CATEGORY}
-            label="全部"
-            count={categoryCounts[ALL_CATEGORY] ?? 0}
-            onClick={() => onCategoryChange(ALL_CATEGORY)}
-          />
-          {MOD_CATEGORIES.map((item) => (
-            <SidebarRow
-              key={item}
-              active={category === item}
-              label={item}
-              count={categoryCounts[item] ?? 0}
-              onClick={() => onCategoryChange(item)}
-            />
-          ))}
+          {/* 没有「全部」这一项：点已选中的分类就取消筛选，选中的那行还挂一枚 X，
+              两条路都回到「全部分类」—— 与工具栏下拉里的那一项同值。 */}
+        <div className="max-h-52 overflow-y-auto pr-0.5">
+          <div className="grid grid-cols-2 gap-0.5">
+            {MOD_CATEGORIES.map((item) => (
+              <SidebarRow
+                key={item}
+                active={category === item}
+                label={item}
+                count={categoryCounts[item] ?? 0}
+                onClick={() => onCategoryChange(toggleCategory(category, item))}
+                onClear={() => onCategoryChange(ALL_CATEGORY)}
+              />
+            ))}
+          </div>
         </div>
       </section>
 

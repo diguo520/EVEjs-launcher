@@ -1298,6 +1298,17 @@ export const RATING_FILTER_LABEL: Record<RatingFilter, string> = {
   lt40: "4.0 分以下",
 }
 
+/**
+ * 分类的点击语义（2026-11-03 反馈）：点**没选中**的 → 筛它；点**已选中**的 → 取消筛选。
+ *
+ * 单独抽成纯函数是因为「点第二次要取消」这条只在侧边栏的 onClick 里体现，
+ * 组件测试很少覆盖得到；放在这里能被单测钉住。取消 = 回到 `ALL_CATEGORY`（不分分类），
+ * 与工具栏那个下拉的「全部分类」是同一个值。
+ */
+export function toggleCategory(current: string, clicked: string): string {
+  return current === clicked ? ALL_CATEGORY : clicked
+}
+
 export const RATING_FILTER_ORDER: RatingFilter[] = [
   "all",
   "gte45",
@@ -1424,8 +1435,18 @@ export function featuredMods(mods: ModEntry[], count: number = FEATURED_SLOTS): 
     .slice(0, count)
 }
 
+/**
+ * 排序上下文：只有「当前版本」这一档需要 —— 它要拿当前服务端版本号去判兼容。
+ *
+ * `serverVersion` 用**不带 `v` 前缀**的那个值（`evejsVersionRaw`）：`serverSupportOf` 虽然
+ * 会剥前缀兜底，但 `261018.x` 这种前缀通配在带 `v` 时对不上（2026-10-19 那条报障就是这么来的）。
+ */
+export interface SortContext {
+  serverVersion?: string
+}
+
 /** 按选定口径排序；并列时用下载量兜底，保证顺序稳定 */
-export function sortMods(mods: ModEntry[], sort: ModSort): ModEntry[] {
+export function sortMods(mods: ModEntry[], sort: ModSort, context: SortContext = {}): ModEntry[] {
   if (sort === "default") return mods
   const sorted = [...mods]
   sorted.sort((a, b) => {
@@ -1442,7 +1463,28 @@ export function sortMods(mods: ModEntry[], sort: ModSort): ModEntry[] {
     }
     return b.updatedAt.localeCompare(a.updatedAt)
   })
-  return sorted
+
+  // 「当前版本」这一档的语义：**支持当前服务端的在前，不支持的整段靠后**。
+  //
+  // 为什么单独在这一档做：这一项的名字就叫「当前版本」，用户读到的是「跟我的服务端版本相关」，
+  // 可排序键只是模组自己的版本号 —— 于是版本号高、却只声明了旧服务端的模组会排到前面
+  // （2026-11-03 报障）。已经排好的组内顺序原样保留，只做一次稳定分区。
+  //
+  // 没声明（unknown）按「放行」处理，与卡片口径一致：界面只对**明确对不上**画红标，
+  // 见 serverSupportOf 的注释与 mod-logic.test.ts 里那条「未声明 → unknown」。
+  //
+  // 其它三档保持纯口径（「下载最多」就是按下载量），不在这里夹带兼容性。
+  if (sort !== "version" || !context.serverVersion) return sorted
+  const supported: ModEntry[] = []
+  const unsupported: ModEntry[] = []
+  for (const mod of sorted) {
+    if (serverSupportOf(mod.evejsVersions, context.serverVersion) === "unsupported") {
+      unsupported.push(mod)
+    } else {
+      supported.push(mod)
+    }
+  }
+  return [...supported, ...unsupported]
 }
 
 export function marketCounts(

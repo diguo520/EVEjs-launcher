@@ -3682,5 +3682,6 @@
   "已保存到 {path}": "Opgeslagen in {path}",
   "点「下载」挑个位置，整包就存到本机。": "Klik op Downloaden, kies een locatie en het pakket wordt op deze pc opgeslagen.",
   "清理 {count} 条已不存在的记录": "{count} regels verwijderen die niet meer bestaan",
-  "已清理 {count} 条已不存在的顺序记录": "{count} verouderde volgorderegels verwijderd"
+  "已清理 {count} 条已不存在的顺序记录": "{count} verouderde volgorderegels verwijderd",
+  "取消「{label}」筛选": "Filter \"{label}\" wissen"
 }
