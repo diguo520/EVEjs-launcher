@@ -1290,8 +1290,13 @@ export interface ServerVersion extends DownloadEntry {
 }
 
 /**
- * 服务端整包的各版本：**往桶里传了新版本就在这里加一条**（顺序随意，「最新」由版本号算，
- * 不靠数组顺序）。现在这两条是 2026-11-01 实测桶里仅有的两个。
+ * 服务端整包的各版本：**往桶里传了新版本，就在 R2 的 `down/index.json` 里加一条**
+ * （顺序随意，「最新」由版本号算，不靠数组顺序）。
+ *
+ * 这份数组是**离线兜底**：启动器打开版本弹窗时先读桶里的清单（`download:index`），
+ * 读到了就用桶里的；读不到（没网、清单没传、格式坏了）才退回这里。
+ * 之所以不再只靠这份数组：R2 自定义域不给目录列表，而界面是编译进 exe 的 ——
+ * 只靠数组就意味着每传一个服务端包都要发一次启动器版本。
  */
 export const SERVER_VERSIONS: ServerVersion[] = [
   { file: "EveJS-261028.1.zip", version: "261028.1", size: "47.1 MB" },
@@ -1319,12 +1324,28 @@ export function compareVersions(left: string, right: string): number {
 }
 
 /** 最新那一版（版本列表里打「最新」徽标用）；清单为空回 null，不编一个出来 */
-export function latestServerVersion(): ServerVersion | null {
+export function latestServerVersion(
+  list: readonly ServerVersion[] = SERVER_VERSIONS
+): ServerVersion | null {
   let best: ServerVersion | null = null
-  for (const entry of SERVER_VERSIONS) {
+  for (const entry of list) {
     if (!best || compareVersions(entry.version, best.version) > 0) best = entry
   }
   return best
+}
+
+/**
+ * 远端清单（R2 的 `down/index.json`）与内置清单的取舍：远端有可用行就用远端，
+ * 否则用内置那份 —— 一次网络失败只该「看到旧列表」，不该让弹窗变空。
+ *
+ * 排序固定为版本号从大到小：清单是手工维护的，写反了顺序也不该把「最新」排到最下面。
+ */
+export function resolveServerVersions(
+  remote: readonly ServerVersion[] | null | undefined
+): ServerVersion[] {
+  const usable = (remote ?? []).filter((entry) => entry.file && entry.version)
+  if (usable.length === 0) return SERVER_VERSIONS
+  return [...usable].sort((left, right) => compareVersions(right.version, left.version))
 }
 
 /**

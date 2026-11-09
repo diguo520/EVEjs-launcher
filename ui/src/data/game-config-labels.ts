@@ -2,10 +2,10 @@
  * 游戏世界参数的中文标注。
  *
  * 服务端 schema 只给英文说明（`config/*.json` 的 description），而 keys 又全是英文驼峰，
- * 直接把 179 条英文摆给中文用户等于没做界面。这里只做**翻译**：条目 key 不动、值不动、
+ * 直接把 185 条英文摆给中文用户等于没做界面。这里只做**翻译**：条目 key 不动、值不动、
  * 校验不在这里，纯粹是给人看的中文短名。
  *
- * 维护口径（2026-10-31）：条目数要与服务端 `config/schema/*.js` 的定义数一致 —— 少一个就会在界面上
+ * 维护口径（2026-11-10，对 261108.1）：条目数要与服务端 `config/schema/*.js` 的定义数一致 —— 少一个就会在界面上
  * 露出英文 key。查缺法：侧车 `read` 出来的 `definitions` 与本文件的 key 取差集（`domain` 字段就是六个文件）。
  * 服务端升版新增条目时，**这里补短名 + GAME_CONFIG_SECTIONS 补分区名**即可，不需要动任何逻辑。
  *
@@ -50,6 +50,7 @@ export const GAME_CONFIG_SECTIONS: Record<string, string> = {
   planets: "行星工业",
   wormholes: "虫洞",
   simulation: "模拟",
+  abyssal: "深渊空间",
   scenery: "场景",
   cosmicSites: "宇宙异常点",
   npcFleets: "NPC 编队",
@@ -74,6 +75,7 @@ export const GAME_CONFIG_LABELS: Record<string, string> = {
   devAutoCreateAccounts: "登录时自动补建账号",
   devSkipPasswordValidation: "跳过密码校验（开发用）",
   devBootstrapPublishedSkills: "新角色自带全部技能 V 级",
+  qaStarterSystemPicker: "QA 账号可选初始星系",
   clusterDowntimeStarts: "每日停机开始时间（UTC）",
   defaultCountryCode: "默认国家代码",
   logLevel: "日志级别",
@@ -118,6 +120,7 @@ export const GAME_CONFIG_LABELS: Record<string, string> = {
   posConsumeFuelWhileServerOffline: "离线期间 POS 继续耗燃料",
   sovereigntyOneTimeParityReset: "主权一次性还原（官方口径）",
   missionRewardMultiplier: "任务奖励倍率",
+  missionStandingGainMultiplier: "任务声望获取倍率",
   omegaLicenseEnabled: "默认 Omega 授权",
   dailyLoginRewardsEnabled: "每日登录奖励",
   dailyLoginRewards: "每日登录奖励表",
@@ -133,6 +136,7 @@ export const GAME_CONFIG_LABELS: Record<string, string> = {
   eventSchedules: "事件时间表",
 
   /* ------------------------------ world ------------------------------- */
+  voidReplayEnabled: "允许进入深渊历史遗迹空间",
   wormholesEnabled: "启用虫洞",
   wormholeLifetimeScale: "虫洞寿命倍率",
   wormholeStaticRespawnDelaySeconds: "静态虫洞重生延迟（秒）",
@@ -152,6 +156,9 @@ export const GAME_CONFIG_LABELS: Record<string, string> = {
   universeSiteCountsByFamily: "按类型覆盖异常点数量",
   homefrontPopulationPreset: "Homefront 点位预设",
   homefrontCustomSitesPerType: "Homefront 每种类型点位数",
+  incursionOrganicHighSecEnabled: "高安自动生成萨沙入侵",
+  incursionOrganicLowSecEnabled: "低安自动生成萨沙入侵",
+  incursionOrganicNullSecEnabled: "零安自动生成萨沙入侵",
   deadspaceWarpRestrictionEnabled: "死亡空间跃迁限制",
 
   /* ------------------------------ mining ------------------------------ */

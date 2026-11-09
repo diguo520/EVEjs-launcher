@@ -118,6 +118,7 @@ async fn dispatch(
             Ok(crate::downloads::save_as(app, &arg_str(args, 0), &arg_str(args, 1)).await)
         }
         "download:cancel" => Ok(crate::downloads::cancel()),
+        "download:index" => Ok(crate::downloads::index().await),
 
         /* ------------------------- 环境自检 / 健康检查 ------------------------- */
         "env:check" => Ok(env::detect_env(&root).await),

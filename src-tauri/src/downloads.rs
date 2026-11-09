@@ -18,6 +18,16 @@ use tauri::{AppHandle, Emitter};
 /// 与 `ui/src/lib/mock.ts` 的 `DOWNLOAD_BASE_URL` 是同一个地址 —— 改一边要改两边。
 const BASE_URL: &str = "https://evejs.5318.cm/down";
 
+/// 版本清单对象名：与整包同在 `down/` 前缀下（`down/index.json`）。
+/// 渲染层不拼这个地址 —— 与整包同口径，域名和路径都在 Rust 侧。
+const INDEX_FILE: &str = "index.json";
+
+/// 清单只有几百字节，但国内到 Cloudflare 偶发慢；给足 20 s 再去回退内置清单。
+const INDEX_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
+
+/// 清单最多认这么多行：桶里真放几百个整包，也不该把弹窗撑爆。
+const INDEX_MAX_ROWS: usize = 100;
+
 /// 进度事件（数组载荷，与 `mod:downloadProgress` 同形）
 const PROGRESS_EVENT: &str = "download:progress";
 
@@ -59,6 +69,75 @@ fn object_url(file: &str) -> String {
         }
     }
     out
+}
+
+/// `download:index`：读桶里的版本清单，让「传了新包」不必再发一次启动器。
+///
+/// 回包 `{ ok:true, versions:[{file, version, sizeBytes}] }` 或 `{ ok:false, reason }`。
+/// 失败时渲染层退回编译进 exe 的内置清单 —— 这条通道的目的是「有新包能跟上」，
+/// 不是「没网就打不开版本列表」。
+pub async fn index() -> Value {
+    let url = object_url(INDEX_FILE);
+    let outcome = tauri::async_runtime::spawn_blocking(move || {
+        net::get(&url, "application/json", INDEX_TIMEOUT)
+    })
+    .await;
+    let response = match outcome {
+        Ok(Ok(response)) => response,
+        Ok(Err(reason)) => return json!({ "ok": false, "reason": reason }),
+        Err(err) => return json!({ "ok": false, "reason": format!("后台任务失败：{err}") }),
+    };
+    if !(200..300).contains(&response.status) {
+        return json!({ "ok": false, "reason": format!("清单返回 HTTP {}", response.status) });
+    }
+    let Some(payload) = response.json() else {
+        return json!({ "ok": false, "reason": "清单不是合法 JSON" });
+    };
+    let versions = parse_index(&payload);
+    if versions.is_empty() {
+        return json!({ "ok": false, "reason": "清单里没有可用条目" });
+    }
+    json!({ "ok": true, "versions": versions })
+}
+
+/// 清单 JSON → 可下载条目。
+///
+/// 坏行**跳过而不是整份失败**：这份文件由维护者手工维护，写错一行不该让
+/// 本来能用的包一起消失。版本号缺省时退回文件名（去掉 `.zip`），至少还能显示。
+fn parse_index(payload: &Value) -> Vec<Value> {
+    let Some(list) = payload.get("versions").and_then(Value::as_array) else {
+        return Vec::new();
+    };
+    let mut seen = std::collections::HashSet::new();
+    let mut rows = Vec::new();
+    for item in list {
+        if rows.len() >= INDEX_MAX_ROWS {
+            break;
+        }
+        let Some(raw) = item.get("file").and_then(Value::as_str) else {
+            continue;
+        };
+        let Some(file) = safe_file_name(raw) else {
+            continue;
+        };
+        // 清单自己不是可下载的包；同一个对象名只留第一条
+        if file == INDEX_FILE || !seen.insert(file.to_string()) {
+            continue;
+        }
+        let version = item
+            .get("version")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string)
+            .unwrap_or_else(|| file.strip_suffix(".zip").unwrap_or(file).to_string());
+        let size = item
+            .get("size")
+            .and_then(Value::as_u64)
+            .filter(|value| *value > 0);
+        rows.push(json!({ "file": file, "version": version, "sizeBytes": size }));
+    }
+    rows
 }
 
 /// `download:cancel`：只置标志，真正的停手在下载循环里
@@ -203,5 +282,36 @@ mod tests {
             object_url("EVE Online - 3396210.zip.torrent"),
             "https://evejs.5318.cm/down/EVE%20Online%20-%203396210.zip.torrent"
         );
+    }
+
+    #[test]
+    fn index_skips_bad_rows_and_dedupes() {
+        let payload = json!({ "versions": [
+            { "file": "EveJS-261110.1.zip", "version": "261110.1", "size": 49_373_650u64 },
+            // 同一对象名重复：只留第一条
+            { "file": "EveJS-261110.1.zip", "version": "261110.1", "size": 1u64 },
+            // 路径穿越 / 清单自身：跳过
+            { "file": "../evil.zip", "version": "9" },
+            { "file": "index.json", "version": "1" },
+            // 版本缺省：退回文件名，size=0 不编一个体积
+            { "file": "EveJS-261018.1.zip", "size": 0u64 },
+            // 没有 file：跳过
+            { "version": "1.0" },
+        ]});
+        let rows = parse_index(&payload);
+        assert_eq!(rows.len(), 2, "只应留下两条可用行");
+        assert_eq!(rows[0]["file"], "EveJS-261110.1.zip");
+        assert_eq!(rows[0]["version"], "261110.1");
+        assert_eq!(rows[0]["sizeBytes"], 49_373_650u64);
+        assert_eq!(rows[1]["file"], "EveJS-261018.1.zip");
+        assert_eq!(rows[1]["version"], "EveJS-261018.1");
+        assert_eq!(rows[1]["sizeBytes"], Value::Null, "0 体积当没有，不编数字");
+    }
+
+    #[test]
+    fn index_rejects_shapes_it_does_not_understand() {
+        assert!(parse_index(&json!({})).is_empty());
+        assert!(parse_index(&json!({ "versions": "nope" })).is_empty());
+        assert!(parse_index(&json!({ "versions": [] })).is_empty());
     }
 }

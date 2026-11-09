@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from "react"
 import { HardDriveDownload } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -11,8 +12,17 @@ import {
 } from "@/components/ui/dialog"
 import { DownloadStrip } from "@/components/dashboard/download-strip"
 import { t } from "@/lib/i18n"
-import { SERVER_VERSIONS, latestServerVersion } from "@/lib/mock"
+import { callOr } from "@/lib/ipc"
+import { formatBytes } from "@/lib/mod-logic"
+import { latestServerVersion, resolveServerVersions, type ServerVersion } from "@/lib/mock"
 import type { useLauncherDownloads } from "@/hooks/use-launcher-downloads"
+
+/** `download:index` 的回包：桶里 `down/index.json` 的归一化结果 */
+interface RemoteIndex {
+  ok?: boolean
+  reason?: string
+  versions?: { file?: unknown; version?: unknown; sizeBytes?: unknown }[]
+}
 
 /**
  * 服务端版本列表：桶里每个整包一行，版本号最大的那条打「最新」徽标。
@@ -29,7 +39,33 @@ export function ServerVersionsDialog({
   onOpenChange: (open: boolean) => void
   downloads: ReturnType<typeof useLauncherDownloads>
 }) {
-  const latest = latestServerVersion()
+  // 远端清单：拿到就用桶里的，拿不到（没网 / 清单没传 / 格式坏了）退回内置那份。
+  // 只在弹窗打开时读一次 —— 版本列表变化是按天算的，没必要每次渲染都打一次网络。
+  const [remote, setRemote] = useState<ServerVersion[] | null>(null)
+  useEffect(() => {
+    if (!open) return
+    let alive = true
+    void callOr<RemoteIndex>("downloadIndex", null).then((reply) => {
+      if (!alive || !reply?.ok || !Array.isArray(reply.versions)) return
+      const rows: ServerVersion[] = []
+      for (const row of reply.versions) {
+        if (typeof row.file !== "string" || typeof row.version !== "string") continue
+        const bytes = typeof row.sizeBytes === "number" ? row.sizeBytes : 0
+        rows.push({
+          file: row.file,
+          version: row.version,
+          size: bytes > 0 ? formatBytes(bytes) : "—",
+        })
+      }
+      if (rows.length > 0) setRemote(rows)
+    })
+    return () => {
+      alive = false
+    }
+  }, [open])
+
+  const versions = useMemo(() => resolveServerVersions(remote), [remote])
+  const latest = latestServerVersion(versions)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -40,7 +76,7 @@ export function ServerVersionsDialog({
         </DialogHeader>
 
         <div className="space-y-1.5">
-          {SERVER_VERSIONS.map((entry) => {
+          {versions.map((entry) => {
             const isLatest = latest?.file === entry.file
             const downloading = downloads.active && downloads.activeFile === entry.file
             return (

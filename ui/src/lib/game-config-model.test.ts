@@ -38,9 +38,10 @@ function def(partial: Partial<GameConfigDefinition> & { key: string }): GameConf
 }
 
 describe("倍率识别", () => {
-  it("认得 179 条里那 10 个倍率键", () => {
+  it("认得 185 条里那 11 个倍率键", () => {
     const keys = [
       "missionRewardMultiplier",
+      "missionStandingGainMultiplier",
       "planetSchematicOutputMultiplier",
       "planetResourceAbundanceMultiplier",
       "skinrDesignIterationMultiplier",
@@ -221,6 +222,19 @@ describe("文案回退", () => {
     expect(labelOf(def({ key: "brandNewServerSetting" }))).toBe("brandNewServerSetting")
     expect(sectionLabelOf("brandNewSection")).toBe("brandNewSection")
     expect(sectionLabelOf("skills")).toBe("技能")
+  })
+
+  it("261108.1 新增的 6 条与 abyssal 分区都有中文名", () => {
+    const keys = [
+      "qaStarterSystemPicker",
+      "missionStandingGainMultiplier",
+      "voidReplayEnabled",
+      "incursionOrganicHighSecEnabled",
+      "incursionOrganicLowSecEnabled",
+      "incursionOrganicNullSecEnabled",
+    ]
+    for (const key of keys) expect(labelOf(def({ key })), key).not.toBe(key)
+    expect(sectionLabelOf("abyssal")).toBe("深渊空间")
   })
 
   it("长结构折叠成一行摘要", () => {

@@ -70,6 +70,7 @@ export const api = {
   databaseSaveRow: (table: string, values: Record<string, unknown>): Promise<unknown> => request("database:save", [table, values]),
   databaseTable: (table: string, limit = 100, offset = 0): Promise<unknown> => request("database:table", [table, limit, offset]),
   downloadCancel: (): Promise<unknown> => request("download:cancel", []),
+  downloadIndex: (): Promise<unknown> => request("download:index", []),
   downloadSaveAs: (file: string, suggestedName?: string): Promise<unknown> => request("download:saveAs", [file, suggestedName]),
   engageStart: (): Promise<unknown> => request("engage:start", []),
   engageStop: (): Promise<unknown> => request("engage:stop", []),

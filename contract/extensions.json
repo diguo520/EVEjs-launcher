@@ -436,6 +436,14 @@
       "why": "下载中点「取消」。下载循环是分段的（`net::download_cancellable`），每读一块前问一次这个标志，所以取消最多浪费一段流量，不会整包下完才发现没人要。取消后**半截文件一并删掉**：用户要的是「这个文件」，留个残缺的同名包在盘上只会被当成下好了 —— 下次解压才发现是坏的。只删刚写进去的那一份目标文件，不碰用户目录里别的东西。"
     },
     {
+      "api": "downloadIndex",
+      "channel": "download:index",
+      "kind": "invoke",
+      "signature": "",
+      "params": [],
+      "why": "服务端版本清单不能编进 exe。原先 SERVER_VERSIONS 是 ui/src/lib/mock.ts 里的手写数组，而 R2 自定义域不给目录列表，结果是「往桶里传了新包，启动器看不到，还得再发一次启动器版本」。这条通道读桶里的 down/index.json（与整包同目录），逐条过 safe_file_name 白名单后回给渲染层；拿不到（文件没传、网络失败、格式写错）就回 ok:false，渲染层退回编译进 exe 的内置清单 —— 失败的后果只是「看到旧列表」，不会让版本弹窗变空。域名与路径同样拼死在 Rust 侧，渲染层只拿结果，开不了任意主机。"
+    },
+    {
       "api": "downloadSaveAs",
       "channel": "download:saveAs",
       "kind": "invoke",

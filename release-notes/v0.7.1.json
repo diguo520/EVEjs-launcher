@@ -1,0 +1,25 @@
+{
+  "version": "0.7.1",
+  "changelog": {
+    "zh": [
+      {
+        "type": "fix",
+        "text": "服务端版本清单不再写死在代码里：启动器改为从 down/index.json（R2 自定义域 evejs.5318.cm/down）读取「有哪些包、多大、谁是最新」。以后上传新服务端包，只需在清单里加一行再重启启动器 —— 不用再为服务端包发一次启动器版本。清单读不到时回落到内置的三条旧版本，弹窗的体积与「最新」标记照旧。"
+      },
+      {
+        "type": "new",
+        "text": "「宇宙配置」补齐新服务端 261108.1 的 6 条参数：QA 账号可选初始星系、任务声望获取倍率、允许进入深渊历史遗迹空间，以及高安 / 低安 / 零安自动生成萨沙入侵；新增的 abyssal 分区中文名叫「深渊空间」。中文短名与 7 种外文翻译都已跟上，面板现在显示 185 项参数、26 条可拉动条。"
+      }
+    ],
+    "en": [
+      {
+        "type": "fix",
+        "text": "The server package list is no longer baked into the binary: the launcher now reads down/index.json from the R2 custom domain (evejs.5318.cm/down) to learn which packages exist, how big they are and which one is newest. Uploading a new server build means adding one line to that manifest and restarting the launcher - no launcher release required. When the manifest is unreachable the built-in three versions are still used, with the same size and \"latest\" markers."
+      },
+      {
+        "type": "new",
+        "text": "Universe configuration now covers the six parameters added by server 261108.1 - QA starter-system picker, mission standing gain multiplier, abyssal relic pocket replay, and Sansha incursion auto-start in high / low / null security - plus the new abyssal section, titled Abyssal space. Chinese labels and all seven locales are filled in; the panel now reports 185 parameters and 26 sliders."
+      }
+    ]
+  }
+}

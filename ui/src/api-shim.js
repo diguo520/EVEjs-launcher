@@ -81,6 +81,7 @@
     databaseSaveRow: function (table, values) { return request("database:save", [table, values]); },
     databaseTable: function (table, limit, offset) { return request("database:table", [table, limit, offset]); },
     downloadCancel: function () { return request("download:cancel", []); },
+    downloadIndex: function () { return request("download:index", []); },
     downloadSaveAs: function (file, suggestedName) { return request("download:saveAs", [file, suggestedName]); },
     engageStart: function () { return request("engage:start", []); },
     engageStop: function () { return request("engage:stop", []); },

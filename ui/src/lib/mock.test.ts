@@ -7,6 +7,7 @@ import {
   compatibleDeclaration,
   formatMB,
   latestServerVersion,
+  resolveServerVersions,
 } from "@/lib/mock"
 import { toMB } from "@/lib/mod-source"
 
@@ -79,6 +80,21 @@ describe("服务端版本清单（拼进 R2 地址的就是这些对象名）", 
       expect(entry.file.length).toBeGreaterThan(0)
       expect(entry.file.startsWith("/")).toBe(false)
       expect(entry.file.includes("..")).toBe(false)
+    }
+  })
+
+  it("远端清单有可用行就用远端，并按版本号从大到小排", () => {
+    const resolved = resolveServerVersions([
+      { file: "EveJS-261018.1.zip", version: "261018.1", size: "45.0 MB" },
+      { file: "EveJS-261110.1.zip", version: "261110.1", size: "47.1 MB" },
+    ])
+    expect(resolved.map((row) => row.version)).toEqual(["261110.1", "261018.1"])
+    expect(latestServerVersion(resolved)?.file).toBe("EveJS-261110.1.zip")
+  })
+
+  it("远端为空 / 不可用（网络失败、清单没传）时退回内置清单", () => {
+    for (const remote of [null, undefined, [], [{ file: "", version: "" }]]) {
+      expect(resolveServerVersions(remote as never)).toBe(SERVER_VERSIONS)
     }
   })
 })

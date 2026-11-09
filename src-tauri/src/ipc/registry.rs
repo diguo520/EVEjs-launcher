@@ -62,6 +62,7 @@ pub const HANDLED: &[&str] = &[
     // 首页横幅的下载（本工程扩展，契约见 contract/extensions.json）：
     // saveAs=另存为对话框 + 启动器内下载；cancel=取消正在进行的下载
     "download:cancel",
+    "download:index",
     "download:saveAs",
     "engage:start",
     "engage:stop",

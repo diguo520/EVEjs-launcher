@@ -3683,5 +3683,12 @@
   "点「下载」挑个位置，整包就存到本机。": "Cliquez sur Télécharger, choisissez un emplacement : le paquet est enregistré sur cette machine.",
   "清理 {count} 条已不存在的记录": "Supprimer {count} entrées qui n'existent plus",
   "已清理 {count} 条已不存在的顺序记录": "{count} entrées d'ordre obsolètes supprimées",
-  "取消「{label}」筛选": "Effacer le filtre « {label} »"
+  "取消「{label}」筛选": "Effacer le filtre « {label} »",
+  "深渊空间": "Espace abyssal",
+  "QA 账号可选初始星系": "Les comptes QA peuvent choisir un système de départ",
+  "任务声望获取倍率": "Multiplicateur de gain de réputation des missions",
+  "允许进入深渊历史遗迹空间": "Autoriser l'accès à la poche de reliques abyssales historique",
+  "高安自动生成萨沙入侵": "Démarrer automatiquement les incursions sansha en haute sécurité",
+  "低安自动生成萨沙入侵": "Démarrer automatiquement les incursions sansha en basse sécurité",
+  "零安自动生成萨沙入侵": "Démarrer automatiquement les incursions sansha en sécurité nulle"
 }

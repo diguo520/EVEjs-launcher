@@ -3683,5 +3683,12 @@
   "点「下载」挑个位置，整包就存到本机。": "Click Download, pick a location, and the package is saved to this machine.",
   "清理 {count} 条已不存在的记录": "Remove {count} entries that no longer exist",
   "已清理 {count} 条已不存在的顺序记录": "Removed {count} stale order entries",
-  "取消「{label}」筛选": "Clear the \"{label}\" filter"
+  "取消「{label}」筛选": "Clear the \"{label}\" filter",
+  "深渊空间": "Abyssal space",
+  "QA 账号可选初始星系": "QA accounts can pick a starter system",
+  "任务声望获取倍率": "Mission reputation gain multiplier",
+  "允许进入深渊历史遗迹空间": "Allow entering the historical Abyssal relic pocket",
+  "高安自动生成萨沙入侵": "Auto-start Sansha incursions in high-sec",
+  "低安自动生成萨沙入侵": "Auto-start Sansha incursions in low-sec",
+  "零安自动生成萨沙入侵": "Auto-start Sansha incursions in null-sec"
 }

@@ -3683,5 +3683,12 @@
   "点「下载」挑个位置，整包就存到本机。": "Klik op Downloaden, kies een locatie en het pakket wordt op deze pc opgeslagen.",
   "清理 {count} 条已不存在的记录": "{count} regels verwijderen die niet meer bestaan",
   "已清理 {count} 条已不存在的顺序记录": "{count} verouderde volgorderegels verwijderd",
-  "取消「{label}」筛选": "Filter \"{label}\" wissen"
+  "取消「{label}」筛选": "Filter \"{label}\" wissen",
+  "深渊空间": "Abyssale ruimte",
+  "QA 账号可选初始星系": "QA-accounts kunnen een startsysteem kiezen",
+  "任务声望获取倍率": "Vermenigvuldiger voor missiestatus",
+  "允许进入深渊历史遗迹空间": "Toegang tot de historische abyssale relikwie-pocket toestaan",
+  "高安自动生成萨沙入侵": "Sansha-incursions automatisch starten in high-sec",
+  "低安自动生成萨沙入侵": "Sansha-incursions automatisch starten in low-sec",
+  "零安自动生成萨沙入侵": "Sansha-incursions automatisch starten in null-sec"
 }

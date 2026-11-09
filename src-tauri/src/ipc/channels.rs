@@ -18,7 +18,7 @@ pub struct ChannelSpec {
     pub kind: ChannelKind,
 }
 
-pub const REQUEST_COUNT: usize = 131;
+pub const REQUEST_COUNT: usize = 132;
 pub const EVENT_COUNT: usize = 11;
 
 #[rustfmt::skip]
@@ -58,6 +58,7 @@ pub const CHANNELS: &[ChannelSpec] = &[
     ChannelSpec { channel: "database:save", api: "databaseSaveRow", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "database:table", api: "databaseTable", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "download:cancel", api: "downloadCancel", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "download:index", api: "downloadIndex", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "download:saveAs", api: "downloadSaveAs", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "engage:start", api: "engageStart", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "engage:stop", api: "engageStop", kind: ChannelKind::Invoke },
