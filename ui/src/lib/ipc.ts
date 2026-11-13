@@ -198,6 +198,13 @@ export interface RawHealth {
   images: boolean
   gateway: boolean
   market: boolean
+  warmup?: RawWarmup
+}
+
+/** health:check 合并下发的模组预热状态 */
+export interface RawWarmup {
+  state: string
+  message: string
 }
 
 /** update:state / update:changed */

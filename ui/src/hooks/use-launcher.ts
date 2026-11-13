@@ -15,6 +15,7 @@ import {
   type RawModList,
   type RawServerLog,
   type RawService,
+  type RawWarmup,
   type RawTokenStatus,
 } from "@/lib/ipc"
 import {
@@ -84,6 +85,7 @@ export interface LauncherState {
   runningCount: number
   onlineCount: number
   busyId: string | null
+  warmup: RawWarmup | null
   launchAll: () => void
   startService: (id: string) => void
   stopService: (id: string) => void
@@ -481,6 +483,8 @@ export function useLauncher(): LauncherState {
     runningCount,
     onlineCount: onlinePlayers ?? 0,
     busyId,
+    // 预热状态随 health:check 每 2s 轮询到达，直接透传给界面
+    warmup: health?.warmup ?? null,
     launchAll,
     startService,
     stopService,

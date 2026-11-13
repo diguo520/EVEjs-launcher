@@ -122,7 +122,13 @@ async fn dispatch(
 
         /* ------------------------- 环境自检 / 健康检查 ------------------------- */
         "env:check" => Ok(env::detect_env(&root).await),
-        "health:check" => Ok(json!(health::check_all().await)),
+        "health:check" => {
+            // 在健康探针上合并预热状态（界面 2s 轮询这个通道，无需新增 IPC 通道）。
+            let mut value = serde_json::to_value(health::check_all().await).unwrap_or_default();
+            value["warmup"] =
+                serde_json::to_value(process::warmup_snapshot(app)).unwrap_or_default();
+            Ok(value)
+        }
         "health:ping" => {
             let configured = config::read_server_config(&root).ports.game;
             let port = if configured > 0 {

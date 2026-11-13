@@ -102,7 +102,8 @@ const CARD_BINDING: Record<
     real: string | null
     /** 读数（PID / CPU / 内存 / 运行时长）取自哪个后端进程 */
     statsFrom: string
-    health: keyof RawHealth
+    /** 探针键：只认四个布尔端口，别用 keyof RawHealth（预热字段会让类型扩宽） */
+    health: "game" | "images" | "gateway" | "market"
   }
 > = {
   node: { real: "mainServer", statsFrom: "mainServer", health: "game" },

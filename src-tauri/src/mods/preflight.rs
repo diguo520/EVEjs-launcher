@@ -672,6 +672,10 @@ pub async fn dry_run(repo_root: &Path, runtime: &RuntimePaths) -> Value {
     }
     let report = dir.join("report.json");
 
+    // 方案 B 预热的关键：与真启动同一个编译缓存目录。没有它，干跑只热了系统文件缓存，
+    // V8 字节码缓存不写 —— 预热对「模组多」的启动就没了主要收益。
+    let compile_cache = runtime.cache.join("node-compile");
+    let _ = fs::create_dir_all(&compile_cache);
     let node = match crate::sidecar::node_executable() {
         Ok(path) => path,
         Err(err) => {
@@ -689,6 +693,7 @@ pub async fn dry_run(repo_root: &Path, runtime: &RuntimePaths) -> Value {
         .env("EVEJS_MODS_PLAN", &plan_file)
         .env("EVEJS_MODS_REPORT", &report)
         .env("EVEJS_MODS_ROOT", repo_root)
+        .env("NODE_COMPILE_CACHE", &compile_cache)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -771,6 +776,17 @@ pub async fn dry_run(repo_root: &Path, runtime: &RuntimePaths) -> Value {
         "elapsedMs": elapsed_ms,
         "loadersMs": report_value.get("loadersDoneMs").and_then(Value::as_u64).unwrap_or(0),
         "output": output,
+    })
+}
+
+/// 方案 B：后台预热。复用干跑内核（同一批 loader、同一个 `NODE_COMPILE_CACHE` 目录），
+/// 把 V8 编译缓存 + 系统文件缓存写热，让下一次真启动少编译、少读冷盘。
+/// 静默、best-effort：不绑端口、不连客户端，任何失败都只影响缓存命中率，不报给用户。
+pub async fn warmup_loaders(repo_root: &Path, runtime: &RuntimePaths) -> Value {
+    let value = dry_run(repo_root, runtime).await;
+    json!({
+        "ok": value.get("ok").and_then(Value::as_bool).unwrap_or(false),
+        "elapsedMs": value.get("elapsedMs").and_then(Value::as_u64).unwrap_or(0),
     })
 }
 
@@ -1101,5 +1117,16 @@ mod tests {
         );
         assert_eq!(cold_report, warm_report, "冷热两趟的结论必须一致");
         assert_eq!(warm_report, warm2_report, "热跑几趟结论都要一致");
+    }
+
+    #[tokio::test]
+    async fn warmup_loaders_skips_silently_without_loaders() {
+        let repo = repo_for("warmup-empty");
+        let runtime = runtime_for("warmup-empty");
+        let value = super::warmup_loaders(&repo, &runtime).await;
+        assert_eq!(value.get("ok").and_then(Value::as_bool), Some(true));
+        assert_eq!(value.get("elapsedMs").and_then(Value::as_u64), Some(0));
+        let _ = fs::remove_dir_all(&repo);
+        let _ = fs::remove_dir_all(runtime.root);
     }
 }

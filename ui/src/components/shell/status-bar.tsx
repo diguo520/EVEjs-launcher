@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils"
 import { StatusDot } from "@/components/common/status-dot"
 import { useLauncherVersion } from "@/components/shell/launcher-version"
 import { LAUNCHER_META, type Service } from "@/lib/mock"
+import type { RawWarmup } from "@/lib/ipc"
 import type { EnvCheckState } from "@/hooks/use-env-check"
 import type { SessionReadout } from "@/hooks/use-launcher"
 
@@ -43,11 +44,14 @@ export function StatusBar({
   env,
   services,
   session,
+  warmup,
   onOpenLegalNotice,
 }: {
   env: EnvCheckState
   services: Service[]
   session: SessionReadout
+  /** 模组预热状态（随 health:check 轮询到达） */
+  warmup: RawWarmup | null
   /** 法律声明缩到底部后的入口；没确认过之前不显示（那时弹窗还在） */
   onOpenLegalNotice?: () => void
 }) {
@@ -76,6 +80,19 @@ export function StatusBar({
       <Cell
         label="PING"
         value={session.ping === "—" ? "—" : `${session.ping} ms`}
+      />
+      <Cell
+        label="预热"
+        value={warmup?.message ?? "—"}
+        tone={
+          warmup?.state === "done"
+            ? "ok"
+            : warmup?.state === "running"
+              ? "warn"
+              : warmup?.state === "error"
+                ? "error"
+                : "default"
+        }
       />
       <div className="flex-1" />
       <Cell label="EVEJS" value={evejsVersion} />

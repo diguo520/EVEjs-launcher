@@ -1868,6 +1868,7 @@
   "环境可用，有提醒项": "Environment usable, with warnings",
   "环境报告已复制": "Environment report copied",
   "环境自检": "Environment check",
+  "预热": "Warmup",
   "环境自检 5/6 通过 · 客户端证书 CA 未检测到": "Environment self-check 5/6 passed · Client certificate CA not detected",
   "环境自检全部通过": "Environment check fully passed",
   "环境自检门禁 → 按序拉起全部服务。启动期间不要关闭启动器。": "Environment gate → start all services in order. Do not close the launcher while starting.",

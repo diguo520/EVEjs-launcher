@@ -1,6 +1,7 @@
 //! 服务启停状态机：对齐现役版 src/main/processManager.ts 的关键语义
 //!   - 状态取值 idle / starting / running / stopping / error（渲染层直接映射卡片颜色）
-//!   - 主服务器经 PTY 执行 `cmd.exe /c npm start`，cwd = server/
+//!   - 主服务器经 PTY 直连 `node`（解析 server/package.json 的 start 脚本，解析不了回退
+//!     `cmd.exe /c npm start`），cwd = server/
 //!   - 市场服务直接 spawn release 二进制，缺失时给出可操作提示
 //!   - 停止统一走 `taskkill /PID <pid> /T /F`（等价现役版 killOwned）
 use crate::env;
@@ -22,6 +23,43 @@ use tauri::{AppHandle, Emitter, Manager};
 pub const MAIN_SERVER: &str = "mainServer";
 pub const MARKET_SERVER: &str = "marketServer";
 pub const CLIENT: &str = "client";
+
+/// 方案 B 预热的互斥标志：同一时刻只允许一个预热在跑。
+static WARMUP_BUSY: AtomicBool = AtomicBool::new(false);
+
+/// 预热状态（随 health:check 下发，界面轮询可见）。
+#[derive(Debug, Clone, Serialize)]
+pub struct WarmupInfo {
+    /// idle / running / done / error
+    pub state: String,
+    pub message: String,
+}
+
+impl Default for WarmupInfo {
+    fn default() -> Self {
+        Self {
+            state: "idle".to_string(),
+            message: "未预热".to_string(),
+        }
+    }
+}
+
+/// 写预热状态并广播给界面（与 set_state 同一套 try_state + 事件口径）。
+pub fn set_warmup(app: &AppHandle, info: WarmupInfo) {
+    if let Some(state) = app.try_state::<AppState>() {
+        if let Ok(mut guard) = state.warmup.lock() {
+            *guard = info;
+        }
+    }
+    emit_services(app);
+}
+
+/// 预热状态快照（给 health:check 合并用）。
+pub fn warmup_snapshot(app: &AppHandle) -> WarmupInfo {
+    app.try_state::<AppState>()
+        .and_then(|state| state.warmup.lock().ok().map(|guard| guard.clone()))
+        .unwrap_or_default()
+}
 
 /// PTY 会话 id（与现役版一致：市场服务用 "market"）
 fn session_id(service_id: &str) -> &'static str {
@@ -205,6 +243,39 @@ fn taskkill_tree(pid: u32) {
         .stderr(Stdio::null())
         .status();
 }
+fn taskkill_pid(pid: u32) {
+    let _ = Command::new("taskkill")
+        .args(["/PID", &pid.to_string(), "/F"])
+        .creation_flags_no_window()
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
+}
+/// taskkill /T 对 detached fork 派生的进程树杀不净（服务端 worker 用 detached+unref 脱离），
+/// 用进程树快照兜底扫杀残留后代。
+#[cfg(windows)]
+fn sweep_descendants(root_pid: u32) {
+    for _ in 0..2 {
+        std::thread::sleep(std::time::Duration::from_millis(400));
+        let survivors: Vec<u32> = crate::win32::descendants(root_pid)
+            .iter()
+            .filter(|entry| crate::win32::alive(entry.pid))
+            .map(|entry| entry.pid)
+            .collect();
+        if survivors.is_empty() {
+            return;
+        }
+        for pid in survivors {
+            taskkill_pid(pid);
+        }
+    }
+    std::thread::sleep(std::time::Duration::from_millis(300));
+}
+fn kill_tree_and_sweep(pid: u32) {
+    taskkill_tree(pid);
+    #[cfg(windows)]
+    sweep_descendants(pid);
+}
 
 /// 只用于隐藏 taskkill 的控制台窗口（不改变进程创建语义）
 trait NoWindow {
@@ -238,7 +309,7 @@ pub fn stop_tree(app: &AppHandle, service_id: &str) {
         }
     }
     for pid in pids {
-        taskkill_tree(pid);
+        kill_tree_and_sweep(pid);
     }
     state.pty.remove(tab);
 }
@@ -622,6 +693,47 @@ fn spawn_main_server_watch(
     });
 }
 
+/// 方案 A：解析 `server/package.json` 的 `scripts.start`。若是 `node <入口> [参数]`
+/// 就返回入口+参数（跳过 cmd + npm 两个外壳层直接 spawn node）；解析不出来返回 None，
+/// 走 `cmd.exe /c npm start` 回退（非 node 入口、跨平台 env 包装、缺 package.json 等）。
+fn resolve_server_start_invocation(server_dir: &Path) -> Option<Vec<String>> {
+    let raw = std::fs::read_to_string(server_dir.join("package.json")).ok()?;
+    let payload: Value = serde_json::from_str(&raw).ok()?;
+    let script = payload.pointer("/scripts/start")?.as_str()?;
+    let mut args = split_start_script(script);
+    if args.len() < 2 {
+        return None;
+    }
+    let first = args[0].to_ascii_lowercase();
+    if first != "node" && first != "node.exe" {
+        return None;
+    }
+    args.remove(0);
+    Some(args)
+}
+
+/// 按空格切 start 脚本，双引号内的空格不切（对齐 npm 的引号解析习惯）。
+fn split_start_script(script: &str) -> Vec<String> {
+    let mut args = Vec::new();
+    let mut current = String::new();
+    let mut quoted = false;
+    for ch in script.chars() {
+        match ch {
+            '"' => quoted = !quoted,
+            ' ' if !quoted => {
+                if !current.is_empty() {
+                    args.push(std::mem::take(&mut current));
+                }
+            }
+            _ => current.push(ch),
+        }
+    }
+    if !current.is_empty() {
+        args.push(current);
+    }
+    args
+}
+
 async fn start_main_server(app: &AppHandle) -> Result<Value, String> {
     let state = app.state::<AppState>();
     let root = state.repo_root();
@@ -729,59 +841,106 @@ async fn start_main_server(app: &AppHandle) -> Result<Value, String> {
         ));
     }
 
+    let direct = resolve_server_start_invocation(&server_dir);
     set_state(
         app,
         MAIN_SERVER,
         "starting",
         None,
-        Some("启动 npm start（server/）…".to_string()),
+        Some(match &direct {
+            Some(_) => "启动 node（server/，跳过 cmd/npm）…".to_string(),
+            None => "启动 npm start（server/）…".to_string(),
+        }),
     );
-    let pid = state.pty.spawn(
+    let budget_ms = main_start_budget_ms(loader.count);
+    let mut attempt = 0u8;
+    loop {
+        attempt += 1;
+        // 进程本身拉不起来是确定性问题（缺 node 等），直接报错；启动中途退出才值得重试。
+        let pid =
+            spawn_main_server_process(state.inner(), app, &server_dir, &direct, env_vars.clone())?;
+        let outcome = await_main_server_ready(app, pid, budget_ms, loader.count).await;
+        match outcome {
+            health::PortWait::Ready if is_starting(app, MAIN_SERVER) => {
+                set_state(
+                    app,
+                    MAIN_SERVER,
+                    "running",
+                    Some(pid),
+                    Some(format!("运行中（PID {pid}）")),
+                );
+                return Ok(json!({ "ok": true, "reason": "ok", "pid": pid }));
+            }
+            health::PortWait::Exited if start_outcome_owned(app, MAIN_SERVER) && attempt < 2 => {
+                // 端口就绪前进程退出：多为模组加载期把服务端内部调度预算（如 10s）耗穿的
+                // 瞬时失败。首轮已把编译缓存与文件缓存写热，自动重试一次通常能过。
+                set_state(
+                    app,
+                    MAIN_SERVER,
+                    "starting",
+                    None,
+                    Some("启动失败，正在自动重试一次…".to_string()),
+                );
+                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                continue;
+            }
+            health::PortWait::Exited if start_outcome_owned(app, MAIN_SERVER) => {
+                let reason = main_server_exit_reason(app, pid, &root);
+                set_state(app, MAIN_SERVER, "error", None, Some(reason.clone()));
+                return Err(reason);
+            }
+            health::PortWait::Timeout => {
+                // 慢 ≠ 坏：预算用尽但进程还活着，不杀也不报错，交后台继续等端口
+                set_state(
+                    app,
+                    MAIN_SERVER,
+                    "starting",
+                    Some(pid),
+                    Some(start_progress_message(
+                        budget_ms,
+                        budget_ms,
+                        loader.count,
+                        true,
+                    )),
+                );
+                spawn_main_server_watch(app, pid, root.clone(), budget_ms, loader.count);
+                return Ok(json!({ "ok": true, "reason": "still-starting", "pid": pid }));
+            }
+            // Ready / Exited 但状态已被别的路径（用户点停止）改掉：不覆盖，也不算失败
+            _ => return Ok(json!({ "ok": true, "reason": "state-changed", "pid": pid })),
+        }
+    }
+}
+
+/// 拉起主服务器进程：能直连 node 就直连，直连连进程都起不来（如 PATH 缺 node）再回退 npm。
+fn spawn_main_server_process(
+    state: &AppState,
+    app: &AppHandle,
+    server_dir: &Path,
+    direct: &Option<Vec<String>>,
+    env_vars: Vec<(String, String)>,
+) -> Result<u32, String> {
+    match state.pty.spawn(
         app,
         session_id(MAIN_SERVER),
-        PtySpec::new("cmd.exe", &server_dir)
-            .args(vec!["/c".to_string(), "npm start".to_string()])
-            .env(env_vars)
-            .log(archive_log_path(state.inner(), crate::logarchive::SERVER)),
-    )?;
-
-    let budget_ms = main_start_budget_ms(loader.count);
-    let outcome = await_main_server_ready(app, pid, budget_ms, loader.count).await;
-    match outcome {
-        health::PortWait::Ready if is_starting(app, MAIN_SERVER) => {
-            set_state(
-                app,
-                MAIN_SERVER,
-                "running",
-                Some(pid),
-                Some(format!("运行中（PID {pid}）")),
-            );
-            Ok(json!({ "ok": true, "reason": "ok", "pid": pid }))
+        match direct {
+            Some(args) => PtySpec::new("node", server_dir).args(args.clone()),
+            None => PtySpec::new("cmd.exe", server_dir)
+                .args(vec!["/c".to_string(), "npm start".to_string()]),
         }
-        health::PortWait::Exited if start_outcome_owned(app, MAIN_SERVER) => {
-            let reason = main_server_exit_reason(app, pid, &root);
-            set_state(app, MAIN_SERVER, "error", None, Some(reason.clone()));
-            Err(reason)
-        }
-        health::PortWait::Timeout => {
-            // 慢 ≠ 坏：预算用尽但进程还活着，不杀也不报错，交后台继续等端口
-            set_state(
-                app,
-                MAIN_SERVER,
-                "starting",
-                Some(pid),
-                Some(start_progress_message(
-                    budget_ms,
-                    budget_ms,
-                    loader.count,
-                    true,
-                )),
-            );
-            spawn_main_server_watch(app, pid, root.clone(), budget_ms, loader.count);
-            Ok(json!({ "ok": true, "reason": "still-starting", "pid": pid }))
-        }
-        // Ready / Exited 但状态已被别的路径（用户点停止）改掉：不覆盖，也不算失败
-        _ => Ok(json!({ "ok": true, "reason": "state-changed", "pid": pid })),
+        .env(env_vars.clone())
+        .log(archive_log_path(state, crate::logarchive::SERVER)),
+    ) {
+        Ok(pid) => Ok(pid),
+        Err(_err) if direct.is_some() => state.pty.spawn(
+            app,
+            session_id(MAIN_SERVER),
+            PtySpec::new("cmd.exe", server_dir)
+                .args(vec!["/c".to_string(), "npm start".to_string()])
+                .env(env_vars)
+                .log(archive_log_path(state, crate::logarchive::SERVER)),
+        ),
+        Err(err) => Err(err),
     }
 }
 
@@ -1065,6 +1224,10 @@ pub async fn stop_service(app: &AppHandle, service_id: &str) -> Result<Value, St
     }
     stop_tree(app, id);
     set_state(app, id, "idle", None, Some("已停止".to_string()));
+    // 方案 B：所有服务都停下后，趁空闲把编译缓存写热，下次启动更快。
+    if !is_any_running(app) {
+        schedule_warmup(app);
+    }
     Ok(json!({ "ok": true, "reason": "已停止" }))
 }
 
@@ -1076,20 +1239,31 @@ pub async fn restart_service(app: &AppHandle, service_id: &str) -> Result<Value,
 /// 一键启动：主服务器失败即中止；市场服务受设置项 startMarket 控制（对齐现役版 engageStart）
 pub async fn engage_start(app: &AppHandle) -> Value {
     let settings = read_setting_bool(app, "startMarket", true);
-    let main = action_of(start_service(app, MAIN_SERVER).await);
+    // 方案 C：主服务与市场服务并发拉起（市场是原生 exe，秒级就绪，串行只是白等）。
+    let market_fut = async move {
+        if settings {
+            start_service(app, MARKET_SERVER).await
+        } else {
+            set_state(
+                app,
+                MARKET_SERVER,
+                "idle",
+                None,
+                Some("已跳过（启动选项关闭）".to_string()),
+            );
+            Ok(json!({ "ok": true, "reason": "skipped" }))
+        }
+    };
+    let (main, market) = tokio::join!(start_service(app, MAIN_SERVER), market_fut);
+    let main = action_of(main);
     if main["ok"] != json!(true) {
+        // 主服务失败即中止：把刚并发拉起的市场服务收掉（外部已运行 / 已跳过的不碰）。
+        if let Ok(market) = market {
+            if market["reason"] == json!("ok") {
+                let _ = stop_service(app, MARKET_SERVER).await;
+            }
+        }
         return main;
-    }
-    if settings {
-        let _ = start_service(app, MARKET_SERVER).await;
-    } else {
-        set_state(
-            app,
-            MARKET_SERVER,
-            "idle",
-            None,
-            Some("已跳过（启动选项关闭）".to_string()),
-        );
     }
     set_state(
         app,
@@ -1648,6 +1822,69 @@ pub fn is_any_running(app: &AppHandle) -> bool {
         .any(|info| info.state == "running" || info.state == "starting")
 }
 
+/// 方案 B：排一次后台预热（把模组编译缓存写热，让下一次真启动更快）。
+///
+/// 无服务在起/在跑、且当前没有预热在跑时才排；真正开跑前再查一次状态，
+/// 避免「刚停完就点启动」时预热与真启动两个 node 抢同一个编译缓存。
+pub fn schedule_warmup(app: &AppHandle) {
+    if WARMUP_BUSY.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    let Some(state) = app.try_state::<AppState>() else {
+        WARMUP_BUSY.store(false, Ordering::SeqCst);
+        return;
+    };
+    let app_handle = app.clone();
+    let root = state.repo_root();
+    let runtime = state.runtime.clone();
+    // 必须走 Tauri 的异步运行时：调度方可能来自 std::thread（启动钩子），那里没有 Tokio 上下文，
+    // 直接 tokio::spawn 会以「no reactor running」崩溃。
+    tauri::async_runtime::spawn(async move {
+        let busy = app_handle
+            .try_state::<AppState>()
+            .map(|state| {
+                state
+                    .services
+                    .snapshot()
+                    .iter()
+                    .any(|info| info.state == "running" || info.state == "starting")
+            })
+            .unwrap_or(true);
+        if !busy {
+            set_warmup(
+                &app_handle,
+                WarmupInfo {
+                    state: "running".to_string(),
+                    message: "模组预热中…".to_string(),
+                },
+            );
+            let started = std::time::Instant::now();
+            let result = crate::mods::preflight::warmup_loaders(&root, &runtime).await;
+            let ok = result.get("ok").and_then(Value::as_bool).unwrap_or(false);
+            let elapsed = started.elapsed().as_millis() as u64;
+            set_warmup(
+                &app_handle,
+                WarmupInfo {
+                    state: if ok { "done" } else { "error" }.to_string(),
+                    message: format!(
+                        "模组预热{}（{elapsed} ms）",
+                        if ok { "完成" } else { "失败" }
+                    ),
+                },
+            );
+        } else {
+            set_warmup(
+                &app_handle,
+                WarmupInfo {
+                    state: "idle".to_string(),
+                    message: "服务运行中，预热已跳过".to_string(),
+                },
+            );
+        }
+        WARMUP_BUSY.store(false, Ordering::SeqCst);
+    });
+}
+
 pub fn server_dir_of(root: &Path) -> std::path::PathBuf {
     root.join("server")
 }
@@ -1680,7 +1917,8 @@ mod tests {
         // 父进程：拉一个孙进程（每秒空转）→ 把孙进程 PID 写盘 → 自己也不退出
         let script = format!(
             "const fs=require('fs');const {{spawn}}=require('child_process');\
-             const child=spawn(process.execPath,['-e','setInterval(()=>{{}},1000)'],{{stdio:'ignore'}});\
+             const child=spawn(process.execPath,['-e','setInterval(()=>{{}},1000)'],{{stdio:'ignore',detached:true}});\
+             child.unref();\
              fs.writeFileSync({path},String(child.pid));\
              setInterval(()=>{{}},1000);",
             path = serde_json::to_string(&pid_file.to_string_lossy().to_string()).unwrap_or_default()
@@ -1715,7 +1953,7 @@ mod tests {
             "孙进程不在进程树里（快照口径可疑）：{tree:?}"
         );
 
-        taskkill_tree(root);
+        kill_tree_and_sweep(root);
 
         let deadline = Instant::now() + Duration::from_secs(20);
         let mut leftover: Vec<win32::ProcessEntry> = win32::descendants(root)
@@ -1983,6 +2221,55 @@ mod tests {
             crash_cause_from_report(&root, 6000).is_none(),
             "比这一轮还旧的报告不许被点名"
         );
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn resolve_server_start_invocation_prefers_direct_node() {
+        let root = std::env::temp_dir().join(format!("evejs-start-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(
+            root.join("package.json"),
+            r#"{"scripts":{"start":"node index.js --flag"}}"#,
+        )
+        .unwrap();
+        let args = resolve_server_start_invocation(&root).unwrap();
+        assert_eq!(args, vec!["index.js", "--flag"]);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn resolve_server_start_invocation_keeps_quoted_entry() {
+        let root = std::env::temp_dir().join(format!("evejs-start-{}", std::process::id() + 1));
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(
+            root.join("package.json"),
+            r#"{"scripts":{"start":"node \"my entry.js\" --flag"}}"#,
+        )
+        .unwrap();
+        let args = resolve_server_start_invocation(&root).unwrap();
+        assert_eq!(args, vec!["my entry.js", "--flag"]);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn resolve_server_start_invocation_falls_back_when_not_node() {
+        let root = std::env::temp_dir().join(format!("evejs-start-{}", std::process::id() + 2));
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(
+            root.join("package.json"),
+            r#"{"scripts":{"start":"cross-env NODE_ENV=dev node index.js"}}"#,
+        )
+        .unwrap();
+        assert!(resolve_server_start_invocation(&root).is_none());
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn resolve_server_start_invocation_none_without_package() {
+        let root = std::env::temp_dir().join(format!("evejs-start-{}", std::process::id() + 3));
+        std::fs::create_dir_all(&root).unwrap();
+        assert!(resolve_server_start_invocation(&root).is_none());
         let _ = std::fs::remove_dir_all(&root);
     }
 }

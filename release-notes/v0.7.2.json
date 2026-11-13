@@ -1,0 +1,49 @@
+{
+  "version": "0.7.2",
+  "changelog": {
+    "zh": [
+      {
+        "type": "new",
+        "text": "启动提速：主服务改为直连 node 启动（解析 server/package.json 的 start 脚本，跳过 cmd + npm 两层包装），主服务与市场服务并发拉起，减少启动等待。"
+      },
+      {
+        "type": "new",
+        "text": "模组编译缓存预热：启动完成后与全部服务停止后的空闲时段，后台预热 node 编译缓存，下次启动更快；预热状态在底部状态栏实时可见，7 种语言均已补齐。"
+      },
+      {
+        "type": "fix",
+        "text": "主服务启动中途进程意外退出时自动重试一次，应对服务端内部调度超时造成的瞬时启动失败，避免一次抖动就判定启动失败。"
+      },
+      {
+        "type": "fix",
+        "text": "修复停止服务后 node 进程残留堆积：原 taskkill /T 对服务端 detached 派生的进程树杀不净，改为按进程树快照兜底扫杀残留后代，停服后进程彻底收干净。"
+      },
+      {
+        "type": "opt",
+        "text": "服务器日志面板高度跟随主窗口变化，不再写死固定高度，窗口拉大时日志区同步扩展。"
+      }
+    ],
+    "en": [
+      {
+        "type": "new",
+        "text": "Faster startup: the main server now launches node directly (resolving the start script from server/package.json and skipping the cmd + npm wrapper layers), and the main and market servers start concurrently, cutting launch wait time."
+      },
+      {
+        "type": "new",
+        "text": "Mod compile-cache warmup: in idle moments after startup and after all services stop, the launcher pre-warms the node compile cache so the next launch is faster; warmup progress is shown live in the bottom status bar, with all 7 locales filled in."
+      },
+      {
+        "type": "fix",
+        "text": "The main server automatically retries once when its process exits mid-start, absorbing transient start failures caused by the server's internal scheduling timeouts instead of reporting a failed launch."
+      },
+      {
+        "type": "fix",
+        "text": "Fix node processes lingering after stopping services: taskkill /T could not reliably kill the server's detached child process tree, so stopping now sweeps surviving descendants via a process-tree snapshot, leaving no residue."
+      },
+      {
+        "type": "opt",
+        "text": "The server log panel now grows with the main window instead of being pinned to a fixed height, so the log area expands as the window is resized."
+      }
+    ]
+  }
+}

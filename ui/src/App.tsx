@@ -265,6 +265,7 @@ export function App() {
               env={env}
               services={launcher.services}
               session={launcher.session}
+              warmup={launcher.warmup}
               onOpenLegalNotice={legalAcknowledged ? () => setLegalOpen(true) : undefined}
             />
           </div>

@@ -114,6 +114,7 @@ pub struct AppState {
     pub pty: Arc<pty::PtyManager>,
     pub metrics: Mutex<metrics::MetricsCollector>,
     pub init: init::InitManager,
+    pub warmup: Mutex<process::WarmupInfo>,
 }
 
 impl AppState {
@@ -165,6 +166,7 @@ pub fn run() {
         pty: Arc::new(pty::PtyManager::new()),
         metrics: Mutex::new(metrics::MetricsCollector::new()),
         init: init::InitManager::new(),
+        warmup: Mutex::new(process::WarmupInfo::default()),
     };
 
     let self_test = is_self_test();
@@ -210,6 +212,15 @@ pub fn run() {
                     if crate::launcher_grant::needs_refresh(&runtime) {
                         let _ = crate::launcher_grant::refresh_license(&runtime);
                     }
+                });
+            }
+            // 方案 B：启动器起来后稍歇片刻，在空闲时预热一次模组编译缓存。
+            // 刻意放后台线程 + 延迟，避开启动关键路径；schedule_warmup 自带互斥与状态检查。
+            {
+                let app_handle = app.handle().clone();
+                std::thread::spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_secs(5));
+                    crate::process::schedule_warmup(&app_handle);
                 });
             }
             let page = resolve_ui_page();
