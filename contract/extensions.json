@@ -436,6 +436,14 @@
       "why": "下载中点「取消」。下载循环是分段的（`net::download_cancellable`），每读一块前问一次这个标志，所以取消最多浪费一段流量，不会整包下完才发现没人要。取消后**半截文件一并删掉**：用户要的是「这个文件」，留个残缺的同名包在盘上只会被当成下好了 —— 下次解压才发现是坏的。只删刚写进去的那一份目标文件，不碰用户目录里别的东西。"
     },
     {
+      "api": "downloadClientIndex",
+      "channel": "download:clientIndex",
+      "kind": "invoke",
+      "signature": "",
+      "params": [],
+      "why": "客户端种子清单（down/client.json）与服务端清单分开维护，避免两堆下载混在一个文件里。结构与 down/index.json 完全一致（`{ \"versions\": [...] }`），复用同一套下载与解析逻辑（含缓存破坏参数，绕开 Cloudflare 边缘缓存）。首页横幅的客户端种子按钮据此判断「是否有新的客户端种子可下载」，用于脉冲提示。"
+    },
+    {
       "api": "downloadIndex",
       "channel": "download:index",
       "kind": "invoke",

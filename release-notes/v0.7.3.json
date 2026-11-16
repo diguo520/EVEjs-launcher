@@ -1,0 +1,41 @@
+{
+  "version": "0.7.3",
+  "changelog": {
+    "zh": [
+      {
+        "type": "fix",
+        "text": "服务端版本清单请求带缓存破坏参数，修复 Cloudflare 边缘缓存把旧 index.json 钉死、导致 R2 更新后启动器仍显示旧版本列表的问题。"
+      },
+      {
+        "type": "new",
+        "text": "服务端与客户端种子下载按钮新增「有新下载」脉冲提示：出现更新版本时按钮脉冲，用户查看一次后脉冲取消，仅再次出现新版本时重新提示。"
+      },
+      {
+        "type": "new",
+        "text": "新增客户端种子清单 down/client.json 与 download:clientIndex 通道，客户端种子下载与服务端分开维护，独立检测新版本。"
+      },
+      {
+        "type": "opt",
+        "text": "启动前预检文案由「版本」改为「基线」，避免与服务端/模组版本号混淆，措辞更准确。"
+      }
+    ],
+    "en": [
+      {
+        "type": "fix",
+        "text": "Server version index requests now carry a cache-busting parameter, fixing stale version lists caused by Cloudflare's edge cache pinning the old index.json after the R2 manifest was updated."
+      },
+      {
+        "type": "new",
+        "text": "Server and client seed download buttons now pulse to signal a new download is available; the pulse clears after the user views it and reappears only when a newer version appears."
+      },
+      {
+        "type": "new",
+        "text": "Added a separate client seed manifest (down/client.json) and a download:clientIndex channel, so client seed downloads are maintained independently of the server and detect new versions on their own."
+      },
+      {
+        "type": "opt",
+        "text": "Pre-launch preflight wording changed from \"version\" to \"baseline\" to avoid confusion with server/mod version numbers."
+      }
+    ]
+  }
+}

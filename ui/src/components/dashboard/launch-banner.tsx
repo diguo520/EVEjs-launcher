@@ -6,6 +6,7 @@ import { StatusDot } from "@/components/common/status-dot"
 import { DownloadStrip } from "@/components/dashboard/download-strip"
 import { ServerVersionsDialog } from "@/components/dashboard/server-versions-dialog"
 import { useLauncherDownloads } from "@/hooks/use-launcher-downloads"
+import { useDownloadAvailability } from "@/hooks/use-download-availability"
 import { cn } from "@/lib/utils"
 import { listSeparator, t } from "@/lib/i18n"
 import { DOWNLOADS } from "@/lib/mock"
@@ -31,6 +32,8 @@ export function LaunchBanner({
 
   /** 下载状态只有一份：种子文件、服务端各版本、版本弹窗里的每一行共用它 */
   const downloads = useLauncherDownloads()
+  /** 服务端 / 客户端按钮的「有新下载」脉冲：出现新版本才脉冲，查看一次即取消 */
+  const availability = useDownloadAvailability()
   const [versionsOpen, setVersionsOpen] = useState(false)
 
   return (
@@ -92,11 +95,16 @@ export function LaunchBanner({
           <Button
             variant="outline"
             size="lg"
+            className={cn(availability.clientPulse && "download-pulse")}
             disabled={downloads.active}
             title={`${DOWNLOADS.clientTorrent.file} · ${DOWNLOADS.clientTorrent.size}`}
-            onClick={() =>
-              void downloads.start(DOWNLOADS.clientTorrent.file, DOWNLOADS.clientTorrent.file)
-            }
+            onClick={() => {
+              availability.markClientViewed()
+              void downloads.start(
+                DOWNLOADS.clientTorrent.file,
+                DOWNLOADS.clientTorrent.file
+              )
+            }}
           >
             <Download />
             客户端种子文件
@@ -104,8 +112,12 @@ export function LaunchBanner({
           <Button
             variant="outline"
             size="lg"
+            className={cn(availability.serverPulse && "download-pulse")}
             title={t("服务端版本")}
-            onClick={() => setVersionsOpen(true)}
+            onClick={() => {
+              availability.markServerViewed()
+              setVersionsOpen(true)
+            }}
           >
             <HardDriveDownload />
             服务端

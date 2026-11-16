@@ -22,6 +22,10 @@ const BASE_URL: &str = "https://evejs.5318.cm/down";
 /// 渲染层不拼这个地址 —— 与整包同口径，域名和路径都在 Rust 侧。
 const INDEX_FILE: &str = "index.json";
 
+/// 客户端种子清单对象名：与整包同在 `down/` 前缀下（`down/client.json`）。
+/// 结构与服务端清单一致（`{ "versions": [...] }`），复用同一套下载与解析逻辑。
+const CLIENT_INDEX_FILE: &str = "client.json";
+
 /// 清单只有几百字节，但国内到 Cloudflare 偶发慢；给足 20 s 再去回退内置清单。
 const INDEX_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
 
@@ -77,7 +81,17 @@ fn object_url(file: &str) -> String {
 /// 失败时渲染层退回编译进 exe 的内置清单 —— 这条通道的目的是「有新包能跟上」，
 /// 不是「没网就打不开版本列表」。
 pub async fn index() -> Value {
-    let url = object_url(INDEX_FILE);
+    read_index(INDEX_FILE).await
+}
+
+/// `download:clientIndex`：读客户端种子清单，结构与服务端清单一致。
+pub async fn client_index() -> Value {
+    read_index(CLIENT_INDEX_FILE).await
+}
+
+/// 读一份清单（服务端 / 客户端共用）：下载 → 解析 → 归一化。
+async fn read_index(file: &str) -> Value {
+    let url = index_url(file);
     let outcome = tauri::async_runtime::spawn_blocking(move || {
         net::get(&url, "application/json", INDEX_TIMEOUT)
     })
@@ -98,6 +112,17 @@ pub async fn index() -> Value {
         return json!({ "ok": false, "reason": "清单里没有可用条目" });
     }
     json!({ "ok": true, "versions": versions })
+}
+
+/// 清单地址：带缓存破坏参数。Cloudflare 按完整 URL 缓存 `index.json`，
+/// 不带参数会被钉在旧清单上（用户更新了 R2 清单，启动器仍读到缓存里的旧版本）。
+/// 每次带时间戳，强制回源拿最新清单。
+fn index_url(file: &str) -> String {
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    format!("{}?cb={ts}", object_url(file))
 }
 
 /// 清单 JSON → 可下载条目。
@@ -282,6 +307,19 @@ mod tests {
             object_url("EVE Online - 3396210.zip.torrent"),
             "https://evejs.5318.cm/down/EVE%20Online%20-%203396210.zip.torrent"
         );
+    }
+
+    #[test]
+    fn index_url_busts_the_cdn_cache() {
+        let url = index_url(INDEX_FILE);
+        assert!(url.starts_with("https://evejs.5318.cm/down/index.json?cb="));
+        // 与不带参数的清单地址不同：带缓存破坏参数，强制 Cloudflare 回源
+        assert_ne!(url, object_url(INDEX_FILE));
+        let ts = url.split("?cb=").nth(1).unwrap_or("");
+        assert!(!ts.is_empty() && ts.chars().all(|c| c.is_ascii_digit()));
+        // 客户端清单走同一套地址构建，只是对象名不同
+        let client = index_url(CLIENT_INDEX_FILE);
+        assert!(client.starts_with("https://evejs.5318.cm/down/client.json?cb="));
     }
 
     #[test]

@@ -2,12 +2,12 @@
   "generatedFrom": "E:\\Games\\EveJS-v0.12.8\\launcher\\launcher",
   "generatedAt": "2026-10-13T16:52:43.237Z",
   "counts": {
-    "invoke": 124,
+    "invoke": 125,
     "send": 8,
     "events": 11,
-    "requests": 132,
+    "requests": 133,
     "registered": 84,
-    "apiTotal": 143
+    "apiTotal": 144
   },
   "invoke": [
     {
@@ -287,6 +287,13 @@
     {
       "api": "downloadCancel",
       "channel": "download:cancel",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "downloadClientIndex",
+      "channel": "download:clientIndex",
       "kind": "invoke",
       "signature": "",
       "params": []

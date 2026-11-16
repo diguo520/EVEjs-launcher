@@ -403,6 +403,23 @@ body {
   animation: update-pulse-ring 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
+/* 有新下载可下：按钮边框 + 外辉光脉冲（用户查看一次后由 JS 摘掉，仅在出现新版本时挂上） */
+@keyframes download-pulse {
+  0%,
+  100% {
+    border-color: hsl(var(--primary) / 0.4);
+    box-shadow: 0 0 0 0 hsl(var(--primary) / 0);
+  }
+  50% {
+    border-color: hsl(var(--primary));
+    box-shadow: 0 0 10px 1px hsl(var(--primary) / 0.5);
+  }
+}
+
+.download-pulse {
+  animation: download-pulse 1.6s ease-in-out infinite;
+}
+
 /* 开机画面：覆盖整屏，等第一次握手回来再淡出（淡出时长跟 App.tsx 的 BOOT_FADE_MS 对齐） */
 .boot-splash {
   position: fixed;
