@@ -22,7 +22,9 @@ export function SettingsPage() {
 
         {/* 两列排：常规设置 | 关于；危险操作单独整行，避免误触 */}
         <div className="grid items-start gap-4 md:grid-cols-[1.35fr_1fr]">
-          <GeneralSettings />
+          <div className="flex flex-col gap-4">
+            <GeneralSettings />
+          </div>
           <AboutPanel />
         </div>
 

@@ -403,6 +403,48 @@ body {
   animation: update-pulse-ring 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
+/* 新功能引导卡片：从侧边滑入、停到目标位置，带指向箭头（一次性，常态不挂） */
+@keyframes boot-hint-slide {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.boot-hint-card {
+  position: fixed;
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid hsl(var(--primary) / 0.45);
+  border-radius: 0.6rem;
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  box-shadow: 0 8px 24px hsl(var(--primary) / 0.18);
+  font-size: 11px;
+  white-space: nowrap;
+  animation: boot-hint-slide 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* 指向齿轮的箭头 */
+.boot-hint-arrow {
+  position: absolute;
+  left: -5px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-right: 6px solid hsl(var(--primary) / 0.45);
+}
+
 /* 有新下载可下：按钮边框 + 外辉光脉冲（用户查看一次后由 JS 摘掉，仅在出现新版本时挂上） */
 @keyframes download-pulse {
   0%,

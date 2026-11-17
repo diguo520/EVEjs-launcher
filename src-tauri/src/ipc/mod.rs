@@ -121,6 +121,25 @@ async fn dispatch(
         "download:clientIndex" => Ok(crate::downloads::client_index().await),
         "download:index" => Ok(crate::downloads::index().await),
 
+        /* ------------------------ 服务端在线升级 ------------------------ */
+        // 发布源复用首页下载的 R2 `down/index.json`；升级动作交给上游更新器，
+        // 启动器只编排「查 → 下 → 停服 → 更新 → 装依赖 → 起服」（见 server_update.rs）。
+        "server:updateCheck" => Ok(crate::server_update::check(&root).await),
+        "server:updateDownload" => {
+            let file = arg_str(args, 0);
+            let version = arg_str(args, 1);
+            let runtime = state.runtime.clone();
+            let app = app.clone();
+            Ok(crate::server_update::download(&app, &runtime, &file, &version).await)
+        }
+        "server:updateApply" => {
+            let version = arg_str(args, 0);
+            let root2 = root.clone();
+            let runtime = state.runtime.clone();
+            let app = app.clone();
+            Ok(crate::server_update::apply(&app, &root2, &runtime, &version).await)
+        }
+
         /* ------------------------- 环境自检 / 健康检查 ------------------------- */
         "env:check" => Ok(env::detect_env(&root).await),
         "health:check" => {

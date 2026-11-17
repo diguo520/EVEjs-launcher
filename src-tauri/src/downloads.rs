@@ -32,8 +32,8 @@ const INDEX_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
 /// 清单最多认这么多行：桶里真放几百个整包，也不该把弹窗撑爆。
 const INDEX_MAX_ROWS: usize = 100;
 
-/// 进度事件（数组载荷，与 `mod:downloadProgress` 同形）
-const PROGRESS_EVENT: &str = "download:progress";
+/// 进度事件（数组载荷，与 `mod:downloadProgress` 同形）。服务端升级复用同一条通道。
+pub(crate) const PROGRESS_EVENT: &str = "download:progress";
 
 /// 同一时刻只允许一条下载：横幅上就那几个入口，两条流同时写盘没有意义；
 /// 上一条没结束就再点一次，直接说「已有下载在进行」比默默排队或并发写同一个文件好解释。
@@ -60,7 +60,7 @@ fn safe_file_name(name: &str) -> Option<&str> {
 
 /// 对象名 → 下载地址。转义口径与渲染层的 `encodeURIComponent` 同向
 /// （种子名里有空格；原样发出去有些网关直接回 400），多转义几个符号无害。
-fn object_url(file: &str) -> String {
+pub(crate) fn object_url(file: &str) -> String {
     let mut out = String::with_capacity(BASE_URL.len() + file.len() + 1);
     out.push_str(BASE_URL);
     out.push('/');

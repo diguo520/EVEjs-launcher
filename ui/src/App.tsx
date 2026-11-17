@@ -7,6 +7,10 @@ import {
   LauncherVersionProvider,
   useLauncherVersionState,
 } from "@/components/shell/launcher-version"
+import {
+  ServerUpdateProvider,
+  useServerUpdateState,
+} from "@/components/shell/server-update"
 import { TopBar } from "@/components/shell/top-bar"
 import { SideNav } from "@/components/shell/side-nav"
 import { AppContextMenu } from "@/components/shell/app-menu"
@@ -72,6 +76,7 @@ export function App() {
   const { t } = useLocale()
   const launcher = useLauncher()
   const launcherVersion = useLauncherVersionState()
+  const serverUpdate = useServerUpdateState()
   /** 账号与角色：到游戏里建号要等客户端几秒，状态挂在外壳上，切页也不会丢 */
   const accounts = useLauncherAccounts()
   /** 服务端根目录：默认取后端 app:info（不再用原型里那串写死的路径），配置中心改过就用改过的 */
@@ -220,6 +225,7 @@ export function App() {
 
   return (
     <LauncherVersionProvider value={launcherVersion}>
+      <ServerUpdateProvider value={serverUpdate}>
       <TooltipProvider delayDuration={180}>
         {/* data-evejs-renderer="react"：G1 运行时自检（src-tauri/src/ipc/smoke.rs）靠它判定 React
             渲染层真的挂载了（要求该节点有子元素）。属性不可改名、不可删除。 */}
@@ -252,6 +258,7 @@ export function App() {
                 metrics={launcher.metrics}
                 badges={navBadges}
                 installedMods={installedMods}
+                ready={!booting}
               />
               <main
                 key={view}
@@ -287,6 +294,7 @@ export function App() {
         <Toaster />
         <ClosePrompt />
       </TooltipProvider>
+      </ServerUpdateProvider>
     </LauncherVersionProvider>
   )
 }

@@ -2,12 +2,12 @@
   "generatedFrom": "E:\\Games\\EveJS-v0.12.8\\launcher\\launcher",
   "generatedAt": "2026-10-13T16:52:43.237Z",
   "counts": {
-    "invoke": 125,
+    "invoke": 128,
     "send": 8,
     "events": 11,
-    "requests": 133,
+    "requests": 136,
     "registered": 84,
-    "apiTotal": 144
+    "apiTotal": 147
   },
   "invoke": [
     {
@@ -939,6 +939,32 @@
       "kind": "invoke",
       "signature": "",
       "params": []
+    },
+    {
+      "api": "serverUpdateApply",
+      "channel": "server:updateApply",
+      "kind": "invoke",
+      "signature": "version: string",
+      "params": [
+        "version"
+      ]
+    },
+    {
+      "api": "serverUpdateCheck",
+      "channel": "server:updateCheck",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "serverUpdateDownload",
+      "channel": "server:updateDownload",
+      "kind": "invoke",
+      "signature": "file: string, version: string",
+      "params": [
+        "file",
+        "version"
+      ]
     },
     {
       "api": "serviceRestart",

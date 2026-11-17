@@ -18,7 +18,7 @@ pub struct ChannelSpec {
     pub kind: ChannelKind,
 }
 
-pub const REQUEST_COUNT: usize = 133;
+pub const REQUEST_COUNT: usize = 136;
 pub const EVENT_COUNT: usize = 11;
 
 #[rustfmt::skip]
@@ -134,6 +134,9 @@ pub const CHANNELS: &[ChannelSpec] = &[
     ChannelSpec { channel: "mods:templates", api: "modsTemplates", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "mods:uninstall", api: "modsUninstall", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "mods:updateMeta", api: "modsUpdateMeta", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "server:updateApply", api: "serverUpdateApply", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "server:updateCheck", api: "serverUpdateCheck", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "server:updateDownload", api: "serverUpdateDownload", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "service:restart", api: "serviceRestart", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "service:start", api: "serviceStart", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "service:stop", api: "serviceStop", kind: ChannelKind::Invoke },

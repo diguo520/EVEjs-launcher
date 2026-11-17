@@ -1304,6 +1304,14 @@ export const SERVER_VERSIONS: ServerVersion[] = [
 ]
 
 /**
+ * 客户端种子各版本：离线兜底，结构与服务端版本一致（R2 的 `down/client.json`）。
+ * 打开客户端下载列表时先读桶里的清单，读不到才退回这里。
+ */
+export const CLIENT_VERSIONS: ServerVersion[] = [
+  { file: "EVE Online - 3396210.zip.torrent", version: "3396210", size: "595 KB" },
+]
+
+/**
  * 版本号比大小：「261028.1」按 `[261028, 1]` 逐段比**数值**。
  * 为什么不直接比字符串：字典序会把 `26120` 排在 `2619` 前面，而日期号必须按数值比。
  * 认不出的段（如 `rc1`）当 0，不抛错 —— 清单是手写的，写错一段不该把界面炸掉。

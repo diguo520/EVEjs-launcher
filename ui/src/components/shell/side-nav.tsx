@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react"
-import { ChevronsLeft, ChevronsRight } from "lucide-react"
+import { useEffect, useLayoutEffect, useRef, useState } from "react"
+import { ArrowUp, ChevronsLeft, ChevronsRight, X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Sparkline } from "@/components/common/sparkline"
@@ -17,6 +17,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { useMediaQuery } from "@/hooks/use-media-query"
+import { t } from "@/lib/i18n"
 import type { Metric } from "@/lib/mock"
 
 const MINI_KEYS = ["cpu", "mem", "net"]
@@ -84,12 +85,100 @@ function RailMetric({
   )
 }
 
+/**
+ * 新功能引导卡片：首次打开某版启动器时，一个悬浮卡片从侧边滑入、停到齿轮（设置）旁边，
+ * 指向它提示「新增服务端在线升级」，点叉关闭。按启动器版本号记 localStorage，每版只提示一次。
+ *
+ * 位置用齿轮按钮的 getBoundingClientRect 实测，停到精确位置（不像脉冲那样只原地闪）。
+ */
+function ServerUpgradeHint({
+  targetRef,
+  version,
+  ready,
+}: {
+  targetRef: React.RefObject<HTMLButtonElement | null>
+  version: string
+  ready: boolean
+}) {
+  // 引导卡片用独立 key：早期开机脉冲提示用过 `evejs_server_upgrade_hint_<版本>`，
+  // 沿用会被它标记的「已看」压制，导致引导弹不出来。
+  const key = `evejs_server_upgrade_guide_${version}`
+  const [show, setShow] = useState(() => {
+    try {
+      return window.localStorage.getItem(key) !== "1"
+    } catch {
+      return true
+    }
+  })
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
+
+  /**
+   * 用 layout effect 实测齿轮位置：在绘制前同步量好，避免「先渲染再量、量不到就永远不弹」
+   * 的时序坑。量不到就留 null，渲染时用兜底位置，保证卡片一定会出现。
+   */
+  useLayoutEffect(() => {
+    if (!show || !ready) return
+    const measure = () => {
+      const el =
+        targetRef.current ??
+        (document.querySelector<HTMLElement>('[data-guide-target="settings"]') ?? null)
+      if (!el) return
+      const r = el.getBoundingClientRect()
+      setPos({ x: r.right + 10, y: r.top + r.height / 2 })
+    }
+    measure()
+    window.addEventListener("resize", measure)
+    window.addEventListener("scroll", measure, true)
+    return () => {
+      window.removeEventListener("resize", measure)
+      window.removeEventListener("scroll", measure, true)
+    }
+  }, [show, ready, targetRef])
+
+  // 卡片已经随 show/ready 出现（定位用兜底也保证可见）才记「已看」：
+  // 只在定位成功时记，避免定位失败被标记后这版再也弹不出来。
+  useEffect(() => {
+    if (!show || !ready || !pos) return
+    try {
+      window.localStorage.setItem(key, "1")
+    } catch {
+      // 存不下只影响下次是否再提示，这次照常显示
+    }
+  }, [show, key, pos, ready])
+
+  if (!show || !ready) return null
+  // 兜底位置：侧栏右侧偏上；量到齿轮就用实测值，量不到也保证卡片可见
+  const left = pos?.x ?? 232
+  const top = pos?.y ?? 180
+  return (
+    <div
+      className="boot-hint-card"
+      style={{ left, top, transform: "translateY(-50%)" }}
+      role="dialog"
+      aria-label={t("新增服务端在线升级")}
+    >
+      <ArrowUp className="size-3.5 shrink-0 text-primary" />
+      <span className="text-primary font-medium">{t("新增服务端在线升级")}</span>
+      <button
+        type="button"
+        onClick={() => setShow(false)}
+        aria-label={t("知道了")}
+        className="ml-1 text-tertiary transition-colors hover:text-foreground"
+      >
+        <X className="size-3" />
+      </button>
+      <span className="boot-hint-arrow" />
+    </div>
+  )
+}
+
 export function SideNav({
   active,
   onNavigate,
   metrics,
   badges,
   installedMods,
+  ready,
 }: {
   active: ViewId
   onNavigate: (id: ViewId) => void
@@ -101,7 +190,10 @@ export function SideNav({
    * 用来决定「群星」这类**依赖模组**的分组显不显示，见 `visibleNavGroups`。
    */
   installedMods?: ReadonlySet<string> | null
+  /** 开机画面收掉后才为 true：引导卡片这时才滑入，避免盖在开机画面底下 */
+  ready?: boolean
 }) {
+  const settingsRef = useRef<HTMLButtonElement>(null)
   const miniMetrics = metrics.filter((m) => MINI_KEYS.includes(m.key))
   /** 没装对应模组的分组整组不画（连标题一起），而不是画出来再点进去看空页 */
   const groups = visibleNavGroups(NAV_GROUPS, installedMods ?? null)
@@ -113,6 +205,7 @@ export function SideNav({
   /** 只有真的有新版 / 正在更新，底部才多出一条分割线（没有更新就别空占一格） */
   const { outdated, updating } = useLauncherVersion()
   const showUpdate = outdated || updating
+  const { version } = useLauncherVersion()
 
   useEffect(() => {
     try {
@@ -155,6 +248,8 @@ export function SideNav({
                   <button
                     key={key}
                     type="button"
+                    ref={item.id === "settings" ? settingsRef : undefined}
+                    data-guide-target={item.id === "settings" ? "settings" : undefined}
                     onClick={() => onNavigate(item.id)}
                     aria-label={item.label}
                     className={cn(
@@ -315,6 +410,12 @@ export function SideNav({
           )}
         </div>
       ) : null}
+
+      <ServerUpgradeHint
+        targetRef={settingsRef}
+        version={version}
+        ready={Boolean(ready)}
+      />
     </nav>
   )
 }

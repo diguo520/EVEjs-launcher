@@ -461,6 +461,35 @@
         "suggestedName"
       ],
       "why": "首页横幅的「客户端种子文件 / 服务端 <版本>」下载入口。用户口径（2026-11-01）：不要跳浏览器，就在启动器里另存为 —— 所以这条通道 = Win32「另存为」对话框（`dialog.rs`，与 `mods:saveText` 同一套）+ `net::download_cancellable`（分段 / 断点续传 / 可取消，与启动器自更新同一套）。入参只有**一个对象名**，域名与 `down/` 前缀拼死在 Rust 侧：既开不了任意主机，也写不到用户选定的目标文件之外（与 `mods::join_within` 同一口径）。同一时刻只允许一条下载，第二次点直接回「已有下载在进行」。目标已存在时先删再下 —— 这里的语义是「覆盖」，把旧文件当半截包续传会拼出坏包。"
+    },
+    {
+      "api": "serverUpdateApply",
+      "channel": "server:updateApply",
+      "kind": "invoke",
+      "signature": "version: string",
+      "params": [
+        "version"
+      ],
+      "why": "服务端在线升级（与启动器自更新解耦，不碰服务端源码）：check=本地版本 vs 桶里 down/index.json 最新版本；download=下整包到 _launcher/temp；apply=停服→调上游 tools/Updater/Update-EvEJS.ps1→装依赖→起服探活。发布源复用首页下载的 R2 清单，不引入第二套签名体系。"
+    },
+    {
+      "api": "serverUpdateCheck",
+      "channel": "server:updateCheck",
+      "kind": "invoke",
+      "signature": "",
+      "params": [],
+      "why": "服务端在线升级（与启动器自更新解耦，不碰服务端源码）：check=本地版本 vs 桶里 down/index.json 最新版本；download=下整包到 _launcher/temp；apply=停服→调上游 tools/Updater/Update-EvEJS.ps1→装依赖→起服探活。发布源复用首页下载的 R2 清单，不引入第二套签名体系。"
+    },
+    {
+      "api": "serverUpdateDownload",
+      "channel": "server:updateDownload",
+      "kind": "invoke",
+      "signature": "file: string, version: string",
+      "params": [
+        "file",
+        "version"
+      ],
+      "why": "服务端在线升级（与启动器自更新解耦，不碰服务端源码）：check=本地版本 vs 桶里 down/index.json 最新版本；download=下整包到 _launcher/temp；apply=停服→调上游 tools/Updater/Update-EvEJS.ps1→装依赖→起服探活。发布源复用首页下载的 R2 清单，不引入第二套签名体系。"
     }
   ],
   "send": [

@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { toast } from "sonner"
-import { Copy, FolderOpen, RefreshCw, ScrollText } from "lucide-react"
+import { ArrowUp, Copy, FolderOpen, Loader2, ScrollText } from "lucide-react"
 
 import { cn, copyText } from "@/lib/utils"
 import { t } from "@/lib/i18n"
@@ -8,8 +8,10 @@ import { GithubMark } from "@/components/common/github-mark"
 import { QqMark } from "@/components/common/qq-mark"
 import { Panel } from "@/components/common/panel"
 import { Button } from "@/components/ui/button"
+import { Progress } from "@/components/ui/progress"
 import { LauncherUpdateDialog } from "@/components/shell/launcher-update-dialog"
 import { useLauncherVersion } from "@/components/shell/launcher-version"
+import { useServerUpdate } from "@/components/shell/server-update"
 import { callOr } from "@/lib/ipc"
 import { LAUNCHER_META, QQ_GROUPS } from "@/lib/mock"
 
@@ -25,6 +27,8 @@ interface AboutField {
  */
 export function AboutPanel() {
   const { version, latestVersion, outdated, evejsVersion, repoRoot } = useLauncherVersion()
+  const { available, latestVersion: serverLatestVersion, phase, progress, upgrade } =
+    useServerUpdate()
   const [updateOpen, setUpdateOpen] = useState(false)
 
   const fields: AboutField[] = [
@@ -89,34 +93,75 @@ export function AboutPanel() {
         {fields.map((f) => (
           <div
             key={f.label}
-            className="grid grid-cols-[minmax(0,88px)_1fr] items-baseline gap-2 border-b border-input pb-2"
+            className="grid grid-cols-[minmax(0,88px)_1fr] items-center gap-2 border-b border-input pb-2"
           >
             <dt className="text-[11px] uppercase tracking-[0.06em] text-tertiary">
               {f.label}
             </dt>
-            <dd
-              className={cn(
-                "tabular min-w-0 truncate text-[12px]",
-                f.tone === "warning" ? "text-warning" : "text-foreground"
-              )}
-              title={f.value}
-            >
-              {f.value}
+            <dd className="flex min-w-0 items-center gap-1.5">
+              <span
+                className={cn(
+                  "tabular min-w-0 truncate text-[12px]",
+                  f.tone === "warning" ? "text-warning" : "text-foreground"
+                )}
+                title={f.value}
+              >
+                {f.value}
+              </span>
+              {/* 最新版本号后：更新内容图标（无文字），随时点开看这一版改了什么 */}
+              {f.label === "最新版本" ? (
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  title={t("更新内容")}
+                  aria-label={t("更新内容")}
+                  onClick={() => setUpdateOpen(true)}
+                >
+                  <ScrollText />
+                </Button>
+              ) : null}
+              {/* EVEJS版本号后：有新版才出现升级图标，点一下下载并升级 */}
+              {f.label === "EVEJS版本" && available ? (
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  title={
+                    phase === "downloading"
+                      ? t("正在下载服务端 {percent}%", { percent: Math.floor(progress) })
+                      : phase === "applying"
+                        ? t("正在升级服务端…")
+                        : t("升级服务端到 {version}", { version: serverLatestVersion })
+                  }
+                  aria-label={t("升级服务端")}
+                  disabled={phase === "downloading" || phase === "applying"}
+                  onClick={() => void upgrade()}
+                >
+                  {phase === "downloading" || phase === "applying" ? (
+                    <Loader2 className="animate-spin" />
+                  ) : (
+                    <ArrowUp />
+                  )}
+                </Button>
+              ) : null}
             </dd>
           </div>
         ))}
       </dl>
 
+      {/* 服务端升级进度：下载 / 升级两阶段，用进度条 + 阶段提示，不用脉冲 */}
+      {phase === "downloading" || phase === "applying" ? (
+        <div className="space-y-1.5">
+          <Progress value={progress} />
+          <div className="flex items-center justify-between text-[11px] text-tertiary">
+            <span>{phase === "downloading" ? t("下载中") : t("升级中")}</span>
+            <span className="tabular">
+              {phase === "downloading" ? `${Math.floor(progress)}%` : t("正在升级服务端…")}
+            </span>
+          </div>
+        </div>
+      ) : null}
+
       <div className="flex flex-wrap items-center gap-3">
-        <Button variant="outline" size="sm" onClick={() => setUpdateOpen(true)}>
-          <RefreshCw />
-          检查更新
-        </Button>
-        {/* 更新内容随时可翻：已经是最新版本时进来就是回顾 */}
-        <Button variant="ghost" size="sm" onClick={() => setUpdateOpen(true)}>
-          <ScrollText />
-          更新内容
-        </Button>
         {/* 仓库入口：「更新内容」右侧，图标颜色与这一块其他图标一致（ghost 的 currentColor）。
             `ml-auto` 挂在这一行**第一个**图标上，后面的 QQ 群图标跟着一起贴到最右。 */}
         <Button

@@ -4,12 +4,11 @@ import { Download, HardDriveDownload, Loader2, Play, Square } from "lucide-react
 import { Button } from "@/components/ui/button"
 import { StatusDot } from "@/components/common/status-dot"
 import { DownloadStrip } from "@/components/dashboard/download-strip"
-import { ServerVersionsDialog } from "@/components/dashboard/server-versions-dialog"
+import { DownloadVersionsDialog } from "@/components/dashboard/download-versions-dialog"
 import { useLauncherDownloads } from "@/hooks/use-launcher-downloads"
 import { useDownloadAvailability } from "@/hooks/use-download-availability"
 import { cn } from "@/lib/utils"
 import { listSeparator, t } from "@/lib/i18n"
-import { DOWNLOADS } from "@/lib/mock"
 
 export function LaunchBanner({
   running,
@@ -34,7 +33,8 @@ export function LaunchBanner({
   const downloads = useLauncherDownloads()
   /** 服务端 / 客户端按钮的「有新下载」脉冲：出现新版本才脉冲，查看一次即取消 */
   const availability = useDownloadAvailability()
-  const [versionsOpen, setVersionsOpen] = useState(false)
+  const [serverOpen, setServerOpen] = useState(false)
+  const [clientOpen, setClientOpen] = useState(false)
 
   return (
     <div
@@ -89,21 +89,16 @@ export function LaunchBanner({
         </div>
 
         <div className="flex items-center gap-2">
-          {/* 两个入口都在启动器里「另存为」再下（用户 2026-11-01 口径：不跳浏览器）。
-              种子文件按下载状态按死：Rust 侧同一时刻只接一条，按死比点下去回一句
-              「已有下载在进行」好懂；服务端那一侧点开的是版本列表，列表里每行自己按。 */}
+          {/* 两个入口都点开版本列表，在列表里挑一个「另存为」再下（用户 2026-11-01 口径：不跳浏览器）。
+              列表加载时显示动画、失败有提示；下载本身由列表里每行触发，进度与横幅共用一份状态。 */}
           <Button
             variant="outline"
             size="lg"
             className={cn(availability.clientPulse && "download-pulse")}
             disabled={downloads.active}
-            title={`${DOWNLOADS.clientTorrent.file} · ${DOWNLOADS.clientTorrent.size}`}
             onClick={() => {
               availability.markClientViewed()
-              void downloads.start(
-                DOWNLOADS.clientTorrent.file,
-                DOWNLOADS.clientTorrent.file
-              )
+              setClientOpen(true)
             }}
           >
             <Download />
@@ -116,7 +111,7 @@ export function LaunchBanner({
             title={t("服务端版本")}
             onClick={() => {
               availability.markServerViewed()
-              setVersionsOpen(true)
+              setServerOpen(true)
             }}
           >
             <HardDriveDownload />
@@ -168,7 +163,8 @@ export function LaunchBanner({
         </div>
       ) : null}
 
-      <ServerVersionsDialog open={versionsOpen} onOpenChange={setVersionsOpen} downloads={downloads} />
+      <DownloadVersionsDialog open={serverOpen} onOpenChange={setServerOpen} downloads={downloads} kind="server" />
+      <DownloadVersionsDialog open={clientOpen} onOpenChange={setClientOpen} downloads={downloads} kind="client" />
     </div>
   )
 }

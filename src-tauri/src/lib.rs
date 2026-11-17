@@ -37,6 +37,7 @@ pub mod pty;
 pub mod runtime;
 pub mod secrets;
 pub mod seed;
+pub mod server_update;
 pub mod shell;
 pub mod sidecar;
 pub mod snapshot;

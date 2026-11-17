@@ -1,0 +1,13 @@
+{
+  "version": "0.7.6",
+  "changelog": {
+    "zh": [
+      { "type": "new", "text": "新增服务端在线升级引导卡片：首次打开新版启动器时指向设置入口，每版只提示一次" },
+      { "type": "opt", "text": "EVEJS 升级按钮改为进度条与阶段提示（下载中 x% / 升级中…），移除脉冲动画" }
+    ],
+    "en": [
+      { "type": "new", "text": "Added server online-upgrade guide card: points to the settings entry on the first launch of a new version, shown once per version" },
+      { "type": "opt", "text": "EVEJS upgrade button now shows a progress bar with staged status (Downloading x% / Upgrading…), pulse animation removed" }
+    ]
+  }
+}
