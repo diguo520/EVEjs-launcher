@@ -3710,6 +3710,10 @@
   "正在升级服务端…": "Mise à jour du serveur…",
   "升级服务端到 {version}": "Mettre à jour le serveur en {version}",
   "升级服务端": "Mettre à jour le serveur",
+  "已完成": "Terminé",
   "新增服务端在线升级": "Nouveau : mise à jour du serveur dans le lanceur",
-  "知道了": "Compris"
+  "知道了": "Compris",
+  "进入设置查看": "Ouvrir les paramètres",
+  "在此升级服务端": "Mettre à jour le serveur ici",
+  "即将定位到设置": "Localisation des paramètres…"
 }

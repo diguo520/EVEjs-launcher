@@ -93,6 +93,7 @@ export function AboutPanel() {
         {fields.map((f) => (
           <div
             key={f.label}
+            data-guide-target={f.label === "EVEJS版本" ? "evEJS-version" : undefined}
             className="grid grid-cols-[minmax(0,88px)_1fr] items-center gap-2 border-b border-input pb-2"
           >
             <dt className="text-[11px] uppercase tracking-[0.06em] text-tertiary">
@@ -148,14 +149,20 @@ export function AboutPanel() {
         ))}
       </dl>
 
-      {/* 服务端升级进度：下载 / 升级两阶段，用进度条 + 阶段提示，不用脉冲 */}
-      {phase === "downloading" || phase === "applying" ? (
+      {/* 服务端升级进度：下载 / 升级合并成一条 0–100 总进度，全部完成才到 100% */}
+      {phase === "downloading" || phase === "applying" || phase === "done" ? (
         <div className="space-y-1.5">
           <Progress value={progress} />
           <div className="flex items-center justify-between text-[11px] text-tertiary">
-            <span>{phase === "downloading" ? t("下载中") : t("升级中")}</span>
+            <span>
+              {phase === "downloading"
+                ? t("下载中")
+                : phase === "applying"
+                  ? t("升级中")
+                  : t("已完成")}
+            </span>
             <span className="tabular">
-              {phase === "downloading" ? `${Math.floor(progress)}%` : t("正在升级服务端…")}
+              {phase === "done" ? "100%" : `${Math.floor(progress)}%`}
             </span>
           </div>
         </div>

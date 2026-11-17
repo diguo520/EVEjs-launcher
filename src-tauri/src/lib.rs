@@ -225,12 +225,18 @@ pub fn run() {
                 });
             }
             let page = resolve_ui_page();
+            // 启动动画带语音：WebView2 默认要用户手势才放音，开机无手势；Tauri 2.11
+            // 没有暴露 autoplay 开关，只能在 WebView 环境创建前用环境变量注入 Chromium 开关。
+            std::env::set_var(
+                "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
+                "--autoplay-policy=no-user-gesture-required",
+            );
             let mut shell = WebviewWindowBuilder::new(app, "main", WebviewUrl::App(page.into()))
                 .title("EVEJS COMMAND")
                 .inner_size(1360.0, 860.0)
                 .min_inner_size(1024.0, 640.0)
                 .decorations(false)
-                .background_color(tauri::window::Color(5, 8, 13, 255))
+                .background_color(tauri::window::Color(11, 17, 32, 255))
                 .visible(false)
                 .center()
                 // 必须关掉：Tauri 默认开着 WebView 的原生拖放（接文件拖进来那套），

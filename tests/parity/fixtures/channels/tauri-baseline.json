@@ -25,7 +25,7 @@
       "phase": "3-4",
       "platform": "win32",
       "repoRoot": "<abs-path>",
-      "version": "0.7.6"
+      "version": "0.7.7"
     },
     "config:get": {
       "client": {
@@ -176,10 +176,10 @@
       "supported": true
     },
     "metrics:get": {
-      "cpuPercent": 31.927574157714844,
+      "cpuPercent": 54.9996452331543,
       "diskRoot": "<abs-path>",
       "diskTotalGB": 976.5624961853028,
-      "diskUsedGB": 927.4841766357422,
+      "diskUsedGB": 939.8939247131348,
       "gpuDedicatedTotalGB": null,
       "gpuDedicatedUsedGB": null,
       "gpuMemoryTotalGB": null,
@@ -187,38 +187,38 @@
       "gpuPercent": null,
       "gpuSharedUsedGB": null,
       "memTotalGB": 31.855934143066406,
-      "memUsedGB": 16.05522918701172,
+      "memUsedGB": 15.53350830078125,
       "netBytesPerSec": 0,
-      "virtualMemTotalGB": 36.85970306396485,
-      "virtualMemUsedGB": 26.12797164916992,
+      "virtualMemTotalGB": 36.85698318481445,
+      "virtualMemUsedGB": 25.763961791992188,
       "volumes": [
         {
-          "freeGB": 41.07143783569336,
-          "percent": 81.53509138024855,
+          "freeGB": 39.32453155517578,
+          "percent": 82.3204659991277,
           "root": "<abs-path>",
           "totalGB": 222.4296836853027,
-          "usedGB": 181.35824584960935
+          "usedGB": 183.10515213012695
         },
         {
-          "freeGB": 148.16168594360352,
-          "percent": 49.42747720608695,
+          "freeGB": 147.88515090942383,
+          "percent": 49.52186783231598,
           "root": "<abs-path>",
           "totalGB": 292.96874618530273,
-          "usedGB": 144.80706024169922
+          "usedGB": 145.0835952758789
         },
         {
-          "freeGB": 49.07831954956055,
-          "percent": 94.97438005849368,
+          "freeGB": 36.66857147216797,
+          "percent": 96.24513826658256,
           "root": "<abs-path>",
           "totalGB": 976.5624961853028,
-          "usedGB": 927.4841766357422
+          "usedGB": 939.8939247131348
         },
         {
-          "freeGB": 331.4611511230469,
-          "percent": 86.5066322943956,
+          "freeGB": 327.77475357055664,
+          "percent": 86.65670091485461,
           "root": "<abs-path>",
           "totalGB": 2456.4746055603027,
-          "usedGB": 2125.013454437256
+          "usedGB": 2128.699851989746
         }
       ]
     },
@@ -346,7 +346,7 @@
     "terminal:input": null,
     "terminal:resize": null,
     "update:state": {
-      "currentVersion": "0.7.6",
+      "currentVersion": "0.7.7",
       "state": "idle"
     }
   }

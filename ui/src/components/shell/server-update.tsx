@@ -66,7 +66,12 @@ export function useServerUpdateState(): ServerUpdateValue {
   const [phase, setPhase] = React.useState<ServerUpdatePhase>("idle")
   const [received, setReceived] = React.useState(0)
   const [total, setTotal] = React.useState(0)
+  const [applyStep, setApplyStep] = React.useState(0)
   const [message, setMessage] = React.useState("")
+
+  // 下载 / 升级合并成一条 0–100 的总进度：下载占前 DOWNLOAD_WEIGHT%，
+  // 升级阶段在剩下的区间里渐进，全部步骤完成才到 100%。
+  const DOWNLOAD_WEIGHT = 60
 
   // 下载进度：只认本次升级的整包（file 与清单里的一致），避免串到首页下载。
   React.useEffect(
@@ -107,6 +112,7 @@ export function useServerUpdateState(): ServerUpdateValue {
     setPhase("downloading")
     setReceived(0)
     setTotal(check.sizeBytes ?? 0)
+    setApplyStep(0)
     setMessage("")
     const downloaded = await callOr<{ ok?: boolean; reason?: string }>(
       "serverUpdateDownload",
@@ -121,12 +127,15 @@ export function useServerUpdateState(): ServerUpdateValue {
     }
     setPhase("applying")
     setMessage(t("正在升级服务端，期间服务会暂停…"))
+    // 升级是本地整包替换，无细粒度回报，用定时步进把剩余区间平滑推到 100。
+    setApplyStep(0)
     const applied = await callOr<{ ok?: boolean; reason?: string; message?: string }>(
       "serverUpdateApply",
       null,
       check.latestVersion
     )
     if (applied?.ok) {
+      setApplyStep(1)
       setPhase("done")
       setMessage(applied.message ?? t("服务端已更新并重启"))
       toast.success(t("服务端升级完成"))
@@ -138,7 +147,21 @@ export function useServerUpdateState(): ServerUpdateValue {
     }
   }, [check, checkForUpdate])
 
-  const progress = total > 0 ? Math.min(100, Math.floor((received / total) * 100)) : 0
+  // 下载阶段：0 → DOWNLOAD_WEIGHT；升级/完成阶段：DOWNLOAD_WEIGHT → 100。
+  const downloadFrac = total > 0 ? Math.min(1, received / total) : 0
+  const progress =
+    phase === "downloading"
+      ? Math.floor(downloadFrac * DOWNLOAD_WEIGHT)
+      : Math.min(100, Math.floor(DOWNLOAD_WEIGHT + (100 - DOWNLOAD_WEIGHT) * applyStep))
+
+  // 升级阶段平滑推进 applyStep，直到后端完成（done 时置 1）。
+  React.useEffect(() => {
+    if (phase !== "applying") return
+    const timer = window.setInterval(() => {
+      setApplyStep((prev) => Math.min(0.98, prev + 0.02))
+    }, 120)
+    return () => window.clearInterval(timer)
+  }, [phase])
 
   return React.useMemo<ServerUpdateValue>(
     () => ({

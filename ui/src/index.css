@@ -403,7 +403,7 @@ body {
   animation: update-pulse-ring 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-/* 新功能引导卡片：从侧边滑入、停到目标位置，带指向箭头（一次性，常态不挂） */
+/* 新功能引导：整屏背景模糊，挖出一块与引导卡片同尺寸的清晰洞，聚焦移动；一次性，常态不挂 */
 @keyframes boot-hint-slide {
   0% {
     opacity: 0;
@@ -415,34 +415,65 @@ body {
   }
 }
 
-.boot-hint-card {
+.guide-overlay {
   position: fixed;
-  z-index: 60;
-  display: inline-flex;
+  inset: 0;
+  z-index: 70;
+  pointer-events: none;
+}
+
+/* 引导进行中：给主内容层整体加模糊，背景全部模糊 */
+.guide-blur-content {
+  filter: blur(10px);
+}
+
+/* 全屏遮罩层：半透明暗色压暗，配合内容层模糊聚焦；卡片不透明盖在上面，自身就是清晰洞 */
+.guide-blur {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(11, 17, 32, 0.45);
+}
+
+/* 引导卡片 */
+.guide-card {
+  position: absolute;
+  z-index: 71;
+  pointer-events: auto;
+  display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.4rem 0.7rem;
-  border: 1px solid hsl(var(--primary) / 0.45);
-  border-radius: 0.6rem;
+  padding: 0 0.7rem;
+  border: 1px solid hsl(var(--primary) / 0.5);
+  border-radius: 0.7rem;
   background: hsl(var(--card));
   color: hsl(var(--foreground));
-  box-shadow: 0 8px 24px hsl(var(--primary) / 0.18);
-  font-size: 11px;
-  white-space: nowrap;
+  box-shadow: 0 10px 30px hsl(var(--primary) / 0.25);
+  font-size: 12px;
+  transition: left 0.6s cubic-bezier(0.2, 0.8, 0.2, 1), top 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
   animation: boot-hint-slide 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-/* 指向齿轮的箭头 */
-.boot-hint-arrow {
+/* 清晰洞：克隆的目标节点（齿轮 / EVEJS 版本）在此保持清晰，不被模糊层覆盖 */
+.guide-hole {
   position: absolute;
-  left: -5px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 0;
-  height: 0;
-  border-top: 5px solid transparent;
-  border-bottom: 5px solid transparent;
-  border-right: 6px solid hsl(var(--primary) / 0.45);
+  z-index: 72;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.guide-card-ok {
+  margin-left: auto;
+  padding: 0.15rem 0.6rem;
+  border-radius: 0.4rem;
+  font-size: 11px;
+  font-weight: 500;
+  color: hsl(var(--primary));
+  background: hsl(var(--primary) / 0.12);
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.guide-card-ok:hover {
+  background: hsl(var(--primary) / 0.2);
 }
 
 /* 有新下载可下：按钮边框 + 外辉光脉冲（用户查看一次后由 JS 摘掉，仅在出现新版本时挂上） */
@@ -460,63 +491,6 @@ body {
 
 .download-pulse {
   animation: download-pulse 1.6s ease-in-out infinite;
-}
-
-/* 开机画面：覆盖整屏，等第一次握手回来再淡出（淡出时长跟 App.tsx 的 BOOT_FADE_MS 对齐） */
-.boot-splash {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  display: grid;
-  place-items: center;
-  background: hsl(var(--background));
-  transition: opacity 400ms ease;
-}
-
-/* 不定量信号带：读不到真实进度就不摆百分比，只表示「还在动」 */
-.boot-track {
-  position: relative;
-  overflow: hidden;
-  width: 190px;
-  height: 2px;
-  border-radius: 999px;
-  background: hsl(var(--primary) / 0.14);
-}
-
-.boot-scan {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 42%;
-  border-radius: 999px;
-  background: linear-gradient(90deg, transparent, hsl(var(--primary)), transparent);
-  animation: boot-scan 1.15s ease-in-out infinite;
-}
-
-@keyframes boot-scan {
-  0% {
-    transform: translateX(-60%);
-  }
-  100% {
-    transform: translateX(240%);
-  }
-}
-
-/* 标识外环：缓慢呼吸 */
-.boot-orbit {
-  animation: boot-orbit 2.4s ease-in-out infinite;
-}
-
-@keyframes boot-orbit {
-  0%,
-  100% {
-    transform: scale(0.86);
-    opacity: 0.55;
-  }
-  50% {
-    transform: scale(1);
-    opacity: 1;
-  }
 }
 
 /* 赞助人弹幕：每个名字一条独立弹幕，动画参数由 Web Animations 控制 */

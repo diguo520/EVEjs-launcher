@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 
+import { cn } from "@/lib/utils"
 import { Toaster } from "@/components/ui/sonner"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import {
@@ -12,9 +13,8 @@ import {
   useServerUpdateState,
 } from "@/components/shell/server-update"
 import { TopBar } from "@/components/shell/top-bar"
-import { SideNav } from "@/components/shell/side-nav"
+import { SideNav, ServerUpgradeHint } from "@/components/shell/side-nav"
 import { AppContextMenu } from "@/components/shell/app-menu"
-import { BootSplash } from "@/components/shell/boot-splash"
 import { LegalNoticeDialog } from "@/components/shell/legal-notice-dialog"
 import { useLocale } from "@/components/shell/locale-provider"
 import { StatusBar } from "@/components/shell/status-bar"
@@ -23,7 +23,6 @@ import { useLauncher } from "@/hooks/use-launcher"
 import { useLauncherAccounts } from "@/hooks/use-launcher-accounts"
 import { useEnvCheck } from "@/hooks/use-env-check"
 import { useInstalledMods } from "@/hooks/use-installed-mods"
-import { hasIpc } from "@/lib/ipc"
 import { hasUnsaved } from "@/lib/unsaved"
 import { markLegalNoticeSeen, needsLegalNotice } from "@/lib/legal-notice"
 import { DashboardPage } from "@/pages/dashboard-page"
@@ -43,31 +42,6 @@ import { ConfigPage } from "@/pages/config-page"
 import { SettingsPage } from "@/pages/settings-page"
 
 /**
- * 开机画面：窗口一显示就盖在整屏上，等后端第一次握手回来（或到点兜底）再淡出。
- *
- * 最少亮 BOOT_MIN_MS，让动画走完一遍（数据到早了也不闪一下就没）；
- * 最多等 BOOT_MAX_MS，后端忙也不能一直盖着；淡出时长跟 index.css 的 .boot-splash 对齐。
- */
-/**
- * 开机画面至少亮这么久。
- *
- * 0.5.0 起曾定成 20 秒（星图走完一轮再进主界面，开机这一段本身就是展示）；
- * **0.5.5 起改回 5 秒** —— 每次都等 20 秒的代价，抵不过这一段的展示价值。
- *
- * 它只控制「最短停留」：后端握手早就完成了，时间到点直接淡出进主界面，不额外等。
- * 想改回「数据一到就走」就把它调回 900。
- *
- * 注：星图那两条动画（`boot-scan` / `boot-orbit`）是**无限循环**，缩短停留不会把动画截在半截，
- * 只是少走几轮 —— 所以这个值可以放心调。
- */
-const BOOT_MIN_MS = 5_000
-// M17（2026-10-28）：这个「最多等」的兜底原本是 2400ms，比 BOOT_MIN_MS（5000ms）还小 ——
-// 定时器到点也解不开 booting（还要等 bootMinPassed），等于**永远不生效**。
-// 它本来的意思是「后端迟迟不回也不能一直盖着」，所以给到 8s：比最短显示长、比用户的耐心短。
-const BOOT_MAX_MS = 8000
-const BOOT_FADE_MS = 400
-
-/**
  * 启动器外壳：顶栏（服务状态 + 时钟）/ 侧栏（八页导航）/ 内容区 / 状态栏。
  * 服务与日志状态提升到这里，供主控台、服务器日志、顶栏、状态栏共用。
  */
@@ -85,6 +59,8 @@ export function App() {
   // 自检与修复都走后端（env:check / init:run），不再吃原型那套演示状态
   const env = useEnvCheck()
   const [view, setView] = useState<ViewId>("dashboard")
+  /** 服务端升级引导是否进行中：为 true 时给内容层加模糊，突出聚焦卡片 */
+  const [guideActive, setGuideActive] = useState(false)
   /**
    * 装了哪些模组：既给侧栏的「模组」计数用，也决定「群星」这一组显不显示 ——
    * 没装 `evejs-faction-sim` 就整组隐藏（势力 / 星图 / KM 的数据都出自它）。
@@ -96,10 +72,14 @@ export function App() {
     [accounts.accounts.length, installedMods]
   )
 
-  /** 开机画面：最短展示时间走完 + 第一次握手有回音，才放它淡出 */
-  const [bootMinPassed, setBootMinPassed] = useState(false)
-  const [bootReady, setBootReady] = useState(() => !hasIpc())
+  /** 开机画面由 dsh 启动动画独立覆盖（见 boot/init.ts），收掉时派发 dsh-startup:done */
   const [splashMounted, setSplashMounted] = useState(true)
+
+  useEffect(() => {
+    const onDone = () => setSplashMounted(false)
+    window.addEventListener("dsh-startup:done", onDone)
+    return () => window.removeEventListener("dsh-startup:done", onDone)
+  }, [])
 
   /**
    * 法律声明：第一次启动自动弹一次；关掉之后缩成状态栏底部的一个入口，之后随时能再打开。
@@ -115,36 +95,11 @@ export function App() {
     setLegalAcknowledged(true)
   }
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => setBootMinPassed(true), BOOT_MIN_MS)
-    return () => window.clearTimeout(timer)
-  }, [])
-
   // 等开机画面收掉再弹：盖在开机画面底下弹出来，看着像没弹
   useEffect(() => {
     if (splashMounted || legalAcknowledged) return
     setLegalOpen(true)
   }, [splashMounted, legalAcknowledged])
-
-  // 第一次握手：app:info 回来就算接上；纯浏览器里没有 IPC，一上来就算就绪
-  useEffect(() => {
-    if (bootReady) return
-    if (!hasIpc() || launcherVersion.repoRoot) setBootReady(true)
-  }, [bootReady, launcherVersion.repoRoot])
-
-  // 后端迟迟不回也不能一直盖着
-  useEffect(() => {
-    const timer = window.setTimeout(() => setBootReady(true), BOOT_MAX_MS)
-    return () => window.clearTimeout(timer)
-  }, [])
-
-  const booting = splashMounted && !(bootReady && bootMinPassed)
-
-  useEffect(() => {
-    if (booting) return
-    const timer = window.setTimeout(() => setSplashMounted(false), BOOT_FADE_MS)
-    return () => window.clearTimeout(timer)
-  }, [booting])
 
   /**
    * 关窗守卫（H4）：还有未保存的改动就拦一下。
@@ -234,7 +189,7 @@ export function App() {
           className="relative flex h-screen flex-col overflow-hidden bg-background text-foreground"
         >
           {/* 环境光与参考网格：低光指挥室里唯一的装饰层。
-              星图只留在开机画面（boot-splash.tsx），进主界面之后不再跑 WebGL ——
+              星图只留在开机动画（boot/init.ts），进主界面之后不再跑 ——
               常驻动效会跟面板里的读数抢注意力，也白耗一个 30fps 的绘制循环。 */}
           <div
             className="mission-glow pointer-events-none fixed inset-0 z-0"
@@ -248,7 +203,7 @@ export function App() {
           {/* 右键只留 刷新 / 复制 / 粘贴：原生那套 WebView2 菜单在启动器里全是噪音 */}
           <AppContextMenu />
 
-          <div className="relative z-10 flex min-h-0 flex-1 flex-col">
+          <div className={cn("relative z-10 flex min-h-0 flex-1 flex-col", guideActive ? "guide-blur-content" : "")}>
             <TopBar onInspectService={inspectService} services={launcher.services} />
 
             <div className="flex min-h-0 flex-1">
@@ -258,7 +213,6 @@ export function App() {
                 metrics={launcher.metrics}
                 badges={navBadges}
                 installedMods={installedMods}
-                ready={!booting}
               />
               <main
                 key={view}
@@ -282,13 +236,13 @@ export function App() {
             onOpenChange={(next) => (next ? setLegalOpen(true) : closeLegalNotice())}
           />
 
-          {/* 开机画面：纯前端覆盖层，G1 自检认的那个根节点原样不动 */}
-          {splashMounted ? (
-            <BootSplash
-              visible={booting}
-              status={bootReady ? "指挥台就绪" : "正在接入本地服务"}
-            />
-          ) : null}
+          {/* 服务端升级引导：整屏模糊遮罩 + 聚焦卡片，挂在根层级盖住所有内容 */}
+          <ServerUpgradeHint
+            onNavigate={setView}
+            onActive={setGuideActive}
+            version={launcherVersion.version}
+            ready={!splashMounted}
+          />
         </div>
 
         <Toaster />

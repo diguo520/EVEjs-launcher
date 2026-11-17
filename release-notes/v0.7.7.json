@@ -1,0 +1,17 @@
+{
+  "version": "0.7.7",
+  "changelog": {
+    "zh": [
+      { "type": "new", "text": "开机动画换新：接入品牌化启动片头 —— EVEJS 标识与指挥台文案、星图网络背景、真声女声播报（Welcome to EVEJS Launcher），一局播完自动无缝进主界面。" },
+      { "type": "opt", "text": "启动器图标更新：任务栏与进程图标改为六边形 EVEJS 标识，与界面 LOGO 一致。" },
+      { "type": "opt", "text": "新功能引导改版：整屏背景模糊聚焦，引导卡片即清晰内容本身，按步骤引导到设置页与服务端升级入口。" },
+      { "type": "opt", "text": "服务端升级进度优化：下载与升级合并为 0–100 总进度条，升级阶段平滑推进，完成后显示 100%。" }
+    ],
+    "en": [
+      { "type": "new", "text": "New branded boot animation: EVEJS mark with command-console copy, starfield background, and a real female voice narration (Welcome to EVEJS Launcher); it plays through and hands off seamlessly to the main UI." },
+      { "type": "opt", "text": "Launcher icons updated: taskbar and process icons now use the hexagonal EVEJS mark, matching the in-app logo." },
+      { "type": "opt", "text": "Feature guide reworked: full-screen blurred focus with the guide card as the clear content itself, guiding to the settings page and the server-upgrade entry step by step." },
+      { "type": "opt", "text": "Server-upgrade progress improved: download and upgrade now share one 0–100 total progress bar that advances smoothly and ends at 100%." }
+    ]
+  }
+}

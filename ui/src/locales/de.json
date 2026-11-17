@@ -3710,6 +3710,10 @@
   "正在升级服务端…": "Server wird aktualisiert…",
   "升级服务端到 {version}": "Server auf {version} aktualisieren",
   "升级服务端": "Server aktualisieren",
+  "已完成": "Abgeschlossen",
   "新增服务端在线升级": "Neu: Server-Aktualisierung im Launcher",
-  "知道了": "Verstanden"
+  "知道了": "Verstanden",
+  "进入设置查看": "Einstellungen öffnen",
+  "在此升级服务端": "Server hier aktualisieren",
+  "即将定位到设置": "Einstellungen werden lokalisiert…"
 }

@@ -3710,6 +3710,10 @@
   "正在升级服务端…": "Upgrading the server…",
   "升级服务端到 {version}": "Upgrade server to {version}",
   "升级服务端": "Upgrade server",
+  "已完成": "Completed",
   "新增服务端在线升级": "New: in-launcher server upgrade",
-  "知道了": "Got it"
+  "知道了": "Got it",
+  "进入设置查看": "Open settings to view",
+  "在此升级服务端": "Upgrade the server here",
+  "即将定位到设置": "Locating settings…"
 }

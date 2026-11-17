@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
-import { ArrowUp, ChevronsLeft, ChevronsRight, X } from "lucide-react"
+import { ChevronsLeft, ChevronsRight, Sparkles } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Sparkline } from "@/components/common/sparkline"
@@ -86,88 +86,192 @@ function RailMetric({
 }
 
 /**
- * 新功能引导卡片：首次打开某版启动器时，一个悬浮卡片从侧边滑入、停到齿轮（设置）旁边，
- * 指向它提示「新增服务端在线升级」，点叉关闭。按启动器版本号记 localStorage，每版只提示一次。
- *
- * 位置用齿轮按钮的 getBoundingClientRect 实测，停到精确位置（不像脉冲那样只原地闪）。
+ * 新功能引导：整屏背景模糊，**卡片本身就是清晰洞**（尺寸与卡片一致，无第二个框/箭头）。
+ * 步骤：0) 屏幕中央聚焦 → 5s 后自动移到齿轮（设置）→ 点「知道了」切设置页，3s 后聚焦
+ * EVEJS 升级版本行 → 点最后一个「知道了」才算看完、恢复正常。
+ * 按启动器版本号记 localStorage，每版只提示一次；「已看」只在用户点最后一个「知道了」时写入。
  */
-function ServerUpgradeHint({
-  targetRef,
+const GUIDE_CARD_W = 240
+const GUIDE_CARD_H = 44
+
+export function ServerUpgradeHint({
+  onNavigate,
+  onActive,
   version,
   ready,
 }: {
-  targetRef: React.RefObject<HTMLButtonElement | null>
+  onNavigate: (id: ViewId) => void
+  onActive: (active: boolean) => void
   version: string
   ready: boolean
 }) {
-  // 引导卡片用独立 key：早期开机脉冲提示用过 `evejs_server_upgrade_hint_<版本>`，
+  // 引导用独立 key：早期开机脉冲提示用过 `evejs_server_upgrade_hint_<版本>`，
   // 沿用会被它标记的「已看」压制，导致引导弹不出来。
   const key = `evejs_server_upgrade_guide_${version}`
-  const [show, setShow] = useState(() => {
+  const [done, setDone] = useState(() => {
     try {
-      return window.localStorage.getItem(key) !== "1"
+      return window.localStorage.getItem(key) === "1"
     } catch {
-      return true
+      return false
     }
   })
-  const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
+  /** 0 = 屏幕中央，1 = 齿轮（设置），2 = EVEJS 升级版本行 */
+  const [step, setStep] = useState(0)
+  /** 已点「知道了」切到设置页（第二步），用来触发 3s 后聚焦 EVEJS 版本行 */
+  const [navigated, setNavigated] = useState(false)
+  /** 清晰洞（= 克隆的目标节点）的位置与尺寸（视口坐标）；step0 无目标，rect 为 null */
+  const [hole, setHole] = useState<{
+    x: number
+    y: number
+    w: number
+    h: number
+    rect: { left: number; top: number; right: number; bottom: number; width: number; height: number } | null
+  } | null>(null)
+  /** 克隆的目标节点：挖清晰洞时塞进洞层，让目标在模糊背景中保持清晰 */
+  const cloneRef = useRef<HTMLElement | null>(null)
+  /** 清晰洞层：挂载后接收克隆节点 */
+  const holeRef = useRef<HTMLDivElement | null>(null)
 
-  /**
-   * 用 layout effect 实测齿轮位置：在绘制前同步量好，避免「先渲染再量、量不到就永远不弹」
-   * 的时序坑。量不到就留 null，渲染时用兜底位置，保证卡片一定会出现。
-   */
+  /** 量出当前步骤目标，把卡片大小的清晰洞居中对准它；中央步直接算坐标，不查 DOM */
   useLayoutEffect(() => {
-    if (!show || !ready) return
+    if (!ready || done) return
     const measure = () => {
-      const el =
-        targetRef.current ??
-        (document.querySelector<HTMLElement>('[data-guide-target="settings"]') ?? null)
+      if (step === 0) {
+        // 中央：卡片水平垂直居中，无目标洞
+        cloneRef.current = null
+        setHole({
+          x: (window.innerWidth - GUIDE_CARD_W) / 2,
+          y: (window.innerHeight - GUIDE_CARD_H) / 2,
+          w: GUIDE_CARD_W,
+          h: GUIDE_CARD_H,
+          rect: null,
+        })
+        return
+      }
+      const sel =
+        step === 1 ? '[data-guide-target="settings"]' : '[data-guide-target="evEJS-version"]'
+      const el = document.querySelector<HTMLElement>(sel)
       if (!el) return
       const r = el.getBoundingClientRect()
-      setPos({ x: r.right + 10, y: r.top + r.height / 2 })
+      // 克隆目标节点，挖清晰洞时显示，让目标在模糊背景中保持清晰
+      const clone = el.cloneNode(true) as HTMLElement
+      clone.removeAttribute("data-guide-target")
+      cloneRef.current = clone
+      setHole({
+        x: r.left,
+        y: r.top,
+        w: r.width,
+        h: r.height,
+        rect: { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height },
+      })
     }
     measure()
-    window.addEventListener("resize", measure)
-    window.addEventListener("scroll", measure, true)
+    // 第二、三步要等目标渲染出来才能量到，多试几次
+    const t1 = window.setTimeout(measure, 150)
+    const t2 = window.setTimeout(measure, 500)
+    const onResize = () => measure()
+    window.addEventListener("resize", onResize)
     return () => {
-      window.removeEventListener("resize", measure)
-      window.removeEventListener("scroll", measure, true)
+      window.clearTimeout(t1)
+      window.clearTimeout(t2)
+      window.removeEventListener("resize", onResize)
     }
-  }, [show, ready, targetRef])
+  }, [step, ready, done])
 
-  // 卡片已经随 show/ready 出现（定位用兜底也保证可见）才记「已看」：
-  // 只在定位成功时记，避免定位失败被标记后这版再也弹不出来。
+  // 第一步（中央聚焦）停留 2 秒后自动移到齿轮
   useEffect(() => {
-    if (!show || !ready || !pos) return
-    try {
-      window.localStorage.setItem(key, "1")
-    } catch {
-      // 存不下只影响下次是否再提示，这次照常显示
-    }
-  }, [show, key, pos, ready])
+    if (!ready || done || step !== 0) return
+    const t = window.setTimeout(() => setStep(1), 2000)
+    return () => window.clearTimeout(t)
+  }, [ready, done, step])
 
-  if (!show || !ready) return null
-  // 兜底位置：侧栏右侧偏上；量到齿轮就用实测值，量不到也保证卡片可见
-  const left = pos?.x ?? 232
-  const top = pos?.y ?? 180
+  // 第二步点「知道了」→ 切设置页，3 秒后聚焦 EVEJS 升级版本行
+  useEffect(() => {
+    if (!ready || done || step !== 1 || !navigated) return
+    onNavigate("settings")
+    const t = window.setTimeout(() => setStep(2), 3000)
+    return () => window.clearTimeout(t)
+  }, [ready, done, step, navigated, onNavigate])
+
+  // 引导进行中时通知外壳给内容层加模糊；看完后撤掉
+  useEffect(() => {
+    onActive(ready && !done)
+  }, [ready, done, onActive])
+
+  // 把克隆的目标节点塞进清晰洞层，让目标在模糊背景中保持清晰
+  useLayoutEffect(() => {
+    if (holeRef.current && cloneRef.current) {
+      holeRef.current.replaceChildren(cloneRef.current)
+    }
+  }, [hole])
+
+  // 点「知道了」：第一步→移到齿轮，第二步→切设置页，第三步→看完并记「已看」
+  const onOk = () => {
+    if (step === 0) {
+      setStep(1)
+    } else if (step === 1) {
+      setNavigated(true)
+    } else {
+      setDone(true)
+      try {
+        window.localStorage.setItem(key, "1")
+      } catch {
+        // 存不下只影响下次是否再提示，这次照常结束
+      }
+    }
+  }
+
+  // 提前返回必须放在所有 hooks 之后：否则 ready 从 false→true 时 hook 数量变化，
+  // React 会抛「渲染的 hooks 比上一次多」整树崩溃白屏。
+  if (!ready || done) return null
+
+  // 卡片位置：放在清晰洞旁边，优先右侧，右侧放不下放左侧，不遮挡目标
+  const cardX = hole?.rect
+    ? hole.rect.right + 12 > window.innerWidth - GUIDE_CARD_W - 8
+      ? Math.max(8, hole.rect.left - GUIDE_CARD_W - 12)
+      : hole.rect.right + 12
+    : (window.innerWidth - GUIDE_CARD_W) / 2
+  const cardY = hole?.rect
+    ? Math.max(8, Math.min(hole.rect.top + hole.rect.height / 2 - GUIDE_CARD_H / 2, window.innerHeight - GUIDE_CARD_H - 8))
+    : (window.innerHeight - GUIDE_CARD_H) / 2
+
   return (
-    <div
-      className="boot-hint-card"
-      style={{ left, top, transform: "translateY(-50%)" }}
-      role="dialog"
-      aria-label={t("新增服务端在线升级")}
-    >
-      <ArrowUp className="size-3.5 shrink-0 text-primary" />
-      <span className="text-primary font-medium">{t("新增服务端在线升级")}</span>
-      <button
-        type="button"
-        onClick={() => setShow(false)}
-        aria-label={t("知道了")}
-        className="ml-1 text-tertiary transition-colors hover:text-foreground"
-      >
-        <X className="size-3" />
-      </button>
-      <span className="boot-hint-arrow" />
+    <div className="guide-overlay">
+      {/* 全屏模糊层：覆盖整个启动器，背景全部模糊 */}
+      <div className="guide-blur" />
+      {/* 清晰洞：克隆的目标节点，让齿轮 / EVEJS 版本在模糊背景中保持清晰 */}
+      {hole && hole.rect ? (
+        <div
+          ref={holeRef}
+          className="guide-hole"
+          style={{ left: hole.x, top: hole.y, width: hole.w, height: hole.h }}
+        />
+      ) : null}
+      {/* 引导卡片：放在清晰洞旁边，不遮挡目标 */}
+      {hole ? (
+        <div
+          className="guide-card"
+          style={{
+            left: cardX,
+            top: cardY,
+            width: GUIDE_CARD_W,
+            height: GUIDE_CARD_H,
+          }}
+          role="dialog"
+          aria-label={t("新增服务端在线升级")}
+        >
+          <Sparkles className="size-4 shrink-0 text-primary" />
+          <span className="text-[12px] font-medium">{t("新增服务端在线升级")}</span>
+          <button
+            type="button"
+            onClick={onOk}
+            aria-label={t("知道了")}
+            className="guide-card-ok"
+          >
+            {t("知道了")}
+          </button>
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -178,7 +282,6 @@ export function SideNav({
   metrics,
   badges,
   installedMods,
-  ready,
 }: {
   active: ViewId
   onNavigate: (id: ViewId) => void
@@ -190,10 +293,7 @@ export function SideNav({
    * 用来决定「群星」这类**依赖模组**的分组显不显示，见 `visibleNavGroups`。
    */
   installedMods?: ReadonlySet<string> | null
-  /** 开机画面收掉后才为 true：引导卡片这时才滑入，避免盖在开机画面底下 */
-  ready?: boolean
 }) {
-  const settingsRef = useRef<HTMLButtonElement>(null)
   const miniMetrics = metrics.filter((m) => MINI_KEYS.includes(m.key))
   /** 没装对应模组的分组整组不画（连标题一起），而不是画出来再点进去看空页 */
   const groups = visibleNavGroups(NAV_GROUPS, installedMods ?? null)
@@ -205,7 +305,6 @@ export function SideNav({
   /** 只有真的有新版 / 正在更新，底部才多出一条分割线（没有更新就别空占一格） */
   const { outdated, updating } = useLauncherVersion()
   const showUpdate = outdated || updating
-  const { version } = useLauncherVersion()
 
   useEffect(() => {
     try {
@@ -248,7 +347,6 @@ export function SideNav({
                   <button
                     key={key}
                     type="button"
-                    ref={item.id === "settings" ? settingsRef : undefined}
                     data-guide-target={item.id === "settings" ? "settings" : undefined}
                     onClick={() => onNavigate(item.id)}
                     aria-label={item.label}
@@ -411,11 +509,6 @@ export function SideNav({
         </div>
       ) : null}
 
-      <ServerUpgradeHint
-        targetRef={settingsRef}
-        version={version}
-        ready={Boolean(ready)}
-      />
     </nav>
   )
 }

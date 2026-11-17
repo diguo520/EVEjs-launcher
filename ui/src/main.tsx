@@ -2,10 +2,19 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App'
+import { clearStartupOverlay } from './boot/init'
 import { LocaleProvider } from './components/shell/locale-provider'
 import { FALLBACK_LOCALE, loadCatalog, readStoredLocale } from './lib/i18n'
 
 async function bootstrap() {
+  // 启动动画（自运行 IIFE）先接管首屏；加载失败也要继续渲染主界面
+  try {
+    await import('./boot/dsh-splash.js')
+  } catch (err) {
+    console.warn('[boot] splash module failed to load, continuing to main UI', err)
+    clearStartupOverlay()
+  }
+
   let locale = readStoredLocale()
   try {
     await loadCatalog(locale)
