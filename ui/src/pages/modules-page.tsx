@@ -1369,23 +1369,7 @@ export function ModulesPage({
       {tab === "mine" ? <ReviewBanner mods={reviewing} /> : null}
 
       {tab === "market" ? (
-        <div className="grid items-start gap-4 xl:grid-cols-[224px_minmax(0,1fr)]">
-          <MarketSidebar
-            query={query}
-            onQueryChange={setQuery}
-            marketFilter={marketFilter}
-            onMarketFilterChange={setMarketFilter}
-            marketCounts={marketCounts}
-            category={category}
-            onCategoryChange={setCategory}
-            categoryCounts={marketCategoryCounts}
-            sort={sort}
-            onSortChange={setSort}
-            tag={activeTag}
-            onTagChange={setActiveTag}
-            tagCounts={marketTagCounts}
-          />
-
+        <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_224px]">
           <div className="min-w-0 space-y-3">
             <MarketSpotlight
               featured={featuredMod}
@@ -1413,6 +1397,21 @@ export function ModulesPage({
               )
             )}
           </div>
+          <MarketSidebar
+            query={query}
+            onQueryChange={setQuery}
+            marketFilter={marketFilter}
+            onMarketFilterChange={setMarketFilter}
+            marketCounts={marketCounts}
+            category={category}
+            onCategoryChange={setCategory}
+            categoryCounts={marketCategoryCounts}
+            sort={sort}
+            onSortChange={setSort}
+            tag={activeTag}
+            onTagChange={setActiveTag}
+            tagCounts={marketTagCounts}
+          />
         </div>
       ) : (
         <>

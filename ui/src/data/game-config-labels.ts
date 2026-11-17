@@ -76,6 +76,7 @@ export const GAME_CONFIG_LABELS: Record<string, string> = {
   devSkipPasswordValidation: "跳过密码校验（开发用）",
   devBootstrapPublishedSkills: "新角色自带全部技能 V 级",
   qaStarterSystemPicker: "QA 账号可选初始星系",
+  serverHealthWindowEnabled: "游戏内服务器健康窗口（GM 用）",
   clusterDowntimeStarts: "每日停机开始时间（UTC）",
   defaultCountryCode: "默认国家代码",
   logLevel: "日志级别",

@@ -1,0 +1,21 @@
+{
+  "version": "0.7.8",
+  "changelog": {
+    "zh": [
+      { "type": "new", "text": "模组市场侧栏移到右侧：搜索、分类、排序统一收在内容右侧边栏，与模组列表左右分区更清晰。" },
+      { "type": "new", "text": "宇宙配置增补「游戏内服务器健康窗口」设置项，与现役服务端配置对齐。" },
+      { "type": "new", "text": "「实验性功能」开关改为「启动器引导」：接入本地存储真正生效，可关闭服务端在线升级引导等新手引导，不再显示「未接」灰态。" },
+      { "type": "opt", "text": "侧边栏切换更丝滑：悬停与点击时高亮条在导航项之间平滑滑动，展开/收起宽度也有过渡动画。" },
+      { "type": "fix", "text": "服务端升级总进度完成后不再残留「已完成 100%」，进度条自动隐藏。" },
+      { "type": "opt", "text": "多语言补齐 3 条新文案（启动器引导 / 新手引导提示 / 服务器健康窗口），德语、英语、法语、日语、韩语、荷兰语、俄语同步更新。" }
+    ],
+    "en": [
+      { "type": "new", "text": "Mod market sidebar moved to the right: search, categories and sorting now sit in a right-hand sidebar, giving a clearer split from the mod list." },
+      { "type": "new", "text": "Universe Config gains the \"In-Game Server Health Window\" setting, aligned with the live server config." },
+      { "type": "new", "text": "The \"Experimental\" toggle is now \"Launcher Guide\": it is wired to local storage and actually works, letting you turn off the server-upgrade onboarding guide; the disabled \"not wired\" state is gone." },
+      { "type": "opt", "text": "Smoother sidebar switching: the highlight bar now glides between nav items on hover and click, and the expand/collapse width transition is animated." },
+      { "type": "fix", "text": "The server-upgrade total progress bar now hides after completion instead of lingering at 100%." },
+      { "type": "opt", "text": "Three new i18n strings added (Launcher Guide / onboarding hint / server health window) in German, English, French, Japanese, Korean, Dutch and Russian." }
+    ]
+  }
+}

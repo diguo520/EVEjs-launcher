@@ -3715,5 +3715,8 @@
   "知道了": "Verstanden",
   "进入设置查看": "Einstellungen öffnen",
   "在此升级服务端": "Server hier aktualisieren",
-  "即将定位到设置": "Einstellungen werden lokalisiert…"
+  "即将定位到设置": "Einstellungen werden lokalisiert…",
+  "启动器引导": "Launcher-Guide",
+  "开启服务端在线升级引导等新手引导": "Neulings-Guides aktivieren, z. B. für das Online-Upgrade des Servers",
+  "游戏内服务器健康窗口（GM 用）": "Ingame-Server-Gesundheitsfenster (für GM)"
 }

@@ -17,6 +17,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { useMediaQuery } from "@/hooks/use-media-query"
+import { readGuideEnabled } from "@/lib/guide-setting"
 import { t } from "@/lib/i18n"
 import type { Metric } from "@/lib/mock"
 
@@ -115,6 +116,8 @@ export function ServerUpgradeHint({
       return false
     }
   })
+  /** 启动器引导开关：关掉（localStorage "0"）就不弹引导 */
+  const enabled = readGuideEnabled()
   /** 0 = 屏幕中央，1 = 齿轮（设置），2 = EVEJS 升级版本行 */
   const [step, setStep] = useState(0)
   /** 已点「知道了」切到设置页（第二步），用来触发 3s 后聚焦 EVEJS 版本行 */
@@ -195,8 +198,8 @@ export function ServerUpgradeHint({
 
   // 引导进行中时通知外壳给内容层加模糊；看完后撤掉
   useEffect(() => {
-    onActive(ready && !done)
-  }, [ready, done, onActive])
+    onActive(ready && !done && enabled)
+  }, [ready, done, enabled, onActive])
 
   // 把克隆的目标节点塞进清晰洞层，让目标在模糊背景中保持清晰
   useLayoutEffect(() => {
@@ -223,7 +226,7 @@ export function ServerUpgradeHint({
 
   // 提前返回必须放在所有 hooks 之后：否则 ready 从 false→true 时 hook 数量变化，
   // React 会抛「渲染的 hooks 比上一次多」整树崩溃白屏。
-  if (!ready || done) return null
+  if (!ready || done || !enabled) return null
 
   // 卡片位置：放在清晰洞旁边，优先右侧，右侧放不下放左侧，不遮挡目标
   const cardX = hole?.rect
@@ -306,6 +309,13 @@ export function SideNav({
   const { outdated, updating } = useLauncherVersion()
   const showUpdate = outdated || updating
 
+  /** 滑动高亮：悬停时高亮条滑到该项，鼠标离开时滑回当前激活项 */
+  const [hoverId, setHoverId] = useState<ViewId | null>(null)
+  const [pill, setPill] = useState<{ left: number; top: number; width: number; height: number } | null>(null)
+  const [scrolling, setScrolling] = useState(false)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const target = hoverId ?? active
+
   useEffect(() => {
     try {
       window.localStorage.setItem(STORAGE_KEY, open ? "1" : "0")
@@ -314,19 +324,67 @@ export function SideNav({
     }
   }, [open])
 
+  /**
+   * 量出目标导航项的位置，驱动高亮条滑动；滚动时重新对齐（滚动中不加过渡，避免拖影）。
+   * 必须用 useEffect 而不是 useLayoutEffect：layoutEffect 在浏览器绘制前同步改位置，
+   * 过渡动画拿不到「起点帧」，高亮条会硬跳而不是滑过去。
+   */
+  useEffect(() => {
+    const container = scrollRef.current
+    if (!container) return
+    let timer: number | undefined
+    const measure = () => {
+      const el = container.querySelector<HTMLElement>(`[data-nav-id="${target}"]`)
+      if (!el) return
+      const cr = container.getBoundingClientRect()
+      const er = el.getBoundingClientRect()
+      setPill({ left: er.left - cr.left, top: er.top - cr.top, width: er.width, height: er.height })
+    }
+    const onScroll = () => {
+      setScrolling(true)
+      window.clearTimeout(timer)
+      timer = window.setTimeout(() => setScrolling(false), 180)
+      measure()
+    }
+    measure()
+    container.addEventListener("scroll", onScroll, { passive: true })
+    const onResize = () => measure()
+    window.addEventListener("resize", onResize)
+    return () => {
+      container.removeEventListener("scroll", onScroll)
+      window.removeEventListener("resize", onResize)
+      window.clearTimeout(timer)
+    }
+  }, [target, expanded])
+
   return (
     <nav
       className={cn(
-        "flex shrink-0 flex-col border-r border-border bg-card/60",
+        "flex shrink-0 flex-col border-r border-border bg-card/60 transition-[width] duration-200 ease-out",
         expanded ? "w-[216px]" : "w-14"
       )}
     >
       <div
+        ref={scrollRef}
+        onMouseLeave={() => setHoverId(null)}
         className={cn(
-          "min-h-0 flex-1 overflow-y-auto py-3",
+          "relative min-h-0 flex-1 overflow-y-auto py-3",
           expanded ? "px-2.5" : "px-2"
         )}
       >
+        {/* 滑动高亮条：跟随悬停项平滑滑动，离开时滑回激活项 */}
+        {pill ? (
+          <div
+            className={cn(
+              "pointer-events-none absolute z-0 rounded-md",
+              // 悬停时用 hover 底色，滑回激活项时用激活底色
+              hoverId ? "bg-secondary" : "bg-primary/10",
+              // 滚动中不加过渡，避免拖影；静止时过渡平滑滑动
+              scrolling ? "" : "transition-all duration-200 ease-out"
+            )}
+            style={{ left: pill.left, top: pill.top, width: pill.width, height: pill.height }}
+          />
+        ) : null}
         {groups.map((group) => (
           <div
             key={group.title}
@@ -347,20 +405,21 @@ export function SideNav({
                   <button
                     key={key}
                     type="button"
+                    data-nav-id={item.id}
                     data-guide-target={item.id === "settings" ? "settings" : undefined}
                     onClick={() => onNavigate(item.id)}
+                    onMouseEnter={() => setHoverId(item.id)}
                     aria-label={item.label}
                     className={cn(
-                      "relative flex w-full items-center rounded-md text-left text-[13px] transition-colors",
+                      "relative flex w-full items-center rounded-md text-left text-[13px] transition-colors duration-150 ease-out",
                       "focus-visible:outline-none focus-visible:shadow-focus",
                       expanded ? "gap-2.5 px-2.5 py-2" : "justify-center py-2.5",
-                      isActive
-                        ? "bg-primary/10 font-medium text-foreground"
-                        : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                      // 背景交给滑动高亮条，这里只管文字层级，避免双层背景
+                      isActive ? "font-medium text-foreground" : "text-muted-foreground hover:text-foreground"
                     )}
                   >
                     {isActive ? (
-                      <span className="absolute inset-y-1.5 left-0 w-[3px] rounded-full bg-primary shadow-[0_0_8px_hsl(var(--primary))]" />
+                      <span className="absolute inset-y-1.5 left-0 w-[3px] rounded-full bg-primary shadow-[0_0_8px_hsl(var(--primary))] transition-opacity duration-150 ease-out" />
                     ) : null}
                     <Icon
                       className={cn(

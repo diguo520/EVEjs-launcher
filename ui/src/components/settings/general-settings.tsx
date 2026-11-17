@@ -5,6 +5,7 @@ import { Panel } from "@/components/common/panel"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { startMarketOf } from "@/lib/config-map"
+import { GUIDE_ENABLED_KEY, readGuideEnabled, writeGuideEnabled } from "@/lib/guide-setting"
 import { t } from "@/lib/i18n"
 import { callOr, hasIpc } from "@/lib/ipc"
 import type { RawAck, RawSettings } from "@/lib/ipc"
@@ -24,6 +25,8 @@ interface SettingDef {
   def: boolean
   /** 后端是否有这个设置项；没有的按「未接」灰掉，不能让开关假装生效 */
   wired: boolean
+  /** 走 localStorage 的本地开关：不进后端，但前端真正可用，不算「未接」 */
+  localKey?: string
 }
 
 const SETTINGS: SettingDef[] = [
@@ -57,10 +60,11 @@ const SETTINGS: SettingDef[] = [
   },
   {
     key: "experimental",
-    label: "实验性功能",
-    hint: "提前体验未稳定特性",
-    def: false,
+    label: "启动器引导",
+    hint: "开启服务端在线升级引导等新手引导",
+    def: true,
     wired: false,
+    localKey: GUIDE_ENABLED_KEY,
   },
   {
     key: "closeAction",
@@ -79,12 +83,17 @@ const DEFAULTS = SETTINGS.reduce(
 /**
  * 通用设置：逐项开关，改动写进后端设置文件（`settings:set`）。
  *
- * 只有 `startMarket` 是后端真有的设置项；原型里其余几项对应的一键行为、
- * 自动备份、遥测在现役后端里还没有实现，这里**灰掉并标「未接」**，不做假开关。
+ * `startMarket` 是后端真有的设置项；`experimental`（启动器引导）走 localStorage
+ * 本地存储，前端真正可用；其余几项在现役后端里还没有实现，**灰掉并标「未接」**，
+ * 不做假开关。
  */
 export function GeneralSettings() {
   const ipc = hasIpc()
-  const [values, setValues] = useState<Record<SettingKey, boolean>>(DEFAULTS)
+  const [values, setValues] = useState<Record<SettingKey, boolean>>(() => ({
+    ...DEFAULTS,
+    // 启动器引导的初始值直接读本地存储（没存过 = 默认开启）
+    experimental: readGuideEnabled(),
+  }))
 
   useEffect(() => {
     if (!ipc) return
@@ -101,8 +110,16 @@ export function GeneralSettings() {
   }, [ipc])
 
   async function toggle(item: SettingDef, next: boolean) {
-    if (!item.wired) return
+    if (!item.wired && !item.localKey) return
     setValues((prev) => ({ ...prev, [item.key]: next }))
+    // 本地开关（启动器引导）直接写 localStorage，不碰后端
+    if (item.localKey) {
+      writeGuideEnabled(next)
+      toast.success(next ? t("已开启：{label}", { label: item.label }) : t("已关闭：{label}", { label: item.label }), {
+        description: next ? item.hint : "该项设置已停用，可随时重新开启。",
+      })
+      return
+    }
     // closeAction 写的是字符串；关掉 = 回到「每次问」
     const payload =
       item.key === "closeAction" ? { closeAction: next ? "tray" : "ask" } : { [item.key]: next }
@@ -129,17 +146,17 @@ export function GeneralSettings() {
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 text-[13px] text-foreground">
               {item.label}
-              {item.wired ? null : <Badge variant="secondary">未接</Badge>}
+              {item.wired || item.localKey ? null : <Badge variant="secondary">未接</Badge>}
             </div>
             <p className="mt-0.5 text-[11px] leading-relaxed text-tertiary">
-              {item.wired
+              {item.wired || item.localKey
                 ? item.hint
                 : t("{hint} · 现役后端还没有这个设置项", { hint: item.hint })}
             </p>
           </div>
           <Switch
             checked={values[item.key]}
-            disabled={!item.wired}
+            disabled={!item.wired && !item.localKey}
             onCheckedChange={(v) => void toggle(item, v)}
             aria-label={item.label}
           />

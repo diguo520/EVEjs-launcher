@@ -149,20 +149,16 @@ export function AboutPanel() {
         ))}
       </dl>
 
-      {/* 服务端升级进度：下载 / 升级合并成一条 0–100 总进度，全部完成才到 100% */}
-      {phase === "downloading" || phase === "applying" || phase === "done" ? (
+      {/* 服务端升级进度：下载 / 升级合并成一条 0–100 总进度；完成后隐藏，不残留「已完成 100%」 */}
+      {phase === "downloading" || phase === "applying" ? (
         <div className="space-y-1.5">
           <Progress value={progress} />
           <div className="flex items-center justify-between text-[11px] text-tertiary">
             <span>
-              {phase === "downloading"
-                ? t("下载中")
-                : phase === "applying"
-                  ? t("升级中")
-                  : t("已完成")}
+              {phase === "downloading" ? t("下载中") : t("升级中")}
             </span>
             <span className="tabular">
-              {phase === "done" ? "100%" : `${Math.floor(progress)}%`}
+              {`${Math.floor(progress)}%`}
             </span>
           </div>
         </div>
