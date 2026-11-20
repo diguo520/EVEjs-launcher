@@ -1,0 +1,11 @@
+{
+  "version": "0.7.9",
+  "changelog": {
+    "zh": [
+      { "type": "opt", "text": "模组市场侧栏切换更丝滑：状态、分类、标签、排序四组导航项的悬停高亮条平滑滑动跟随，与启动器左侧栏保持一致的视觉反馈。" }
+    ],
+    "en": [
+      { "type": "opt", "text": "Smoother mod market sidebar switching: the hover highlight bar now glides smoothly to follow status, category, tag and sort nav items, matching the launcher left sidebar's visual feedback." }
+    ]
+  }
+}

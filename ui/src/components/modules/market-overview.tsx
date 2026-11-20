@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 import {
   ArrowRight,
@@ -60,6 +60,8 @@ function SidebarRow({
   count,
   onClick,
   onClear,
+  navId,
+  onHover,
 }: {
   active: boolean
   label: string
@@ -67,14 +69,19 @@ function SidebarRow({
   onClick: () => void
   /** 给了就在「选中」时挂一枚 X：点它直接取消筛选（与「再点一次」等价） */
   onClear?: () => void
+  /** 滑动高亮条的目标 id，与启动器侧栏同一套测量逻辑 */
+  navId: string
+  onHover: (id: string | null) => void
 }) {
   return (
     <div
+      data-nav-id={navId}
+      onMouseEnter={() => onHover(navId)}
       className={cn(
-        "flex w-full items-center rounded-sm text-[11px] transition-colors",
+        "relative flex w-full items-center rounded-sm text-[11px] transition-colors",
         active
           ? "bg-primary/10 font-semibold text-primary"
-          : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
+          : "text-muted-foreground hover:text-foreground"
       )}
     >
       <button
@@ -130,8 +137,68 @@ export function MarketSidebar({
   onTagChange: (value: string | null) => void
   tagCounts: MarketTagCount[]
 }) {
+  /** 滑动高亮：与启动器侧栏同一套测量逻辑，悬停时高亮条滑到该项 */
+  const [hoverId, setHoverId] = useState<string | null>(null)
+  const [pill, setPill] = useState<{ left: number; top: number; width: number; height: number } | null>(null)
+  const [scrolling, setScrolling] = useState(false)
+  const asideRef = useRef<HTMLElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  /**
+   * 量出悬停项的位置，驱动高亮条滑动；分类区滚动时重新对齐（滚动中不加过渡，避免拖影）。
+   * 必须用 useEffect：layoutEffect 在绘制前同步改位置，过渡拿不到起点帧会硬跳。
+   */
+  useEffect(() => {
+    const container = asideRef.current
+    if (!container || !hoverId) return
+    let timer: number | undefined
+    const measure = () => {
+      const el = container.querySelector<HTMLElement>(`[data-nav-id="${CSS.escape(hoverId)}"]`)
+      if (!el) return
+      const cr = container.getBoundingClientRect()
+      const er = el.getBoundingClientRect()
+      // 高亮条 absolute 相对 aside 的 padding box，减去边框宽才不差 1px
+      setPill({
+        left: er.left - cr.left - container.clientLeft,
+        top: er.top - cr.top - container.clientTop,
+        width: er.width,
+        height: er.height,
+      })
+    }
+    const onScroll = () => {
+      setScrolling(true)
+      window.clearTimeout(timer)
+      timer = window.setTimeout(() => setScrolling(false), 180)
+      measure()
+    }
+    measure()
+    const scroller = scrollRef.current
+    scroller?.addEventListener("scroll", onScroll, { passive: true })
+    const onResize = () => measure()
+    window.addEventListener("resize", onResize)
+    return () => {
+      scroller?.removeEventListener("scroll", onScroll)
+      window.removeEventListener("resize", onResize)
+      window.clearTimeout(timer)
+    }
+  }, [hoverId])
+
   return (
-    <aside className="flex min-h-0 flex-col gap-3 rounded-lg border border-border bg-card/70 p-3 xl:sticky xl:top-3">
+    <aside
+      ref={asideRef}
+      onMouseLeave={() => setHoverId(null)}
+      className="relative flex min-h-0 flex-col gap-3 rounded-lg border border-border bg-card/70 p-3 xl:sticky xl:top-3"
+    >
+      {/* 滑动高亮条：跟随悬停项平滑滑动，离开时收起 */}
+      {pill && hoverId ? (
+        <div
+          className={cn(
+            "pointer-events-none absolute z-0 rounded-md bg-secondary",
+            scrolling ? "" : "transition-all duration-200 ease-out"
+          )}
+          style={{ left: pill.left, top: pill.top, width: pill.width, height: pill.height }}
+        />
+      ) : null}
       <div className="relative">
         <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-tertiary" />
         <Input
@@ -153,6 +220,8 @@ export function MarketSidebar({
                 active={marketFilter === item}
                 label={t(MARKET_FILTER_LABEL[item])}
                 count={marketCounts[item]}
+                navId={`status:${item}`}
+                onHover={setHoverId}
                 onClick={() => onMarketFilterChange(item)}
               />
             ))}
@@ -163,7 +232,7 @@ export function MarketSidebar({
         <div className="panel-label mb-1">分类</div>
           {/* 没有「全部」这一项：点已选中的分类就取消筛选，选中的那行还挂一枚 X，
               两条路都回到「全部分类」—— 与工具栏下拉里的那一项同值。 */}
-        <div className="max-h-52 overflow-y-auto pr-0.5">
+        <div ref={scrollRef} className="max-h-52 overflow-y-auto pr-0.5">
           <div className="grid grid-cols-2 gap-0.5">
             {MOD_CATEGORIES.map((item) => (
               <SidebarRow
@@ -171,6 +240,8 @@ export function MarketSidebar({
                 active={category === item}
                 label={item}
                 count={categoryCounts[item] ?? 0}
+                navId={`category:${item}`}
+                onHover={setHoverId}
                 onClick={() => onCategoryChange(toggleCategory(category, item))}
                 onClear={() => onCategoryChange(ALL_CATEGORY)}
               />
@@ -187,9 +258,11 @@ export function MarketSidebar({
               <button
                 key={item.tag}
                 type="button"
+                data-nav-id={`tag:${item.tag}`}
+                onMouseEnter={() => setHoverId(`tag:${item.tag}`)}
                 onClick={() => onTagChange(tag === item.tag ? null : item.tag)}
                 className={cn(
-                  "rounded-full border px-2 py-0.5 text-[10px] transition-colors",
+                  "relative rounded-full border px-2 py-0.5 text-[10px] transition-colors",
                   tag === item.tag
                     ? "border-primary/55 bg-primary/10 text-primary"
                     : "border-input text-tertiary hover:border-primary/45 hover:text-primary"
@@ -210,10 +283,12 @@ export function MarketSidebar({
             <button
               key={item}
               type="button"
+              data-nav-id={`sort:${item}`}
+              onMouseEnter={() => setHoverId(`sort:${item}`)}
               aria-pressed={sort === item}
               onClick={() => onSortChange(item)}
               className={cn(
-                "rounded-full border px-2 py-1 text-[10px] transition-colors",
+              "relative rounded-full border px-2 py-1 text-[10px] transition-colors",
                 sort === item
                   ? "border-primary/55 bg-primary/10 font-semibold text-primary"
                   : "border-input text-tertiary hover:border-primary/45 hover:text-primary"
