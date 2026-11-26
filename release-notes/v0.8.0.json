@@ -1,0 +1,13 @@
+{
+  "version": "0.8.0",
+  "changelog": {
+    "zh": [
+      { "type": "new", "text": "宇宙配置增补服务端 261125.3 新增的 AIR 学院舰船开关：可在「玩法 / 学院舰船」中控制飞行员借用学院舰船；修改后需重启服务端与客户端生效。" },
+      { "type": "opt", "text": "新增配置的中文名称与英语、日语、韩语、法语、德语、荷兰语、俄语界面翻译已同步补齐。" }
+    ],
+    "en": [
+      { "type": "new", "text": "Universe Config now includes the AIR Academy Ships toggle added in server 261125.3, under Gameplay / Academy Ships, controlling whether pilots can borrow academy ships. Restart both the server and client after changing it." },
+      { "type": "opt", "text": "The new setting is localized in English, Japanese, Korean, French, German, Dutch and Russian." }
+    ]
+  }
+}

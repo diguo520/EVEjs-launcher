@@ -39,6 +39,7 @@ export const GAME_CONFIG_SECTIONS: Record<string, string> = {
   xmpp: "XMPP 聊天",
   characters: "角色",
   skills: "技能",
+  academyShips: "学院舰船",
   structures: "建筑",
   sovereignty: "主权",
   missions: "任务",
@@ -114,6 +115,7 @@ export const GAME_CONFIG_LABELS: Record<string, string> = {
 
   /* ----------------------------- gameplay ----------------------------- */
   characterDeletionDelayMinutes: "角色删除等待（分钟）",
+  academyShipsEnabled: "启用学院舰船",
   skillTrainingSpeed: "技能训练速度倍率",
   skillPurchaseEnabled: "允许直接购买技能书",
   expertSystemsEnabled: "启用专家系统",

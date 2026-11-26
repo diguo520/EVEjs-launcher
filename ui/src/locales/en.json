@@ -2667,6 +2667,8 @@
   "开机编队矿船数量": "Miners per startup fleet",
   "开机编队运输舰数量": "Haulers per startup fleet",
   "角色删除等待（分钟）": "Character deletion delay (minutes)",
+  "学院舰船": "Academy Ships",
+  "启用学院舰船": "Enable Academy Ships",
   "开机编队档案": "Startup fleet profile",
   "开机运输舰档案": "Startup hauler profile",
   "NPC 可攻击玩家无人机": "NPCs can target player drones",
