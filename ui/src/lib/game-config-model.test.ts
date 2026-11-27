@@ -38,7 +38,7 @@ function def(partial: Partial<GameConfigDefinition> & { key: string }): GameConf
 }
 
 describe("倍率识别", () => {
-  it("认得 185 条里那 11 个倍率键", () => {
+  it("认得 184 条里那 11 个倍率键", () => {
     const keys = [
       "missionRewardMultiplier",
       "missionStandingGainMultiplier",

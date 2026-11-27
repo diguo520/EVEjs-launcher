@@ -1,6 +1,6 @@
 /* 由 scripts/gen-contract.mjs 生成 —— 请勿手改。源: contract/ipc-channels.json */
 /* 抽取源: E:\Games\EveJS-v0.12.8\launcher\launcher */
-/* 生成时间: 2026-10-13T16:52:43.237Z */
+/* 生成时间: 2026-11-27T21:17:25.746Z */
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
@@ -147,6 +147,10 @@ export const api = {
   modsUpdateMeta: (folder: string, patch: Record<string, unknown>): Promise<unknown> => request("mods:updateMeta", [folder, patch]),
   openExternal: (url: string): Promise<unknown> => request("shell:openExternal", [url]),
   readServerLog: (): Promise<unknown> => request("log:read", []),
+  serverDeploy: (target: string, file: string, version: string, options: Record<string, unknown>): Promise<unknown> => request("server:deploy", [target, file, version, options]),
+  serverDeployCancel: (): Promise<unknown> => request("server:deployCancel", []),
+  serverDeployOpenLog: (): Promise<unknown> => request("server:deployOpenLog", []),
+  serverDeployPickDir: (title?: string): Promise<unknown> => request("server:deployPickDir", [title]),
   serverUpdateApply: (version: string): Promise<unknown> => request("server:updateApply", [version]),
   serverUpdateCheck: (): Promise<unknown> => request("server:updateCheck", []),
   serverUpdateDownload: (file: string, version: string): Promise<unknown> => request("server:updateDownload", [file, version]),
@@ -179,6 +183,7 @@ export const api = {
   onInitChanged: (cb: (...args: any[]) => void): UnlistenFn => on("init:changed", cb),
   onModDownloadProgress: (cb: (...args: any[]) => void): UnlistenFn => on("mod:downloadProgress", cb),
   onModPublishProgress: (cb: (...args: any[]) => void): UnlistenFn => on("mod:publishProgress", cb),
+  onServerDeployProgress: (cb: (...args: any[]) => void): UnlistenFn => on("server:deployProgress", cb),
   onServicesChanged: (cb: (...args: any[]) => void): UnlistenFn => on("services:changed", cb),
   onTerminalData: (cb: (...args: any[]) => void): UnlistenFn => on("terminal:data", cb),
   onTerminalExit: (cb: (...args: any[]) => void): UnlistenFn => on("terminal:exit", cb),

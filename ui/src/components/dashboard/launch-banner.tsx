@@ -1,10 +1,11 @@
 import { useState } from "react"
-import { Download, HardDriveDownload, Loader2, Play, Square } from "lucide-react"
+import { Download, HardDriveDownload, Loader2, Play, Rocket, Square } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { StatusDot } from "@/components/common/status-dot"
 import { DownloadStrip } from "@/components/dashboard/download-strip"
 import { DownloadVersionsDialog } from "@/components/dashboard/download-versions-dialog"
+import { ServerDeployDialog } from "@/components/config/server-deploy-dialog"
 import { useLauncherDownloads } from "@/hooks/use-launcher-downloads"
 import { useDownloadAvailability } from "@/hooks/use-download-availability"
 import { cn } from "@/lib/utils"
@@ -17,6 +18,7 @@ export function LaunchBanner({
   blockers,
   onLaunchAll,
   onStopAll,
+  onServerRootChanged,
 }: {
   running: number
   total: number
@@ -25,6 +27,7 @@ export function LaunchBanner({
   blockers: string[]
   onLaunchAll: () => void
   onStopAll: () => void
+  onServerRootChanged: (root: string) => void
 }) {
   const allUp = running === total
   const blocked = blockers.length > 0
@@ -35,6 +38,7 @@ export function LaunchBanner({
   const availability = useDownloadAvailability()
   const [serverOpen, setServerOpen] = useState(false)
   const [clientOpen, setClientOpen] = useState(false)
+  const [deployOpen, setDeployOpen] = useState(false)
 
   return (
     <div
@@ -117,6 +121,10 @@ export function LaunchBanner({
             <HardDriveDownload />
             服务端
           </Button>
+          <Button variant="outline" size="lg" onClick={() => setDeployOpen(true)}>
+            <Rocket />
+            {t("部署服务端")}
+          </Button>
         </div>
 
         <div className="flex items-center gap-2">
@@ -165,6 +173,11 @@ export function LaunchBanner({
 
       <DownloadVersionsDialog open={serverOpen} onOpenChange={setServerOpen} downloads={downloads} kind="server" />
       <DownloadVersionsDialog open={clientOpen} onOpenChange={setClientOpen} downloads={downloads} kind="client" />
+      <ServerDeployDialog
+        open={deployOpen}
+        onOpenChange={setDeployOpen}
+        onDeployed={onServerRootChanged}
+      />
     </div>
   )
 }

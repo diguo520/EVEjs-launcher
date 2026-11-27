@@ -1,6 +1,6 @@
 //! 由 scripts/gen-contract.mjs 生成 —— 请勿手改。源: contract/ipc-channels.json
 //! 抽取源: E:\Games\EveJS-v0.12.8\launcher\launcher
-//! 生成时间: 2026-10-13T16:52:43.237Z
+//! 生成时间: 2026-11-27T21:17:25.746Z
 
 #![allow(dead_code)]
 
@@ -18,8 +18,8 @@ pub struct ChannelSpec {
     pub kind: ChannelKind,
 }
 
-pub const REQUEST_COUNT: usize = 136;
-pub const EVENT_COUNT: usize = 11;
+pub const REQUEST_COUNT: usize = 140;
+pub const EVENT_COUNT: usize = 12;
 
 #[rustfmt::skip]
 pub const CHANNELS: &[ChannelSpec] = &[
@@ -134,6 +134,10 @@ pub const CHANNELS: &[ChannelSpec] = &[
     ChannelSpec { channel: "mods:templates", api: "modsTemplates", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "mods:uninstall", api: "modsUninstall", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "mods:updateMeta", api: "modsUpdateMeta", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "server:deploy", api: "serverDeploy", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "server:deployCancel", api: "serverDeployCancel", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "server:deployOpenLog", api: "serverDeployOpenLog", kind: ChannelKind::Invoke },
+    ChannelSpec { channel: "server:deployPickDir", api: "serverDeployPickDir", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "server:updateApply", api: "serverUpdateApply", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "server:updateCheck", api: "serverUpdateCheck", kind: ChannelKind::Invoke },
     ChannelSpec { channel: "server:updateDownload", api: "serverUpdateDownload", kind: ChannelKind::Invoke },
@@ -166,6 +170,7 @@ pub const CHANNELS: &[ChannelSpec] = &[
     ChannelSpec { channel: "init:changed", api: "onInitChanged", kind: ChannelKind::Event },
     ChannelSpec { channel: "mod:downloadProgress", api: "onModDownloadProgress", kind: ChannelKind::Event },
     ChannelSpec { channel: "mod:publishProgress", api: "onModPublishProgress", kind: ChannelKind::Event },
+    ChannelSpec { channel: "server:deployProgress", api: "onServerDeployProgress", kind: ChannelKind::Event },
     ChannelSpec { channel: "services:changed", api: "onServicesChanged", kind: ChannelKind::Event },
     ChannelSpec { channel: "terminal:data", api: "onTerminalData", kind: ChannelKind::Event },
     ChannelSpec { channel: "terminal:exit", api: "onTerminalExit", kind: ChannelKind::Event },

@@ -42,6 +42,19 @@ struct OpenFileNameW {
     flags_ex: u32,
 }
 
+/// BROWSEINFOW（shell32 的目录选择器）
+#[repr(C)]
+struct BrowseInfoW {
+    hwnd_owner: *mut c_void,
+    pidl_root: *const c_void,
+    psz_display_name: *mut u16,
+    lpsz_title: *const u16,
+    ul_flags: u32,
+    lpfn: Option<unsafe extern "system" fn(*mut c_void, u32, *mut c_void, isize) -> i32>,
+    l_param: isize,
+    i_image: i32,
+}
+
 const OFN_OVERWRITEPROMPT: u32 = 0x0000_0002;
 const OFN_HIDEREADONLY: u32 = 0x0000_0004;
 const OFN_NOCHANGEDIR: u32 = 0x0000_0008;
@@ -49,11 +62,24 @@ const OFN_PATHMUSTEXIST: u32 = 0x0000_0800;
 const OFN_FILEMUSTEXIST: u32 = 0x0000_1000;
 const OFN_EXPLORER: u32 = 0x0008_0000;
 const OFN_DONTADDTORECENT: u32 = 0x0200_0000;
+const BIF_RETURNONLYFSDIRS: u32 = 0x0000_0001;
+const BIF_NEWDIALOGSTYLE: u32 = 0x0000_0040;
 
 #[link(name = "comdlg32")]
 extern "system" {
     fn GetOpenFileNameW(ofn: *mut OpenFileNameW) -> i32;
     fn GetSaveFileNameW(ofn: *mut OpenFileNameW) -> i32;
+}
+
+#[link(name = "shell32")]
+extern "system" {
+    fn SHBrowseForFolderW(info: *mut BrowseInfoW) -> *mut c_void;
+    fn SHGetPathFromIDListW(pidl: *const c_void, path: *mut u16) -> i32;
+}
+
+#[link(name = "ole32")]
+extern "system" {
+    fn CoTaskMemFree(ptr: *mut c_void);
 }
 
 #[link(name = "user32")]
@@ -229,6 +255,47 @@ pub async fn pick(app: &AppHandle, spec: DialogSpec) -> Result<Option<PathBuf>, 
     receiver.await.map_err(|err| err.to_string())
 }
 
+fn blocking_pick_folder(title: &str) -> Option<PathBuf> {
+    let title = wide(title);
+    let mut display = vec![0u16; PATH_BUFFER_CHARS];
+    let mut info = BrowseInfoW {
+        hwnd_owner: unsafe { GetForegroundWindow() },
+        pidl_root: std::ptr::null(),
+        psz_display_name: display.as_mut_ptr(),
+        lpsz_title: title.as_ptr(),
+        ul_flags: BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE,
+        lpfn: None,
+        l_param: 0,
+        i_image: 0,
+    };
+    let pidl = unsafe { SHBrowseForFolderW(&mut info) };
+    if pidl.is_null() {
+        return None;
+    }
+    let mut path = vec![0u16; PATH_BUFFER_CHARS];
+    let ok = unsafe { SHGetPathFromIDListW(pidl, path.as_mut_ptr()) };
+    unsafe { CoTaskMemFree(pidl) };
+    if ok == 0 {
+        return None;
+    }
+    let end = path.iter().position(|ch| *ch == 0).unwrap_or(path.len());
+    if end == 0 {
+        return None;
+    }
+    Some(PathBuf::from(String::from_utf16_lossy(&path[..end])))
+}
+
+/// 在主线程弹系统目录选择器；`Ok(None)` = 用户取消
+pub async fn pick_folder(app: &AppHandle, title: &str) -> Result<Option<PathBuf>, String> {
+    let title = title.to_string();
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+    app.run_on_main_thread(move || {
+        let _ = sender.send(blocking_pick_folder(&title));
+    })
+    .map_err(|err| err.to_string())?;
+    receiver.await.map_err(|err| err.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -318,5 +385,11 @@ mod tests {
         );
         assert_eq!(offset(std::ptr::addr_of!(probe.flags) as *const u8), 96);
         assert_eq!(offset(std::ptr::addr_of!(probe.flags_ex) as *const u8), 148);
+    }
+
+    #[test]
+    fn folder_picker_flags_include_only_file_system_directories() {
+        assert_ne!(BIF_RETURNONLYFSDIRS & 1, 0);
+        assert_eq!(BIF_NEWDIALOGSTYLE, 0x40);
     }
 }

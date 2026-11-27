@@ -61,7 +61,7 @@ export interface SliderSpec {
 
 /**
  * 倍率类：key 以 Multiplier / Scale / Speed 结尾。
- * 185 条里命中 11 条（技能训练、建筑计时、任务奖励与任务声望、行星产出与行星资源丰度、
+ * 184 条里命中 11 条（技能训练、建筑计时、任务奖励与任务声望、行星产出与行星资源丰度、
  * SKINR 设计迭代、虫洞寿命与游荡数量、工业速度、小行星带储量），正是玩家嘴里说的"倍数"。
  */
 export function multiplierKindOf(key: string): boolean {

@@ -9,9 +9,11 @@ import type { EnvCheckState } from "@/hooks/use-env-check"
 export function DashboardPage({
   launcher,
   env,
+  onServerRootChanged,
 }: {
   launcher: LauncherState
   env: EnvCheckState
+  onServerRootChanged: (root: string) => void
 }) {
   const {
     services,
@@ -66,6 +68,7 @@ export function DashboardPage({
         blockers={env.blockers}
         onLaunchAll={launch}
         onStopAll={() => services.forEach((s) => stopService(s.id))}
+        onServerRootChanged={onServerRootChanged}
       />
 
       {/* 同一行内两块面板等高：日志只给最小高度（再多日志也只在框内滚），

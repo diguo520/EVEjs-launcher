@@ -139,6 +139,48 @@ async fn dispatch(
             let app = app.clone();
             Ok(crate::server_update::apply(&app, &root2, &runtime, &version).await)
         }
+        "server:deployPickDir" => {
+            let title_arg = arg_str(args, 0);
+            let title = if title_arg.trim().is_empty() {
+                "选择目录"
+            } else {
+                title_arg.as_str()
+            };
+            Ok(match crate::dialog::pick_folder(app, title).await {
+                Ok(Some(path)) => json!({ "ok": true, "path": path.to_string_lossy() }),
+                Ok(None) => json!({ "ok": true, "path": "" }),
+                Err(reason) => json!({ "ok": false, "reason": reason }),
+            })
+        }
+        "server:deploy" => {
+            let target = arg_str(args, 0);
+            let file = arg_str(args, 1);
+            let version = arg_str(args, 2);
+            let options = args.get(3).cloned().unwrap_or_else(|| json!({}));
+            let runtime = state.runtime.clone();
+            let app = app.clone();
+            let mut result =
+                crate::server_deploy::deploy(&app, &runtime, &target, &file, &version, &options)
+                    .await;
+            if result.get("ok").and_then(Value::as_bool) == Some(true)
+                && result.get("deployed").and_then(Value::as_bool) == Some(true)
+            {
+                let saved = set_repo_root(&state, &target);
+                if saved.get("ok").and_then(Value::as_bool) == Some(true) {
+                    result["repoRoot"] = saved["repoRoot"].clone();
+                } else {
+                    result["ok"] = json!(false);
+                    result["deployed"] = json!(true);
+                    result["reason"] = saved
+                        .get("reason")
+                        .cloned()
+                        .unwrap_or_else(|| json!("部署完成，但服务端根目录写入失败"));
+                }
+            }
+            Ok(result)
+        }
+        "server:deployCancel" => Ok(crate::server_deploy::cancel()),
+        "server:deployOpenLog" => Ok(crate::server_deploy::open_log()),
 
         /* ------------------------- 环境自检 / 健康检查 ------------------------- */
         "env:check" => Ok(env::detect_env(&root).await),

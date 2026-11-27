@@ -67,6 +67,10 @@ pub const HANDLED: &[&str] = &[
     "download:saveAs",
     // 服务端在线升级（本工程扩展）：check=本地版本 vs 桶里最新清单；
     // download=下整包到 _launcher/temp；apply=停服→上游更新器→装依赖→起服
+    "server:deploy",
+    "server:deployCancel",
+    "server:deployOpenLog",
+    "server:deployPickDir",
     "server:updateApply",
     "server:updateCheck",
     "server:updateDownload",

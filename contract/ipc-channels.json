@@ -1,13 +1,13 @@
 {
   "generatedFrom": "E:\\Games\\EveJS-v0.12.8\\launcher\\launcher",
-  "generatedAt": "2026-10-13T16:52:43.237Z",
+  "generatedAt": "2026-11-27T21:17:25.746Z",
   "counts": {
-    "invoke": 128,
+    "invoke": 132,
     "send": 8,
-    "events": 11,
-    "requests": 136,
+    "events": 12,
+    "requests": 140,
     "registered": 84,
-    "apiTotal": 147
+    "apiTotal": 152
   },
   "invoke": [
     {
@@ -941,6 +941,41 @@
       "params": []
     },
     {
+      "api": "serverDeploy",
+      "channel": "server:deploy",
+      "kind": "invoke",
+      "signature": "target: string, file: string, version: string, options: Record<string, unknown>",
+      "params": [
+        "target",
+        "file",
+        "version",
+        "options"
+      ]
+    },
+    {
+      "api": "serverDeployCancel",
+      "channel": "server:deployCancel",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "serverDeployOpenLog",
+      "channel": "server:deployOpenLog",
+      "kind": "invoke",
+      "signature": "",
+      "params": []
+    },
+    {
+      "api": "serverDeployPickDir",
+      "channel": "server:deployPickDir",
+      "kind": "invoke",
+      "signature": "title?: string",
+      "params": [
+        "title"
+      ]
+    },
+    {
       "api": "serverUpdateApply",
       "channel": "server:updateApply",
       "kind": "invoke",
@@ -1176,6 +1211,10 @@
       "channel": "mod:publishProgress"
     },
     {
+      "api": "onServerDeployProgress",
+      "channel": "server:deployProgress"
+    },
+    {
       "api": "onServicesChanged",
       "channel": "services:changed"
     },
@@ -1215,6 +1254,7 @@
       "danger:eraseWorld",
       "danger:resetConfig",
       "download:cancel",
+      "download:clientIndex",
       "download:index",
       "download:saveAs",
       "faction:action",
@@ -1249,6 +1289,13 @@
       "mods:reviews",
       "mods:starSet",
       "mods:updateMeta",
+      "server:deploy",
+      "server:deployCancel",
+      "server:deployOpenLog",
+      "server:deployPickDir",
+      "server:updateApply",
+      "server:updateCheck",
+      "server:updateDownload",
       "sponsors:snapshot",
       "storeEditor:itemLookup",
       "storeEditor:read",
@@ -1261,7 +1308,8 @@
       "app:closeRequested",
       "download:progress",
       "faction:event",
-      "faction:streamState"
+      "faction:streamState",
+      "server:deployProgress"
     ]
   }
 }

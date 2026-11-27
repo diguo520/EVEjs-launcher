@@ -136,10 +136,22 @@ export function App() {
     })
   }
 
+  function handleServerRootSaved(root: string) {
+    setRootOverride(root)
+    // 根目录换了，自检结论跟配置清单全都得重来一遍
+    env.recheck()
+  }
+
   function renderView() {
     switch (view) {
       case "dashboard":
-        return <DashboardPage launcher={launcher} env={env} />
+        return (
+          <DashboardPage
+            launcher={launcher}
+            env={env}
+            onServerRootChanged={handleServerRootSaved}
+          />
+        )
       case "console":
         return <ConsolePage launcher={launcher} />
       case "gameconfig":
@@ -166,11 +178,7 @@ export function App() {
         return (
           <ConfigPage
             serverRoot={serverRoot}
-            onRootSaved={(root) => {
-              setRootOverride(root)
-              // 根目录换了，自检结论跟配置清单全都得重来一遍
-              env.recheck()
-            }}
+            onRootSaved={handleServerRootSaved}
           />
         )
       case "settings":

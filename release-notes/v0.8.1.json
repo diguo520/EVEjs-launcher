@@ -1,0 +1,13 @@
+{
+  "version": "0.8.1",
+  "changelog": {
+    "zh": [
+      { "type": "new", "text": "首页新增「部署服务端」入口，位于服务端按钮右侧，可一键部署服务端到指定目录。" },
+      { "type": "new", "text": "部署目标目录支持已解压但尚未安装的完整服务端包，无需再选择空目录，直接进入安装向导。" }
+    ],
+    "en": [
+      { "type": "new", "text": "Added a Deploy Server entry on the home page, next to the server button, for one-click server deployment to a chosen directory." },
+      { "type": "new", "text": "Deployment now accepts an already-extracted but not yet installed server package as the target folder, so an empty folder is no longer required and installation starts directly." }
+    ]
+  }
+}

@@ -25,7 +25,7 @@
       "phase": "3-4",
       "platform": "win32",
       "repoRoot": "<abs-path>",
-      "version": "0.8.0"
+      "version": "0.8.1"
     },
     "config:get": {
       "client": {
@@ -64,7 +64,7 @@
         {
           "key": "node",
           "label": "Node.js 运行时",
-          "message": "Node v26.5.0（满足 ≥22）",
+          "message": "Node v26.13.1（满足 ≥22）",
           "ok": true
         },
         {
@@ -112,7 +112,7 @@
       ],
       "node": {
         "ok": true,
-        "version": "26.5.0"
+        "version": "26.13.1"
       },
       "passCount": 3,
       "repoRoot": "<abs-path>",
@@ -176,10 +176,10 @@
       "supported": true
     },
     "metrics:get": {
-      "cpuPercent": 26.45563507080078,
+      "cpuPercent": 31.11969757080078,
       "diskRoot": "<abs-path>",
       "diskTotalGB": 976.5624961853028,
-      "diskUsedGB": 846.5957412719727,
+      "diskUsedGB": 870.0863456726074,
       "gpuDedicatedTotalGB": null,
       "gpuDedicatedUsedGB": null,
       "gpuMemoryTotalGB": null,
@@ -187,38 +187,38 @@
       "gpuPercent": null,
       "gpuSharedUsedGB": null,
       "memTotalGB": 31.855934143066406,
-      "memUsedGB": 13.560295104980469,
+      "memUsedGB": 15.787849426269531,
       "netBytesPerSec": 0,
-      "virtualMemTotalGB": 36.835845947265625,
-      "virtualMemUsedGB": 20.42784118652344,
+      "virtualMemTotalGB": 34.230934143066406,
+      "virtualMemUsedGB": 22.212379455566406,
       "volumes": [
         {
-          "freeGB": 43.91166305541992,
-          "percent": 80.25818212395299,
+          "freeGB": 44.55794525146485,
+          "percent": 79.96762639176065,
           "root": "<abs-path>",
           "totalGB": 222.4296836853027,
-          "usedGB": 178.5180206298828
+          "usedGB": 177.8717384338379
         },
         {
-          "freeGB": 148.29085159301758,
-          "percent": 49.383388663846205,
+          "freeGB": 146.32688522338867,
+          "percent": 50.05375586007494,
           "root": "<abs-path>",
           "totalGB": 292.96874618530273,
-          "usedGB": 144.67789459228516
+          "usedGB": 146.64186096191406
         },
         {
-          "freeGB": 129.96675491333008,
-          "percent": 86.69140424488829,
+          "freeGB": 106.47615051269533,
+          "percent": 89.09684214490954,
           "root": "<abs-path>",
           "totalGB": 976.5624961853028,
-          "usedGB": 846.5957412719727
+          "usedGB": 870.0863456726074
         },
         {
-          "freeGB": 320.1355400085449,
-          "percent": 86.96768371698576,
+          "freeGB": 320.04249572753906,
+          "percent": 86.97147143295871,
           "root": "<abs-path>",
           "totalGB": 2456.4746055603027,
-          "usedGB": 2136.339065551758
+          "usedGB": 2136.4321098327637
         }
       ]
     },
@@ -346,7 +346,7 @@
     "terminal:input": null,
     "terminal:resize": null,
     "update:state": {
-      "currentVersion": "0.8.0",
+      "currentVersion": "0.8.1",
       "state": "idle"
     }
   }

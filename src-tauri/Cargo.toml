@@ -1,6 +1,6 @@
 [package]
 name = "evejs-launcher"
-version = "0.8.0"
+version = "0.8.1"
 description = "EvEJS 启动器（Tauri 2 外壳）"
 authors = ["EvEJS"]
 edition = "2021"
@@ -36,6 +36,7 @@ ed25519-dalek = "3.0.0"
 getrandom = "0.4.3"
 sha2 = "0.11.0"
 ureq = { version = "3.4.2", default-features = false, features = ["native-tls", "win-system-proxy", "gzip"] }
+zip = { version = "9.8.2", default-features = false, features = ["deflate-flate2"] }
 
 [build-dependencies]
 tauri-build = { version = "2.6.3", features = [] }

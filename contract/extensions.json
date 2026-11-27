@@ -490,6 +490,45 @@
         "version"
       ],
       "why": "服务端在线升级（与启动器自更新解耦，不碰服务端源码）：check=本地版本 vs 桶里 down/index.json 最新版本；download=下整包到 _launcher/temp；apply=停服→调上游 tools/Updater/Update-EvEJS.ps1→装依赖→起服探活。发布源复用首页下载的 R2 清单，不引入第二套签名体系。"
+    },
+    {
+      "api": "serverDeploy",
+      "channel": "server:deploy",
+      "kind": "invoke",
+      "signature": "target: string, file: string, version: string, options: Record<string, unknown>",
+      "params": [
+        "target",
+        "file",
+        "version",
+        "options"
+      ],
+      "why": "全新服务端完整部署。与在线升级分开：只接受空目录（或本启动器上次未完成的部署目录），先校验 ZIP 条目路径再解压，然后调用发布包自带的 tools/Setup/Setup-EvEJS.ps1 完成 Node.js 检查、依赖安装、证书、游戏数据库、独立市场、客户端补丁与可选防火墙。启动器不重写服务端安装逻辑，也不修改服务端源码；checkOnly=true 只跑安装向导的 -Preflight。"
+    },
+    {
+      "api": "serverDeployCancel",
+      "channel": "server:deployCancel",
+      "kind": "invoke",
+      "signature": "",
+      "params": [],
+      "why": "请求在当前安装阶段结束后停止完整部署。服务端安装向导会在阶段之间检查 CancelFile，已完成的阶段与文件保留，用户可以在同一目录再次部署继续。"
+    },
+    {
+      "api": "serverDeployOpenLog",
+      "channel": "server:deployOpenLog",
+      "kind": "invoke",
+      "signature": "",
+      "params": [],
+      "why": "用记事本打开最近一次完整部署的日志。日志由启动器写到 _launcher/temp/server-deploy，和安装向导的阶段输出一致，失败时用来定位具体是哪一步没通过。"
+    },
+    {
+      "api": "serverDeployPickDir",
+      "channel": "server:deployPickDir",
+      "kind": "invoke",
+      "signature": "title?: string",
+      "params": [
+        "title"
+      ],
+      "why": "配置中心「部署服务端」的服务端目录 / 客户端目录选择按钮。目录选择器必须走 Win32 原生对话框，渲染层无法可靠拿到目录的绝对路径；这里复用 dialog.rs 的 getForegroundWindow + 主线程约束，title 由界面传入本地化文案，返回空路径表示用户取消。"
     }
   ],
   "send": [
@@ -522,6 +561,11 @@
       "api": "onDownloadProgress",
       "channel": "download:progress",
       "why": "下载进度帧：`{file, received, total, path}`（`total` 在服务端不给长度时是 null，界面就只报已下字节）。数组载荷，与 `mod:downloadProgress` 同形；下载循环每读完一块回报一次，进度条按 received/total 画。"
+    },
+    {
+      "api": "onServerDeployProgress",
+      "channel": "server:deployProgress",
+      "why": "完整服务端部署的事件流：`{kind, phase, percent, message, record}`。下载阶段仍复用 download:progress；解压后把 Setup-EvEJS.ps1 的 `@evejs-setup` JSON 记录原样放进 record，界面按 `[ok]/[todo]/[work]/[done]/[skip]/[FAIL]` 渲染检查与安装阶段。`kind=log` 是安装器的普通输出，界面只保留尾部日志，避免几十分钟的部署只显示一个不动进度条。"
     }
   ]
 }
