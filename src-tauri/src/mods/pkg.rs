@@ -2,23 +2,23 @@
 //! `modManager.ts` 的 `importModZip` / `updateMod` / `findManifestRoot` / `safeFolderName`。
 //!
 //! 两个关键取舍：
-//!   - **不引 zip crate**：解压继续用系统自带的 `Expand-Archive`（现役版就是这么做的），
-//!     打包用 .NET 的 `ZipFile::CreateFromDirectory`（`Compress-Archive` 会在 ZIP 里写反斜杠，
-//!     别的解压工具会出错，现役版注释里专门写了这一点）；
+//!   - **打包 / 解压都用 Rust `zip` crate**：不再依赖 PowerShell 的 `Expand-Archive` 与
+//!     .NET 的 `ZipFile::CreateFromDirectory`。不同机器上 PowerShell / .NET 的 ZIP 行为
+//!     并不一致（CI 上实测 `Expand-Archive` 会漏解条目，导致清单找不到），换成 Rust 实现后
+//!     行为完全确定；条目名统一用正斜杠（`Compress-Archive` 会写反斜杠，别的解压工具会出错）。
 //!   - **A3 路径穿越防护**：解压前先自己解析 ZIP 的中央目录，拒绝 `..`、绝对路径、盘符与
-//!     控制字符条目。这台机器上 `Expand-Archive`（.NET Framework）对路径穿越的历史行为
-//!     不可依赖，所以宁可自己先断言一遍。
+//!     控制字符条目；解压时再用 `enclosed_name` 二次校验，绝不写出目标目录之外。
 use crate::mods::scan::{self, MANIFEST_NAME};
 use crate::mods::{plan, sanitize_folder_name};
 use crate::runtime::RuntimePaths;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::fs;
-use std::io::Read;
-use std::os::windows::process::CommandExt;
+use std::io::{self, Read};
 use std::path::{Component, Path, PathBuf};
-use std::process::Stdio;
 use std::sync::atomic::{AtomicU64, Ordering};
+use zip::write::SimpleFileOptions;
+use zip::{ZipArchive, ZipWriter};
 
 /// 看起来像「用户私有数据」的文件/目录：更新时要保留旧的（新包里的同名文件另存 .new）
 pub const USER_DATA_NAMES: [&str; 7] = [
@@ -30,8 +30,6 @@ pub const USER_DATA_NAMES: [&str; 7] = [
     "data",
     "config.json",
 ];
-
-use crate::win32::CREATE_NO_WINDOW;
 
 /* ------------------------------ 通用小工具 ------------------------------ */
 
@@ -99,51 +97,32 @@ pub fn sha256_hex(bytes: &[u8]) -> String {
 }
 
 /// PowerShell 单引号字符串转义
-fn ps_quote(value: &str) -> String {
-    format!("'{}'", value.replace('\'', "''"))
-}
-
-/// 跑一段 PowerShell（隐藏窗口）；失败返回 stderr/stdout 的首行
-fn run_powershell(script: &str) -> Result<(), String> {
-    let mut command = std::process::Command::new("powershell.exe");
-    command
-        .args(["-NoProfile", "-NonInteractive", "-Command"])
-        .arg(script)
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    command.creation_flags(CREATE_NO_WINDOW);
-    let output = command
-        .output()
-        .map_err(|err| format!("无法启动 PowerShell：{err}"))?;
-    if output.status.success() {
-        return Ok(());
-    }
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let text = if stderr.trim().is_empty() {
-        stdout
-    } else {
-        stderr
-    };
-    let reason = text
-        .lines()
-        .map(str::trim)
-        .find(|line| !line.is_empty())
-        .unwrap_or("命令执行失败")
-        .to_string();
-    Err(reason)
-}
-
-/// 解压到目标目录（现役版用 `Expand-Archive -Force`）
+/// 解压到目标目录（Rust `zip` crate，不依赖 PowerShell / .NET 的 `Expand-Archive`，
+/// 避免不同机器上解压行为不一致）。解压前已由 `assert_zip_entries_safe` 校验过条目名。
 fn expand_archive(zip: &Path, dest: &Path) -> Result<(), String> {
     fs::create_dir_all(dest).map_err(|err| format!("创建临时目录失败：{err}"))?;
-    let script = format!(
-        "Expand-Archive -LiteralPath {} -DestinationPath {} -Force",
-        ps_quote(&zip.to_string_lossy()),
-        ps_quote(&dest.to_string_lossy())
-    );
-    run_powershell(&script)
+    let file = fs::File::open(zip).map_err(|err| format!("打开 ZIP 失败：{err}"))?;
+    let mut archive = ZipArchive::new(file).map_err(|err| format!("ZIP 不是有效压缩包：{err}"))?;
+    for index in 0..archive.len() {
+        let mut entry = archive
+            .by_index(index)
+            .map_err(|err| format!("读取 ZIP 条目失败：{err}"))?;
+        let Some(relative) = entry.enclosed_name() else {
+            return Err("ZIP 包含越界路径，已拒绝解压".to_string());
+        };
+        let output = dest.join(relative);
+        if entry.is_dir() {
+            fs::create_dir_all(&output).map_err(|err| format!("创建目录失败：{err}"))?;
+            continue;
+        }
+        if let Some(parent) = output.parent() {
+            fs::create_dir_all(parent).map_err(|err| format!("创建目录失败：{err}"))?;
+        }
+        let mut output_file =
+            fs::File::create(&output).map_err(|err| format!("写入解压文件失败：{err}"))?;
+        io::copy(&mut entry, &mut output_file).map_err(|err| format!("解压文件失败：{err}"))?;
+    }
+    Ok(())
 }
 
 /* ------------------------------ ZIP 中央目录解析 ------------------------------ */
@@ -492,9 +471,53 @@ fn assert_zip_entries_safe(zip: &Path) -> Result<(), String> {
 
 /// 目录 → ZIP（ZIP 内根就是模组根，不含外层目录），并算好 sha256 / sizeBytes。
 ///
-/// 用 .NET 的 `ZipFile::CreateFromDirectory` 而不是 `Compress-Archive`：
-/// 部分 PowerShell 版本的 `Compress-Archive` 会用反斜杠当 ZIP 内的路径分隔符，
-/// 别的工具解压就出错。
+/// 用 Rust `zip` crate 写包，不再依赖 .NET 的 `ZipFile::CreateFromDirectory`：
+/// 不同机器上 .NET / PowerShell 的 ZIP 行为不一致，Rust 实现完全确定；
+/// 条目名统一用正斜杠（`Compress-Archive` 会写反斜杠，别的解压工具会出错）。
+fn write_dir_to_zip(source_dir: &Path, dest_zip: &Path) -> Result<(), String> {
+    let file = fs::File::create(dest_zip).map_err(|err| format!("创建 ZIP 失败：{err}"))?;
+    let mut writer = ZipWriter::new(file);
+    let options = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+    add_dir_to_zip(&mut writer, source_dir, source_dir, options)?;
+    writer
+        .finish()
+        .map_err(|err| format!("写入 ZIP 失败：{err}"))?;
+    Ok(())
+}
+
+/// 递归把目录写进 ZIP；条目名用正斜杠，相对 `base` 的路径。
+fn add_dir_to_zip(
+    writer: &mut ZipWriter<fs::File>,
+    dir: &Path,
+    base: &Path,
+    options: SimpleFileOptions,
+) -> Result<(), String> {
+    let entries = fs::read_dir(dir).map_err(|err| format!("读取源目录失败：{err}"))?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let Ok(rel) = path.strip_prefix(base) else {
+            continue;
+        };
+        let name = rel.to_string_lossy().replace('\\', "/");
+        let file_type = entry
+            .file_type()
+            .map_err(|err| format!("读取源目录失败：{err}"))?;
+        if file_type.is_dir() {
+            writer
+                .add_directory(name, options)
+                .map_err(|err| format!("写入 ZIP 目录条目失败：{err}"))?;
+            add_dir_to_zip(writer, &path, base, options)?;
+        } else if file_type.is_file() {
+            writer
+                .start_file(name, options)
+                .map_err(|err| format!("写入 ZIP 文件条目失败：{err}"))?;
+            let mut file = fs::File::open(&path).map_err(|err| format!("读取源文件失败：{err}"))?;
+            io::copy(&mut file, writer).map_err(|err| format!("写入 ZIP 文件内容失败：{err}"))?;
+        }
+    }
+    Ok(())
+}
+
 pub fn pack_mod_zip(source_dir: &Path, dest_zip: &Path) -> Value {
     if !source_dir.exists() {
         return json!({ "ok": false, "reason": format!("源目录不存在：{}", source_dir.display()) });
@@ -522,12 +545,7 @@ pub fn pack_mod_zip(source_dir: &Path, dest_zip: &Path) -> Value {
         }
     }
 
-    let script = format!(
-        "Add-Type -AssemblyName System.IO.Compression.FileSystem; [System.IO.Compression.ZipFile]::CreateFromDirectory({}, {}, [System.IO.Compression.CompressionLevel]::Optimal, $false)",
-        ps_quote(&source_dir.to_string_lossy()),
-        ps_quote(&dest_zip.to_string_lossy())
-    );
-    if let Err(err) = run_powershell(&script) {
+    if let Err(err) = write_dir_to_zip(source_dir, dest_zip) {
         return json!({ "ok": false, "reason": format!("打包失败：{err}") });
     }
     if !dest_zip.is_file() {
