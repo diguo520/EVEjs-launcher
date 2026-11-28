@@ -413,48 +413,60 @@ fn result_obj(pairs: Vec<(&str, Value)>) -> Value {
     Value::Object(map)
 }
 
-/// 一级子目录（读不到就是空）
-fn child_dirs(dir: &Path) -> Vec<PathBuf> {
-    let Ok(entries) = fs::read_dir(dir) else {
-        return Vec::new();
-    };
-    entries
-        .flatten()
-        .filter(|entry| entry.file_type().map(|kind| kind.is_dir()).unwrap_or(false))
-        .map(|entry| entry.path())
-        .collect()
+/// 清单定位的最大搜索深度。
+///
+/// 早期只认「根 + 一层嵌套」，但不同 .NET / PowerShell 版本打包的 ZIP
+/// 解压后清单可能落在更深的目录里（CI 上实测会多套两层），所以做有界深度搜索。
+const MAX_MANIFEST_DEPTH: usize = 6;
+
+/// 递归收集解包目录里所有含清单的目录（有界深度，跳过 `__MACOSX` 与符号链接）。
+fn manifest_dirs(root: &Path, max_depth: usize) -> Vec<PathBuf> {
+    fn walk(dir: &Path, depth: usize, max_depth: usize, out: &mut Vec<PathBuf>) {
+        if dir.join(MANIFEST_NAME).is_file() {
+            out.push(dir.to_path_buf());
+        }
+        if depth >= max_depth {
+            return;
+        }
+        let Ok(entries) = fs::read_dir(dir) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let Ok(file_type) = entry.file_type() else {
+                continue;
+            };
+            if !file_type.is_dir() || file_type.is_symlink() {
+                continue;
+            }
+            if entry.file_name() == "__MACOSX" {
+                continue;
+            }
+            walk(&entry.path(), depth + 1, max_depth, out);
+        }
+    }
+    let mut out = Vec::new();
+    walk(root, 0, max_depth, &mut out);
+    out
 }
 
-/// 在解包目录里找清单所在的那一层（ZIP 可能多套一层目录）—— 对齐现役版 `findManifestRoot`
+/// 在解包目录里找清单所在的那一层（ZIP 可能多套若干层目录）—— 对齐现役版 `findManifestRoot`
 pub fn find_manifest_root(dir: &Path) -> Option<PathBuf> {
     if dir.join(MANIFEST_NAME).is_file() {
         return Some(dir.to_path_buf());
     }
-    let dirs = child_dirs(dir);
+    let dirs = manifest_dirs(dir, MAX_MANIFEST_DEPTH);
     if dirs.len() == 1 {
-        let nested = &dirs[0];
-        if nested.join(MANIFEST_NAME).is_file() {
-            return Some(nested.clone());
-        }
+        return Some(dirs.into_iter().next().expect("长度已确认"));
     }
     None
 }
 
-/// 导入时的包根定位：根有清单就用根，否则找唯一一个含清单的一级子目录（跳过 `__MACOSX`）
+/// 导入时的包根定位：根有清单就用根，否则找唯一一个含清单的目录（跳过 `__MACOSX`）
 fn locate_package_root(temp_root: &Path) -> Result<PathBuf, String> {
     if temp_root.join(MANIFEST_NAME).is_file() {
         return Ok(temp_root.to_path_buf());
     }
-    let Ok(entries) = fs::read_dir(temp_root) else {
-        return Err(format!("读不到解压目录：{}", temp_root.display()));
-    };
-    let dirs: Vec<PathBuf> = entries
-        .flatten()
-        .filter(|entry| entry.file_type().map(|kind| kind.is_dir()).unwrap_or(false))
-        .filter(|entry| entry.file_name() != "__MACOSX")
-        .map(|entry| entry.path())
-        .filter(|dir| dir.join(MANIFEST_NAME).is_file())
-        .collect();
+    let dirs = manifest_dirs(temp_root, MAX_MANIFEST_DEPTH);
     match dirs.len() {
         0 => Err(format!("ZIP 里没有 {MANIFEST_NAME}")),
         1 => Ok(dirs.into_iter().next().expect("长度已确认")),
@@ -1230,13 +1242,27 @@ mod tests {
         write_manifest(&nested, "pkg", "1.0.0");
         assert_eq!(find_manifest_root(&root).as_deref(), Some(nested.as_path()));
 
-        // 多了一层无清单的目录 → 不再猜
+        // 多了一层无清单的噪声目录 → 不影响定位
         fs::create_dir_all(root.join("noise")).unwrap();
-        assert!(find_manifest_root(&root).is_none());
+        assert_eq!(find_manifest_root(&root).as_deref(), Some(nested.as_path()));
 
         // 根自己有清单 → 优先用根
         write_manifest(&root, "root-pkg", "1.0.0");
         assert_eq!(find_manifest_root(&root).as_deref(), Some(root.as_path()));
+    }
+
+    #[test]
+    fn find_manifest_root_searches_deeper_nesting() {
+        let root = temp_dir("manifest-deep");
+        // 模拟不同 .NET / PowerShell 版本打包后多套两层目录的 ZIP 解压布局
+        let deep = root.join("outer").join("inner").join("package");
+        write_manifest(&deep, "deep-pkg", "1.0.0");
+        assert_eq!(find_manifest_root(&root).as_deref(), Some(deep.as_path()));
+
+        // 两个不同深度的清单 → 歧义，不猜
+        let other = root.join("other");
+        write_manifest(&other, "other-pkg", "1.0.0");
+        assert!(find_manifest_root(&root).is_none());
     }
 
     #[test]
