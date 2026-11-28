@@ -474,27 +474,32 @@ async fn probe_node_version() -> String {
     }
 }
 
+/// Node 版本是否达到 `wanted`（语义化三段比较；解析失败的段按 0 算）。
+fn node_version_at_least(version: &str, wanted: (u32, u32, u32)) -> bool {
+    let mut parts = version.split('.');
+    let major = parts.next().and_then(|v| v.parse().ok()).unwrap_or(0);
+    let minor = parts.next().and_then(|v| v.parse().ok()).unwrap_or(0);
+    let patch = parts.next().and_then(|v| v.parse().ok()).unwrap_or(0);
+    (major, minor, patch) >= wanted
+}
+
 fn node_check(version: &str) -> serde_json::Value {
-    let ok = version
-        .split('.')
-        .next()
-        .and_then(|major| major.parse::<u32>().ok())
-        .map(|major| major >= 22)
-        .unwrap_or(false);
+    // 硬性要求与服务端安装器一致：Node.js 26 LTS ≥ 26.13.1
+    let ok = node_version_at_least(version, (26, 13, 1));
     check_item(
         "node",
         "Node.js 运行时",
         ok,
         None,
         if ok {
-            format!("Node v{version}（满足 ≥22）")
+            format!("Node v{version}（满足 ≥26.13.1）")
         } else {
             format!("未检测到可用 Node（当前: {version}）")
         },
         if ok {
             None
         } else {
-            Some("请手动安装 Node.js 22+（推荐使用 22 LTS）")
+            Some("请手动安装 Node.js 26.13.1+（推荐使用 26 LTS）")
         },
         if ok { None } else { Some("https://nodejs.org") },
     )
@@ -1038,17 +1043,20 @@ mod tests {
     }
 
     #[test]
-    fn node_check_accepts_v22_and_rejects_older_runtime() {
-        let current = node_check("22.21.1");
+    fn node_check_requires_26_13_1_and_rejects_older_runtime() {
+        let current = node_check("26.13.1");
         assert_eq!(current["ok"], serde_json::json!(true), "{current}");
         assert_eq!(
             current["message"],
-            serde_json::json!("Node v22.21.1（满足 ≥22）")
+            serde_json::json!("Node v26.13.1（满足 ≥26.13.1）")
         );
 
-        let old = node_check("20.19.0");
+        let borderline = node_check("26.13.0");
+        assert_eq!(borderline["ok"], serde_json::json!(false), "{borderline}");
+
+        let old = node_check("22.21.1");
         assert_eq!(old["ok"], serde_json::json!(false), "{old}");
-        assert!(old["hint"].as_str().unwrap_or_default().contains("22"));
+        assert!(old["hint"].as_str().unwrap_or_default().contains("26.13.1"));
     }
 
     #[test]

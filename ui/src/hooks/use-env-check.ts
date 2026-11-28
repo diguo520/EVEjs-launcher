@@ -4,6 +4,7 @@ import { toast } from "sonner"
 import { call, callOr, hasIpc, subscribe, type RawEnvReport, type RawInitState } from "@/lib/ipc"
 import { CERT_FIX_IDS, envItemsFrom, initKeyOf } from "@/lib/live"
 import { localizeEnvItem } from "@/lib/env-i18n"
+import { setupText } from "@/lib/setup-text"
 import { useLocale } from "@/components/shell/locale-provider"
 import { CHECK_ITEMS, ENV_META, type CheckItem } from "@/lib/mock"
 import { formatClock } from "@/lib/time"
@@ -141,14 +142,16 @@ export function useEnvCheck(): EnvCheckState {
             })
             return
           }
-          const parts = [result?.reason, result?.hint].filter((value): value is string => Boolean(value))
+          const parts = [result?.reason, result?.hint]
+            .filter((value): value is string => Boolean(value))
+            .map((value) => setupText(value))
           toast.error(t("证书安装失败"), {
             description: parts.length > 0 ? parts.join(" · ") : t("详情见环境自检与日志。"),
           })
         })
         .catch((error: unknown) => {
           const message = error instanceof Error ? error.message : String(error)
-          toast.error(t("证书安装失败"), { description: message })
+          toast.error(t("证书安装失败"), { description: setupText(message) })
         })
         .finally(() => {
           setBusy(null)

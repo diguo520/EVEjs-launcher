@@ -1,0 +1,17 @@
+{
+  "version": "0.8.2",
+  "changelog": {
+    "zh": [
+      { "type": "new", "text": "「部署服务端」的检查与安装详情、进度消息补齐 8 种语言：服务端脚本输出的英文消息会自动翻译成当前界面语言。" },
+      { "type": "opt", "text": "市场快照下载现在显示约 20 MB 的总量与每 3 秒更新的实时进度；超过 1 分钟没有变化时提示网络可能被卡住。" },
+      { "type": "fix", "text": "修复未准备的客户端副本无法安装证书：现在会先按服务端 GUI 的顺序应用 start.ini 本地设置（server = 127.0.0.1 / cryptoPack = Placebo，自动备份 start.ini.original），再安装客户端证书。" },
+      { "type": "fix", "text": "环境自检的 Node.js 要求与服务端安装器对齐为 Node.js 26 LTS ≥26.13.1（原先只判 ≥22）。" }
+    ],
+    "en": [
+      { "type": "new", "text": "The Deploy Server check/install details and progress messages are now localized in all 8 languages; the English messages emitted by the server scripts are translated automatically." },
+      { "type": "opt", "text": "Market snapshot downloads now show the ~20 MB size and live progress, polled every 3 seconds, with a warning when nothing changes for over a minute." },
+      { "type": "fix", "text": "Fixed certificate installation on unprepared client copies: the launcher now applies the start.ini settings first (server = 127.0.0.1 / cryptoPack = Placebo, backing up start.ini.original), matching the server GUI order, then installs the client certificate." },
+      { "type": "fix", "text": "The environment check now requires Node.js 26 LTS ≥26.13.1, matching the server installer (previously it only checked ≥22)." }
+    ]
+  }
+}

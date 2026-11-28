@@ -1186,7 +1186,7 @@ export const CHECK_ITEMS: CheckItem[] = [
 export const WORLD_STORE = "gameStore.sqlite · 128.4 MB · 可写"
 
 export const ENV_META = {
-  runtime: "Node v26.5.0",
+  runtime: "Node v26.13.1",
   ram: "32 GB",
   threads: 16,
   checkedAt: "14:01:49",
@@ -1460,3 +1460,4 @@ export function formatMB(mb: number): string {
     allowBytes: false,
   })
 }
+

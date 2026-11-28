@@ -16,7 +16,7 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter};
 use tokio::io::{AsyncBufReadExt, BufReader as AsyncBufReader};
 use zip::ZipArchive;
@@ -319,6 +319,26 @@ fn record_detail(record: &Value) -> &str {
     record.get("detail").and_then(Value::as_str).unwrap_or("")
 }
 
+/// 人类可读的字节数（市场快照下载进度用）。
+fn format_bytes(bytes: u64) -> String {
+    const KIB: f64 = 1024.0;
+    const MIB: f64 = 1024.0 * 1024.0;
+    if bytes as f64 >= MIB {
+        format!("{:.1} MiB", bytes as f64 / MIB)
+    } else if bytes as f64 >= KIB {
+        format!("{:.1} KiB", bytes as f64 / KIB)
+    } else {
+        format!("{bytes} B")
+    }
+}
+
+/// 从 `[source] size: 19.73 MiB (20690861 bytes)  etag: ...` 里取出字节数。
+fn parse_snapshot_total(line: &str) -> Option<u64> {
+    let open = line.rfind('(')?;
+    let close = line.get(open..)?.find(" bytes)")? + open;
+    line.get(open + 1..close)?.trim().parse().ok()
+}
+
 async fn run_setup(
     app: &AppHandle,
     root: &Path,
@@ -380,9 +400,23 @@ async fn run_setup(
     let mut last_error = String::new();
     let mut last_output = String::new();
     let total = options.total_phases().max(1);
+    // 市场 v3 种子会先下载约 20 MB 的 EVE Ref 快照，这期间没有阶段事件、
+    // 进度条又只画在终端（启动器捕获的是管道），看起来就像卡死。这里跟踪
+    // `.part` 文件大小，把下载进度/停滞状态显式回报给界面。
+    let mut snapshot_part: Option<PathBuf> = None;
+    let mut snapshot_total: u64 = 0;
+    let mut snapshot_active = false;
+    let mut snapshot_last_size: u64 = 0;
+    let mut snapshot_last_change = Instant::now();
+    let mut snapshot_last_emit = Instant::now();
 
     loop {
-        let next = tokio::time::timeout(Duration::from_secs(120), reader.next_line()).await;
+        let poll_timeout = if snapshot_active {
+            Duration::from_secs(3)
+        } else {
+            Duration::from_secs(120)
+        };
+        let next = tokio::time::timeout(poll_timeout, reader.next_line()).await;
         let line = match next {
             Ok(Ok(Some(line))) => line,
             Ok(Ok(None)) => break,
@@ -396,6 +430,33 @@ async fn run_setup(
                     let _ = child.kill().await;
                     return Ok((2, "用户已停止部署".to_string()));
                 }
+                // 市场快照下载进行中：按 3 秒节拍看 `.part` 大小，回报进度或停滞。
+                if snapshot_active {
+                    if let Some(part) = snapshot_part.as_ref() {
+                        let size = fs::metadata(part).map(|meta| meta.len()).unwrap_or(0);
+                        if size != snapshot_last_size {
+                            snapshot_last_size = size;
+                            snapshot_last_change = Instant::now();
+                        }
+                        if snapshot_last_emit.elapsed() >= Duration::from_secs(5) {
+                            snapshot_last_emit = Instant::now();
+                            let total_bytes = snapshot_total.max(1);
+                            let percent = (size.saturating_mul(100) / total_bytes).min(99);
+                            let done = format_bytes(size);
+                            let total_text = format_bytes(snapshot_total);
+                            let message = if snapshot_last_change.elapsed()
+                                >= Duration::from_secs(60)
+                            {
+                                format!(
+                                "Market snapshot download stalled at {percent}% ({done} / {total_text}); no change for over a minute, the network may be stuck."
+                            )
+                            } else {
+                                format!("Downloading the market snapshot {percent}% ({done} / {total_text}).")
+                            };
+                            emit(app, "phase", "market-download", 60, &message, None);
+                        }
+                    }
+                }
                 continue;
             }
         };
@@ -404,6 +465,38 @@ async fn run_setup(
         if !line.trim().is_empty() {
             last_output = line.clone();
         }
+        let trimmed = line.trim();
+        if trimmed.starts_with("[source] size:") {
+            if let Some(total_bytes) = parse_snapshot_total(trimmed) {
+                snapshot_total = total_bytes;
+            }
+        }
+        if let Some(rest) = trimmed.strip_prefix("[cache] path:") {
+            let relative = rest.trim();
+            if !relative.is_empty() {
+                let base = root.join("tools").join("market-seederv3");
+                let mut part = base.join(relative).into_os_string();
+                part.push(".part");
+                snapshot_part = Some(PathBuf::from(part));
+            }
+        }
+        if trimmed.contains("[download] downloading latest snapshot") {
+            snapshot_active = true;
+            snapshot_last_size = 0;
+            snapshot_last_change = Instant::now();
+            snapshot_last_emit = Instant::now();
+            let total_text = format_bytes(snapshot_total);
+            emit(
+                app,
+                "phase",
+                "market-download",
+                60,
+                &format!(
+                    "Downloading the market snapshot (~{total_text}). If it does not change for a while, the network may be stuck."
+                ),
+                None,
+            );
+        }
 
         let Some(record) = parse_event(&line) else {
             if !line.trim().is_empty() {
@@ -411,6 +504,8 @@ async fn run_setup(
             }
             continue;
         };
+        // 收到新的安装阶段事件，说明市场快照下载那一步已经结束。
+        snapshot_active = false;
         let kind = record.get("kind").and_then(Value::as_str).unwrap_or("");
         let title = record_title(&record).to_string();
         let detail = record_detail(&record).to_string();
@@ -799,6 +894,27 @@ mod tests {
         assert!(!safe_version("../261126.2"));
         assert!(!safe_version("261126.2/.."));
         assert!(!safe_version(""));
+    }
+
+    #[test]
+    fn snapshot_total_parses_from_source_line() {
+        assert_eq!(
+            parse_snapshot_total(
+                "[source] size: 19.73 MiB (20690861 bytes)  etag: 702bae48197ff2505c1d0a22ed37c4e1"
+            ),
+            Some(20_690_861)
+        );
+        assert_eq!(
+            parse_snapshot_total("[download] downloading latest snapshot"),
+            None
+        );
+    }
+
+    #[test]
+    fn format_bytes_switches_units() {
+        assert_eq!(format_bytes(512), "512 B");
+        assert_eq!(format_bytes(1536), "1.5 KiB");
+        assert_eq!(format_bytes(20_690_861), "19.7 MiB");
     }
 
     #[test]

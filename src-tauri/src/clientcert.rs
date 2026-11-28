@@ -23,6 +23,8 @@ use serde_json::{json, Value};
 
 /// 服务端随包的证书脚本（相对安装根，与 `InstallCerts.bat` 指向同一个文件）
 const SCRIPT_REL: [&str; 4] = ["tools", "ClientSETUP", "scripts", "Install-EvEJSCerts.ps1"];
+/// 客户端准备脚本（把 `start.ini` 写成 `server = 127.0.0.1` / `cryptoPack = Placebo`）
+const PREPARE_REL: [&str; 4] = ["tools", "ClientSETUP", "scripts", "ClientPreparation.ps1"];
 /// 客户端信任包（相对客户端 `tq`）：脚本处理的就是这两份，缺任何一份都算没装全
 const BUNDLE_REL: [&[&str]; 2] = [
     &["bin64", "cacert.pem"],
@@ -271,6 +273,51 @@ async fn command_capture(
     }
 }
 
+/// PowerShell 单引号字面量（内部单引号双写）。
+fn ps_literal(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "''"))
+}
+
+/// 应用客户端的 `start.ini` 本地设置 —— 服务端 GUI 的「步骤 5」。
+///
+/// 证书脚本的身份校验要求 `start.ini` 里 `server = 127.0.0.1`、`cryptoPack = Placebo`；
+/// GUI 也规定「先应用 start.ini 设置，再安装客户端信任」。启动器的证书按钮以前只跑证书
+/// 脚本，没准备过的客户端副本就会撞上身份校验。这里先跑服务端自带的幂等函数再装证书。
+async fn prepare_client_ini(root: &Path, client_path: &str) -> Result<(), String> {
+    let prep = PREPARE_REL
+        .iter()
+        .fold(root.to_path_buf(), |path, part| path.join(part));
+    if !prep.is_file() {
+        return Err(
+            "服务端目录里没有 ClientPreparation.ps1（无法应用 start.ini 设置）".to_string(),
+        );
+    }
+    let script = format!(
+        ". {}; Set-EvEJSClientIni -Path {}",
+        ps_literal(&prep.to_string_lossy()),
+        ps_literal(client_path)
+    );
+    let args = vec![
+        "-NoProfile".to_string(),
+        "-NonInteractive".to_string(),
+        "-ExecutionPolicy".to_string(),
+        "Bypass".to_string(),
+        "-Command".to_string(),
+        script,
+    ];
+    let capture = command_capture("powershell.exe", &args, root, Duration::from_secs(60)).await?;
+    if capture.ok {
+        return Ok(());
+    }
+    Err(crate::sidecar::first_line(
+        if capture.stderr.trim().is_empty() {
+            &capture.stdout
+        } else {
+            &capture.stderr
+        },
+    ))
+}
+
 /// 在安装根探 `node-forge`：与脚本自己的 `Test-NodeForgeAvailable` 同一个判定
 async fn probe_forge(root: &Path) -> Result<(), String> {
     let args = vec!["-e".to_string(), "require('node-forge')".to_string()];
@@ -345,13 +392,14 @@ pub async fn ensure_forge(root: &Path) -> (bool, String) {
 /// 界面按钮 / 启动前准备走的入口：客户端路径取自 `EVEJS_CLIENT_PATH`
 pub async fn ensure_from_config(root: &Path) -> Value {
     let client_path = crate::config::read_client_config(root).client_path;
-    ensure(root, &client_path).await
+    // 显式「重新为客户端安装证书」：先应用 start.ini 本地设置，再装证书（与 GUI 顺序一致）
+    ensure(root, &client_path, true).await
 }
 
 /// 打（或重打）客户端证书：自愈前置 → 跑服务端脚本 → 复检状态。
 ///
 /// **幂等**：装过与没装过走同一条路，脚本自己按当前 CA/叶子重写两份 bundle。
-pub async fn ensure(root: &Path, client_path: &str) -> Value {
+pub async fn ensure(root: &Path, client_path: &str, prepare_client: bool) -> Value {
     let script = script_path(root);
     if !script.is_file() {
         return json!({
@@ -376,6 +424,19 @@ pub async fn ensure(root: &Path, client_path: &str) -> Value {
             "reason": format!("客户端路径不存在: {client_path}"),
             "hint": "检查客户端是否已安装，或路径是否指到了 ...\tq",
         });
+    }
+
+    // 与服务端 GUI 的步骤顺序一致：显式装证书前先应用 start.ini 本地设置。
+    // 启动路径（prepare_client=false）不自动改客户端，避免误改正在运行的原始 EVE。
+    if prepare_client {
+        if let Err(reason) = prepare_client_ini(root, client_path).await {
+            return json!({
+                "ok": false,
+                "stage": "prepare",
+                "reason": reason,
+                "hint": "先准备好客户端副本：start.ini 要写成 server = 127.0.0.1 / cryptoPack = Placebo（不要用正在运行的原始 EVE 客户端）",
+            });
+        }
     }
 
     let (tooling_ok, tooling_detail) = ensure_forge(root).await;

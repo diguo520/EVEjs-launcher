@@ -1452,7 +1452,8 @@ pub(crate) async fn run_client_setup_script(
 /// 先自愈脚本前置（安装根缺 node-forge 就补一次 npm ci），再跑脚本，最后读盘复检；
 /// 结论返回给调用方（启动前那条路仍不阻塞启动，但拿到的是真实结果）。
 async fn prepare_client_certificate_trust(root: &Path, client_path: &str) -> serde_json::Value {
-    crate::clientcert::ensure(root, client_path).await
+    // 启动路径不自动改客户端 start.ini；显式「装证书」按钮才做前置（见 ipc/mod.rs 的 cert:ensure）
+    crate::clientcert::ensure(root, client_path, false).await
 }
 
 /// 启动前按配置决定是否重置显示设置（开关默认 off，此时完全不启动 PowerShell）

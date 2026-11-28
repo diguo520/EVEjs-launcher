@@ -4,6 +4,7 @@ import { toast } from "sonner"
 
 import { callOr, hasIpc, subscribe } from "@/lib/ipc"
 import { t } from "@/lib/i18n"
+import { setupText } from "@/lib/setup-text"
 import { formatBytes } from "@/lib/format"
 import { Button } from "@/components/ui/button"
 import {
@@ -142,6 +143,7 @@ function statusTone(label: string): string {
   return "border-warning/45 bg-warning/10 text-warning"
 }
 
+
 export function ServerDeployDialog({
   open,
   onOpenChange,
@@ -230,10 +232,15 @@ export function ServerDeployDialog({
       if (typeof frame.percent === "number" && frame.percent > 0) {
         setProgress(frame.percent)
       }
-      if (frame.message) setMessage(frame.message)
-      if (frame.kind === "error" && frame.message) setError(frame.message)
+      if (frame.message) setMessage(setupText(frame.message))
+      if (frame.kind === "error" && frame.message) setError(setupText(frame.message))
       const record = frame.record
       if (!record?.title) return
+      setMessage(
+        [phaseTitle(record.title), setupText(record.detail || "")]
+          .filter(Boolean)
+          .join("：")
+      )
       setResults((prev) => {
         const next = [...prev]
         const index = next.findIndex((row) => row.title === record.title)
@@ -628,7 +635,9 @@ export function ServerDeployDialog({
                   {t("已部署到 {path}", { path: deployedRoot })}
                 </p>
               ) : null}
-              {error ? <p className="mt-1 text-[11px] text-destructive">{error}</p> : null}
+              {error ? (
+                <p className="mt-1 text-[11px] text-destructive">{setupText(error)}</p>
+              ) : null}
             </div>
 
             <div className="min-h-0 flex-1 rounded-lg border border-border bg-background/35">
@@ -665,7 +674,7 @@ export function ServerDeployDialog({
                           </div>
                           {row.detail ? (
                             <div className="mt-0.5 whitespace-pre-wrap break-words text-[10px] leading-relaxed text-muted-foreground">
-                              {row.detail}
+                              {setupText(row.detail)}
                             </div>
                           ) : null}
                         </div>
